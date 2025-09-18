@@ -1,0 +1,58 @@
+[tool.poetry]
+name = "spx-examples"
+version = "0.1.0-rc.0"
+description = "Runnable SPX examples and smoke tests using the Python client against SPX Server."
+authors = ["Aleksander Stanik <aleksander.stanik@hammerheadsengineers.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+spx-python = "0.1.0-rc.6"           # SPX Python client for talking to the server
+numpy = "*"      # Py3.9-compatible upper bound
+scipy = "*"      # Py3.9-compatible upper bound
+pyyaml = "*"
+matplotlib = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+coverage = "^7.3.1"
+black = "*"
+isort = "*"
+flake8 = "*"
+commitizen = "*"
+python-semantic-release = "*"  # keep versioning & changelog automation
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.semantic_release]
+# Use pyproject version as the single source of truth
+version_toml = [
+    "pyproject.toml:tool.poetry.version"
+]
+changelog_file = "CHANGELOG.md"
+commit_message = "chore(release): v{version} [skip ci]"
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+prerelease_token = "rc"
+
+[tool.semantic_release.branches.alpha]
+match = "^(feat|fix|perf)/.+"
+prerelease = true
+prerelease_token = "alpha"
+
+[tool.semantic_release.branches.develop]
+match = "develop"
+prerelease = true
+prerelease_token = "rc"
+
+[tool.semantic_release.remote]
+type = "github"
+token = { env = "GH_TOKEN" }
+
+[tool.semantic_release.publish]
+upload_to_vcs_release = true

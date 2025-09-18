@@ -1,0 +1,20 @@
+services:
+  spx-server:
+    image: simplephysx/spx-server:v0.3.0-alpha.15
+    container_name: spx-server-examples
+    ports:
+      - "8000:8000"
+      - "502:502"  # Modbus TCP port
+    # Pass SPX product key from host environment
+    environment:
+      SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}
+    # Healthcheck: verify SPX server is responding before running tests
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # Mount local SPX core and extensions for development/testing
+      - ./extensions:/app/extensions
+    command: ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]

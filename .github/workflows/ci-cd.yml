@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feat/**
+      - feature/**
+      - fix/**
+      - perf/**
+      - performance/**
+      - ci/**
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_API_URL: http://localhost:8000
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9.19, 3.10.14, 3.11.9, 3.12.4]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --with=dev --no-interaction --no-ansi
+
+      - name: Start SPX server (Docker Compose)
+        run: docker compose up -d
+
+      - name: Wait for SPX server health
+        shell: bash
+        run: |
+          for i in {1..24}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/24)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; docker compose logs --no-color; exit 1
+
+      - name: Run unit tests
+        shell: bash
+        run: |
+          if [ -f pytest.ini ] || [ -d tests ] || grep -q "\[tool.pytest.ini_options\]" pyproject.toml 2>/dev/null; then
+            poetry run pytest -q
+          else
+            poetry run python -m unittest discover -s tests -p "test_*.py"
+          fi
+
+      - name: Show server logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop SPX server
+        if: always()
+        run: docker compose down --remove-orphans
