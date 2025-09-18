@@ -43,7 +43,7 @@ jobs:
         run: pipx install poetry
 
       - name: Install dependencies
-        run: poetry install --with=dev --no-interaction --no-ansi
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
       - name: Start SPX server (Docker Compose)
         run: docker compose up -d
