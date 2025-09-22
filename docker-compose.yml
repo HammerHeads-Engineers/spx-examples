@@ -1,6 +1,6 @@
 services:
   spx-server:
-    image: simplephysx/spx-server:v0.3.0-alpha.15
+    image: simplephysx/spx-server:v0.3.0-alpha.16
     container_name: spx-server-examples
     ports:
       - "8000:8000"
