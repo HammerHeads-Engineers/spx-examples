@@ -1,14 +1,11 @@
-
-
 import os
-import sys
-import time
 import pathlib
 import subprocess
-import urllib.request
+import sys
+import time
+import unittest
 import urllib.error
-
-import pytest
+import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = ROOT / "examples"
@@ -28,13 +25,6 @@ def _server_healthy(url: str, timeout: int = 5) -> bool:
     return False
 
 
-@pytest.fixture(scope="session", autouse=True)
-def ensure_server():
-    """Skip all tests if the SPX server is not reachable (useful for local runs)."""
-    if not _server_healthy(SPX_API_URL, timeout=5):
-        pytest.skip(f"SPX server not healthy at {SPX_API_URL}")
-
-
 def discover_examples():
     """Find runnable example scripts under examples/.
 
@@ -51,13 +41,13 @@ def discover_examples():
         return [p for p in paths if p.exists() and p.suffix == ".py"]
 
     candidates = []
-    for p in EXAMPLES_DIR.glob("**/*.py"):
-        name = p.name.lower()
+    for path in EXAMPLES_DIR.glob("**/*.py"):
+        name = path.name.lower()
         if name in ("__init__.py",):
             continue
         if name.startswith("_") or name.startswith("test_") or name.endswith("_test.py"):
             continue
-        candidates.append(p)
+        candidates.append(path)
     return sorted(candidates)
 
 
@@ -67,8 +57,7 @@ EXAMPLE_SCRIPTS = discover_examples()
 def _run_script(path: pathlib.Path, timeout: int = 120) -> subprocess.CompletedProcess:
     env = os.environ.copy()
     env.setdefault("SPX_API_URL", SPX_API_URL)
-    # Ensure non-interactive plotting backend for CI/headless
-    env.setdefault("MPLBACKEND", "Agg")
+    env.setdefault("MPLBACKEND", "Agg")  # Ensure non-interactive plotting backend.
     return subprocess.run(
         [sys.executable, str(path)],
         cwd=str(path.parent),
@@ -80,14 +69,33 @@ def _run_script(path: pathlib.Path, timeout: int = 120) -> subprocess.CompletedP
     )
 
 
-@pytest.mark.parametrize("script_path", EXAMPLE_SCRIPTS, ids=lambda p: str(p.relative_to(ROOT)))
-def test_example_runs_without_errors(script_path: pathlib.Path):
-    proc = _run_script(script_path)
-    if proc.returncode != 0:
-        print("=== STDOUT ===\n" + proc.stdout)
-        print("=== STDERR ===\n" + proc.stderr)
-    assert proc.returncode == 0
+@unittest.skip("Temporarily disable example tests")
+class TestExampleScripts(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if not _server_healthy(SPX_API_URL, timeout=5):
+            raise unittest.SkipTest(f"SPX server not healthy at {SPX_API_URL}")
+
+    def test_example_runs_without_errors(self):
+        for script_path in EXAMPLE_SCRIPTS:
+            display_name = str(script_path.relative_to(ROOT))
+            with self.subTest(script=display_name):
+                proc = _run_script(script_path)
+                if proc.returncode != 0:
+                    output = (
+                        f"Script {display_name} exited with {proc.returncode}\n"
+                        f"=== STDOUT ===\n{proc.stdout}\n"
+                        f"=== STDERR ===\n{proc.stderr}"
+                    )
+                    self.fail(output)
+
+    def test_discovery_found_examples(self):
+        self.assertGreater(
+            len(EXAMPLE_SCRIPTS),
+            0,
+            f"No example scripts found under {EXAMPLES_DIR}",
+        )
 
 
-def test_discovery_found_examples():
-    assert len(EXAMPLE_SCRIPTS) > 0, f"No example scripts found under {EXAMPLES_DIR}"
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()

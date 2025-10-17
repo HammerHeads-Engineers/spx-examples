@@ -1,0 +1,59 @@
+# Thermal controller with safety features (overload protection)
+attributes:
+  # core
+  temperature: 25.0     # current process temperature [°C]
+  setpoint: 30.0        # target temperature [°C]
+  heating_power: 0.0    # actuator power 0..100 [%]
+  power_on: 1           # 1 = powered, 0 = off
+  ambient: 22.0         # ambient/environment temperature [°C]
+
+  # safety
+  overload: 0           # 0/1 flag
+  overload_threshold: 70.0  # °C - demo value
+  overload_hyst: 2.0        # °C - hysteresis to avoid flicker
+
+conditions:
+  # 1) Power OFF → force zero power
+  - if: "$in(power_on) == 0"
+    actions:
+      - set: "$in(heating_power)"
+        value: 0.0
+
+  # 2) Overload ON when temperature >= threshold
+  - if: "$in(temperature) >= $in(overload_threshold)"
+    actions:
+      - set: "$in(overload)"
+        value: 1
+      # optional: safety cutback — clamp power to 0 while overloaded
+      - set: "$in(heating_power)"
+        value: 0.0
+
+  # 3) Overload OFF when temperature <= threshold - hysteresis
+  - if: "$in(temperature) <= ($in(overload_threshold) - $in(overload_hyst))"
+    actions:
+      - set: "$in(overload)"
+        value: 0
+
+actions:
+  # (1) Slower P controller (lower gain → gentler approach to setpoint)
+  - function: $in(heating_power)
+    call: max(0, min(100, 1.5 * ($in(setpoint) - $in(temperature)))) 
+
+  # (2) Physics with guaranteed cooldown:
+  # step_factor keeps dynamics slow; cool_coeff ensures drift to ambient when power=0.
+  # temp_next = temp + step * (heat_coeff * power - cool_coeff * (temp - ambient))
+  - function: $in(temperature)
+    call: $in(temperature) + 0.2 * (0.25 * $in(heating_power) - 0.03 * ($in(temperature) - $in(ambient)))
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.25
+      mapping:
+        temperature:        { address: [0,1], group: h_r, type: float_32 }
+        setpoint:           { address: [2,3], group: h_r, type: float_32 }
+        heating_power:      { address: [4,5], group: h_r, type: float_32 }
+        power_on:           { address: [6,6], group: c_o,  type: uint_16 }
+        ambient:            { address: [7,8], group: h_r, type: float_32 }
+        overload:           { address: [9,9], group: h_r, type: uint_16 }
+        overload_threshold: { address: [10,11], group: h_r, type: float_32 }
+        overload_hyst:      { address: [12,13], group: h_r, type: float_32 }

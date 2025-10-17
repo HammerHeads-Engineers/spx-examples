@@ -37,6 +37,7 @@ inst = client["instances"]["pt100_1"]
 temperature = inst["attributes"]["temperature"]
 timer = inst["timer"]
 
+# Use Plotly for plotting (works in headless/CI environments)
 import plotly.graph_objects as go
 
 # # # Create an instance and step it deterministically

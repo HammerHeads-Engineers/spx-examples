@@ -1,0 +1,113 @@
+# Stepper motor controller with homing, soft limits, and torque monitoring
+attributes:
+  enable: 1                    # 1 = drive enabled
+  homing_request: 0            # 1 = start homing routine
+  homed: 0                     # 1 = reference complete
+  position_command: 120.0      # target position [mm]
+  position_feedback: 5.0       # actual position [mm]
+  velocity_command: 0.0        # internal velocity request [mm/s]
+  velocity_feedback: 0.0       # actual velocity estimate [mm/s]
+  torque_load: 40.0            # % of rated torque
+  torque_limit: 85.0           # % threshold for alarm
+  soft_limit_pos: 500.0        # mm
+  soft_limit_neg: -10.0        # mm
+  max_speed: 10.0             # mm/s limit for motion
+  max_accel: 0.25              # mm/s^2 limit for acceleration
+  max_decel: 0.5              # mm/s^2 limit for deceleration
+  motion_error: 0.0            # helper for control loop
+  velocity_goal: 0.0           # helper for control loop
+  pos_limit_switch: 0          # digital input (0/1)
+  neg_limit_switch: 0          # digital input (0/1)
+  alarm_limit: 0               # 0/1 soft or hard limit alarm
+  alarm_torque: 0              # torque overload alarm
+  alarm_drive_fault: 0         # general drive fault
+  step_mode: 16                # microstepping ratio (for display)
+
+actions:
+  # Update tracking error.
+  - function: $in(motion_error)
+    call: $in(position_command) - $in(position_feedback)
+
+  # Compute velocity goal that respects braking distance.
+  - function: $in(velocity_goal)
+    call: 0.0 if abs($in(motion_error)) < 1e-6 else (
+          ($in(motion_error) / abs($in(motion_error)))
+          * min($in(max_speed), (max(0.0, 2 * $in(max_decel) * abs($in(motion_error)))) ** 0.5)
+        )
+
+  # Ramp actual velocity toward the goal with independent accel/decel limits.
+  - function: $in(velocity_command)
+    call: 0.0 if $in(enable) == 0 else (
+          $in(velocity_command)
+          + (
+              min($in(max_accel) * 0.1, $in(velocity_goal) - $in(velocity_command))
+              if $in(velocity_goal) > $in(velocity_command)
+              else max(-$in(max_decel) * 0.1, $in(velocity_goal) - $in(velocity_command))
+            )
+        )
+
+  # Integrate position with clamping to avoid overshoot.
+  - function: $in(position_feedback)
+    call: (
+          $in(position_command)
+          if abs($in(motion_error)) <= abs($in(velocity_command)) * 0.1
+          else min($in(soft_limit_pos), max($in(soft_limit_neg), $in(position_feedback) + 0.1 * $in(velocity_command)))
+        )
+
+  # Zero velocity when clamped by soft limits.
+  - function: $in(velocity_command)
+    call: 0.0 if ($in(position_feedback) <= $in(soft_limit_neg) and $in(velocity_command) < 0)
+             or ($in(position_feedback) >= $in(soft_limit_pos) and $in(velocity_command) > 0)
+          else $in(velocity_command)
+
+  # Recalculate error after motion step.
+  - function: $in(motion_error)
+    call: $in(position_command) - $in(position_feedback)
+
+  # Zero velocity when settled.
+  - function: $in(velocity_command)
+    call: 0.0 if abs($in(motion_error)) < 1e-4 and abs($in(velocity_command)) < 1e-3 else $in(velocity_command)
+
+  - function: $in(velocity_feedback)
+    call: $in(velocity_command)
+
+  - function: $in(pos_limit_switch)
+    call: 1 if $in(position_feedback) >= ($in(soft_limit_pos) - 0.1) else 0
+
+  - function: $in(neg_limit_switch)
+    call: 1 if $in(position_feedback) <= ($in(soft_limit_neg) + 0.1) else 0
+
+  - function: $in(torque_load)
+    call: 20.0 + 0.2 * abs($in(velocity_command))
+
+distortions:
+  actions:
+    - noise: $out(position_feedback)
+      std: 5.0e-4
+      mode: proportional
+
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.1
+      mapping:
+        enable:             { address: [0,0],   group: c_o, type: uint_16 }
+        homing_request:     { address: [1,1],   group: c_o, type: uint_16 }
+        homed:              { address: [2,2],   group: h_r, type: uint_16 }
+        position_command:   { address: [3,4],   group: h_r, type: float }
+        position_feedback:  { address: [5,6],   group: h_r, type: float }
+        velocity_command:   { address: [7,8],   group: h_r, type: float }
+        velocity_feedback:  { address: [9,10],  group: h_r, type: float }
+        torque_load:        { address: [11,12], group: h_r, type: float }
+        torque_limit:       { address: [13,14], group: h_r, type: float }
+        soft_limit_pos:     { address: [15,16], group: h_r, type: float }
+        soft_limit_neg:     { address: [17,18], group: h_r, type: float }
+        max_speed:          { address: [19,20], group: h_r, type: float }
+        max_accel:          { address: [21,22], group: h_r, type: float }
+        max_decel:          { address: [23,24], group: h_r, type: float }
+        pos_limit_switch:   { address: [25,25], group: h_r, type: uint_16 }
+        neg_limit_switch:   { address: [26,26], group: h_r, type: uint_16 }
+        alarm_limit:        { address: [27,27], group: h_r, type: uint_16 }
+        alarm_torque:       { address: [28,28], group: h_r, type: uint_16 }
+        alarm_drive_fault:  { address: [29,29], group: h_r, type: uint_16 }
+        step_mode:          { address: [30,31], group: h_r, type: uint_32 }
