@@ -1,4 +1,4 @@
-# Software driver for the Modbus vacuum gauge model used in tests.
+"""Example SUT implementation: Modbus vacuum gauge client used in integration tests."""
 from __future__ import annotations
 
 from copy import deepcopy
@@ -84,11 +84,11 @@ def _decode_u16(registers: Sequence[int]) -> int:
 
 
 def _decode_float_abcd(registers: Sequence[int]) -> float:
-    return ModbusVacuumGaugeDriver.modbus_to_float(registers, "ABCD")
+    return ModbusVacuumGaugeSUTExample.modbus_to_float(registers, "ABCD")
 
 
-class ModbusVacuumGaugeDriver:
-    """Thin wrapper around pymodbus for talking to the SPX Modbus vacuum gauge model."""
+class ModbusVacuumGaugeSUTExample:
+    """Thin wrapper around pymodbus representing the SUT Modbus vacuum gauge model."""
 
     _MIN_CLIENT_TIMEOUT = 0.05
 
@@ -107,7 +107,7 @@ class ModbusVacuumGaugeDriver:
     ) -> None:
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
             raise RuntimeError(
-                "pymodbus is not available. Install pymodbus to use ModbusVacuumGaugeDriver."
+                "pymodbus is not available. Install pymodbus to use ModbusVacuumGaugeSUTExample."
             )
         client_kwargs = {"host": host, "port": port}
         if timeout is not None:
@@ -184,7 +184,7 @@ class ModbusVacuumGaugeDriver:
     def modbus_to_float(data: Sequence[int], bit_order: str) -> float:
         import struct
 
-        ordered = ModbusVacuumGaugeDriver._order_words(data, bit_order)
+        ordered = ModbusVacuumGaugeSUTExample._order_words(data, bit_order)
         packed = struct.pack(">HH", ordered[0], ordered[1])
         return struct.unpack(">f", packed)[0]
 

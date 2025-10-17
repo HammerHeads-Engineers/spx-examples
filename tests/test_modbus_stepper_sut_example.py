@@ -1,3 +1,5 @@
+"""Integration coverage for the example Modbus stepper SUT device implementation."""
+
 import contextlib
 import os
 import pathlib
@@ -6,7 +8,7 @@ import unittest
 from typing import Optional
 
 from tests.common.spx_utils import bootstrap_model_instance
-from tests.drivers.modbus_stepper_driver import ModbusStepperDriver, ModbusTcpClient
+from tests.devices.modbus_stepper_sut_example import ModbusStepperSUTExample, ModbusTcpClient
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MODEL_PATH = ROOT / "library" / "motion_controllers" / "generic" / "stepper_controller.yaml"
@@ -16,7 +18,7 @@ DISCONNECT_DURATION = 1.5
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 
 
-class TestModbusStepperDriverIntegration(unittest.TestCase):
+class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
@@ -50,20 +52,20 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
             unit_id=2,
         )
 
-    def _make_driver(self, **kwargs):
-        return ModbusStepperDriver(unit_id=2, **kwargs)
+    def _make_sut_example(self, **kwargs):
+        return ModbusStepperSUTExample(unit_id=2, **kwargs)
 
     @contextlib.contextmanager
-    def _connected_driver(self, **kwargs):
-        driver = self._make_driver(**kwargs)
+    def _connected_sut_example(self, **kwargs):
+        sut = self._make_sut_example(**kwargs)
         try:
-            if not driver.connect():
+            if not sut.connect():
                 self.skipTest(
                     "Modbus server not reachable at 127.0.0.1:502 (unit 2)"
                 )
-            yield driver
+            yield sut
         finally:
-            driver.close()
+            sut.close()
 
     def _require_spx_instance(self):
         instance = getattr(self.__class__, "_instance", None)
@@ -117,7 +119,7 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
 
     def _await_position_feedback(
         self,
-        driver: ModbusStepperDriver,
+        sut: ModbusStepperSUTExample,
         feedback_attribute,
         *,
         target: float,
@@ -133,7 +135,7 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
             self._wait(0.5)
             final_expected = float(feedback_attribute.internal_value)
             try:
-                recovered_position = driver.read_position_feedback()
+                recovered_position = sut.read_position_feedback()
             except RuntimeError as exc:
                 last_error = exc
                 continue
@@ -144,17 +146,17 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
             if reached_target and abs(recovered_position - final_expected) <= tolerance:
                 return recovered_position, final_expected
 
-        state = driver.state()
-        details = [f"driver_state={state}"]
+        state = sut.state()
+        details = [f"sut_state={state}"]
         if last_error:
             details.append(f"last_error={last_error}")
         if final_expected is not None:
             details.append(
-                f"expected_position={final_expected}, driver_read={recovered_position}"
+                f"expected_position={final_expected}, sut_read={recovered_position}"
             )
         detail_msg = ", ".join(details)
         raise AssertionError(
-            f"Modbus driver did not recover within {timeout}s ({detail_msg})"
+            f"Modbus SUT did not recover within {timeout}s ({detail_msg})"
         )
 
     def _await_limit_switch(self, attribute, expected: int, timeout: float = 5.0) -> None:
@@ -181,51 +183,51 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                     pass
 
     def test_connects_default_instance(self):
-        driver = self._make_driver()
+        sut = self._make_sut_example()
         try:
-            connected = driver.connect()
+            connected = sut.connect()
             self.assertTrue(
                 connected,
                 "Expected connection to Modbus server at 127.0.0.1:502 (unit 1)",
             )
         finally:
-            driver.close()
+            sut.close()
 
     def test_reads_position_feedback(self):
-        driver = self._make_driver()
+        sut = self._make_sut_example()
         try:
-            if not driver.connect():
+            if not sut.connect():
                 self.skipTest(
                     "Modbus server not reachable at 127.0.0.1:502 (unit 1)"
                 )
             try:
-                position = driver.read_position_feedback()
+                position = sut.read_position_feedback()
             except RuntimeError as exc:
                 self.skipTest(f"Unable to read position feedback: {exc}")
         finally:
-            driver.close()
+            sut.close()
 
         self.assertIsInstance(
             position, float, "Expected position feedback to be a float value"
         )
 
     def test_moves_to_positive_position(self):
-        with self._connected_driver(timeout=1.0, retries=3) as driver:
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
-            driver.set_enable(1)
+            sut.set_enable(1)
             original_limits = {
                 "max_speed": float(attributes["max_speed"].internal_value),
                 "max_accel": float(attributes["max_accel"].internal_value),
                 "max_decel": float(attributes["max_decel"].internal_value),
             }
             self._reset_stepper_state(attributes, position=0.0)
-            driver.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
+            sut.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
 
             try:
-                driver.set_position_command(150.0)
-                driver_position, expected_position = self._await_position_feedback(
-                    driver,
+                sut.set_position_command(150.0)
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
                     attributes["position_feedback"],
                     target=149.0,
                     timeout=15.0,
@@ -233,13 +235,13 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 )
                 self._wait(0.5)
                 self.assertAlmostEqual(expected_position, 150.0, delta=1.0)
-                self.assertAlmostEqual(driver_position, expected_position, delta=1.0)
+                self.assertAlmostEqual(sut_position, expected_position, delta=1.0)
                 self.assertFalse(self._bool_attribute(attributes["pos_limit_switch"]))
                 self.assertFalse(self._bool_attribute(attributes["neg_limit_switch"]))
             finally:
                 self._reset_stepper_state(attributes)
-                driver.set_position_command(0.0)
-                driver.set_motion_limits(
+                sut.set_position_command(0.0)
+                sut.set_motion_limits(
                     max_speed=original_limits["max_speed"],
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
@@ -247,22 +249,22 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 self._wait(0.2)
 
     def test_moves_to_negative_position(self):
-        with self._connected_driver(timeout=1.0, retries=3) as driver:
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
-            driver.set_enable(1)
+            sut.set_enable(1)
             original_limits = {
                 "max_speed": float(attributes["max_speed"].internal_value),
                 "max_accel": float(attributes["max_accel"].internal_value),
                 "max_decel": float(attributes["max_decel"].internal_value),
             }
             self._reset_stepper_state(attributes, position=40.0)
-            driver.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
+            sut.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
 
             try:
-                driver.set_position_command(-8.0)
-                driver_position, expected_position = self._await_position_feedback(
-                    driver,
+                sut.set_position_command(-8.0)
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
                     attributes["position_feedback"],
                     target=-7.5,
                     timeout=15.0,
@@ -270,13 +272,13 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 )
                 self._wait(0.5)
                 self.assertAlmostEqual(expected_position, -8.0, delta=1.0)
-                self.assertAlmostEqual(driver_position, expected_position, delta=1.0)
+                self.assertAlmostEqual(sut_position, expected_position, delta=1.0)
                 self.assertFalse(self._bool_attribute(attributes["pos_limit_switch"]))
                 self.assertFalse(self._bool_attribute(attributes["neg_limit_switch"]))
             finally:
                 self._reset_stepper_state(attributes)
-                driver.set_position_command(0.0)
-                driver.set_motion_limits(
+                sut.set_position_command(0.0)
+                sut.set_motion_limits(
                     max_speed=original_limits["max_speed"],
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
@@ -284,24 +286,24 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 self._wait(0.2)
 
     def test_soft_limit_positive_enforced(self):
-        with self._connected_driver(timeout=1.0, retries=3) as driver:
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
-            driver.set_enable(1)
+            sut.set_enable(1)
             original_pos_limit = float(attributes["soft_limit_pos"].internal_value)
             original_limits = {
                 "max_speed": float(attributes["max_speed"].internal_value),
                 "max_accel": float(attributes["max_accel"].internal_value),
                 "max_decel": float(attributes["max_decel"].internal_value),
             }
-            driver.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
+            sut.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
 
             try:
                 self._reset_stepper_state(attributes, position=0.0, soft_limit_pos=30.0)
 
-                driver.set_position_command(100.0)
-                driver_position, expected_position = self._await_position_feedback(
-                    driver,
+                sut.set_position_command(100.0)
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
                     attributes["position_feedback"],
                     target=29.0,
                     timeout=10.0,
@@ -309,15 +311,15 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 )
                 self._await_limit_switch(attributes["pos_limit_switch"], 1)
                 self.assertAlmostEqual(expected_position, 30.0, delta=0.5)
-                self.assertAlmostEqual(driver_position, expected_position, delta=0.5)
+                self.assertAlmostEqual(sut_position, expected_position, delta=0.5)
                 self.assertFalse(self._bool_attribute(attributes["neg_limit_switch"]))
             finally:
                 self._reset_stepper_state(
                     attributes,
                     soft_limit_pos=original_pos_limit,
                 )
-                driver.set_position_command(0.0)
-                driver.set_motion_limits(
+                sut.set_position_command(0.0)
+                sut.set_motion_limits(
                     max_speed=original_limits["max_speed"],
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
@@ -325,24 +327,24 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 self._wait(0.2)
 
     def test_soft_limit_negative_enforced(self):
-        with self._connected_driver(timeout=1.0, retries=3) as driver:
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
-            driver.set_enable(1)
+            sut.set_enable(1)
             original_neg_limit = float(attributes["soft_limit_neg"].internal_value)
             original_limits = {
                 "max_speed": float(attributes["max_speed"].internal_value),
                 "max_accel": float(attributes["max_accel"].internal_value),
                 "max_decel": float(attributes["max_decel"].internal_value),
             }
-            driver.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
+            sut.set_motion_limits(max_speed=80.0, max_accel=40.0, max_decel=40.0)
 
             try:
                 self._reset_stepper_state(attributes, position=0.0, soft_limit_neg=-5.0)
 
-                driver.set_position_command(-25.0)
-                driver_position, expected_position = self._await_position_feedback(
-                    driver,
+                sut.set_position_command(-25.0)
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
                     attributes["position_feedback"],
                     target=-4.8,
                     timeout=10.0,
@@ -350,15 +352,15 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 )
                 self._await_limit_switch(attributes["neg_limit_switch"], 1)
                 self.assertAlmostEqual(expected_position, -5.0, delta=0.5)
-                self.assertAlmostEqual(driver_position, expected_position, delta=0.5)
+                self.assertAlmostEqual(sut_position, expected_position, delta=0.5)
                 self.assertFalse(self._bool_attribute(attributes["pos_limit_switch"]))
             finally:
                 self._reset_stepper_state(
                     attributes,
                     soft_limit_neg=original_neg_limit,
                 )
-                driver.set_position_command(0.0)
-                driver.set_motion_limits(
+                sut.set_position_command(0.0)
+                sut.set_motion_limits(
                     max_speed=original_limits["max_speed"],
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
@@ -366,21 +368,21 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 self._wait(0.2)
 
     def test_timeout_behavior(self):
-        with self._connected_driver(timeout=1.0, retries=3) as driver:
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
             feedback_attr = attributes["position_feedback"]
 
             scenario = self._configure_disconnect_scenario(instance["scenarios"])
 
-            position = driver.read_position_feedback()
+            position = sut.read_position_feedback()
             self.assertIsInstance(
                 position, float, "Expected position feedback to be a float value"
             )
             self.assertEqual(
-                driver.state(),
+                sut.state(),
                 "connected",
-                f"Expected driver to be connected, got '{driver.state()}'",
+                f"Expected SUT to be connected, got '{sut.state()}'",
             )
 
             with self._running_scenario(scenario):
@@ -391,8 +393,8 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
 
                 self._wait(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
 
-                driver_position, expected_position = self._await_position_feedback(
-                    driver,
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
                     feedback_attr,
                     target=190.0,
                     timeout=20.0,
@@ -405,19 +407,19 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 "Stepper model did not reach target position within recovery window",
             )
             self.assertAlmostEqual(
-                driver_position,
+                sut_position,
                 expected_position,
                 delta=1.0,
-                msg="Driver did not report the latest position feedback value",
+                msg="SUT did not report the latest position feedback value",
             )
             self.assertEqual(
-                driver.state(),
+                sut.state(),
                 "connected",
-                f"Expected driver to be connected after recovery, got '{driver.state()}'",
+                f"Expected SUT to be connected after recovery, got '{sut.state()}'",
             )
 
     def test_timeout_single_retry_disabled(self):
-        with self._connected_driver(timeout=0.0, retries=0) as driver:
+        with self._connected_sut_example(timeout=0.0, retries=0) as sut:
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
 
@@ -429,13 +431,13 @@ class TestModbusStepperDriverIntegration(unittest.TestCase):
                 failure_deadline = time.time() + 3.0
                 while time.time() < failure_deadline:
                     try:
-                        driver.read_position_feedback()
+                        sut.read_position_feedback()
                     except RuntimeError:
                         break
                     self._wait(0.1)
                 else:
                     self.fail(
-                        "Expected driver without retries to fail on first disconnect read"
+                        "Expected SUT without retries to fail on first disconnect read"
                     )
 
 

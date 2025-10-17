@@ -1,4 +1,4 @@
-# Software driver for the Modbus stepper motor model used in tests.
+"""Example SUT implementation: Modbus stepper motor client used in integration tests."""
 from __future__ import annotations
 
 import time
@@ -81,15 +81,15 @@ def _decode_u32(registers: Sequence[int]) -> int:
 
 def _decode_u32_float_be(registers: Sequence[int]) -> float:
     high, low = registers
-    return ModbusStepperDriver._registers_to_float(high, low)
+    return ModbusStepperSUTExample._registers_to_float(high, low)
 
 
 def _decode_u32_from_two_u16_be(registers: Sequence[int]) -> float:
-    return float(ModbusStepperDriver._u32_from_two_u16_be(registers))
+    return float(ModbusStepperSUTExample._u32_from_two_u16_be(registers))
 
 
-class ModbusStepperDriver:
-    """Thin wrapper around pymodbus for talking to the SPX Modbus stepper model."""
+class ModbusStepperSUTExample:
+    """Thin wrapper around pymodbus representing the SUT Modbus stepper model."""
 
     _MIN_CLIENT_TIMEOUT = 0.05
 
@@ -101,7 +101,7 @@ class ModbusStepperDriver:
             count=2, fn=_decode_u32_from_two_u16_be
         ),
         "modbus_float_be": RegisterDecoder(
-            count=2, fn=lambda regs: ModbusStepperDriver.modbus_to_float(regs, "ABCD")
+            count=2, fn=lambda regs: ModbusStepperSUTExample.modbus_to_float(regs, "ABCD")
         ),
     }
 
@@ -116,7 +116,7 @@ class ModbusStepperDriver:
     ) -> None:
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
             raise RuntimeError(
-                "pymodbus is not available. Install pymodbus to use ModbusStepperDriver."
+                "pymodbus is not available. Install pymodbus to use ModbusStepperSUTExample."
             )
         client_kwargs = {"host": host, "port": port}
         if timeout is not None:
@@ -151,7 +151,6 @@ class ModbusStepperDriver:
 
     def set_position_command(self, value: float) -> None:
         self._write_float(self._get_address_for_field("position_command"), value)
-        
 
     def set_motion_limits(
         self,
@@ -274,7 +273,7 @@ class ModbusStepperDriver:
     def modbus_to_float(data: Sequence[int], bit_order: str) -> float:
         import struct
 
-        ordered = ModbusStepperDriver._order_words(data, bit_order)
+        ordered = ModbusStepperSUTExample._order_words(data, bit_order)
         packed_struct = struct.pack(">HH", ordered[0], ordered[1])
         value = struct.unpack(">f", packed_struct)[0]
         return round(value, 5)

@@ -1,11 +1,13 @@
+"""Integration coverage for the example Modbus vacuum gauge SUT device implementation."""
+
 import os
 import pathlib
 import time
 import unittest
 
 from tests.common.spx_utils import bootstrap_model_instance
-from tests.drivers.modbus_vacuum_gauge import (
-    ModbusVacuumGaugeDriver,
+from tests.devices.modbus_vacuum_gauge_sut_example import (
+    ModbusVacuumGaugeSUTExample,
     ModbusTcpClient,
 )
 
@@ -17,7 +19,7 @@ INSTANCE_KEY = "generic_vacuum_gauge"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 
 
-class TestModbusVacuumGaugeIntegration(unittest.TestCase):
+class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
@@ -55,21 +57,21 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
         self.model = self.__class__._instance
         time.sleep(0.5)
 
-        self.driver = ModbusVacuumGaugeDriver(unit_id=1, timeout=1.0)
-        if not self.driver.connect():
+        self.sut = ModbusVacuumGaugeSUTExample(unit_id=1, timeout=1.0)
+        if not self.sut.connect():
             self.skipTest(
                 "Modbus server not reachable at 127.0.0.1:502 (unit 1)"
             )
         time.sleep(0.2)
 
     def tearDown(self):
-        if hasattr(self, "driver") and self.driver:
+        if hasattr(self, "sut") and self.sut:
             try:
-                self.driver.set_coil("leak_event", 0)
-                self.driver.set_coil("discharge_event", 0)
+                self.sut.set_coil("leak_event", 0)
+                self.sut.set_coil("discharge_event", 0)
             except Exception:
                 pass
-            self.driver.close()
+            self.sut.close()
         # self.model.reset()
 
     @staticmethod
@@ -91,7 +93,7 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
         self._sleep(0.2)
 
     def _read_pressures(self):
-        return self.driver.read_rough_pressure(), self.driver.read_high_pressure()
+        return self.sut.read_rough_pressure(), self.sut.read_high_pressure()
 
     def test_pumpdown(self):
         self._prime_pressures(rough=0.5, high=0.5)
@@ -163,7 +165,7 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
         baseline_rough, baseline_high = self._read_pressures()
         upset_target = float(self.model["attributes"]["upset_target"].internal_value)
 
-        self.driver.set_coil("leak_event", 1)
+        self.sut.set_coil("leak_event", 1)
         self.assertTrue(
             self._wait_for(
                 lambda: self._read_pressures()[1] >= upset_target * 0.7,
@@ -175,7 +177,7 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
         self.assertGreater(leak_high, baseline_high)
         self.assertGreater(leak_rough, baseline_rough)
 
-        self.driver.set_coil("leak_event", 0)
+        self.sut.set_coil("leak_event", 0)
         self.assertTrue(
             self._wait_for(
                 lambda: self._read_pressures()[1] < leak_high * 0.6,
@@ -185,13 +187,13 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
         )
 
     def test_relay_outputs_follow_setpoints(self):
-        self.driver.set_float("relay_setpoint_1", 5.0e-4)
-        self.driver.set_float("relay_setpoint_2", 2.0e-4)
+        self.sut.set_float("relay_setpoint_1", 5.0e-4)
+        self.sut.set_float("relay_setpoint_2", 2.0e-4)
         # Keep remaining relays inactive by using very small thresholds.
-        self.driver.set_float("relay_setpoint_3", 1.0e-9)
-        self.driver.set_float("relay_setpoint_4", 1.0e-9)
-        self.driver.set_float("relay_setpoint_5", 1.0e-9)
-        self.driver.set_float("pumpdown_target", 1.0e-5)
+        self.sut.set_float("relay_setpoint_3", 1.0e-9)
+        self.sut.set_float("relay_setpoint_4", 1.0e-9)
+        self.sut.set_float("relay_setpoint_5", 1.0e-9)
+        self.sut.set_float("pumpdown_target", 1.0e-5)
 
         self._prime_pressures(rough=0.05, high=0.05)
 
@@ -202,8 +204,8 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
             ),
             "Expected high-vacuum pressure to fall below first relay setpoint",
         )
-        self.assertEqual(self.driver.read_flag("relay_output_1"), 1)
-        self.assertEqual(self.driver.read_flag("relay_output_2"), 0)
+        self.assertEqual(self.sut.read_flag("relay_output_1"), 1)
+        self.assertEqual(self.sut.read_flag("relay_output_2"), 0)
 
         self.assertTrue(
             self._wait_for(
@@ -212,9 +214,9 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
             ),
             "Expected high-vacuum pressure to fall below second relay setpoint",
         )
-        self.assertEqual(self.driver.read_flag("relay_output_2"), 1)
+        self.assertEqual(self.sut.read_flag("relay_output_2"), 1)
 
-        self.driver.set_coil("leak_event", 1)
+        self.sut.set_coil("leak_event", 1)
         self.assertTrue(
             self._wait_for(
                 lambda: self._read_pressures()[1] >= 0.01,
@@ -223,8 +225,8 @@ class TestModbusVacuumGaugeIntegration(unittest.TestCase):
             "Expected leak event to raise pressure above relay thresholds",
         )
         self._sleep(0.3)
-        self.assertEqual(self.driver.read_flag("relay_output_1"), 0)
-        self.assertEqual(self.driver.read_flag("relay_output_2"), 0)
+        self.assertEqual(self.sut.read_flag("relay_output_1"), 0)
+        self.assertEqual(self.sut.read_flag("relay_output_2"), 0)
 
 
 if __name__ == "__main__":  # pragma: no cover
