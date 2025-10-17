@@ -2,10 +2,13 @@
 
 import os
 import pathlib
-import time
 import unittest
 
-from tests.common.spx_utils import bootstrap_model_instance
+from tests.common.spx_utils import (
+    bootstrap_model_instance,
+    wait_for_condition,
+    wait_seconds,
+)
 from tests.devices.thermal_controller_sut_example import (
     ModbusThermalControllerSUTExample,
     ModbusTcpClient,
@@ -55,7 +58,7 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
 
     def setUp(self):
         self.model = self.__class__._instance
-        time.sleep(0.3)
+        wait_seconds(0.3)
 
         self.sut = ModbusThermalControllerSUTExample(unit_id=3, timeout=1.0)
         if not self.sut.connect():
@@ -70,18 +73,6 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
             except Exception:
                 pass
             self.sut.close()
-
-    @staticmethod
-    def _sleep(duration: float) -> None:
-        time.sleep(duration)
-
-    def _wait_for(self, predicate, timeout: float = 8.0, interval: float = 0.2) -> bool:
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if predicate():
-                return True
-            self._sleep(interval)
-        return False
 
     def _reset_model_state(
         self,
@@ -107,7 +98,7 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         attrs["power_derivative_gain"].internal_value = 0.8
         attrs["power_error_prev"].internal_value = 0.0
         attrs["power_integral_leak"].internal_value = 0.05
-        self._sleep(0.3)
+        wait_seconds(0.3)
 
     def test_heating_increases_temperature_towards_setpoint(self):
         baseline_temp = self.sut.read_temperature()
@@ -115,12 +106,12 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         self.sut.set_setpoint(target)
 
         self.assertTrue(
-            self._wait_for(lambda: self.sut.read_heating_power() > 5.0, timeout=10.0),
+            wait_for_condition(lambda: self.sut.read_heating_power() > 5.0, timeout=10.0),
             "Expected controller to increase heating power for higher setpoint",
         )
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self.sut.read_temperature() >= baseline_temp + 6.0,
                 timeout=25.0,
                 interval=0.5,
@@ -129,7 +120,7 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         )
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: abs(self.sut.read_temperature() - target) <= 1.0,
                 timeout=45.0,
                 interval=0.5,
@@ -142,18 +133,18 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         self._reset_model_state(temperature=ambient + 5.0, setpoint=ambient + 20.0, ambient=ambient)
 
         self.assertTrue(
-            self._wait_for(lambda: self.sut.read_heating_power() >= 10.0, timeout=10.0),
+            wait_for_condition(lambda: self.sut.read_heating_power() >= 10.0, timeout=10.0),
             "Expected heating power to ramp up before shutdown",
         )
 
         self.sut.set_power_state(False)
         self.assertTrue(
-            self._wait_for(lambda: self.sut.read_heating_power() == 0.0, timeout=8.0),
+            wait_for_condition(lambda: self.sut.read_heating_power() == 0.0, timeout=8.0),
             "Expected heating power to drop to zero once powered off",
         )
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self.sut.read_temperature() <= ambient + 5.0,
                 timeout=20.0,
                 interval=0.5,
@@ -167,19 +158,19 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         attrs = self.model["attributes"]
         attrs["temperature"].internal_value = 34.0
         attrs["overload"].internal_value = 0
-        self._sleep(0.4)
+        wait_seconds(0.4)
 
         attrs["temperature"].internal_value = 36.5
-        self._sleep(0.4)
+        wait_seconds(0.4)
         self.assertTrue(
-            self._wait_for(lambda: self.sut.read_overload_flag() == 1, timeout=6.0),
+            wait_for_condition(lambda: self.sut.read_overload_flag() == 1, timeout=6.0),
             "Expected overload flag to assert when temperature exceeds threshold",
         )
 
         attrs["temperature"].internal_value = 32.0
-        self._sleep(0.4)
+        wait_seconds(0.4)
         self.assertTrue(
-            self._wait_for(lambda: self.sut.read_overload_flag() == 0, timeout=6.0),
+            wait_for_condition(lambda: self.sut.read_overload_flag() == 0, timeout=6.0),
             "Expected overload flag to clear once temperature drops below hysteresis band",
         )
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import yaml
 
@@ -140,3 +141,26 @@ def bootstrap_model_instance(
     )
 
     return client, instance, model_changed
+
+
+def wait_seconds(duration: float, interval: float = 0.2) -> None:
+    """Sleep for duration seconds, yielding periodically to keep loops responsive."""
+    deadline = time.time() + max(0.0, duration)
+    while time.time() < deadline:
+        remaining = max(0.0, deadline - time.time())
+        time.sleep(min(interval, remaining))
+
+
+def wait_for_condition(
+    predicate: Callable[[], bool],
+    *,
+    timeout: float = 5.0,
+    interval: float = 0.1,
+) -> bool:
+    """Poll predicate until it returns True or timeout expires."""
+    deadline = time.time() + max(0.0, timeout)
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return False

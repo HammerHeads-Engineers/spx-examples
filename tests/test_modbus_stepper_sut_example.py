@@ -7,7 +7,7 @@ import time
 import unittest
 from typing import Optional
 
-from tests.common.spx_utils import bootstrap_model_instance
+from tests.common.spx_utils import bootstrap_model_instance, wait_seconds
 from tests.devices.modbus_stepper_sut_example import ModbusStepperSUTExample, ModbusTcpClient
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -86,12 +86,6 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
         return scenarios["modbus_disconnect"]
 
     @staticmethod
-    def _wait(duration: float, interval: float = 0.2) -> None:
-        deadline = time.time() + duration
-        while time.time() < deadline:
-            time.sleep(min(interval, max(0.0, deadline - time.time())))
-
-    @staticmethod
     def _bool_attribute(attribute) -> bool:
         return bool(round(float(attribute.internal_value)))
 
@@ -115,7 +109,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             attributes["soft_limit_pos"].internal_value = soft_limit_pos
         if soft_limit_neg is not None:
             attributes["soft_limit_neg"].internal_value = soft_limit_neg
-        self._wait(0.2)
+        wait_seconds(0.2)
 
     def _await_position_feedback(
         self,
@@ -132,7 +126,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
         final_expected = None
 
         while time.time() < deadline:
-            self._wait(0.5)
+            wait_seconds(0.5)
             final_expected = float(feedback_attribute.internal_value)
             try:
                 recovered_position = sut.read_position_feedback()
@@ -164,7 +158,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
         while time.time() < deadline:
             if self._bool_attribute(attribute) == bool(expected):
                 return
-            time.sleep(0.1)
+            wait_seconds(0.1)
         raise AssertionError(
             f"Limit switch did not reach state {expected} within {timeout}s"
         )
@@ -233,7 +227,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     timeout=15.0,
                     tolerance=1.0,
                 )
-                self._wait(0.5)
+                wait_seconds(0.5)
                 self.assertAlmostEqual(expected_position, 150.0, delta=1.0)
                 self.assertAlmostEqual(sut_position, expected_position, delta=1.0)
                 self.assertFalse(self._bool_attribute(attributes["pos_limit_switch"]))
@@ -246,7 +240,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
                 )
-                self._wait(0.2)
+                wait_seconds(0.2)
 
     def test_moves_to_negative_position(self):
         with self._connected_sut_example(timeout=1.0, retries=3) as sut:
@@ -270,7 +264,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     timeout=15.0,
                     tolerance=1.0,
                 )
-                self._wait(0.5)
+                wait_seconds(0.5)
                 self.assertAlmostEqual(expected_position, -8.0, delta=1.0)
                 self.assertAlmostEqual(sut_position, expected_position, delta=1.0)
                 self.assertFalse(self._bool_attribute(attributes["pos_limit_switch"]))
@@ -283,7 +277,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
                 )
-                self._wait(0.2)
+                wait_seconds(0.2)
 
     def test_soft_limit_positive_enforced(self):
         with self._connected_sut_example(timeout=1.0, retries=3) as sut:
@@ -324,7 +318,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
                 )
-                self._wait(0.2)
+                wait_seconds(0.2)
 
     def test_soft_limit_negative_enforced(self):
         with self._connected_sut_example(timeout=1.0, retries=3) as sut:
@@ -365,7 +359,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     max_accel=original_limits["max_accel"],
                     max_decel=original_limits["max_decel"],
                 )
-                self._wait(0.2)
+                wait_seconds(0.2)
 
     def test_timeout_behavior(self):
         with self._connected_sut_example(timeout=1.0, retries=3) as sut:
@@ -391,7 +385,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                 attributes["max_accel"].internal_value = 50  # limit accel
                 attributes["max_decel"].internal_value = 50  # limit decel
 
-                self._wait(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
+                wait_seconds(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
 
                 sut_position, expected_position = self._await_position_feedback(
                     sut,
@@ -434,7 +428,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                         sut.read_position_feedback()
                     except RuntimeError:
                         break
-                    self._wait(0.1)
+                    wait_seconds(0.1)
                 else:
                     self.fail(
                         "Expected SUT without retries to fail on first disconnect read"

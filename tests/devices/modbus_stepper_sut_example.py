@@ -2,29 +2,16 @@
 from __future__ import annotations
 
 import time
-from copy import deepcopy
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import Dict, Optional, Sequence, Tuple
 
-try:  # pymodbus >= 3.0
-    from pymodbus.client import ModbusTcpClient  # type: ignore
-except Exception:  # pragma: no cover - fallback for < 3.0
-    try:
-        from pymodbus.client.sync import ModbusTcpClient  # type: ignore
-    except Exception:  # pragma: no cover - pymodbus unavailable
-        ModbusTcpClient = None  # type: ignore
-
-try:
-    from pymodbus.exceptions import ConnectionException, ModbusIOException  # type: ignore
-except Exception:  # pragma: no cover - fallback when pymodbus unavailable
-    class ModbusIOException(Exception):  # type: ignore
-        pass
-
-    class ConnectionException(ModbusIOException):  # type: ignore
-        pass
-
-RegisterConfig = Dict[str, Any]
-ModbusMap = Dict[str, RegisterConfig]
+from .modbus_sut_base import (
+    ConnectionException,
+    ModbusIOException,
+    ModbusMap,
+    ModbusSUTBase,
+    ModbusTcpClient,
+    RegisterDecoder,
+)
 
 DEFAULT_MODBUS_MAP: ModbusMap = {
     "enable": {"address": 0, "kind": "coil"},
@@ -57,19 +44,6 @@ DEFAULT_MODBUS_MAP: ModbusMap = {
 }
 
 
-@dataclass(frozen=True)
-class RegisterDecoder:
-    count: int
-    fn: Callable[[Sequence[int]], Any]
-
-    def decode(self, registers: Sequence[int]) -> Any:
-        if len(registers) != self.count:
-            raise ValueError(
-                f"Decoder expected {self.count} registers, got {len(registers)}"
-            )
-        return self.fn(registers)
-
-
 def _decode_u16(registers: Sequence[int]) -> int:
     return registers[0] & 0xFFFF
 
@@ -88,10 +62,8 @@ def _decode_u32_from_two_u16_be(registers: Sequence[int]) -> float:
     return float(ModbusStepperSUTExample._u32_from_two_u16_be(registers))
 
 
-class ModbusStepperSUTExample:
+class ModbusStepperSUTExample(ModbusSUTBase):
     """Thin wrapper around pymodbus representing the SUT Modbus stepper model."""
-
-    _MIN_CLIENT_TIMEOUT = 0.05
 
     _DECODER_REGISTRY: Dict[str, RegisterDecoder] = {
         "u16": RegisterDecoder(count=1, fn=_decode_u16),
@@ -114,40 +86,21 @@ class ModbusStepperSUTExample:
         retries: int = 3,
         mapping: Optional[ModbusMap] = None,
     ) -> None:
-        if ModbusTcpClient is None:  # pragma: no cover - dependency missing
-            raise RuntimeError(
-                "pymodbus is not available. Install pymodbus to use ModbusStepperSUTExample."
-            )
-        client_kwargs = {"host": host, "port": port}
-        if timeout is not None:
-            client_timeout = (
-                timeout
-                if timeout and timeout > 0.0
-                else self._MIN_CLIENT_TIMEOUT
-            )
-            # pymodbus rejects non-positive values; clamp to a minimal positive timeout.
-            client_kwargs["timeout"] = client_timeout
-        self._client = ModbusTcpClient(**client_kwargs)
-        self.unit_id = unit_id
-        self.retries = retries
-        self.timeout = timeout
-
-        self.mapping: ModbusMap = deepcopy(mapping) if mapping else deepcopy(
-            DEFAULT_MODBUS_MAP
+        super().__init__(
+            default_map=DEFAULT_MODBUS_MAP,
+            mapping=mapping,
+            host=host,
+            port=port,
+            unit_id=unit_id,
+            timeout=timeout,
         )
-
-    def connect(self) -> bool:
-        return bool(self._client.connect())
-
-    def close(self) -> None:
-        self._client.close()
+        self.retries = retries
 
     # Write operations
     def set_enable(self, value: int) -> None:
         config = self._get_field_config("enable")
         address = self._get_address(config, "enable")
-        self._ensure_connected()
-        self._call_with_unit_kwarg("write_coil", address, bool(value))
+        self._write_coils(address, bool(value))
 
     def set_position_command(self, value: float) -> None:
         self._write_float(self._get_address_for_field("position_command"), value)
@@ -176,9 +129,8 @@ class ModbusStepperSUTExample:
         return self._read_decoded_register("motion_error")
 
     def _write_float(self, address: int, value: float) -> None:
-        self._ensure_connected()
         registers = self._float_to_registers(value)
-        self._call_with_unit_kwarg("write_registers", address, registers)
+        self._write_registers(address, registers)
 
     def _read_decoded_register(self, field_name: str) -> float:
         config = self._get_field_config(field_name)
@@ -278,67 +230,12 @@ class ModbusStepperSUTExample:
         value = struct.unpack(">f", packed_struct)[0]
         return round(value, 5)
 
-    @staticmethod
-    def _order_words(data: Sequence[int], bit_order: str) -> Sequence[int]:
-        if len(data) != 2:
-            raise ValueError(f"Expected 2 registers, got {len(data)}")
-        order = bit_order.upper()
-        if order == "ABCD":
-            return data
-        if len(order) != 4 or set(order) != {"A", "B", "C", "D"}:
-            raise ValueError(f"Unsupported bit order '{bit_order}' for Modbus float decoding")
-        byte_map = {
-            "A": (data[0] >> 8) & 0xFF,
-            "B": data[0] & 0xFF,
-            "C": (data[1] >> 8) & 0xFF,
-            "D": data[1] & 0xFF,
-        }
-        try:
-            ordered_bytes = [byte_map[ch] for ch in order]
-        except KeyError as exc:
-            raise ValueError(
-                f"Unsupported bit order '{bit_order}' for Modbus float decoding"
-            ) from exc
-        word0 = (ordered_bytes[0] << 8) | ordered_bytes[1]
-        word1 = (ordered_bytes[2] << 8) | ordered_bytes[3]
-        return (word0, word1)
-
-    def _call_with_unit_kwarg(self, method_name: str, *args, **kwargs):
-        method = getattr(self._client, method_name)
-        try:
-            return method(*args, slave=self.unit_id, **kwargs)
-        except TypeError as exc:
-            message = str(exc)
-            if "unexpected keyword argument" in message and "'slave'" in message:
-                return method(*args, unit=self.unit_id, **kwargs)
-            raise
-
-    def _get_field_config(self, field_name: str) -> RegisterConfig:
-        try:
-            return self.mapping[field_name]
-        except KeyError as exc:
-            raise ValueError(f"Field '{field_name}' not found in Modbus map") from exc
-
     def _get_address_for_field(self, field_name: str) -> int:
         config = self._get_field_config(field_name)
         return self._get_address(config, field_name)
 
-    @staticmethod
-    def _get_address(config: RegisterConfig, field_name: str) -> int:
-        try:
-            return int(config["address"])
-        except KeyError as exc:
-            raise ValueError(
-                f"Missing 'address' for field '{field_name}' in Modbus map"
-            ) from exc
-
-    def _ensure_connected(self) -> None:
-        if not self._client:
-            raise RuntimeError("Modbus client not initialised")
-        if not self._client.connected:  # type: ignore[attr-defined]
-            connected = self._client.connect()
-            if not connected:
-                raise RuntimeError("Failed to connect Modbus client")
-
     def state(self) -> str:
         return "connected" if self._client and self._client.connected else "disconnected"
+
+
+__all__ = ["ModbusStepperSUTExample", "ModbusTcpClient"]

@@ -2,10 +2,13 @@
 
 import os
 import pathlib
-import time
 import unittest
 
-from tests.common.spx_utils import bootstrap_model_instance
+from tests.common.spx_utils import (
+    bootstrap_model_instance,
+    wait_for_condition,
+    wait_seconds,
+)
 from tests.devices.modbus_vacuum_gauge_sut_example import (
     ModbusVacuumGaugeSUTExample,
     ModbusTcpClient,
@@ -55,14 +58,14 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
     def setUp(self):
         self.model = self.__class__._instance
-        time.sleep(0.5)
+        wait_seconds(0.5)
 
         self.sut = ModbusVacuumGaugeSUTExample(unit_id=1, timeout=1.0)
         if not self.sut.connect():
             self.skipTest(
                 "Modbus server not reachable at 127.0.0.1:502 (unit 1)"
             )
-        time.sleep(0.2)
+        wait_seconds(0.2)
 
     def tearDown(self):
         if hasattr(self, "sut") and self.sut:
@@ -74,23 +77,11 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             self.sut.close()
         # self.model.reset()
 
-    @staticmethod
-    def _sleep(duration: float) -> None:
-        time.sleep(duration)
-
-    def _wait_for(self, predicate, timeout: float = 5.0, interval: float = 0.1):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            if predicate():
-                return True
-            self._sleep(interval)
-        return False
-
     def _prime_pressures(self, rough: float, high: float) -> None:
         attrs = self.model["attributes"]
         attrs["rough_pressure"].internal_value = rough
         attrs["high_pressure"].internal_value = high
-        self._sleep(0.2)
+        wait_seconds(0.2)
 
     def _read_pressures(self):
         return self.sut.read_rough_pressure(), self.sut.read_high_pressure()
@@ -101,7 +92,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
         rough_samples = []
         high_samples = []
         for _ in range(12):
-            self._sleep(0.4)
+            wait_seconds(0.4)
             rough, high = self._read_pressures()
             rough_samples.append(rough)
             high_samples.append(high)
@@ -130,17 +121,17 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             self.model["attributes"]["discharge_pressure"].internal_value
         )
         self._prime_pressures(rough=0.1, high=0.05)
-        self._wait_for(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
+        wait_for_condition(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
         baseline_rough, baseline_high = self._read_pressures()
 
         # scenario = self.model["scenarios"]["discharge_spike"]
         # scenario.start()
-        
+
         self.model["attributes"]["discharge_event"].internal_value = 1
-        self._sleep(0.2)
+        wait_seconds(0.2)
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] >= discharge_pressure * 0.7,
                 timeout=6.0,
             ),
@@ -151,7 +142,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
         self.assertGreater(spike_rough, baseline_rough)
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] < spike_high * 0.7,
                 timeout=8.0,
             ),
@@ -160,14 +151,14 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
     def test_leak_event_causes_pressure_rise_and_recovery(self):
         self._prime_pressures(rough=0.05, high=0.05)
-        self._wait_for(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
+        wait_for_condition(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
 
         baseline_rough, baseline_high = self._read_pressures()
         upset_target = float(self.model["attributes"]["upset_target"].internal_value)
 
         self.sut.set_coil("leak_event", 1)
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] >= upset_target * 0.7,
                 timeout=6.0,
             ),
@@ -179,7 +170,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
         self.sut.set_coil("leak_event", 0)
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] < leak_high * 0.6,
                 timeout=10.0,
             ),
@@ -198,7 +189,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
         self._prime_pressures(rough=0.05, high=0.05)
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] <= 5.0e-4,
                 timeout=15.0,
             ),
@@ -208,7 +199,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
         self.assertEqual(self.sut.read_flag("relay_output_2"), 0)
 
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] <= 2.0e-4,
                 timeout=15.0,
             ),
@@ -218,13 +209,13 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
         self.sut.set_coil("leak_event", 1)
         self.assertTrue(
-            self._wait_for(
+            wait_for_condition(
                 lambda: self._read_pressures()[1] >= 0.01,
                 timeout=8.0,
             ),
             "Expected leak event to raise pressure above relay thresholds",
         )
-        self._sleep(0.3)
+        wait_seconds(0.3)
         self.assertEqual(self.sut.read_flag("relay_output_1"), 0)
         self.assertEqual(self.sut.read_flag("relay_output_2"), 0)
 
