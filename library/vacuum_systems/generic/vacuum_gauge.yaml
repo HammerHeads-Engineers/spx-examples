@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
 # Two-channel vacuum gauge simulation with roughing and high-vacuum readings.
 attributes:
   rough_pressure: 1.0              # mbar, roughing gauge covering atmosphere to 1e-3

@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
 # This example defines a PT100-like sensor model with composite actions
 # (ramp, noise). Internal temperature is driven by actions; external
 # temperature can include noise without affecting internal logic.

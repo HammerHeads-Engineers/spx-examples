@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
 """Integration coverage for the example Modbus vacuum gauge SUT device implementation."""
 
 import os
@@ -53,14 +57,14 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=1,
+            unit_id=2,
         )
 
     def setUp(self):
         self.model = self.__class__._instance
         wait_seconds(0.5)
 
-        self.sut = ModbusVacuumGaugeSUTExample(unit_id=1, timeout=1.0)
+        self.sut = ModbusVacuumGaugeSUTExample(unit_id=2, timeout=1.0)
         if not self.sut.connect():
             self.skipTest(
                 "Modbus server not reachable at 127.0.0.1:502 (unit 1)"

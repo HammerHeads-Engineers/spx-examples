@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
 """Integration coverage for the example Modbus stepper SUT device implementation."""
 
 import contextlib
@@ -49,11 +53,11 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=2,
+            unit_id=1,
         )
 
     def _make_sut_example(self, **kwargs):
-        return ModbusStepperSUTExample(unit_id=2, **kwargs)
+        return ModbusStepperSUTExample(unit_id=1, **kwargs)
 
     @contextlib.contextmanager
     def _connected_sut_example(self, **kwargs):
@@ -169,12 +173,7 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             scenario.start()
             yield
         finally:
-            stop = getattr(scenario, "stop", None)
-            if callable(stop):
-                try:
-                    stop()
-                except Exception:
-                    pass
+            pass
 
     def test_connects_default_instance(self):
         sut = self._make_sut_example()
@@ -204,6 +203,57 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
         self.assertIsInstance(
             position, float, "Expected position feedback to be a float value"
         )
+
+    def test_timeout_behavior(self):
+        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
+            instance = self._require_spx_instance()
+            attributes = instance["attributes"]
+            feedback_attr = attributes["position_feedback"]
+
+            scenario = self._configure_disconnect_scenario(instance["scenarios"])
+
+            position = sut.read_position_feedback()
+            self.assertIsInstance(
+                position, float, "Expected position feedback to be a float value"
+            )
+            self.assertEqual(
+                sut.state(),
+                "connected",
+                f"Expected SUT to be connected, got '{sut.state()}'",
+            )
+
+            with self._running_scenario(scenario):
+                attributes["max_speed"].internal_value = 100  # limit travel speed
+                attributes["position_command"].internal_value = 200  # move target
+                attributes["max_accel"].internal_value = 50  # limit accel
+                attributes["max_decel"].internal_value = 50  # limit decel
+
+                wait_seconds(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
+
+                sut_position, expected_position = self._await_position_feedback(
+                    sut,
+                    feedback_attr,
+                    target=190.0,
+                    timeout=20.0,
+                    tolerance=1.0,
+                )
+
+            self.assertGreaterEqual(
+                expected_position,
+                190.0,
+                "Stepper model did not reach target position within recovery window",
+            )
+            self.assertAlmostEqual(
+                sut_position,
+                expected_position,
+                delta=1.0,
+                msg="SUT did not report the latest position feedback value",
+            )
+            self.assertEqual(
+                sut.state(),
+                "connected",
+                f"Expected SUT to be connected after recovery, got '{sut.state()}'",
+            )
 
     def test_moves_to_positive_position(self):
         with self._connected_sut_example(timeout=1.0, retries=3) as sut:
@@ -360,57 +410,6 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                     max_decel=original_limits["max_decel"],
                 )
                 wait_seconds(0.2)
-
-    def test_timeout_behavior(self):
-        with self._connected_sut_example(timeout=1.0, retries=3) as sut:
-            instance = self._require_spx_instance()
-            attributes = instance["attributes"]
-            feedback_attr = attributes["position_feedback"]
-
-            scenario = self._configure_disconnect_scenario(instance["scenarios"])
-
-            position = sut.read_position_feedback()
-            self.assertIsInstance(
-                position, float, "Expected position feedback to be a float value"
-            )
-            self.assertEqual(
-                sut.state(),
-                "connected",
-                f"Expected SUT to be connected, got '{sut.state()}'",
-            )
-
-            with self._running_scenario(scenario):
-                attributes["max_speed"].internal_value = 100  # limit travel speed
-                attributes["position_command"].internal_value = 200  # move target
-                attributes["max_accel"].internal_value = 50  # limit accel
-                attributes["max_decel"].internal_value = 50  # limit decel
-
-                wait_seconds(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
-
-                sut_position, expected_position = self._await_position_feedback(
-                    sut,
-                    feedback_attr,
-                    target=190.0,
-                    timeout=20.0,
-                    tolerance=1.0,
-                )
-
-            self.assertGreaterEqual(
-                expected_position,
-                190.0,
-                "Stepper model did not reach target position within recovery window",
-            )
-            self.assertAlmostEqual(
-                sut_position,
-                expected_position,
-                delta=1.0,
-                msg="SUT did not report the latest position feedback value",
-            )
-            self.assertEqual(
-                sut.state(),
-                "connected",
-                f"Expected SUT to be connected after recovery, got '{sut.state()}'",
-            )
 
     def test_timeout_single_retry_disabled(self):
         with self._connected_sut_example(timeout=0.0, retries=0) as sut:

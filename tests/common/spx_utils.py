@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
 """Shared helpers for preparing SPX models and instances in integration tests."""
 from __future__ import annotations
 
