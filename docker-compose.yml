@@ -8,17 +8,28 @@ services:
     container_name: spx-server-examples
     ports:
       - "8000:8000"
-      - "502:502"  # Modbus TCP port
-    # Pass SPX product key from host environment
+      - "502:502"
     environment:
       SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}
-    # Healthcheck: verify SPX server is responding before running tests
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
-      # Mount local SPX core and extensions for development/testing
       - ./extensions:/app/extensions
-    command: ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
+    command:
+      ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
+
+  spx-ui:
+    image: simplephysx/spx-ui:v1.0.0-rc.14     # or use `build: .` to build from the local repo
+    container_name: spx-ui-examples
+    depends_on:
+      spx-server:
+        condition: service_healthy           # wait until API is reachable
+    ports:
+      - "3000:3000"
+    environment:
+      SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}    # entrypoint will pick this up
+    command:
+      ["--product-key", "${SPX_PRODUCT_KEY}"]
