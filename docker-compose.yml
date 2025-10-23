@@ -4,7 +4,7 @@
 
 services:
   spx-server:
-    image: simplephysx/spx-server:v0.3.0-alpha.28
+    image: simplephysx/spx-server:v0.3.0-alpha.35
     container_name: spx-server-examples
     ports:
       - "8000:8000"
@@ -22,7 +22,7 @@ services:
       ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
 
   spx-ui:
-    image: simplephysx/spx-ui:v1.0.0-rc.14     # or use `build: .` to build from the local repo
+    image: simplephysx/spx-ui:v1.0.0-rc.15     # or use `build: .` to build from the local repo
     container_name: spx-ui-examples
     depends_on:
       spx-server:
