@@ -12,7 +12,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-spx-python = "0.1.0-rc.7"           # SPX Python client for talking to the server
+spx-python = "0.1.0-rc.10"           # SPX Python client for talking to the server
 numpy = "*"      # Py3.9-compatible upper bound
 plotly = "*"
 scipy = "*"      # Py3.9-compatible upper bound

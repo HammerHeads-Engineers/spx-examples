@@ -4,7 +4,7 @@
 
 services:
   spx-server:
-    image: simplephysx/spx-server:v0.3.0-rc.2
+    image: simplephysx/spx-server:v0.3.0-rc.4
     container_name: spx-server-examples
     ports:
       - "8000:8000"
