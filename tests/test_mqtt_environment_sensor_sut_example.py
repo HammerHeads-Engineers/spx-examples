@@ -23,6 +23,17 @@ except Exception:  # pragma: no cover - dependency missing in some environments
 
 BROKER_HOST = os.environ.get("MQTT_TEST_BROKER_HOST", "127.0.0.1")
 BROKER_PORT = int(os.environ.get("MQTT_TEST_BROKER_PORT", "1883"))
+BROKER_CONTAINER_HOST = os.environ.get("MQTT_TEST_BROKER_HOST_CONTAINER")
+if BROKER_CONTAINER_HOST is None:
+    if os.environ.get("CI"):
+        BROKER_CONTAINER_HOST = "mosquitto"
+    elif BROKER_HOST in {"127.0.0.1", "localhost"}:
+        BROKER_CONTAINER_HOST = "host.docker.internal"
+    else:
+        BROKER_CONTAINER_HOST = BROKER_HOST
+BROKER_CONTAINER_PORT = int(
+    os.environ.get("MQTT_TEST_BROKER_PORT_CONTAINER", str(BROKER_PORT))
+)
 MODEL_PATH = Path("library/iot/generic/mqtt_environment_sensor.yaml")
 MODEL_KEY = "tests__generic_mqtt_environment_sensor"
 INSTANCE_KEY = "tests_generic_mqtt_environment_sensor_inst"
@@ -62,11 +73,16 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         model_changed = ensure_model(cls._spx_client, MODEL_KEY, model_def)
 
+        overrides = {
+            "communication/mqtt/broker": BROKER_CONTAINER_HOST,
+            "communication/mqtt/port": BROKER_CONTAINER_PORT,
+        }
+
         cls._instance = ensure_instance(
             cls._spx_client,
             INSTANCE_KEY,
             MODEL_KEY,
-            overrides=None,
+            overrides=overrides,
             recreate=model_changed,
         )
 
