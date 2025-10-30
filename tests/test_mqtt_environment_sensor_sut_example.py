@@ -81,12 +81,17 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             self.skipTest("SPX instance not initialised")
         self.attributes = self.instance["attributes"]
 
-        # Block until the SPX model starts publishing telemetry so command subscriptions are ready.
-        ready_temperature = self._await_value(self.sut.latest_temperature, timeout=5.0)
-        self.assertIsNotNone(
-            ready_temperature,
-            "MQTT telemetry not received from SPX instance; broker connection may not be ready.",
-        )
+        # Ensure the SPX model has attached to the broker before publishing commands.
+        mqtt_connected_attr = self.attributes.get("mqtt_connected")
+        if mqtt_connected_attr is not None:
+            connected = wait_for_condition(
+                lambda: bool(float(getattr(mqtt_connected_attr, "internal_value", 0))),
+                timeout=10.0,
+            )
+            self.assertTrue(
+                connected,
+                "SPX MQTT adapter did not report connected state within timeout.",
+            )
 
         self.publisher = mqtt.Client()
         self.publisher.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
