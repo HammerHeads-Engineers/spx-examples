@@ -12,8 +12,8 @@ import time
 import unittest
 from typing import Optional
 
-from common.spx_utils import bootstrap_model_instance, wait_seconds, wait_for_condition
-from devices.scpi_multimeter_sut_example import ScpiMultimeterSUTExample
+from tests.common.spx_utils import bootstrap_model_instance, wait_seconds, wait_for_condition
+from tests.devices.scpi_multimeter_sut_example import ScpiMultimeterSUTExample
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
