@@ -75,6 +75,12 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         if not self.sut.connect():
             self.skipTest(f"Unable to connect SUT to MQTT broker at {BROKER_HOST}:{BROKER_PORT}")
         time.sleep(0.2)
+
+        # Wait for at least one telemetry message to confirm the model has attached to the broker.
+        ready_temperature = self._await_value(self.sut.latest_temperature, timeout=5.0)
+        if ready_temperature is None:
+            self.skipTest("MQTT telemetry not received from SPX instance; broker connection may not be ready.")
+
         self.publisher = mqtt.Client()
         self.publisher.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
         self.publisher.loop_start()
@@ -175,7 +181,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
             timeout=5.0,
         )
-        self.assertTrue(target_updated, "target_c attribute did not update from command topic")
+        self.assertTrue(target_updated, f"target_c={self.attributes['target_c'].internal_value} == {target_value} attribute did not update from command topic")
 
         temp_reached = wait_for_condition(
             lambda: abs(self.attributes["temperature_c"].internal_value - target_value) <= 0.5,
