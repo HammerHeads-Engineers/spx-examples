@@ -115,7 +115,13 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     # ------------------------------------------------------------------
     def _publish(self, topic: str, payload: str) -> None:
         info = self.publisher.publish(topic, payload, qos=1, retain=False)
-        info.wait_for_publish(timeout=2.0)
+        published = info.wait_for_publish(timeout=2.0)
+        if topic == COMMAND_SETPOINT_TOPIC:
+            print(
+                f"[MQTT TEST] publish topic={topic} payload={payload!r} rc={info.rc} "
+                f"published={published} mid={info.mid} broker={BROKER_HOST}:{BROKER_PORT}",
+                flush=True,
+            )
 
     def _await_value(
         self,
