@@ -76,19 +76,21 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             self.skipTest(f"Unable to connect SUT to MQTT broker at {BROKER_HOST}:{BROKER_PORT}")
         time.sleep(0.2)
 
-        # # Wait for at least one telemetry message to confirm the model has attached to the broker.
-        # ready_temperature = self._await_value(self.sut.latest_temperature, timeout=5.0)
-        # if ready_temperature is None:
-        #     self.skipTest("MQTT telemetry not received from SPX instance; broker connection may not be ready.")
-
-        self.publisher = mqtt.Client()
-        self.publisher.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
-        self.publisher.loop_start()
-
         self.instance = getattr(self.__class__, "_instance", None)
         if self.instance is None:
             self.skipTest("SPX instance not initialised")
         self.attributes = self.instance["attributes"]
+
+        # Block until the SPX model starts publishing telemetry so command subscriptions are ready.
+        ready_temperature = self._await_value(self.sut.latest_temperature, timeout=5.0)
+        self.assertIsNotNone(
+            ready_temperature,
+            "MQTT telemetry not received from SPX instance; broker connection may not be ready.",
+        )
+
+        self.publisher = mqtt.Client()
+        self.publisher.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
+        self.publisher.loop_start()
 
     def tearDown(self) -> None:
         if hasattr(self, "publisher") and self.publisher is not None:
@@ -175,12 +177,18 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             self.attributes["temperature_integral"].internal_value = 0.0
         time.sleep(0.2)
 
-        self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
+        target_updated = False
+        attempts = 3
+        for attempt in range(attempts):
+            self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
+            target_updated = wait_for_condition(
+                lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
+                timeout=5.0,
+            )
+            if target_updated:
+                break
+            time.sleep(0.5)
 
-        target_updated = wait_for_condition(
-            lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
-            timeout=5.0,
-        )
         self.assertTrue(target_updated, f"target_c={self.attributes['target_c'].internal_value} == {target_value} attribute did not update from command topic")
 
         temp_reached = wait_for_condition(
