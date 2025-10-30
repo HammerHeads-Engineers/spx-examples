@@ -19,6 +19,7 @@ scipy = "*"      # Py3.9-compatible upper bound
 pyyaml = "*"
 modbus_tk = "*"
 pymodbus = "*"
+paho-mqtt = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
