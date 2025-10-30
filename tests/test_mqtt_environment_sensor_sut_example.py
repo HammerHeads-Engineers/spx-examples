@@ -82,7 +82,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         self.attributes = self.instance["attributes"]
 
         # Ensure the SPX model has attached to the broker before publishing commands.
-        mqtt_connected_attr = self.attributes.get("mqtt_connected")
+        mqtt_connected_attr = self.attributes["mqtt_connected"]
         if mqtt_connected_attr is not None:
             connected = wait_for_condition(
                 lambda: bool(float(getattr(mqtt_connected_attr, "internal_value", 0))),
