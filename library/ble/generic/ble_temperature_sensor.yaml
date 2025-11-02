@@ -1,0 +1,44 @@
+attributes:
+  temperature: 22.5
+  setpoint: 24.0
+
+communication:
+  - ble:
+      adapter:
+        baseUrl: http://host.docker.internal:8080
+      device:
+        name: SpX Temperature Sensor
+      codecs:
+        celsius:
+          format: utf8
+      bindings:
+        temperature:
+          attribute: $out(temperature)
+          codecRef: celsius
+        setpoint:
+          attribute: $in(setpoint)
+          codecRef: celsius
+          stateKey: setpointC
+      services:
+        - uuid: "181a"
+          name: Environmental Sensing
+          characteristics:
+            - uuid: "2a6e"
+              name: Temperature
+              binding: temperature
+              properties: [read, notify]
+              notify:
+                triggers: [state]
+            - uuid: "f0c09111-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Setpoint
+              binding: setpoint
+              properties: [read, write, notify]
+              notify:
+                triggers: [state]
+              onWrite:
+                - action: parse
+                  type: float
+                  target: state
+                  key: setpointC
+                - action: log
+                  template: "[BLE] Setpoint -> {{value}}"

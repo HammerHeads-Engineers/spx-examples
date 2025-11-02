@@ -73,10 +73,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         model_changed = ensure_model(cls._spx_client, MODEL_KEY, model_def)
 
-        overrides = {
-            "communication/mqtt/broker": BROKER_CONTAINER_HOST,
-            "communication/mqtt/port": BROKER_CONTAINER_PORT,
-        }
+        overrides = None
+        # overrides = {
+        #     "communication/mqtt/broker": BROKER_CONTAINER_HOST,
+        #     "communication/mqtt/port": BROKER_CONTAINER_PORT,
+        # }
 
         cls._instance = ensure_instance(
             cls._spx_client,
