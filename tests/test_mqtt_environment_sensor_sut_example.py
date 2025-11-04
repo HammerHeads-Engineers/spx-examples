@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+from pprint import pprint
 import socket
 import time
 import unittest
@@ -58,6 +59,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             raise unittest.SkipTest("paho-mqtt is not installed; install it to run MQTT integration tests.")
         if not _broker_available(BROKER_HOST, BROKER_PORT):
             raise unittest.SkipTest(f"MQTT broker not reachable at {BROKER_HOST}:{BROKER_PORT}")
+        print(
+            f"[MQTT TEST] Broker reachable at {BROKER_HOST}:{BROKER_PORT} "
+            f"(container target {BROKER_CONTAINER_HOST}:{BROKER_CONTAINER_PORT})",
+            flush=True,
+        )
 
         try:
             import spx_python  # type: ignore
@@ -86,11 +92,32 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
             overrides=overrides,
             recreate=model_changed,
         )
+        try:
+            instance_state = cls._instance.get().get("state")
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            instance_state = f"<error retrieving state: {exc}>"
+        print(
+            f"[MQTT TEST] SPX instance {INSTANCE_KEY} state={instance_state} "
+            f"model_changed={model_changed}",
+            flush=True,
+        )
+        try:
+            logs_tail = cls._instance["logs"].tail()
+        except Exception as exc:  # pragma: no cover - diagnostic only
+            logs_tail = f"<unable to fetch logs: {exc}>"
+        else:
+            logs_tail = list(logs_tail)
+        print("[MQTT TEST] Initial instance logs tail:", flush=True)
+        pprint(logs_tail)
 
     def setUp(self) -> None:
         self.sut = SimpleMqttEnvironmentSensorSUT(host=BROKER_HOST, port=BROKER_PORT)
         if not self.sut.connect():
             self.skipTest(f"Unable to connect SUT to MQTT broker at {BROKER_HOST}:{BROKER_PORT}")
+        print(
+            f"[MQTT TEST] SUT connected to broker {BROKER_HOST}:{BROKER_PORT}",
+            flush=True,
+        )
         time.sleep(0.2)
 
         self.instance = getattr(self.__class__, "_instance", None)
@@ -105,6 +132,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
                 lambda: bool(float(getattr(mqtt_connected_attr, "internal_value", 0))),
                 timeout=10.0,
             )
+            print(
+                f"[MQTT TEST] mqtt_connected attribute value="
+                f"{getattr(mqtt_connected_attr, 'internal_value', None)} connected={connected}",
+                flush=True,
+            )
             self.assertTrue(
                 connected,
                 "SPX MQTT adapter did not report connected state within timeout.",
@@ -113,6 +145,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         self.publisher = mqtt.Client()
         self.publisher.connect(BROKER_HOST, BROKER_PORT, keepalive=30)
         self.publisher.loop_start()
+        print("[MQTT TEST] Publisher connected and loop started.", flush=True)
 
     def tearDown(self) -> None:
         if hasattr(self, "publisher") and self.publisher is not None:
@@ -133,12 +166,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     def _publish(self, topic: str, payload: str) -> None:
         info = self.publisher.publish(topic, payload, qos=1, retain=False)
         published = info.wait_for_publish(timeout=2.0)
-        if topic == COMMAND_SETPOINT_TOPIC:
-            print(
-                f"[MQTT TEST] publish topic={topic} payload={payload!r} rc={info.rc} "
-                f"published={published} mid={info.mid} broker={BROKER_HOST}:{BROKER_PORT}",
-                flush=True,
-            )
+        print(
+            f"[MQTT TEST] publish topic={topic} payload={payload!r} rc={info.rc} "
+            f"published={published} mid={info.mid} broker={BROKER_HOST}:{BROKER_PORT}",
+            flush=True,
+        )
 
     def _await_value(
         self,
@@ -153,10 +185,13 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         while time.time() < deadline:
             value = getter()
             if value is not None:
+                print(f"[MQTT TEST] _await_value observed value={value}", flush=True)
+            if value is not None:
                 last_value = value
                 if predicate(value):
                     return value
             time.sleep(0.1)
+        print(f"[MQTT TEST] _await_value timeout. last_value={last_value}", flush=True)
         return last_value
 
     # ------------------------------------------------------------------
@@ -199,6 +234,10 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     def test_setpoint_command_updates_temperature(self):
         start_temp = 20.0
         target_value = 25.0
+        print(
+            f"[MQTT TEST] Starting setpoint test start_temp={start_temp} target={target_value}",
+            flush=True,
+        )
         self.attributes["temperature_c"].internal_value = start_temp
         self.attributes["target_c"].internal_value = start_temp
         if "temperature_integral" in self.attributes:
@@ -214,15 +253,32 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
                 lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
                 timeout=5.0,
             )
+            print(
+                f"[MQTT TEST] attempt={attempt} target_c="
+                f"{self.attributes['target_c'].internal_value} target_updated={target_updated}",
+                flush=True,
+            )
             if target_updated:
                 break
             time.sleep(0.5)
 
         self.assertTrue(target_updated, f"target_c={self.attributes['target_c'].internal_value} == {target_value} attribute did not update from command topic")
 
+        try:
+            logs_tail = list(self.instance["logs"].tail(limit=20))
+        except Exception as exc:
+            logs_tail = f"<unable to fetch logs: {exc}>"
+        print("[MQTT TEST] Instance logs tail before temperature wait:", flush=True)
+        pprint(logs_tail)
+
         temp_reached = wait_for_condition(
             lambda: abs(self.attributes["temperature_c"].internal_value - target_value) <= 0.5,
             timeout=10.0,
+        )
+        print(
+            f"[MQTT TEST] Post-wait temperature_c={self.attributes['temperature_c'].internal_value} "
+            f"temp_reached={temp_reached}",
+            flush=True,
         )
         self.assertTrue(temp_reached, "temperature_c did not converge to the setpoint")
 
@@ -233,6 +289,13 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         )
         self.assertIsInstance(telemetry_temperature, float)
         self.assertAlmostEqual(telemetry_temperature, target_value, delta=0.5)
+
+        try:
+            final_logs = list(self.instance["logs"].tail(limit=20))
+        except Exception as exc:
+            final_logs = f"<unable to fetch logs: {exc}>"
+        print("[MQTT TEST] Instance logs tail after temperature wait:", flush=True)
+        pprint(final_logs)
 
 
 if __name__ == "__main__":
