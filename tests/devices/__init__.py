@@ -11,4 +11,5 @@ __all__ = [
     "scpi_multimeter_sut_example",
     "mqtt_environment_sensor_sut_example",
     "ble_vital_signs_monitor_sut",
+    "open_meteo_static_sut",
 ]

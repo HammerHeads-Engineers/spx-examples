@@ -17,10 +17,12 @@ services:
       retries: 5
 
   spx-server:
-    image: simplephysx/spx-server:v1.0.0-alpha.1
+    image: simplephysx/spx-server:v1.0.0-rc.4
     container_name: spx-server-examples
     ports:
       - "8000:8000"
+      - "8091:8091"
+      - "8092:8092" 
       - "502:502"
       - "5025:5025"      # SCPI/ASCII instrument #1 (multimeter)
       - "5026:5026"      # SCPI/ASCII instrument #2 (future use)
@@ -37,7 +39,7 @@ services:
       ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
 
   spx-ui:
-    image: simplephysx/spx-ui:v1.0.0-rc.15     # or use `build: .` to build from the local repo
+    image: simplephysx/spx-ui:v1.0.0-rc.15    # or use `build: .` to build from the local repo
     container_name: spx-ui-examples
     depends_on:
       spx-server:
