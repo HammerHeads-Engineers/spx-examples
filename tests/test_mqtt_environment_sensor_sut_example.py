@@ -81,16 +81,6 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         model_changed = ensure_model(cls._spx_client, MODEL_KEY, model_def)
 
-        # overrides = {
-        #     "communication/mqtt/broker": BROKER_CONTAINER_HOST,
-        #     "communication/mqtt/port": BROKER_CONTAINER_PORT,
-        # }
-        # print(
-        #     "[MQTT TEST] Applying overrides:",
-        #     overrides,
-        #     flush=True,
-        # )
-
         cls._instance = ensure_instance(
             cls._spx_client,
             INSTANCE_KEY,
@@ -243,7 +233,6 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     # Tests
     # ------------------------------------------------------------------
     def test_receives_temperature_humidity_comfort(self):
-        raise unittest.SkipTest("Temporarily skipping SUT tests due to instability in CI environments.")
         self._publish(SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "26.75")
         self._publish(SimpleMqttEnvironmentSensorSUT.HUMIDITY_TOPIC, "51.2")
         self._publish(SimpleMqttEnvironmentSensorSUT.COMFORT_TOPIC, "89.4")
@@ -260,7 +249,6 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         self.assertAlmostEqual(comfort, 89.4, places=1)
 
     def test_ignores_non_numeric_payload(self):
-        raise unittest.SkipTest("Temporarily skipping SUT tests due to instability in CI environments.")
         self._publish(SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "22.1")
         baseline = self._await_value(
             self.sut.latest_temperature,
