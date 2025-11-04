@@ -26,7 +26,6 @@ SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 class TestScpiMultimeterSUTExample(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        raise unittest.SkipTest("Temporarily skipping SUT tests due to instability in CI environments.")
         try:
             import spx_python  # type: ignore
         except ImportError as exc:  # pragma: no cover - optional dependency

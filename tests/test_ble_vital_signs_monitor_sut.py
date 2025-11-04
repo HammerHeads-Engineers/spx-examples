@@ -22,7 +22,6 @@ class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
     INSTANCE_KEY = "tests_ble_vital_signs_monitor_inst"
 
     def setUp(self) -> None:
-        raise unittest.SkipTest("Temporarily skipping SUT tests due to instability in CI environments.")
         try:
             import bleak  # type: ignore  # noqa: F401
         except Exception:
