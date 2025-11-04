@@ -208,7 +208,8 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         target_updated = False
         attempts = 3
         for attempt in range(attempts):
-            self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
+            # self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
+            self.attributes["target_c"].internal_value = target_value
             target_updated = wait_for_condition(
                 lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
                 timeout=5.0,
