@@ -76,24 +76,26 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         cls._spx_client = spx_python.init(address=SPX_API_URL, product_key=product_key)
         model_def = load_model_definition(MODEL_PATH)
+        model_def["communication"][0]["mqtt"]["broker"] = BROKER_CONTAINER_HOST
+        model_def["communication"][0]["mqtt"]["port"] = BROKER_CONTAINER_PORT
 
         model_changed = ensure_model(cls._spx_client, MODEL_KEY, model_def)
 
-        overrides = {
-            "communication/mqtt/broker": BROKER_CONTAINER_HOST,
-            "communication/mqtt/port": BROKER_CONTAINER_PORT,
-        }
-        print(
-            "[MQTT TEST] Applying overrides:",
-            overrides,
-            flush=True,
-        )
+        # overrides = {
+        #     "communication/mqtt/broker": BROKER_CONTAINER_HOST,
+        #     "communication/mqtt/port": BROKER_CONTAINER_PORT,
+        # }
+        # print(
+        #     "[MQTT TEST] Applying overrides:",
+        #     overrides,
+        #     flush=True,
+        # )
 
         cls._instance = ensure_instance(
             cls._spx_client,
             INSTANCE_KEY,
             MODEL_KEY,
-            overrides=overrides,
+            overrides=None,
             recreate=model_changed,
         )
         try:
@@ -131,7 +133,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         instance_state = "<unknown>"
         try:
-            instance_state = self.instance.get().get("state")
+            instance_state = self.instance.state
         except Exception as exc:
             instance_state = f"<error retrieving state: {exc}>"
         print(f"[MQTT TEST] Instance state before ensure running: {instance_state}", flush=True)
@@ -143,7 +145,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
                 print(f"[MQTT TEST] instance.start() raised: {exc}", flush=True)
             time.sleep(0.5)
             try:
-                instance_state = self.instance.get().get("state")
+                instance_state = self.instance.state
             except Exception as exc:
                 instance_state = f"<error retrieving state: {exc}>"
             print(f"[MQTT TEST] Instance state after ensure running: {instance_state}", flush=True)
