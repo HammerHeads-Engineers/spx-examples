@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: MIT
+
+name: io_module__modbus
+description: |
+  Simple remote I/O module exposing digital inputs/outputs and analog inputs
+  over Modbus. Useful for testing PLC mappings and edge gateways.
+
+attributes:
+  di_1: 0
+  di_2: 0
+  di_3: 0
+  di_4: 0
+  do_1: 0
+  do_2: 0
+  do_3: 0
+  do_4: 0
+
+  ai_1: 0.0   # e.g., 4-20 mA scaled engineering value
+  ai_2: 0.0
+  ai_3: 0.0
+  ai_4: 0.0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.1
+      mapping:
+        di_1: { address: [0,0], group: h_r, type: uint_16 }
+        di_2: { address: [1,1], group: h_r, type: uint_16 }
+        di_3: { address: [2,2], group: h_r, type: uint_16 }
+        di_4: { address: [3,3], group: h_r, type: uint_16 }
+        do_1: { address: [4,4], group: c_o, type: uint_16 }
+        do_2: { address: [5,5], group: c_o, type: uint_16 }
+        do_3: { address: [6,6], group: c_o, type: uint_16 }
+        do_4: { address: [7,7], group: c_o, type: uint_16 }
+        ai_1: { address: [8,9], group: h_r, type: float }
+        ai_2: { address: [10,11], group: h_r, type: float }
+        ai_3: { address: [12,13], group: h_r, type: float }
+        ai_4: { address: [14,15], group: h_r, type: float }
+

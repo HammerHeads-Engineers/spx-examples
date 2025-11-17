@@ -1,0 +1,15 @@
+name: bms_quickstart
+description: |
+  Minimal smart-building baseline containing environmental telemetry, HVAC control
+  and weather backhaul so installers can validate MQTT/Modbus wiring quickly.
+models:
+  - library/domains/iot/generic/environment_sensor__mqtt.yaml
+  - library/domains/iot/generic/environment_sensor__lwm2m.yaml
+  - library/domains/iot/generic/air_quality_station__http.yaml
+  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+  - library/domains/weather/weather_forecast__http.yaml
+services:
+  - mqtt_broker
+  - modbus_tcp_gateway
+  - lwm2m_server
+  - http_gateway

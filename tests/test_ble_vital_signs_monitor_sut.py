@@ -17,7 +17,7 @@ from tests.devices.ble_vital_signs_monitor_sut import BleVitalSignsMonitorSUT
 class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
     """Validates the BLE facade against a running SPX vital signs instance."""
 
-    MODEL_PATH = Path("library/ble/generic/ble_vital_signs_monitor.yaml")
+    MODEL_PATH = Path("library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml")
     MODEL_KEY = "tests__ble_vital_signs_monitor"
     INSTANCE_KEY = "tests_ble_vital_signs_monitor_inst"
 

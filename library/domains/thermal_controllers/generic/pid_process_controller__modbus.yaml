@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MIT
+
+name: pid_process_controller__modbus
+description: |
+  Generic PID process controller for a single-loop process variable exposed
+  via Modbus. Represents typical industrial temperature/pressure/level loops.
+
+attributes:
+  pv: 0.0           # process variable
+  sp: 1.0           # setpoint
+  cv: 0.0           # controller output 0..100
+
+  k_p: 2.0
+  k_i: 0.5
+  k_d: 0.0
+
+  i_term: 0.0
+  d_term: 0.0
+  error_prev: 0.0
+
+  output_min: 0.0
+  output_max: 100.0
+
+  mode_auto: 1      # 1=auto, 0=manual
+  manual_cv: 0.0
+
+  alarm_high: 0
+  alarm_low: 0
+  alarm_high_limit: 1.2
+  alarm_low_limit: -0.2
+
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(i_term)
+    name: integrate_error
+    description: Integrate error when in auto mode.
+    call: (
+          $in(i_term)
+          if $in(mode_auto) == 0
+          else $in(i_term) + $in(k_i) * ($in(sp) - $in(pv)) * cycle_time_s
+        )
+
+  - function: $in(d_term)
+    name: differentiate_error
+    description: Derivative action based on error slope.
+    call: $in(k_d) * (($in(sp) - $in(pv)) - $in(error_prev)) / max(1e-3, cycle_time_s)
+
+  - function: $in(error_prev)
+    name: capture_error
+    call: $in(sp) - $in(pv)
+
+  - function: $in(cv)
+    name: compute_output
+    description: PID output with clamping and manual override.
+    call: >-
+          (
+            $in(manual_cv)
+            if $in(mode_auto) == 0
+            else max(
+              $in(output_min),
+              min(
+                $in(output_max),
+                $in(k_p) * ($in(sp) - $in(pv)) + $in(i_term) + $in(d_term)
+              )
+            )
+          )
+
+  - function: $in(alarm_high)
+    name: detect_high
+    call: 1 if $in(pv) >= $in(alarm_high_limit) else 0
+
+  - function: $in(alarm_low)
+    name: detect_low
+    call: 1 if $in(pv) <= $in(alarm_low_limit) else 0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.25
+      mapping:
+        pv:              { address: [0,1], group: h_r, type: float }
+        sp:              { address: [2,3], group: h_r, type: float }
+        cv:              { address: [4,5], group: h_r, type: float }
+        k_p:             { address: [6,7], group: h_r, type: float }
+        k_i:             { address: [8,9], group: h_r, type: float }
+        k_d:             { address: [10,11], group: h_r, type: float }
+        mode_auto:       { address: [12,12], group: c_o, type: uint_16 }
+        manual_cv:       { address: [13,14], group: h_r, type: float }
+        alarm_high:      { address: [15,15], group: h_r, type: uint_16 }
+        alarm_low:       { address: [16,16], group: h_r, type: uint_16 }
+        alarm_high_limit: { address: [17,18], group: h_r, type: float }
+        alarm_low_limit: { address: [19,20], group: h_r, type: float }

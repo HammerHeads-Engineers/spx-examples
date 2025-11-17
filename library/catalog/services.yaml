@@ -1,0 +1,170 @@
+services:
+  - id: mqtt_broker
+    name: MQTT Broker
+    protocol: mqtt
+    description: MQTT broker used by edge telemetry publishers/consumers.
+    ports:
+      - transport: tcp
+        host: 1883
+        container: 1883
+        purpose: telemetry/control topics
+    deployment:
+      runtime: docker
+      image: eclipse-mosquitto:latest
+      container_name: mosquitto-examples
+      volumes:
+        - ./library/assets/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      healthcheck:
+        test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health/check -n || exit 1"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+  - id: modbus_tcp_gateway
+    name: Modbus TCP Gateway
+    protocol: modbus
+    description: Exposes SPX models to Modbus masters/slaves for motion/process control.
+    ports:
+      - transport: tcp
+        host: 502
+        container: 502
+        purpose: Modbus TCP server (unit IDs defined per model)
+    deployment:
+      runtime: builtin
+      provider: spx-server
+  - id: lwm2m_server
+    name: LwM2M Server
+    protocol: lwm2m
+    description: CoAP/LwM2M endpoint (e.g., Leshan) used by environment sensors.
+    ports:
+      - transport: udp
+        host: 5683
+        container: 5683
+        purpose: CoAP/LwM2M plain (DTLS optional)
+      - transport: udp
+        host: 5684
+        container: 5684
+        purpose: CoAP/LwM2M DTLS
+      - transport: tcp
+        host: 8080
+        container: 8080
+        purpose: Management console / REST
+    deployment:
+      runtime: docker
+      image: corfr/leshan:latest
+      container_name: leshan-server
+      hostname: leshan
+      restart: unless-stopped
+  - id: http_gateway
+    name: HTTP Simulator Gateway
+    protocol: http
+    description: Static REST endpoints for weather and air-quality feeds.
+    ports:
+      - transport: tcp
+        host: 8091
+        container: 8091
+        purpose: Weather forecast API `/v1/forecast`
+      - transport: tcp
+        host: 8092
+        container: 8092
+        purpose: Air-quality API `/v1/air-quality`
+    deployment:
+      runtime: builtin
+      provider: spx-server
+      notes: "Expose only if models requiring HTTP endpoints are enabled."
+  - id: btvirt_adapter
+    name: btvirt Adapter
+    protocol: ble
+    description: btvirt-backed fake BLE adapter that exposes BLE GATT devices over HTTP.
+    ports:
+      - transport: tcp
+        host: 8080
+        container: 8080
+        purpose: btvirt REST bridge used by BLE codecs
+    deployment:
+      runtime: native
+      instructions:
+        macos: "Install via Homebrew (`brew install btvirt`), then run installer/scripts/setup_btvirt_macos.sh"
+        linux: "Install btvirt (build from source) and run installer/scripts/setup_btvirt_linux.sh with sudo"
+        windows: "Not supported yet; use WSL2 or external BLE bridge"
+      commands:
+        macos: ["bash", "installer/scripts/setup_btvirt_macos.sh"]
+        linux: ["bash", "installer/scripts/setup_btvirt_linux.sh"]
+      notes: >
+        The adapter spawns a local btvirt daemon; ensure the service is running before starting BLE models.
+  - id: scpi_tcp_stack
+    name: SCPI TCP Stack
+    protocol: scpi
+    description: ASCII/SCPI listener for virtual bench instruments.
+    ports:
+      - transport: tcp
+        host: 5025
+        container: 5025
+        purpose: SCPI socket server for VISA/TCP clients
+    deployment:
+      runtime: builtin
+      provider: spx-server
+      notes: "Enable port mappings per instrument (5025 multimeter, 5026 future expansion)."
+  - id: knx_gateway
+    name: KNX Gateway
+    protocol: knx
+    description: KNX/IP router (knxd) exposing KNXnet/IP and TCP interfaces.
+    ports:
+      - transport: udp
+        host: 3671
+        container: 3671
+        purpose: KNXnet/IP (routing/tunneling)
+      - transport: tcp
+        host: 6720
+        container: 6720
+        purpose: knxd TCP interface
+    deployment:
+      runtime: docker
+      image: michelmu/knxd-docker:latest
+      container_name: knxd-examples
+      volumes:
+        - ./library/assets/knx/knxd.ini:/etc/knxd.ini:ro
+      entrypoint: ["knxd", "/etc/knxd.ini"]
+      restart: unless-stopped
+  - id: homeassistant_bridge
+    name: Home Assistant Bridge
+    protocol: http
+    description: Home Assistant container bridging SPX devices with UI/automations.
+    ports:
+      - transport: tcp
+        host: 8123
+        container: 8123
+        purpose: Home Assistant UI/API
+    deployment:
+      runtime: docker
+      image: ghcr.io/home-assistant/home-assistant:stable
+      container_name: homeassistant
+      environment:
+        TZ: Europe/Warsaw
+      volumes:
+        - ./library/assets/homeassistant/config:/config
+        - /etc/localtime:/etc/localtime:ro
+      restart: unless-stopped
+      depends_on:
+        - knx_gateway
+  - id: matter_server
+    name: Matter Server
+    protocol: matter
+    description: Python Matter server exposing API/WebSocket for HA integrations.
+    ports:
+      - transport: tcp
+        host: 5580
+        container: 5580
+        purpose: Matter server API/WebSocket
+    deployment:
+      runtime: docker
+      image: ghcr.io/home-assistant-libs/python-matter-server:stable
+      container_name: matter-server
+      environment:
+        MATTER_SERVER_DATABASE_PATH: /data/matter.db
+        MATTER_SERVER_LOG_LEVEL: info
+      volumes:
+        - ./library/assets/matter/data:/data
+        - /etc/localtime:/etc/localtime:ro
+      restart: unless-stopped
+      depends_on:
+        - homeassistant_bridge

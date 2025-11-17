@@ -23,7 +23,7 @@ else:
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "weather" / "open_meteo_static.yaml"
+MODEL_PATH = ROOT / "library" / "domains" / "weather" / "weather_forecast__http.yaml"
 MODEL_KEY = "tests__open_meteo_static"
 INSTANCE_KEY = "tests_open_meteo_static_instance"
 

@@ -15,7 +15,14 @@ from tests.common.spx_utils import bootstrap_model_instance, wait_seconds
 from tests.devices.modbus_stepper_sut_example import ModbusStepperSUTExample, ModbusTcpClient
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "motion_controllers" / "generic" / "stepper_controller.yaml"
+MODEL_PATH = (
+    ROOT
+    / "library"
+    / "domains"
+    / "motion_controllers"
+    / "generic"
+    / "stepper_controller__modbus.yaml"
+)
 MODEL_KEY = "tests__stepper_controller"
 INSTANCE_KEY = "generic_stepper_controller"
 DISCONNECT_DURATION = 1.5

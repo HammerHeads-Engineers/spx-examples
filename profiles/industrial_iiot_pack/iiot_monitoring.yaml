@@ -1,0 +1,12 @@
+name: iiot_monitoring
+description: |
+  Monitoring-oriented profile that feeds MQTT/HTTP telemetry from the building
+  sensors into factory dashboards.
+models:
+  - library/domains/iot/generic/environment_sensor__mqtt.yaml
+  - library/domains/iot/generic/air_quality_station__http.yaml
+  - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+services:
+  - mqtt_broker
+  - http_gateway
+  - scpi_tcp_stack

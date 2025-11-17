@@ -34,7 +34,7 @@ if BROKER_CONTAINER_HOST is None:
 BROKER_CONTAINER_PORT = int(
     os.environ.get("MQTT_TEST_BROKER_PORT_CONTAINER", str(BROKER_PORT))
 )
-MODEL_PATH = Path("library/iot/generic/mqtt_environment_sensor.yaml")
+MODEL_PATH = Path("library/domains/iot/generic/environment_sensor__mqtt.yaml")
 MODEL_KEY = "tests__generic_mqtt_environment_sensor"
 INSTANCE_KEY = "tests_generic_mqtt_environment_sensor_inst"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")

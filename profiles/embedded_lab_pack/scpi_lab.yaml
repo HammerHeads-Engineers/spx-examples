@@ -1,0 +1,10 @@
+name: scpi_lab
+description: |
+  SCPI-focused lab harness bundling the virtual multimeter and vacuum gauge so
+  VISA/TCP test benches can run deterministically.
+models:
+  - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+  - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
+services:
+  - scpi_tcp_stack
+  - modbus_tcp_gateway

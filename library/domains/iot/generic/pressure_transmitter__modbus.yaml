@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: MIT
+
+name: pressure_transmitter__modbus
+description: |
+  Simple pressure transmitter with linear response, exposed via Modbus. Useful
+  for testing analog input scaling and alarm handling.
+
+attributes:
+  pressure_bar: 1.0          # process pressure [bar]
+  pressure_min_bar: 0.0
+  pressure_max_bar: 10.0
+
+  alarm_high: 0
+  alarm_low: 0
+  alarm_high_limit: 8.0
+  alarm_low_limit: 0.5
+
+actions:
+  - function: $in(alarm_high)
+    name: detect_high
+    call: 1 if $in(pressure_bar) >= $in(alarm_high_limit) else 0
+
+  - function: $in(alarm_low)
+    name: detect_low
+    call: 1 if $in(pressure_bar) <= $in(alarm_low_limit) else 0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.2
+      mapping:
+        pressure_bar:      { address: [0,1], group: h_r, type: float }
+        alarm_high:        { address: [2,2], group: h_r, type: uint_16 }
+        alarm_low:         { address: [3,3], group: h_r, type: uint_16 }
+        alarm_high_limit:  { address: [4,5], group: h_r, type: float }
+        alarm_low_limit:   { address: [6,7], group: h_r, type: float }
+

@@ -1,0 +1,181 @@
+models:
+  - id: Env.EnvSensor.Mqtt
+    name: MQTT Environment Sensor
+    path: library/domains/iot/generic/environment_sensor__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [smart_building_pack, energy_pack, embedded_lab_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, iiot_monitoring]
+  - id: Env.EnvSensor.Lwm2m
+    name: LwM2M Environment Sensor
+    path: library/domains/iot/generic/environment_sensor__lwm2m.yaml
+    domain: iot
+    protocols: [lwm2m, coap]
+    services:
+      - id: lwm2m_server
+    packages: [smart_building_pack, embedded_lab_pack]
+    profiles: [bms_quickstart]
+  - id: Env.AirQualityStation.Http
+    name: Air Quality Station (HTTP)
+    path: library/domains/iot/generic/air_quality_station__http.yaml
+    domain: iot
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [smart_building_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, iiot_monitoring]
+  - id: Weather.WeatherFeed.Http
+    name: Weather Forecast Feed
+    path: library/domains/weather/weather_forecast__http.yaml
+    domain: weather
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [smart_building_pack, energy_pack]
+    profiles: [bms_quickstart, ev_csms_demo]
+  - id: Process.ThermalController.Modbus
+    name: Thermal Controller (Modbus)
+    path: library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, opcua_line_quickstart]
+  - id: Motion.StepperController.Modbus
+    name: Stepper Controller (Modbus)
+    path: library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]
+  - id: Process.VacuumGauge.Modbus
+    name: Vacuum Gauge (Modbus)
+    path: library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
+    domain: vacuum_systems
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: [scpi_lab, opcua_line_quickstart]
+  - id: Lab.Multimeter.Scpi
+    name: SCPI Multimeter
+    path: library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: [scpi_lab, iiot_monitoring]
+  - id: Embedded.HealthMonitor.BleGatt
+    name: BLE Vital Signs Monitor
+    path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
+    domain: ble
+    protocols: [ble]
+    services:
+      - id: btvirt_adapter
+    packages: [embedded_lab_pack]
+    profiles: [mhealth_ci]
+  - id: Embedded.TempSensor.BleGatt
+    name: BLE Temperature Sensor
+    path: library/domains/ble/generic/temperature_sensor__ble_gatt.yaml
+    domain: ble
+    protocols: [ble]
+    services:
+      - id: btvirt_adapter
+    packages: [embedded_lab_pack]
+    profiles: [mhealth_ci]
+  - id: IIoT.LineCounter.Mqtt
+    name: Line Counter (MQTT)
+    path: library/domains/iot/generic/line_counter__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Energy.EnergyMeter3Ph.Mqtt
+    name: 3-Phase Energy Meter (MQTT)
+    path: library/domains/iot/generic/energy_meter_3ph__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack, energy_pack]
+    profiles: [iiot_monitoring]
+  - id: Condition.ConditionMonitor.Mqtt
+    name: Condition Monitor (MQTT)
+    path: library/domains/iot/generic/condition_monitor__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Motion.VFDrive.Modbus
+    name: VFD Drive (Modbus)
+    path: library/domains/motion_controllers/generic/vfd_drive__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]
+  - id: IO.IOModule.Modbus
+    name: IO Module (Modbus)
+    path: library/domains/iot/generic/io_module__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Process.PIDController.Modbus
+    name: PID Process Controller (Modbus)
+    path: library/domains/thermal_controllers/generic/pid_process_controller__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]
+  - id: Energy.EnergyMeter3Ph.Modbus
+    name: 3-Phase Energy Meter (Modbus)
+    path: library/domains/iot/generic/energy_meter_3ph__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack, energy_pack]
+    profiles: [iiot_monitoring]
+  - id: Process.PressureTransmitter.Modbus
+    name: Pressure Transmitter (Modbus)
+    path: library/domains/iot/generic/pressure_transmitter__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Logistics.AGVVehicle.Mqtt
+    name: AGV Vehicle (MQTT)
+    path: library/domains/iot/generic/agv_vehicle__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Quality.VisionStation.Http
+    name: Vision Quality Station (HTTP)
+    path: library/domains/iot/generic/vision_quality_station__http.yaml
+    domain: iot
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]

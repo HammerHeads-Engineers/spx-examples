@@ -9,15 +9,104 @@ services:
     ports:
       - "1883:1883"
     volumes:
-      - ./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./library/assets/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health/check -n || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  mosquitto_2:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto-examples-2
+    ports:
+      - "2883:2883"
+    volumes:
+      - ./library/assets/mosquitto/mosquitto-ha.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health/check -n || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  knxd:
+    image: michelmu/knxd-docker:latest
+    container_name: knxd-examples
+    # Używamy pliku konfiguracyjnego z repo:
+    volumes:
+      - ./library/assets/knx/knxd.ini:/etc/knxd.ini:ro
+    # Mapowanie portów: KNXnet/IP (UDP/3671) i knxd_tcp (TCP/6720)
+    ports:
+      - "3671:3671/udp"
+      - "6720:6720"
+    restart: unless-stopped
+    entrypoint: ["knxd", "/etc/knxd.ini"]
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant-examples
+    environment:
+      - TZ=Europe/Warsaw
+    volumes:
+      - ./library/assets/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8123:8123"   # Home Assistant UI
+    depends_on:
+      knxd:
+        condition: service_started
+    restart: unless-stopped
+
+  matter-server:
+    image: ghcr.io/home-assistant-libs/python-matter-server:stable
+    container_name: matter-server-examples
+    ports:
+      - "5580:5580"   # Matter server API/WebSocket
+    volumes:
+      - ./library/assets/matter/data:/data
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      MATTER_SERVER_DATABASE_PATH: /data/matter.db
+      MATTER_SERVER_LOG_LEVEL: info
+    depends_on:
+      homeassistant:
+        condition: service_started
+    restart: unless-stopped
+
+  leshan:
+    image: corfr/leshan:latest
+    container_name: leshan-server-examples
+    hostname: leshan
+    restart: unless-stopped
+    ports:
+      - "8080:8080"        # Leshan web UI / management console
+      - "5683:5683/udp"    # CoAP / LwM2M (keep UDP exposed)
+      - "5684:5684/udp"    # DTLS / LwM2M secure channel (optional)
+    # No volumes required; demo server keeps state in-memory.
+
+  # dali-gateway:
+  #   build:
+  #     context: ./library/assets/dali-gateway
+  #     args:
+  #       DALIGATEWAY_REF: main
+  #   image: spx-examples/dali-gateway:latest
+  #   container_name: dali-gateway
+  #   ports:
+  #     - "8081:8081"   # REST API / Web UI
+  #   volumes:
+  #     - ./library/assets/dali-gateway/data:/data
+  #   # Odkomentuj sekcję devices na hostach Linux, aby udostępnić interfejs DALI (USB/RS485).
+  #   # devices:
+  #   #   - /dev/ttyUSB0:/dev/ttyUSB0
+  #   environment:
+  #     ASPNETCORE_URLS: http://0.0.0.0:8081
+  #   depends_on:
+  #     mosquitto:
+  #       condition: service_started
+  #   restart: unless-stopped
+
   spx-server:
-    image: simplephysx/spx-server:v1.0.0-rc.4
+    image: simplephysx/spx-server:v1.0.0-rc.11
     container_name: spx-server-examples
     ports:
       - "8000:8000"
@@ -38,15 +127,15 @@ services:
     command:
       ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
 
-  spx-ui:
-    image: simplephysx/spx-ui:v1.0.0-rc.15    # or use `build: .` to build from the local repo
-    container_name: spx-ui-examples
-    depends_on:
-      spx-server:
-        condition: service_healthy           # wait until API is reachable
-    ports:
-      - "3000:3000"
-    environment:
-      SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}    # entrypoint will pick this up
-    command:
-      ["--product-key", "${SPX_PRODUCT_KEY}"]
+  # spx-ui:
+  #   image: simplephysx/spx-ui:trial   # or use `build: .` to build from the local repo
+  #   container_name: spx-ui-examples
+  #   depends_on:
+  #     spx-server:
+  #       condition: service_healthy           # wait until API is reachable
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}    # entrypoint will pick this up
+  #   command:
+  #     ["--product-key", "${SPX_PRODUCT_KEY}"]

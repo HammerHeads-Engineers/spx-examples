@@ -1,0 +1,10 @@
+name: opcua_line_quickstart
+description: |
+  Quick baseline for motion/process control containing the stepper axis, thermal
+  loop, and vacuum instrumentation mapped through Modbus.
+models:
+  - library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
+  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+  - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
+services:
+  - modbus_tcp_gateway

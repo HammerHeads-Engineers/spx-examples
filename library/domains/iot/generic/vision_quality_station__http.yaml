@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: MIT
+
+name: vision_quality_station__http
+description: |
+  Simple vision/quality inspection station. Exposes HTTP endpoints for fetching
+  inspection statistics and simulating new inspection results. Useful for
+  Industry 4.0 quality dashboards and scrap analysis.
+
+attributes:
+  ok_count: 0
+  nok_count: 0
+  last_result: ok          # ok / nok
+  last_defect_code: none
+  last_part_id: ""
+  sample_queued: 0
+
+  defect_count_none: 0
+  defect_count_scratch: 0
+  defect_count_dent: 0
+  defect_count_offset: 0
+
+actions:
+  - function: $in(ok_count)
+    name: update_ok_count
+    call: (
+          $in(ok_count)
+          if $in(sample_queued) == 0 or $in(last_result) != "ok"
+          else $in(ok_count) + 1
+        )
+
+  - function: $in(nok_count)
+    name: update_nok_count
+    call: (
+          $in(nok_count)
+          if $in(sample_queued) == 0 or $in(last_result) != "nok"
+          else $in(nok_count) + 1
+        )
+
+  - function: $in(defect_count_none)
+    name: update_defect_none
+    call: (
+          $in(defect_count_none)
+          if $in(sample_queued) == 0 or $in(last_result) != "nok" or $in(last_defect_code) != "none"
+          else $in(defect_count_none) + 1
+        )
+
+  - function: $in(defect_count_scratch)
+    name: update_defect_scratch
+    call: (
+          $in(defect_count_scratch)
+          if $in(sample_queued) == 0 or $in(last_result) != "nok" or $in(last_defect_code) != "scratch"
+          else $in(defect_count_scratch) + 1
+        )
+
+  - function: $in(defect_count_dent)
+    name: update_defect_dent
+    call: (
+          $in(defect_count_dent)
+          if $in(sample_queued) == 0 or $in(last_result) != "nok" or $in(last_defect_code) != "dent"
+          else $in(defect_count_dent) + 1
+        )
+
+  - function: $in(defect_count_offset)
+    name: update_defect_offset
+    call: (
+          $in(defect_count_offset)
+          if $in(sample_queued) == 0 or $in(last_result) != "nok" or $in(last_defect_code) != "offset"
+          else $in(defect_count_offset) + 1
+        )
+
+  - function: $in(sample_queued)
+    name: reset_sample_queue
+    call: 0
+          if $in(sample_queued) == 0
+          else 0
+
+communication:
+  - http_endpoint:
+      host: 0.0.0.0
+      port: 8093
+      endpoints:
+        "/v1/inspection/stats":
+          method: GET
+          response:
+            ok_count: "#attr(ok_count)"
+            nok_count: "#attr(nok_count)"
+            last_result: "#attr(last_result)"
+            last_defect_code: "#attr(last_defect_code)"
+            last_part_id: "#attr(last_part_id)"
+            defect_histogram:
+              none: "#attr(defect_count_none)"
+              scratch: "#attr(defect_count_scratch)"
+              dent: "#attr(defect_count_dent)"
+              offset: "#attr(defect_count_offset)"
+
+        "/v1/inspection/sample":
+          method: POST
+          alias:
+            - "#attr(last_part_id) = #param(__body__.part_id)"
+            - "#attr(last_result) = #param(__body__.result)"
+            - "#attr(last_defect_code) = #param(__body__.defect_code)"
+            - "#attr(sample_queued) = 1"
+          response:
+            status: "ok"
+            part_id: "#attr(last_part_id)"
+            result: "#attr(last_result)"
+            defect_code: "#attr(last_defect_code)"

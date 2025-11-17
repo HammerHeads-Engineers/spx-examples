@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Runtime state from bundled services (keep only template configs)
+library/assets/homeassistant/config/home-assistant*.db*
+library/assets/homeassistant/config/home-assistant*.log*
+library/assets/homeassistant/config/.storage/
+library/assets/homeassistant/config/deps/
+library/assets/homeassistant/config/tts/
+library/assets/homeassistant/config/secrets.yaml
+library/assets/matter/data/

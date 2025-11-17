@@ -1,0 +1,82 @@
+industries:
+  - id: smart_building_pack
+    name: Smart-Building Pack (BMS)
+    description: >-
+      Building automation starter kit with MQTT/LwM2M sensors, Modbus HVAC controllers
+      and weather services for immediate BMS demos.
+    protocols: [mqtt, lwm2m, coap, http, modbus]
+    services: [mqtt_broker, lwm2m_server, modbus_tcp_gateway, http_gateway, knx_gateway, homeassistant_bridge, matter_server]
+    profiles:
+      - profiles/smart_building_pack/bms_quickstart.yaml
+    default_instances:
+      - model: Env.EnvSensor.Mqtt
+        instance: spx_env_sensor_mqtt
+      - model: Env.EnvSensor.Lwm2m
+        instance: spx_env_sensor_lwm2m
+      - model: Process.ThermalController.Modbus
+        instance: spx_hvac_controller
+      - model: Weather.WeatherFeed.Http
+        instance: spx_weather_feed
+      - model: Env.AirQualityStation.Http
+        instance: spx_air_quality_feed
+    path: library/industries/smart_building_pack
+  - id: energy_pack
+    name: Energy Pack (e-Mobility & DER)
+    description: >-
+      DER orchestration scaffold; currently reuses shared telemetry/controllers until
+      dedicated OCPP/SunSpec device twins land.
+    protocols: [mqtt, http, modbus]
+    services: [mqtt_broker, modbus_tcp_gateway, http_gateway]
+    profiles:
+      - profiles/energy_pack/ev_csms_demo.yaml
+    path: library/industries/energy_pack
+  - id: embedded_lab_pack
+    name: Embedded & Lab Pack
+    description: >-
+      BLE, MQTT/LwM2M and SCPI devices for firmware CI and hardware-in-the-loop labs.
+    protocols: [ble, mqtt, lwm2m, coap, scpi, modbus]
+    services: [btvirt_adapter, mqtt_broker, lwm2m_server, scpi_tcp_stack, modbus_tcp_gateway]
+    profiles:
+      - profiles/embedded_lab_pack/mhealth_ci.yaml
+      - profiles/embedded_lab_pack/scpi_lab.yaml
+    path: library/industries/embedded_lab_pack
+  - id: industrial_iiot_pack
+    name: Industrial + IIoT Pack
+    description: >-
+      Motion/process control and monitoring bundle mixing Modbus, MQTT and SCPI
+      instrumentation for factory/QA flows.
+    protocols: [modbus, mqtt, http, scpi]
+    services: [modbus_tcp_gateway, mqtt_broker, http_gateway, scpi_tcp_stack]
+    profiles:
+      - profiles/industrial_iiot_pack/opcua_line_quickstart.yaml
+      - profiles/industrial_iiot_pack/iiot_monitoring.yaml
+    default_instances:
+      - model: Motion.StepperController.Modbus
+        instance: spx_stepper_axis
+      - model: Process.ThermalController.Modbus
+        instance: spx_process_heater
+      - model: Process.VacuumGauge.Modbus
+        instance: spx_vacuum_gauge
+      - model: IIoT.LineCounter.Mqtt
+        instance: spx_line_counter
+      - model: Energy.EnergyMeter3Ph.Mqtt
+        instance: spx_energy_meter_3ph
+      - model: Condition.ConditionMonitor.Mqtt
+        instance: spx_condition_monitor
+      - model: Lab.Multimeter.Scpi
+        instance: spx_lab_multimeter
+      - model: Logistics.AGVVehicle.Mqtt
+        instance: spx_agv_vehicle
+      - model: Quality.VisionStation.Http
+        instance: spx_vision_station
+      - model: Motion.VFDrive.Modbus
+        instance: spx_vfd_drive
+      - model: IO.IOModule.Modbus
+        instance: spx_io_module
+      - model: Process.PIDController.Modbus
+        instance: spx_pid_controller
+      - model: Energy.EnergyMeter3Ph.Modbus
+        instance: spx_energy_meter_3ph_modbus
+      - model: Process.PressureTransmitter.Modbus
+        instance: spx_pressure_transmitter
+    path: library/industries/industrial_iiot_pack

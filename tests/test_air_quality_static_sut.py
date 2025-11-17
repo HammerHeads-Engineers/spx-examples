@@ -23,7 +23,14 @@ else:
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "iot" / "generic" / "air_quality_static.yaml"
+MODEL_PATH = (
+    ROOT
+    / "library"
+    / "domains"
+    / "iot"
+    / "generic"
+    / "air_quality_station__http.yaml"
+)
 MODEL_KEY = "tests__air_quality_static"
 INSTANCE_KEY = "tests_air_quality_static_instance"
 

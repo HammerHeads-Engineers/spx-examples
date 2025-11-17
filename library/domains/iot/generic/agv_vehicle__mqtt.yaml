@@ -1,0 +1,129 @@
+# SPDX-License-Identifier: MIT
+
+name: agv_vehicle__mqtt
+description: |
+  Autonomous guided vehicle (AGV) model for intralogistics scenarios. Publishes
+  position, battery state, mission status and load information over MQTT.
+
+attributes:
+  pos_x_m: 0.0              # current X position [m]
+  pos_y_m: 0.0              # current Y position [m]
+  heading_deg: 0.0          # heading angle [deg]
+  speed_mps: 0.0            # current speed [m/s]
+  target_x_m: 10.0          # target waypoint X [m]
+  target_y_m: 0.0           # target waypoint Y [m]
+  target_speed_mps: 1.0     # commanded speed [m/s]
+
+  battery_soc_percent: 100.0   # state of charge [%]
+  battery_discharge_rate: 0.02 # discharge per second at nominal speed
+
+  mission_state: idle       # idle, navigating, waiting, error
+  load_present: 0           # 1 = pallet/box on board
+  alarm_obstacle: 0         # 1 = obstacle detected
+
+  cycle_time_s: 0.5         # integration step [s]
+
+actions:
+  - function: $in(speed_mps)
+    name: track_speed
+    description: Slew actual speed toward target when navigating.
+    accel: 0.4
+    decel: 0.7
+    call: (
+          0.0 if $in(mission_state) != "navigating"
+          else (
+            $in(speed_mps)
+            + (
+                min(accel, $in(target_speed_mps) - $in(speed_mps))
+                if $in(target_speed_mps) > $in(speed_mps)
+                else max(-decel, $in(target_speed_mps) - $in(speed_mps))
+              )
+          )
+        )
+
+  - function: $in(pos_x_m)
+    name: integrate_position_x
+    description: Simple kinematics update in X assuming heading defines direction.
+    call: $in(pos_x_m) + $in(speed_mps) * cycle_time_s * cos($in(heading_deg) * 3.14159 / 180.0)
+
+  - function: $in(pos_y_m)
+    name: integrate_position_y
+    description: Simple kinematics update in Y assuming heading defines direction.
+    call: $in(pos_y_m) + $in(speed_mps) * cycle_time_s * sin($in(heading_deg) * 3.14159 / 180.0)
+
+  - function: $in(battery_soc_percent)
+    name: discharge_battery
+    description: Discharge battery in proportion to speed.
+    call: max(
+          0.0,
+          $in(battery_soc_percent)
+          - $in(battery_discharge_rate) * cycle_time_s * max(0.2, abs($in(speed_mps)))
+        )
+
+  - function: $in(mission_state)
+    name: update_mission_state
+    description: Switch mission state based on speed and waypoint proximity.
+    tolerance_m: 0.3
+    call: (
+          "error" if $in(alarm_obstacle) == 1
+          else (
+            "idle" if $in(target_speed_mps) <= 0.01
+            else (
+              "waiting" if sqrt(($in(target_x_m) - $in(pos_x_m)) ** 2 + ($in(target_y_m) - $in(pos_y_m)) ** 2) <= tolerance_m
+              else "navigating"
+            )
+          )
+        )
+
+communication:
+  - mqtt:
+      broker: "host.docker.internal"
+      port: 1883
+      publish_interval: 0.5
+      topic_prefix: "spx/examples/agv"
+      default_qos: 1
+      default_retain: false
+      bindings:
+        - attribute: $ext(pos_x_m)
+          topic: telemetry/pos_x_m
+          direction: publish
+        - attribute: $ext(pos_y_m)
+          topic: telemetry/pos_y_m
+          direction: publish
+        - attribute: $ext(heading_deg)
+          topic: telemetry/heading_deg
+          direction: publish
+        - attribute: $ext(speed_mps)
+          topic: telemetry/speed_mps
+          direction: publish
+        - attribute: $ext(battery_soc_percent)
+          topic: telemetry/battery_soc_percent
+          direction: publish
+        - attribute: $ext(mission_state)
+          topic: telemetry/mission_state
+          direction: publish
+        - attribute: $ext(load_present)
+          topic: telemetry/load_present
+          direction: publish
+        - attribute: $ext(alarm_obstacle)
+          topic: telemetry/alarms/obstacle
+          direction: publish
+        - attribute: $attr(target_x_m)
+          topic: command/target_x_m
+          direction: subscribe
+        - attribute: $attr(target_y_m)
+          topic: command/target_y_m
+          direction: subscribe
+        - attribute: $attr(target_speed_mps)
+          topic: command/target_speed_mps
+          direction: subscribe
+        - attribute: $attr(heading_deg)
+          topic: command/heading_deg
+          direction: subscribe
+        - attribute: $attr(load_present)
+          topic: command/load_present
+          direction: subscribe
+        - attribute: $attr(alarm_obstacle)
+          topic: command/obstacle
+          direction: subscribe
+

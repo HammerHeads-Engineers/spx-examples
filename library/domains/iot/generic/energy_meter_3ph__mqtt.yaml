@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: MIT
+
+name: energy_meter_3ph__mqtt
+description: |
+  Virtual three-phase energy meter exposing voltages, currents, power and
+  cumulative energy over MQTT. Useful for testing industrial energy dashboards
+  and load-shedding logic.
+
+attributes:
+  voltage_l1: 400.0       # [V]
+  voltage_l2: 400.0       # [V]
+  voltage_l3: 400.0       # [V]
+  current_l1: 12.0        # [A]
+  current_l2: 10.5        # [A]
+  current_l3: 11.2        # [A]
+  frequency_hz: 50.0      # [Hz]
+  power_factor: 0.95      # cos(phi)
+
+  active_power_kw: 0.0    # instantaneous active power [kW]
+  energy_import_kwh: 0.0  # accumulated imported energy [kWh]
+
+  overload_threshold_kw: 45.0  # threshold for overload alarm
+  overload_alarm: 0            # 1 = overload
+
+  cycle_time_s: 1.0            # integration step
+
+actions:
+  - function: $in(active_power_kw)
+    name: compute_active_power
+    description: Estimate active power from three-phase voltage, currents, and power factor.
+    call: max(
+          0.0,
+          1e-3
+          * $in(power_factor)
+          * (
+              $in(voltage_l1) * $in(current_l1)
+              + $in(voltage_l2) * $in(current_l2)
+              + $in(voltage_l3) * $in(current_l3)
+            )
+        )
+
+  - function: $in(energy_import_kwh)
+    name: integrate_energy
+    description: Integrate cumulative imported energy based on active power.
+    call: $in(energy_import_kwh) + max(0.0, $in(active_power_kw)) * cycle_time_s / 3600.0
+
+  - function: $in(overload_alarm)
+    name: detect_overload
+    description: Raise overload alarm when power exceeds the threshold.
+    call: 1 if $in(active_power_kw) >= $in(overload_threshold_kw) else 0
+
+communication:
+  - mqtt:
+      broker: "host.docker.internal"
+      port: 1883
+      publish_interval: 1.0
+      topic_prefix: "spx/examples/energy_meter"
+      default_qos: 1
+      default_retain: false
+      bindings:
+        - attribute: $ext(voltage_l1)
+          topic: telemetry/voltage_l1
+          direction: publish
+        - attribute: $ext(voltage_l2)
+          topic: telemetry/voltage_l2
+          direction: publish
+        - attribute: $ext(voltage_l3)
+          topic: telemetry/voltage_l3
+          direction: publish
+        - attribute: $ext(current_l1)
+          topic: telemetry/current_l1
+          direction: publish
+        - attribute: $ext(current_l2)
+          topic: telemetry/current_l2
+          direction: publish
+        - attribute: $ext(current_l3)
+          topic: telemetry/current_l3
+          direction: publish
+        - attribute: $ext(active_power_kw)
+          topic: telemetry/active_power_kw
+          direction: publish
+        - attribute: $ext(energy_import_kwh)
+          topic: telemetry/energy_import_kwh
+          direction: publish
+        - attribute: $ext(overload_alarm)
+          topic: telemetry/alarms/overload
+          direction: publish
+        - attribute: $attr(overload_threshold_kw)
+          topic: command/overload_threshold_kw
+          direction: subscribe

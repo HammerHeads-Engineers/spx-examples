@@ -9,8 +9,12 @@ import spx_python
 import yaml
 
 MODEL_PATHS = {
-    "ble_temperature_sensor": Path("library/ble/generic/ble_temperature_sensor.yaml"),
-    "ble_vital_signs_monitor": Path("library/ble/generic/ble_vital_signs_monitor.yaml"),
+    "ble_temperature_sensor": Path(
+        "library/domains/ble/generic/temperature_sensor__ble_gatt.yaml"
+    ),
+    "ble_vital_signs_monitor": Path(
+        "library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml"
+    ),
 }
 
 

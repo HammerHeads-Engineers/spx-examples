@@ -20,7 +20,14 @@ from tests.devices.modbus_vacuum_gauge_sut_example import (
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "vacuum_systems" / "generic" / "vacuum_gauge.yaml"
+MODEL_PATH = (
+    ROOT
+    / "library"
+    / "domains"
+    / "vacuum_systems"
+    / "generic"
+    / "vacuum_gauge__modbus.yaml"
+)
 MODEL_KEY = "tests__vacuum_gauge"
 INSTANCE_KEY = "generic_vacuum_gauge"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")

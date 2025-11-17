@@ -1,0 +1,214 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+# LwM2M-driven environmental sensor that registers against a Leshan server and
+# exposes temperature, humidity, and HVAC control resources over CoAP.
+# name: generic_lwm2m_environment_sensor
+
+attributes:
+  temperature_c: 22.5
+  ambient_c: 20.5
+  target_c: 22.0
+  temperature_min_c: 21.0
+  temperature_max_c: 24.5
+  humidity_percent: 45.0
+  humidity_target: 47.0
+  humidity_min_percent: 40.0
+  humidity_max_percent: 55.0
+  comfort_index: 92.0
+  hvac_mode: auto
+  fan_speed_percent: 32.0
+  fan_speed_target: 35.0
+  fan_speed_adjusted_target: 35.0
+  fan_slew_rate: 4.0
+  occupancy_count: 3.0
+  occupancy_target: 3.0
+  status_text: "IDLE"
+  current_timestamp: "2025-01-01T12:00:00Z"
+  lwm2m_endpoint: "generic-lwm2m-env-001"
+  lwm2m_connected: 0
+  lwm2m_request_counter: 0
+
+actions:
+  - function: $in(temperature_c)
+    name: update_temperature
+    description: Glide the temperature toward the setpoint with ambient influence.
+    heating_gain: 0.12
+    cooling_gain: 0.09
+    ambient_gain: 0.04
+    occupancy_gain: 0.018
+    call: (
+          $in(temperature_c)
+          + ambient_gain * ($in(ambient_c) - $in(temperature_c))
+          + occupancy_gain * max(0.0, $in(occupancy_count) - 1.0)
+          + heating_gain * max(0.0, $in(target_c) - $in(temperature_c))
+          - cooling_gain * max(0.0, $in(temperature_c) - $in(target_c))
+        )
+
+  - function: $in(temperature_min_c)
+    name: capture_min_temperature
+    description: Track the minimum observed temperature for the current session.
+    call: min($in(temperature_min_c), $in(temperature_c))
+
+  - function: $in(temperature_max_c)
+    name: capture_max_temperature
+    description: Track the maximum observed temperature for the current session.
+    call: max($in(temperature_max_c), $in(temperature_c))
+
+  - function: $in(humidity_percent)
+    name: update_humidity
+    description: Blend humidity toward the target with occupant contribution.
+    recovery_gain: 0.06
+    occupant_gain: 0.025
+    call: max(
+          15.0,
+          min(
+            95.0,
+            $in(humidity_percent)
+            + recovery_gain * ($in(humidity_target) - $in(humidity_percent))
+            + occupant_gain * max(0.0, $in(occupancy_count) - 1.0)
+          )
+        )
+
+  - function: $in(comfort_index)
+    name: compute_comfort_index
+    description: Collapse deviations into a 0-100 score (100 = best comfort).
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0
+            - 10.0 * abs($in(target_c) - $in(temperature_c))
+            - 2.5 * abs($in(humidity_target) - $in(humidity_percent))
+          )
+        )
+
+  - function: $in(fan_speed_adjusted_target)
+    name: compute_fan_speed_adjusted_target
+    description: Increase fan demand when temperature exceeds the setpoint.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            $in(fan_speed_target)
+            + max(-25.0, min(25.0, 2.5 * ($in(temperature_c) - $in(target_c))))
+          )
+        )
+
+  - function: $in(fan_speed_percent)
+    name: slew_fan_speed
+    description: Rate-limit fan speed adjustments derived from remote commands.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            (
+              $in(fan_speed_adjusted_target)
+              if abs($in(fan_speed_adjusted_target) - $in(fan_speed_percent)) <= $in(fan_slew_rate)
+              else (
+                $in(fan_speed_percent)
+                + (
+                    $in(fan_slew_rate)
+                    if $in(fan_speed_adjusted_target) > $in(fan_speed_percent)
+                    else -$in(fan_slew_rate)
+                  )
+              )
+            )
+          )
+        )
+
+  - function: $in(status_text)
+    name: update_status
+    description: Provide a textual status reflecting target tracking and connectivity.
+    call: (
+          "DISCONNECTED" if $in(lwm2m_connected) == 0
+          else (
+            "HEATING" if $in(target_c) - $in(temperature_c) > 0.6
+            else ("COOLING" if $in(temperature_c) - $in(target_c) > 0.6 else "IDLE")
+          )
+        )
+
+communication:
+  - lwm2m:
+      description: |
+        Realistic LwM2M client that performs Register/Update/Delete exchanges
+        with a Leshan server and exposes standard environmental objects.
+      client:
+        endpoint: "#attr(lwm2m_endpoint)"
+        lifetime: 120
+        queue_mode: false
+      server:
+        scheme: coap
+        host: host.docker.internal
+        port: 5683    # CoAP port exposed by docker-compose Leshan service.
+        endpoint: leshan
+      security:
+        mode: nosec   # Switch to "psk" and provide identity/key when using DTLS.
+        psk_identity: ""
+        psk_key: ""
+      resources:
+        - path: "3/0/0"
+          name: manufacturer
+          properties: [read]
+          value: "Hammerheads Engineers"
+        - path: "3/0/1"
+          name: model_number
+          properties: [read]
+          value: "generic-lwm2m-env"
+        - path: "3/0/13"
+          name: current_time
+          properties: [read, notify]
+          attribute: $ext(current_timestamp)
+        - path: "3303/0/5700"
+          name: temperature_c
+          properties: [read, notify]
+          attribute: $ext(temperature_c)
+        - path: "3303/0/5601"
+          name: temperature_min
+          properties: [read]
+          attribute: $ext(temperature_min_c)
+        - path: "3303/0/5602"
+          name: temperature_max
+          properties: [read]
+          attribute: $ext(temperature_max_c)
+        - path: "3304/0/5700"
+          name: humidity_percent
+          properties: [read, notify]
+          attribute: $ext(humidity_percent)
+        - path: "3304/0/5601"
+          name: humidity_min
+          properties: [read]
+          attribute: $ext(humidity_min_percent)
+        - path: "3304/0/5602"
+          name: humidity_max
+          properties: [read]
+          attribute: $ext(humidity_max_percent)
+        - path: "3308/0/5900"
+          name: temperature_setpoint
+          properties: [read, write]
+          attribute: $attr(target_c)
+        - path: "3308/0/5903"
+          name: hvac_mode
+          properties: [read, write]
+          attribute: $attr(hvac_mode)
+        - path: "3340/0/5851"
+          name: fan_speed_command
+          properties: [read, write]
+          attribute: $attr(fan_speed_target)
+        - path: "3340/0/5900"
+          name: fan_speed_percent
+          properties: [read, notify]
+          attribute: $ext(fan_speed_percent)
+        - path: "3342/0/5500"
+          name: lwm2m_connected
+          properties: [read]
+          attribute: $ext(lwm2m_connected)
+
+scenarios:
+  lwm2m_reconnect:
+    enabled: true
+    duration: 3.0
+    call:
+      path: communication.lwm2m_client.detach
+      stop_path: communication.lwm2m_client.attach

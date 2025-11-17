@@ -1,0 +1,76 @@
+# SPDX-License-Identifier: MIT
+
+name: condition_monitor__mqtt
+description: |
+  Simplified condition monitoring node for rotating equipment. Publishes vibration
+  RMS values and winding temperature over MQTT with a derived health index.
+
+attributes:
+  vib_rms_x: 2.0           # [mm/s]
+  vib_rms_y: 1.5           # [mm/s]
+  vib_rms_z: 1.8           # [mm/s]
+  vib_limit_warning: 4.5   # [mm/s]
+  vib_limit_alarm: 7.0     # [mm/s]
+
+  temp_stator_c: 65.0      # [°C]
+  temp_limit_warning_c: 90.0
+  temp_limit_alarm_c: 110.0
+
+  health_index: 100.0      # 0..100 (100 = perfect)
+  alarm_vibration: 0       # 1 = vibration alarm
+  alarm_temperature: 0     # 1 = over-temperature alarm
+
+actions:
+  - function: $in(health_index)
+    name: compute_health_index
+    description: Combine vibration and temperature deviations into a single index.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0
+            - 5.0 * max(0.0, ($in(vib_rms_x) + $in(vib_rms_y) + $in(vib_rms_z)) / 3.0 - $in(vib_limit_warning))
+            - 2.0 * max(0.0, $in(temp_stator_c) - $in(temp_limit_warning_c))
+          )
+        )
+
+  - function: $in(alarm_vibration)
+    name: detect_vibration_alarm
+    description: Alarm when any axis exceeds the alarm vibration limit.
+    call: 1 if max($in(vib_rms_x), $in(vib_rms_y), $in(vib_rms_z)) >= $in(vib_limit_alarm) else 0
+
+  - function: $in(alarm_temperature)
+    name: detect_temperature_alarm
+    description: Alarm when winding temperature exceeds the alarm limit.
+    call: 1 if $in(temp_stator_c) >= $in(temp_limit_alarm_c) else 0
+
+communication:
+  - mqtt:
+      broker: "host.docker.internal"
+      port: 1883
+      publish_interval: 1.0
+      topic_prefix: "spx/examples/condition_monitor"
+      default_qos: 1
+      default_retain: false
+      bindings:
+        - attribute: $ext(vib_rms_x)
+          topic: telemetry/vib_rms_x
+          direction: publish
+        - attribute: $ext(vib_rms_y)
+          topic: telemetry/vib_rms_y
+          direction: publish
+        - attribute: $ext(vib_rms_z)
+          topic: telemetry/vib_rms_z
+          direction: publish
+        - attribute: $ext(temp_stator_c)
+          topic: telemetry/temp_stator_c
+          direction: publish
+        - attribute: $ext(health_index)
+          topic: telemetry/health_index
+          direction: publish
+        - attribute: $ext(alarm_vibration)
+          topic: telemetry/alarms/vibration
+          direction: publish
+        - attribute: $ext(alarm_temperature)
+          topic: telemetry/alarms/temperature
+          direction: publish

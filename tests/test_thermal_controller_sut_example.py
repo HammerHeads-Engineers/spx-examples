@@ -20,7 +20,14 @@ from tests.devices.thermal_controller_sut_example import (
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "thermal_controllers" / "generic" / "thermal_controller.yaml"
+MODEL_PATH = (
+    ROOT
+    / "library"
+    / "domains"
+    / "thermal_controllers"
+    / "generic"
+    / "thermal_controller__modbus.yaml"
+)
 MODEL_KEY = "tests__thermal_controller"
 INSTANCE_KEY = "generic_thermal_controller"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")

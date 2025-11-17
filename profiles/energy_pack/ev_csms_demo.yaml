@@ -1,0 +1,12 @@
+name: ev_csms_demo
+description: |
+  Placeholder EV/DER orchestration profile built from the models we already ship.
+  Extend it with OCPP/SunSpec assets as they land in the domains catalog.
+models:
+  - library/domains/iot/generic/environment_sensor__mqtt.yaml
+  - library/domains/weather/weather_forecast__http.yaml
+  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+services:
+  - mqtt_broker
+  - modbus_tcp_gateway
+  - http_gateway

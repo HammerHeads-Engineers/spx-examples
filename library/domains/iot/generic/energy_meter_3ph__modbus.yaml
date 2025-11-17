@@ -1,0 +1,67 @@
+# SPDX-License-Identifier: MIT
+
+name: energy_meter_3ph__modbus
+description: |
+  Three-phase energy meter model for Modbus-based energy monitoring. Mirrors
+  the behaviour of the MQTT variant but exposes measurements via Modbus.
+
+attributes:
+  voltage_l1: 400.0
+  voltage_l2: 400.0
+  voltage_l3: 400.0
+  current_l1: 12.0
+  current_l2: 10.5
+  current_l3: 11.2
+  frequency_hz: 50.0
+  power_factor: 0.95
+
+  active_power_kw: 0.0
+  energy_import_kwh: 0.0
+
+  overload_threshold_kw: 45.0
+  overload_alarm: 0
+
+  cycle_time_s: 1.0
+
+actions:
+  - function: $in(active_power_kw)
+    name: compute_active_power
+    description: Estimate active power from three-phase voltage, currents, and power factor.
+    call: max(
+          0.0,
+          1e-3
+          * $in(power_factor)
+          * (
+              $in(voltage_l1) * $in(current_l1)
+              + $in(voltage_l2) * $in(current_l2)
+              + $in(voltage_l3) * $in(current_l3)
+            )
+        )
+
+  - function: $in(energy_import_kwh)
+    name: integrate_energy
+    description: Integrate cumulative imported energy based on active power.
+    call: $in(energy_import_kwh) + max(0.0, $in(active_power_kw)) * cycle_time_s / 3600.0
+
+  - function: $in(overload_alarm)
+    name: detect_overload
+    description: Raise overload alarm when power exceeds the threshold.
+    call: 1 if $in(active_power_kw) >= $in(overload_threshold_kw) else 0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.5
+      mapping:
+        voltage_l1:        { address: [0,1],  group: h_r, type: float }
+        voltage_l2:        { address: [2,3],  group: h_r, type: float }
+        voltage_l3:        { address: [4,5],  group: h_r, type: float }
+        current_l1:        { address: [6,7],  group: h_r, type: float }
+        current_l2:        { address: [8,9],  group: h_r, type: float }
+        current_l3:        { address: [10,11], group: h_r, type: float }
+        frequency_hz:      { address: [12,13], group: h_r, type: float }
+        power_factor:      { address: [14,15], group: h_r, type: float }
+        active_power_kw:   { address: [16,17], group: h_r, type: float }
+        energy_import_kwh: { address: [18,19], group: h_r, type: float }
+        overload_threshold_kw: { address: [20,21], group: h_r, type: float }
+        overload_alarm:    { address: [22,22], group: h_r, type: uint_16 }
+
