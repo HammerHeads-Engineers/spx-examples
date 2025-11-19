@@ -93,3 +93,19 @@ From inside the generated folder:
   - Windows/pwsh: `pwsh ./spx-stop.ps1`
 
 `spx-start` performs safety checks, installs/updates the BLE adapter if needed, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.
+
+### 4. Build a distributable installer (optional)
+
+To share the installer (wizard + manifests) without the whole repository, run:
+
+```bash
+scripts/build_installer_package.sh
+```
+
+This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
+
+- `installer/`, `library/`, `profiles/`, `extensions/`
+- `spx-install.sh` / `spx-install.ps1`
+- `INSTALLER_README.md` with quickstart instructions
+
+Hand the `.tgz` to teammates; they can extract it anywhere and run `./spx-install.sh` (or `pwsh ./spx-install.ps1`) to go through the wizard locally.

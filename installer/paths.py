@@ -19,4 +19,3 @@ def catalog_dir() -> Path:
 def profiles_dir() -> Path:
     """Return the path to the profiles directory."""
     return repo_root() / "profiles"
-

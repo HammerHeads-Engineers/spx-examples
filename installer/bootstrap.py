@@ -74,8 +74,6 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
 def register_via_sdk(client, entry: Dict[str, Any]) -> None:
     model_id = entry.get("id")
     model_path = Path(entry.get("path", ""))
@@ -118,3 +116,7 @@ def register_via_http(api_url: str, product_key: str, models: list[Dict[str, Any
         )
         resp.raise_for_status()
         print(f"  - Registered model {model_id} via HTTP")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

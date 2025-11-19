@@ -43,7 +43,7 @@ class DeploymentGenerator:
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN=${PYTHON_BIN:-python3}
-REQUIRED_MODULES=(requests spx_python)
+REQUIRED_MODULES=(requests:requests spx_python:spx-python)
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
 
@@ -69,17 +69,26 @@ need_cmd() {
 
 check_python_modules() {
   local missing=()
-  for module in "${REQUIRED_MODULES[@]}"; do
+  local packages=()
+  for entry in "${REQUIRED_MODULES[@]}"; do
+    local module="${entry%%:*}"
+    local package="${entry##*:}"
     if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
       missing+=("$module")
+      packages+=("$package")
     fi
   done
   if [ ${#missing[@]} -eq 0 ]; then
     return
   fi
-  echo "[spx-start] Missing Python modules: ${missing[*]}"
-  echo "            Install them via 'pip install spx-python requests' and rerun."
-  exit 1
+  echo "[spx-start] Missing Python modules: ${missing[*]}. Installing via pip..."
+  "$PYTHON_BIN" -m pip install --user "${packages[@]}"
+  for module in "${missing[@]}"; do
+    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
+      echo "[spx-start] Unable to import module '${module}' even after pip install." >&2
+      exit 1
+    fi
+  done
 }
 
 need_cmd docker
@@ -125,7 +134,10 @@ Set-StrictMode -Version Latest
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PythonBin = if ($Env:PYTHON_BIN) { $Env:PYTHON_BIN } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
-$RequiredModules = @("requests", "spx_python")
+$RequiredModules = @(
+    @{ Module = "requests"; Package = "requests" },
+    @{ Module = "spx_python"; Package = "spx-python" }
+)
 $BleAdapterPort = if ($Env:BLE_ADAPTER_PORT) { $Env:BLE_ADAPTER_PORT } else { 8085 }
 $bleProcess = $null
 
@@ -138,16 +150,27 @@ function Need-Command {
 
 function Check-PythonModules {
     $missing = @()
-    foreach ($module in $RequiredModules) {
-        & $PythonBin -c "import $module" 2>$null
+    foreach ($entry in $RequiredModules) {
+        & $PythonBin -c "import $($entry.Module)" 2>$null
         if ($LASTEXITCODE -ne 0) {
-            $missing += $module
+            $missing += $entry
         }
     }
-    if ($missing.Count -gt 0) {
-        Write-Error "[spx-start] Missing Python modules: $($missing -join ', ')"
-        Write-Host "            Install them via 'pip install spx-python requests' and rerun."
-        throw "Missing Python modules"
+    if ($missing.Count -eq 0) {
+        return
+    }
+    $moduleNames = $missing | ForEach-Object { $_.Module }
+    $packages = $missing | ForEach-Object { $_.Package }
+    Write-Host "[spx-start] Missing Python modules: $($moduleNames -join ', '). Installing via pip..."
+    & $PythonBin -m pip install --user @packages
+    if ($LASTEXITCODE -ne 0) {
+        throw "[spx-start] pip install failed"
+    }
+    foreach ($entry in $missing) {
+        & $PythonBin -c "import $($entry.Module)" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "[spx-start] Unable to import module '$($entry.Module)' even after pip install."
+        }
     }
 }
 
@@ -342,7 +365,7 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
 
     def _relocate_host_path(self, host: str, assets_root: Path) -> str:
         clean = host
-        prefix_removed = False
+
         if host.startswith("./"):
             clean = host[2:]
         else:

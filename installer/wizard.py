@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from shutil import get_terminal_size
-from typing import Dict, Iterable, List, Sequence
+from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from . import ui
