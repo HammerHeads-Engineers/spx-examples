@@ -17,7 +17,7 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.11"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.12"
 
 
 class DeploymentGenerator:
@@ -44,10 +44,25 @@ class DeploymentGenerator:
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN=${PYTHON_BIN:-python3}
 REQUIRED_MODULES=(requests spx_python)
+BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
+BLE_ADAPTER_PID=""
+
+cleanup_on_failure() {
+  local status=$?
+  trap - ERR INT TERM
+  echo "[spx-start] Encountered an error, cleaning up (exit code ${status})" >&2
+  if [ -n "${BLE_ADAPTER_PID:-}" ] && kill -0 "${BLE_ADAPTER_PID}" >/dev/null 2>&1; then
+    kill "${BLE_ADAPTER_PID}" >/dev/null 2>&1 || true
+  fi
+  docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
+  exit "${status}"
+}
+
+trap cleanup_on_failure ERR INT TERM
 
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    echo "[start-spx] Missing required command: $1" >&2
+    echo "[spx-start] Missing required command: $1" >&2
     exit 1
   fi
 }
@@ -62,7 +77,7 @@ check_python_modules() {
   if [ ${#missing[@]} -eq 0 ]; then
     return
   fi
-  echo "[start-spx] Missing Python modules: ${missing[*]}"
+  echo "[spx-start] Missing Python modules: ${missing[*]}"
   echo "            Install them via 'pip install spx-python requests' and rerun."
   exit 1
 }
@@ -71,14 +86,149 @@ need_cmd docker
 need_cmd "$PYTHON_BIN"
 check_python_modules
 
+# Optional BLE adapter (NodeJS) support
+HAS_BLE=$(
+  SCRIPT_DIR="$SCRIPT_DIR" "$PYTHON_BIN" - <<'PY'
+import json, pathlib, os
+bundle_path = pathlib.Path(os.environ.get("SCRIPT_DIR", ".")) / "bundle.json"
+try:
+    data = json.loads(bundle_path.read_text(encoding="utf-8"))
+    print("yes" if "btvirt_adapter" in data.get("services", []) else "no")
+except Exception:
+    print("no")
+PY
+)
+if [ "$HAS_BLE" = "yes" ]; then
+  if command -v npm >/dev/null 2>&1; then
+    if command -v spx-ble-adapter >/dev/null 2>&1; then
+      echo "[spx-start] Updating BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
+      npm update -g @simplephysx/spx-ble-adapter
+    else
+      echo "[spx-start] Installing BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
+      npm install -g @simplephysx/spx-ble-adapter
+    fi
+    echo "[spx-start] Starting BLE adapter on port ${BLE_ADAPTER_PORT}"
+    spx-ble-adapter --port "${BLE_ADAPTER_PORT}" >/dev/null 2>&1 &
+    BLE_ADAPTER_PID=$!
+  else
+    echo "[spx-start] npm not available; skipping BLE adapter start" >&2
+  fi
+fi
+
+docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
 "$PYTHON_BIN" -m installer bootstrap --bundle "$SCRIPT_DIR/bundle.json"
 """
-        self._write_script(output_dir / "start-spx.sh", start_script.strip() + "\n")
-        self._write_script(
-            output_dir / "stop-spx.sh",
-            'docker compose -f "$(dirname "$0")/docker-compose.generated.yml" --env-file "$(dirname "$0")/.env" down\n',
-        )
+        start_script_ps1 = r"""
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PythonBin = if ($Env:PYTHON_BIN) { $Env:PYTHON_BIN } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+$RequiredModules = @("requests", "spx_python")
+$BleAdapterPort = if ($Env:BLE_ADAPTER_PORT) { $Env:BLE_ADAPTER_PORT } else { 8085 }
+$bleProcess = $null
+
+function Need-Command {
+    param([string]$Command)
+    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
+        throw "[spx-start] Missing required command: $Command"
+    }
+}
+
+function Check-PythonModules {
+    $missing = @()
+    foreach ($module in $RequiredModules) {
+        & $PythonBin -c "import $module" 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            $missing += $module
+        }
+    }
+    if ($missing.Count -gt 0) {
+        Write-Error "[spx-start] Missing Python modules: $($missing -join ', ')"
+        Write-Host "            Install them via 'pip install spx-python requests' and rerun."
+        throw "Missing Python modules"
+    }
+}
+
+function Cleanup-OnFailure {
+    param([int]$ExitCode = 1)
+    if ($bleProcess -and -not $bleProcess.HasExited) {
+        try { $bleProcess.Kill() | Out-Null } catch {}
+    }
+    try {
+        docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
+    } catch {}
+    exit $ExitCode
+}
+
+try {
+    Need-Command "docker"
+    Need-Command $PythonBin
+    Check-PythonModules
+
+    $bundlePath = Join-Path $ScriptDir "bundle.json"
+    $hasBle = $false
+    if (Test-Path $bundlePath) {
+        try {
+            $bundle = Get-Content $bundlePath -Raw | ConvertFrom-Json
+            if ($bundle.services -and ($bundle.services -contains "btvirt_adapter")) {
+                $hasBle = $true
+            }
+        } catch {
+            $hasBle = $false
+        }
+    }
+
+    if ($hasBle) {
+        if (Get-Command npm -ErrorAction SilentlyContinue) {
+            if (Get-Command spx-ble-adapter -ErrorAction SilentlyContinue) {
+                Write-Host "[spx-start] Updating BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
+                npm update -g '@simplephysx/spx-ble-adapter' | Out-Null
+            } else {
+                Write-Host "[spx-start] Installing BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
+                npm install -g '@simplephysx/spx-ble-adapter' | Out-Null
+            }
+            Write-Host "[spx-start] Starting BLE adapter on port $BleAdapterPort"
+            $bleProcess = Start-Process "spx-ble-adapter" -ArgumentList "--port", "$BleAdapterPort" -NoNewWindow -PassThru
+        } else {
+            Write-Warning "[spx-start] npm not available; skipping BLE adapter start"
+        }
+    }
+
+    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
+    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d
+    & $PythonBin -m installer bootstrap --bundle (Join-Path $ScriptDir "bundle.json")
+}
+catch {
+    Write-Error "[spx-start] Encountered an error: $($_.Exception.Message)"
+    Cleanup-OnFailure 1
+}
+"""
+        self._write_script(output_dir / "spx-start.sh", start_script.strip() + "\n")
+        self._write_ps_script(output_dir / "spx-start.ps1", start_script_ps1.strip() + "\n")
+        stop_script = """
+pkill -f spx-ble-adapter >/dev/null 2>&1 || true
+docker compose -f "$(dirname "$0")/docker-compose.generated.yml" --env-file "$(dirname "$0")/.env" down
+"""
+        stop_script_ps1 = r"""
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+try {
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match "spx-ble-adapter" } | ForEach-Object {
+        try {
+            Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
+        } catch {}
+    }
+} catch {}
+
+docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down
+"""
+        self._write_script(output_dir / "spx-stop.sh", stop_script.strip() + "\n")
+        self._write_ps_script(output_dir / "spx-stop.ps1", stop_script_ps1.strip() + "\n")
 
     # Internal helpers -------------------------------------------------------
     def _build_compose(self, service_ids: List[str], assets_root: Path) -> Dict[str, Dict]:
@@ -121,7 +271,7 @@ docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT
         volumes = [self._process_volume("./extensions:/app/extensions", assets_root)]
         service = {
             "image": SPX_SERVER_IMAGE,
-            "container_name": "spx-server-examples",
+            "container_name": "spx-server",
             "ports": ports,
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
@@ -231,6 +381,9 @@ docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT
         mode = os.stat(path).st_mode
         os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
+    def _write_ps_script(self, path: Path, command: str) -> None:
+        path.write_text(command, encoding="utf-8")
+
     def _write_bundle(self, output_dir: Path, selection) -> None:
         bundle = {
             "packages": selection.packages,
@@ -244,6 +397,7 @@ docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT
                 for model_id in selection.model_ids
             ],
             "instances": self._collect_instances(selection),
+            "services": selection.service_ids,
         }
         bundle_path = output_dir / "bundle.json"
         bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")

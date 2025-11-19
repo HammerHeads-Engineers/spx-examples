@@ -11,7 +11,7 @@ services:
     deployment:
       runtime: docker
       image: eclipse-mosquitto:latest
-      container_name: mosquitto-examples
+      container_name: mosquitto-server
       volumes:
         - ./library/assets/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       healthcheck:
@@ -77,8 +77,8 @@ services:
     description: btvirt-backed fake BLE adapter that exposes BLE GATT devices over HTTP.
     ports:
       - transport: tcp
-        host: 8080
-        container: 8080
+        host: 8085
+        container: 8085
         purpose: btvirt REST bridge used by BLE codecs
     deployment:
       runtime: native
@@ -120,7 +120,7 @@ services:
     deployment:
       runtime: docker
       image: michelmu/knxd-docker:latest
-      container_name: knxd-examples
+      container_name: knxd-server
       volumes:
         - ./library/assets/knx/knxd.ini:/etc/knxd.ini:ro
       entrypoint: ["knxd", "/etc/knxd.ini"]

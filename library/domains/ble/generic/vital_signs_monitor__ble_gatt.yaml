@@ -179,9 +179,9 @@ actions:
 communication:
   - ble:
       adapter:
-        baseUrl: http://host.docker.internal:8080
+        baseUrl: http://host.docker.internal:8085
       device:
-        name: SpX Vital Signs Monitor
+        name: SPX-Sim
       codecs:
         celsius:
           format: utf8

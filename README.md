@@ -53,3 +53,43 @@ When you are done, tear everything down with:
 ```bash
 docker compose down
 ```
+
+## Installer workflow
+
+Prefer running an interactive wizard and sharing a self-contained bundle? Use the installer scripts.
+
+### 1. Run the wizard
+
+- **macOS/Linux shells:** `./spx-install.sh`
+- **PowerShell (Windows or pwsh on macOS/Linux):** `pwsh ./spx-install.ps1`
+
+Both wrappers:
+
+- check that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
+- launch `python -m installer generate` with the wizard,
+- write the output to `build/spx-generated` (or another `--output` path you pass through).
+
+### 2. Inspect the generated directory
+
+Inside `build/spx-generated/` you will see:
+
+- `docker-compose.generated.yml` – only the services selected in the wizard.
+- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key.
+- `bundle.json` – consumed by `python -m installer bootstrap`.
+- `spx-start.sh` / `spx-stop.sh` and `spx-start.ps1` / `spx-stop.ps1` – start/stop helpers for Bash/zsh and PowerShell.
+- `assets/` and `extensions/` – copied resources referenced by the selected services.
+
+You can zip or commit this folder and hand it to teammates; they do not need the full repo.
+
+### 3. Start and stop the stack
+
+From inside the generated folder:
+
+- **Start:**  
+  - macOS/Linux: `./spx-start.sh`  
+  - Windows/pwsh: `pwsh ./spx-start.ps1`
+- **Stop:**  
+  - macOS/Linux: `./spx-stop.sh`  
+  - Windows/pwsh: `pwsh ./spx-stop.ps1`
+
+`spx-start` performs safety checks, installs/updates the BLE adapter if needed, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.

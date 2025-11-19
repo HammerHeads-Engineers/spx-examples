@@ -126,6 +126,29 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
 
     bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
     assert bundle["license_key"] == "ABC-123"
+    assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway"]
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
     assert bundle.get("instances") == [{"model_id": "sensor", "instance_key": "inst_001"}]
+
+    start_path = output_dir / "spx-start.sh"
+    stop_path = output_dir / "spx-stop.sh"
+    assert start_path.exists()
+    assert stop_path.exists()
+    start_content = start_path.read_text(encoding="utf-8")
+    stop_content = stop_path.read_text(encoding="utf-8")
+    assert "BLE_ADAPTER_PID" in start_content
+    assert "trap cleanup_on_failure ERR INT TERM" in start_content
+    assert "down --remove-orphans" in start_content
+    assert "docker compose" in start_content
+    assert "pkill -f spx-ble-adapter" in stop_content
+    start_ps_path = output_dir / "spx-start.ps1"
+    stop_ps_path = output_dir / "spx-stop.ps1"
+    assert start_ps_path.exists()
+    assert stop_ps_path.exists()
+    start_ps_content = start_ps_path.read_text(encoding="utf-8")
+    stop_ps_content = stop_ps_path.read_text(encoding="utf-8")
+    assert "Cleanup-OnFailure" in start_ps_content
+    assert "Start-Process \"spx-ble-adapter\"" in start_ps_content
+    assert "docker compose -f (Join-Path $ScriptDir \"docker-compose.generated.yml\")" in start_ps_content
+    assert "Get-CimInstance Win32_Process" in stop_ps_content

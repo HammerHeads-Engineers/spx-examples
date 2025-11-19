@@ -17,7 +17,7 @@ from tests.devices.scpi_multimeter_sut_example import ScpiMultimeterSUTExample
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-MODEL_PATH = ROOT / "library" / "measurement_instruments" / "generic" / "scpi_multimeter.yaml"
+MODEL_PATH = ROOT / "library" / "domains" / "measurement_instruments" / "generic" / "multimeter__scpi.yaml"
 MODEL_KEY = "tests__scpi_multimeter"
 INSTANCE_KEY = "generic_scpi_multimeter"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
