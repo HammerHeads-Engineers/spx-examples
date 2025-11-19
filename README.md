@@ -109,3 +109,18 @@ This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 - `INSTALLER_README.md` with quickstart instructions
 
 Hand the `.tgz` to teammates; they can extract it anywhere and run `./spx-install.sh` (or `pwsh ./spx-install.ps1`) to go through the wizard locally.
+
+### 5. Produce single-file installers (optional)
+
+Convert the package into self-extracting files so users run a single artifact per platform:
+
+```bash
+scripts/build_self_extractors.sh --version v1.2.3
+```
+
+Outputs:
+
+- `dist/spx-installer-v1.2.3.run` – executable for macOS/Linux that extracts to a temporary directory and launches `spx-install.sh`.
+- `dist/spx-installer-v1.2.3.ps1` – PowerShell script for Windows/pwsh that unpacks to `%TEMP%` and runs `spx-install.ps1`.
+
+Share these files directly; recipients only need Docker + Python and can execute them without manual extraction.

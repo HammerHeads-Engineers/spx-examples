@@ -88,9 +88,9 @@ jobs:
 
       - name: Build installer package
         run: |
-          chmod +x scripts/build_installer_package.sh
-          PACKAGE_NAME="spx-installer-${{ github.ref_name }}"
-          scripts/build_installer_package.sh --package-name "${PACKAGE_NAME}"
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh --package-name "spx-installer"
+          scripts/build_self_extractors.sh --version "${{ github.ref_name }}"
 
       - name: Create GitHub Release
         id: create_release
@@ -103,15 +103,35 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
+      - name: Upload Release Asset (.tgz)
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/spx-installer-${{ github.ref_name }}.tgz
+          asset_path: dist/spx-installer.tgz
           asset_name: spx-installer-${{ github.ref_name }}.tgz
           asset_content_type: application/gzip
+
+      - name: Upload Release Asset (.run)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/spx-installer-${{ github.ref_name }}.run
+          asset_name: spx-installer-${{ github.ref_name }}.run
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset (.ps1)
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/spx-installer-${{ github.ref_name }}.ps1
+          asset_name: spx-installer-${{ github.ref_name }}.ps1
+          asset_content_type: text/plain
 
       - name: Publish generic package to GitHub Packages
         env:
@@ -119,10 +139,15 @@ jobs:
         run: |
           PKG_NAME="spx-installer"
           VERSION="${{ github.ref_name }}"
-          FILE="dist/spx-installer-${VERSION}.tgz"
-          curl -L \
-            -X PUT \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @"${FILE}" \
-            "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${FILE}")"
+          upload_pkg() {
+            local file="$1"
+            curl -L \
+              -X PUT \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"${file}" \
+              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
+          }
+          upload_pkg "dist/spx-installer.tgz"
+          upload_pkg "dist/spx-installer-${VERSION}.run"
+          upload_pkg "dist/spx-installer-${VERSION}.ps1"
