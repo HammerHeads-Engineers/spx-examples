@@ -57,6 +57,7 @@ cat > "${RUN_FILE}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
+ORIG_DIR="$(pwd)"
 ARCHIVE_LINE=$(awk '/^__SPX_PAYLOAD_BELOW__/ {print NR + 1; exit}' "$0")
 TMP_DIR=$(mktemp -d)
 cleanup() { rm -rf "$TMP_DIR"; }
@@ -65,7 +66,13 @@ trap cleanup EXIT
 tail -n +"$ARCHIVE_LINE" "$0" | tar -xz -C "$TMP_DIR"
 cd "$TMP_DIR/spx-installer"
 ./spx-install.sh "$@"
-exit $?
+STATUS=$?
+if [ -d "$TMP_DIR/spx-installer/build" ]; then
+  mkdir -p "$ORIG_DIR/build"
+  cp -R "$TMP_DIR/spx-installer/build/." "$ORIG_DIR/build/"
+  echo "[spx-installer] Copied bundle to $ORIG_DIR/build"
+fi
+exit $STATUS
 __SPX_PAYLOAD_BELOW__
 EOF
 cat "${tmp_tar}" >> "${RUN_FILE}"
@@ -115,6 +122,8 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory($zipPath, $tmpDir)
 Remove-Item $zipPath -Force
 $installerPath = Join-Path $tmpDir "spx-installer"
+$origDir = Get-Location
+$status = 1
 try {
     if (Get-Command pwsh -ErrorAction SilentlyContinue) {
         & pwsh -ExecutionPolicy Bypass -File (Join-Path $installerPath "spx-install.ps1") @args
@@ -123,10 +132,19 @@ try {
     } else {
         throw "Neither pwsh nor powershell is available on this system."
     }
+    $status = $LASTEXITCODE
+    $buildPath = Join-Path $installerPath "build"
+    if (Test-Path $buildPath) {
+        $dest = Join-Path $origDir "build"
+        New-Item -ItemType Directory -Path $dest -Force | Out-Null
+        Copy-Item -Path (Join-Path $buildPath '*') -Destination $dest -Recurse -Force
+        Write-Host "[spx-installer] Copied bundle to $dest"
+    }
 }
 finally {
     Remove-Item $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }
+exit $status
 EOF
 
 chmod +x "${PS1_FILE}"

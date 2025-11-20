@@ -6,6 +6,9 @@ from __future__ import annotations
 import argparse
 
 from pathlib import Path
+import os
+import shutil
+import subprocess
 
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
@@ -89,6 +92,14 @@ def run(args: argparse.Namespace) -> int:
             output_dir = Path(args.output)
             generator.generate(selection, output_dir)
             print(f"\nArtifacts generated in {output_dir}")
+            print("Next steps:")
+            print(f"  1. Update '{output_dir}/.env' with your SPX product key if needed.")
+            print(f"  2. Run '{output_dir}/spx-start.sh' (macOS/Linux) or 'pwsh {output_dir}/spx-start.ps1' (Windows) to start the stack.")
+            print(f"  3. Use '{output_dir}/spx-stop.sh' or 'pwsh {output_dir}/spx-stop.ps1' to shut everything down.")
+
+            launch = input("\nStart the stack now? [Y/n]: ").strip().lower()
+            if launch in {"", "y", "yes"}:
+                _launch_stack(output_dir)
         return 0
     if args.command == "bootstrap":
         from .bootstrap import bootstrap
@@ -102,6 +113,31 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return run(args)
+
+
+def _launch_stack(output_dir: Path) -> None:
+    if os.name == "nt":
+        script = output_dir / "spx-start.ps1"
+        if not script.exists():
+            print(f"[spx-installer] Cannot find {script}; skipping start.")
+            return
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if not shell:
+            print("[spx-installer] Neither pwsh nor powershell is available; please start manually.")
+            return
+        cmd = [shell, "-ExecutionPolicy", "Bypass", "-File", str(script)]
+    else:
+        script = output_dir / "spx-start.sh"
+        if not script.exists():
+            print(f"[spx-installer] Cannot find {script}; skipping start.")
+            return
+        cmd = [str(script)]
+
+    print(f"[spx-installer] Launching stack via {script} ...")
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"[spx-installer] Start script exited with {exc.returncode}. Please inspect the logs.")
 
 
 if __name__ == "__main__":
