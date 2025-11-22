@@ -8,7 +8,7 @@ import stat
 import json
 import shutil
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import yaml
 
@@ -18,6 +18,8 @@ from . import paths
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
 SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.12"
+SPX_UI_SERVICE_NAME = "spx-ui"
+SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.28"
 
 
 class DeploymentGenerator:
@@ -33,13 +35,19 @@ class DeploymentGenerator:
         assets_root = output_dir / "assets"
         assets_root.mkdir(parents=True, exist_ok=True)
 
-        compose_data = self._build_compose(selection.service_ids, assets_root)
+        compose_data = self._build_compose(selection.service_ids, assets_root, selection.install_spx_ui)
         compose_path = output_dir / "docker-compose.generated.yml"
         with compose_path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(compose_data, handle, sort_keys=False)
 
         self._write_env(output_dir, selection.license_key)
         self._write_bundle(output_dir, selection)
+        bootstrap_cmd_sh = '"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" --bundle "$SCRIPT_DIR/bundle.json"\n'
+        bootstrap_cmd_ps = '    & $PythonBin (Join-Path $ScriptDir "bootstrap_runner.py") --bundle (Join-Path $ScriptDir "bundle.json")\n'
+        if not selection.install_examples:
+            bootstrap_cmd_sh = 'echo "[spx-start] Skipping example bootstrap per installer selection."\n'
+            bootstrap_cmd_ps = '    Write-Host "[spx-start] Skipping example bootstrap per installer selection."\n'
+
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON_BIN=${PYTHON_BIN:-python3}
@@ -126,8 +134,8 @@ fi
 
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
-"$PYTHON_BIN" -m installer bootstrap --bundle "$SCRIPT_DIR/bundle.json"
-"""
+__BOOTSTRAP_CMD_SH__"""
+        start_script = start_script.replace("__BOOTSTRAP_CMD_SH__", bootstrap_cmd_sh).strip("\n")
         start_script_ps1 = r"""
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -221,15 +229,17 @@ try {
 
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d
-    & $PythonBin -m installer bootstrap --bundle (Join-Path $ScriptDir "bundle.json")
+__BOOTSTRAP_CMD_PS__
 }
 catch {
     Write-Error "[spx-start] Encountered an error: $($_.Exception.Message)"
     Cleanup-OnFailure 1
 }
 """
+        start_script_ps1 = start_script_ps1.replace("__BOOTSTRAP_CMD_PS__", bootstrap_cmd_ps)
         self._write_script(output_dir / "spx-start.sh", start_script.strip() + "\n")
         self._write_ps_script(output_dir / "spx-start.ps1", start_script_ps1.strip() + "\n")
+        self._write_bootstrap_runner(output_dir)
         stop_script = """
 pkill -f spx-ble-adapter >/dev/null 2>&1 || true
 docker compose -f "$(dirname "$0")/docker-compose.generated.yml" --env-file "$(dirname "$0")/.env" down
@@ -254,7 +264,7 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
         self._write_ps_script(output_dir / "spx-stop.ps1", stop_script_ps1.strip() + "\n")
 
     # Internal helpers -------------------------------------------------------
-    def _build_compose(self, service_ids: List[str], assets_root: Path) -> Dict[str, Dict]:
+    def _build_compose(self, service_ids: List[str], assets_root: Path, include_ui: bool) -> Dict[str, Dict]:
         services: Dict[str, Dict] = {}
         builtin_ports: List[str] = []
         docker_services: Dict[str, ServiceManifest] = {}
@@ -273,6 +283,8 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
                 native_services.append(manifest)
 
         services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root)
+        if include_ui:
+            services[SPX_UI_SERVICE_NAME] = self._build_spx_ui_service()
 
         for service_id, manifest in docker_services.items():
             services[service_id] = self._build_docker_service(manifest, assets_root)
@@ -316,6 +328,25 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
             ],
         }
         return service
+
+    def _build_spx_ui_service(self) -> Dict:
+        return {
+            "image": SPX_UI_IMAGE,
+            "container_name": "spx-ui-server",
+            "depends_on": {
+                SPX_SERVER_SERVICE_NAME: {
+                    "condition": "service_healthy",
+                }
+            },
+            "ports": ["3000:3000"],
+            "environment": {
+                "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
+            },
+            "command": [
+                "--product-key",
+                "${SPX_PRODUCT_KEY}",
+            ],
+        }
 
     def _build_docker_service(self, manifest: ServiceManifest, assets_root: Path) -> Dict:
         deployment = manifest.deployment
@@ -408,22 +439,30 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
         path.write_text(command, encoding="utf-8")
 
     def _write_bundle(self, output_dir: Path, selection) -> None:
+        model_entries = []
+        model_paths: Set[Path] = set()
+        for model_id in selection.model_ids:
+            model = self.index.models[model_id]
+            model_path = Path(model.path)
+            model_entries.append(
+                {
+                    "id": model_id,
+                    "path": str(model_path),
+                }
+            )
+            model_paths.add(model_path)
+
         bundle = {
             "packages": selection.packages,
             "protocols": selection.protocols,
             "license_key": selection.license_key,
-            "models": [
-                {
-                    "id": model_id,
-                    "path": str(self.index.models[model_id].path),
-                }
-                for model_id in selection.model_ids
-            ],
+            "models": model_entries,
             "instances": self._collect_instances(selection),
             "services": selection.service_ids,
         }
         bundle_path = output_dir / "bundle.json"
         bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+        self._copy_model_sources(model_paths, output_dir)
 
     def _collect_instances(self, selection) -> list[dict[str, str]]:
         instances: list[dict[str, str]] = []
@@ -437,3 +476,149 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
                 if model_id and instance_key:
                     instances.append({"model_id": model_id, "instance_key": instance_key})
         return instances
+
+    def _copy_model_sources(self, model_paths: Set[Path], output_dir: Path) -> None:
+        for rel in model_paths:
+            src = self.repo_root / rel
+            if not src.exists():
+                continue
+            dest = output_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+
+    def _write_bootstrap_runner(self, output_dir: Path) -> None:
+        runner = """#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+\"\"\"Local bootstrap runner bundled with generated artifacts.\"\"\"
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import time
+from pathlib import Path
+from typing import Any, Dict
+
+import requests
+import yaml
+
+try:
+    import spx_python
+except Exception:  # pragma: no cover
+    spx_python = None
+
+BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_API = os.environ.get("SPX_API_URL", "http://localhost:8000")
+
+
+def load_bundle(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def wait_for_server(api_url: str, timeout: float = 60.0) -> None:
+    deadline = time.monotonic() + timeout
+    base = api_url.rstrip("/")
+    candidates = [f"{base}/health", base]
+    while time.monotonic() < deadline:
+        for url in candidates:
+            try:
+                response = requests.get(url, timeout=3.0)
+                if response.ok:
+                    return
+            except Exception:
+                continue
+        time.sleep(2.0)
+    raise RuntimeError(f"SPX server at {api_url} did not become healthy within {timeout} seconds")
+
+
+def resolve_model_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = (BASE_DIR / path).resolve()
+    return path
+
+
+def bootstrap(bundle_path: Path, api_url: str) -> None:
+    bundle = load_bundle(bundle_path)
+    models = bundle.get("models", [])
+    instances = bundle.get("instances", [])
+    if not models:
+        print("[bootstrap] No models defined in bundle; nothing to do.")
+        return
+
+    wait_for_server(api_url)
+    if spx_python is not None:
+        client = spx_python.init(address=api_url, product_key=bundle.get("license_key", ""))
+        for entry in models:
+            register_via_sdk(client, entry)
+        for entry in instances:
+            create_instance_via_sdk(client, entry)
+    else:
+        register_via_http(api_url, bundle.get("license_key", ""), models)
+        if instances:
+            print("[bootstrap] Instance creation skipped (spx_python not available).")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Bootstrap models/instances into SPX server")
+    parser.add_argument("--bundle", required=True, help="Path to bundle JSON produced by installer")
+    parser.add_argument("--api-url", default=DEFAULT_API, help="SPX server API base URL")
+    args = parser.parse_args(argv)
+
+    bootstrap(Path(args.bundle), args.api_url)
+    return 0
+
+
+def register_via_sdk(client, entry: Dict[str, Any]) -> None:
+    model_id = entry.get("id")
+    raw_path = entry.get("path", "")
+    model_path = resolve_model_path(raw_path)
+    if not model_id or not model_path.exists():
+        print(f"  - Skipping invalid entry: {entry}")
+        return
+    with model_path.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle)
+    client["models"][model_id] = payload
+    print(f"  - Registered model {model_id} via SDK")
+
+
+def create_instance_via_sdk(client, entry: Dict[str, Any]) -> None:
+    model_id = entry.get("model_id")
+    instance_key = entry.get("instance_key")
+    if not model_id or not instance_key:
+        return
+    client["instances"][instance_key] = model_id
+    print(f"  - Created instance {instance_key} from {model_id}")
+
+
+def register_via_http(api_url: str, product_key: str, models: list[Dict[str, Any]]) -> None:
+    session = requests.Session()
+    if product_key:
+        session.headers.update({"X-SPX-PRODUCT-KEY": product_key})
+    for entry in models:
+        model_id = entry.get("id")
+        raw_path = entry.get("path", "")
+        model_path = resolve_model_path(raw_path)
+        if not model_id or not model_path.exists():
+            print(f"  - Skipping invalid entry: {entry}")
+            continue
+        with model_path.open("r", encoding="utf-8") as handle:
+            payload = handle.read()
+        resp = session.post(
+            f"{api_url.rstrip('/')}/models",
+            headers={"Content-Type": "application/x-yaml"},
+            params={"model_id": model_id},
+            data=payload,
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        print(f"  - Registered model {model_id} via HTTP")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())
+"""
+        path = output_dir / "bootstrap_runner.py"
+        path.write_text(runner, encoding="utf-8")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from installer.generator import DeploymentGenerator
+from installer.generator import DeploymentGenerator, SPX_UI_IMAGE
 from installer.manifest import (
     DomainManifest,
     IndustryManifest,
@@ -111,6 +111,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
     services = data["services"]
     assert "spx-server" in services
+    assert "spx-ui" not in services
     assert "mqtt_broker" in services
     assert "8000:8000" in services["spx-server"]["ports"]
     assert "502:502" in services["spx-server"]["ports"]
@@ -135,12 +136,15 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     stop_path = output_dir / "spx-stop.sh"
     assert start_path.exists()
     assert stop_path.exists()
+    runner_path = output_dir / "bootstrap_runner.py"
+    assert runner_path.exists()
     start_content = start_path.read_text(encoding="utf-8")
     stop_content = stop_path.read_text(encoding="utf-8")
     assert "BLE_ADAPTER_PID" in start_content
     assert "trap cleanup_on_failure ERR INT TERM" in start_content
     assert "down --remove-orphans" in start_content
     assert "docker compose" in start_content
+    assert "bootstrap_runner.py" in start_content
     assert "pkill -f spx-ble-adapter" in stop_content
     start_ps_path = output_dir / "spx-start.ps1"
     stop_ps_path = output_dir / "spx-stop.ps1"
@@ -151,4 +155,35 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "Cleanup-OnFailure" in start_ps_content
     assert "Start-Process \"spx-ble-adapter\"" in start_ps_content
     assert "docker compose -f (Join-Path $ScriptDir \"docker-compose.generated.yml\")" in start_ps_content
+    assert "bootstrap_runner.py" in start_ps_content
     assert "Get-CimInstance Win32_Process" in stop_ps_content
+
+
+def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=True,
+        install_spx_ui=True,
+        offline_bundle=False,
+        license_key="KEY-456",
+        model_ids=["sensor"],
+        service_ids=["mqtt_broker", "modbus_tcp_gateway"],
+    )
+
+    output_dir = tmp_path / "out-ui"
+    generator.generate(selection, output_dir)
+
+    compose_path = output_dir / "docker-compose.generated.yml"
+    data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    services = data["services"]
+    assert "spx-ui" in services
+    ui_service = services["spx-ui"]
+    assert ui_service["image"] == SPX_UI_IMAGE
+    assert ui_service["ports"] == ["3000:3000"]
+    assert ui_service["environment"]["SPX_PRODUCT_KEY"] == "${SPX_PRODUCT_KEY}"
+    assert ui_service["command"] == ["--product-key", "${SPX_PRODUCT_KEY}"]
+    assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
