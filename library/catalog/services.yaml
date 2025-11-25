@@ -31,6 +31,37 @@ services:
     deployment:
       runtime: builtin
       provider: spx-server
+  - id: opcua_server
+    name: OPC UA Server
+    protocol: opcua
+    description: AsyncUA-powered OPC UA endpoint exposing SPX attributes as nodes.
+    ports:
+      - transport: tcp
+        host: 4840
+        container: 4840
+        purpose: OPC UA endpoint (Process Cell)
+      - transport: tcp
+        host: 4841
+        container: 4841
+        purpose: OPC UA endpoint (Production Workcell)
+      - transport: tcp
+        host: 4842
+        container: 4842
+        purpose: OPC UA endpoint (Packaging Line)
+      - transport: tcp
+        host: 53530
+        container: 53530
+        purpose: OPC UA discovery / sample compatibility
+      - transport: tcp
+        host: 61610
+        container: 61610
+        purpose: OPC UA discovery / sample compatibility
+    deployment:
+      runtime: builtin
+      provider: spx-server
+      notes: >
+        Models configure their endpoint/namespace via `communication.opcua_server`; enable certificates or
+        username tokens directly in the model definition if needed.
   - id: lwm2m_server
     name: LwM2M Server
     protocol: lwm2m

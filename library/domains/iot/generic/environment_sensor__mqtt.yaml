@@ -60,7 +60,6 @@ attributes:
 actions:
   # Slew the inferred occupancy toward the target (used by scenarios).
   - function: $in(occupancy_count)
-    name: track_occupancy
     description: Smoothly blend occupancy toward scenario target to avoid impulsive spikes.
     slew_rate: 0.6
     call: (
@@ -72,7 +71,6 @@ actions:
 
   # Update process temperature using a simple ambient/load/PI blend.
   - function: $in(temperature_integral)
-    name: integrate_temperature_bias
     description: Integrate temperature error to remove steady-state offset.
     call: max(
           -$in(temperature_integral_clamp),
@@ -84,7 +82,6 @@ actions:
         )
 
   - function: $in(temperature_c)
-    name: update_temperature
     description: Combine ambient drift, occupant heat load, and setpoint tracking consistent with HVAC models.
     heating_gain: 0.12
     cooling_gain: 0.09
@@ -101,7 +98,6 @@ actions:
 
   # Blend humidity toward the target while respecting physical limits.
   - function: $in(humidity_percent)
-    name: update_humidity
     description: Approach humidity target with ambient influence and occupant moisture load.
     recovery_gain: 0.06
     occupant_gain: 0.025
@@ -119,7 +115,6 @@ actions:
 
   # Evolve CO₂ concentration based on ventilation and occupancy respiration.
   - function: $in(co2_ppm)
-    name: update_co2
     description: Estimate indoor CO₂ with a low-order balance between emissions and ventilation.
     outdoor_ppm: 420.0
     call: max(
@@ -134,7 +129,6 @@ actions:
 
   # Blend manual fan target with automatic bias based on temperature error.
   - function: $in(fan_speed_adjusted_target)
-    name: compute_fan_speed_adjusted_target
     description: Increase fan demand when temperature exceeds the setpoint.
     call: max(
           0.0,
@@ -147,7 +141,6 @@ actions:
 
   # Slew the applied fan speed toward the target command with rate limiting.
   - function: $in(fan_speed_percent)
-    name: slew_fan_speed
     description: Rate-limit fan speed adjustments derived from MQTT commands or automation.
     call: max(
           0.0,
@@ -170,7 +163,6 @@ actions:
 
   # Compute a composite comfort index based on temperature, humidity, and CO₂ deviation.
   - function: $in(comfort_index)
-    name: compute_comfort_index
     description: Collapse deviations into a 0-100 score (100 = best comfort).
     call: max(
           0.0,
@@ -185,7 +177,6 @@ actions:
 
   # Derive a readable status string for telemetry dashboards.
   - function: $in(status_text)
-    name: update_status
     description: Provide a textual status reflecting target tracking and connectivity.
     call: (
           "DISCONNECTED" if $in(mqtt_connected) == 0
@@ -197,7 +188,6 @@ actions:
 
   # Track stale counter based on connectivity status.
   - function: $in(stale_counter)
-    name: integrate_stale_counter
     description: Integrate offline time to drive stale-data alarms.
     increment: 1.0
     decay: 1.2
@@ -209,15 +199,12 @@ actions:
 
   # Raise alarms based on environmental thresholds or stale communications.
   - function: $in(alarm_high_temp)
-    name: detect_high_temperature
     call: 1 if $in(temperature_c) >= $in(high_temp_threshold) else 0
 
   - function: $in(alarm_co2)
-    name: detect_high_co2
     call: 1 if $in(co2_ppm) >= $in(co2_threshold) else 0
 
   - function: $in(alarm_stale_data)
-    name: detect_stale_telemetry
     call: 1 if $in(stale_counter) >= $in(stale_timeout) else 0
 
 communication:
@@ -288,9 +275,8 @@ scenarios:
   occupancy_spike:
     enabled: true
     duration: 15.0
-    actions:
-      - set: $in(occupancy_target)
-        value: 18.0
+    overrides:
+      $in(occupancy_target): 18.0
 
   night_setback:
     enabled: true

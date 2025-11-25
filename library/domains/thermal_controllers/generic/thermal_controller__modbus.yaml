@@ -99,3 +99,32 @@ communication:
         power_derivative_gain: { address: [22,23], group: h_r, type: float }
         power_error_prev:   { address: [24,25], group: h_r, type: float }
         power_integral_leak: { address: [26,27], group: h_r, type: float }
+
+scenarios:
+  heatup_nominal:
+    enabled: true
+    duration: 40.0
+    overrides:
+      $in(power_on): 1
+      $in(setpoint): 80.0
+      $in(ambient): 24.0
+      $in(power_gain): 1.8
+
+  overload_trip_test:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(power_on): 1
+      $in(setpoint): 130.0
+      $in(overload_threshold): 90.0
+      $in(overload_hyst): 3.0
+
+  powered_cooldown:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(power_on): 0
+      $in(setpoint): 0.0
+      $in(ambient): 18.0
+      $in(power_integral): 0.0
+      $in(power_derivative_gain): 0.0

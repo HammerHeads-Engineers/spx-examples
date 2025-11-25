@@ -90,3 +90,26 @@ communication:
         alarm_low:       { address: [16,16], group: h_r, type: uint_16 }
         alarm_high_limit: { address: [17,18], group: h_r, type: float }
         alarm_low_limit: { address: [19,20], group: h_r, type: float }
+
+scenarios:
+  setpoint_step_up:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(sp): 3.0
+      $in(mode_auto): 1
+
+  load_disturbance:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(pv): 1.6
+      $in(sp): 1.0
+      $in(mode_auto): 1
+
+  manual_bump_test:
+    enabled: true
+    duration: 8.0
+    overrides:
+      $in(mode_auto): 0
+      $in(manual_cv): 65.0

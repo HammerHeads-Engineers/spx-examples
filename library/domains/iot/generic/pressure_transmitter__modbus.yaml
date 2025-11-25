@@ -7,8 +7,10 @@ description: |
 
 attributes:
   pressure_bar: 1.0          # process pressure [bar]
-  pressure_min_bar: 0.0
-  pressure_max_bar: 10.0
+  pressure_min_bar: 0.0      # lower clamp of the transmitter span
+  pressure_max_bar: 10.0     # upper clamp of the transmitter span
+  pressure_target_bar: 1.0   # helper driven by scenarios to create ramps
+  pressure_slew_rate_bar: 0.35  # max bar change per simulation tick
 
   alarm_high: 0
   alarm_low: 0
@@ -16,6 +18,28 @@ attributes:
   alarm_low_limit: 0.5
 
 actions:
+  - function: $in(pressure_bar)
+    name: track_process_pressure
+    description: Slew the sensed pressure toward the requested target while clamping to the span.
+    call: max(
+          $in(pressure_min_bar),
+          min(
+            $in(pressure_max_bar),
+            (
+              $in(pressure_target_bar)
+              if abs($in(pressure_target_bar) - $in(pressure_bar)) <= $in(pressure_slew_rate_bar)
+              else (
+                $in(pressure_bar)
+                + (
+                    $in(pressure_slew_rate_bar)
+                    if $in(pressure_target_bar) > $in(pressure_bar)
+                    else -$in(pressure_slew_rate_bar)
+                  )
+              )
+            )
+          )
+        )
+
   - function: $in(alarm_high)
     name: detect_high
     call: 1 if $in(pressure_bar) >= $in(alarm_high_limit) else 0
@@ -34,3 +58,31 @@ communication:
         alarm_high_limit:  { address: [4,5], group: h_r, type: float }
         alarm_low_limit:   { address: [6,7], group: h_r, type: float }
 
+scenarios:
+  pressure_ramp_up:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(pressure_target_bar): 8.5
+      $in(pressure_slew_rate_bar): 0.45
+
+  pressure_ramp_down:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(pressure_target_bar): 0.4
+      $in(pressure_slew_rate_bar): 0.35
+
+  pressure_spike:
+    enabled: true
+    duration: 2.0
+    overrides:
+      $in(pressure_target_bar): 9.8
+      $in(pressure_slew_rate_bar): 1.2
+
+  pressure_dropout:
+    enabled: true
+    duration: 2.5
+    overrides:
+      $in(pressure_target_bar): 0.1
+      $in(pressure_slew_rate_bar): 1.0

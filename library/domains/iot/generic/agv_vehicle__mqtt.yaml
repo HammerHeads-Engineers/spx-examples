@@ -127,3 +127,29 @@ communication:
           topic: command/obstacle
           direction: subscribe
 
+scenarios:
+  mission_run:
+    enabled: true
+    duration: 30.0
+    overrides:
+      $in(target_x_m): 25.0
+      $in(target_y_m): 12.0
+      $in(target_speed_mps): 1.4
+      $in(heading_deg): 25.0
+      $in(load_present): 1
+
+  obstacle_stop:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(target_speed_mps): 0.0
+      $in(alarm_obstacle): 1
+      $in(mission_state): error
+
+  battery_service_window:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(target_speed_mps): 0.3
+      $in(battery_soc_percent): 18.0
+      $in(load_present): 0

@@ -186,3 +186,47 @@ communication:
             o3: "#attr(current_o3)"
             aqi: "#attr(current_aqi)"
             aqi_category: "#attr(current_aqi_category)"
+
+scenarios:
+  winter_smog_episode:
+    enabled: true
+    duration: 45.0
+    overrides:
+      $in(active_profile): "urban-smog"
+      $in(current_timestamp): "2025-01-01T07:00"
+      $in(current_pm2_5): 115.0
+      $in(current_pm10): 168.0
+      $in(current_no2): 64.0
+      $in(current_o3): 32.0
+      $in(current_aqi): 182
+      $in(current_aqi_category): unhealthy
+      $in(hourly_pm2_5): [45.0, 52.0, 78.0, 115.0, 98.0, 74.0, 66.0, 54.0]
+      $in(hourly_pm10): [60.0, 72.0, 118.0, 168.0, 159.0, 121.0, 96.0, 72.0]
+      $in(hourly_no2): [30.0, 38.0, 49.0, 64.0, 61.0, 55.0, 46.0, 36.0]
+      $in(hourly_o3): [40.0, 38.0, 36.0, 32.0, 33.0, 35.0, 38.0, 41.0]
+      $in(hourly_aqi): [76, 92, 141, 182, 170, 138, 110, 88]
+      $in(hourly_aqi_category): [moderate, moderate, unhealthy, unhealthy, unhealthy, unhealthy, unhealthy, moderate]
+
+  coastal_reset:
+    enabled: true
+    duration: 30.0
+    overrides:
+      $in(active_profile): "coastal-clean"
+      $in(current_timestamp): "2025-01-01T14:00"
+      $in(current_pm2_5): 8.0
+      $in(current_pm10): 14.0
+      $in(current_no2): 9.0
+      $in(current_o3): 78.0
+      $in(current_aqi): 32
+      $in(current_aqi_category): good
+
+  station_relocation:
+    enabled: true
+    duration: 60.0
+    overrides:
+      $in(station_id): "PL-LOD-004"
+      $in(station_name): "Lodz Fabryczna Monitor"
+      $in(latitude): 51.7592
+      $in(longitude): 19.4550
+      $in(timezone): Europe/Warsaw
+      $in(active_profile): "industrial-corridor"

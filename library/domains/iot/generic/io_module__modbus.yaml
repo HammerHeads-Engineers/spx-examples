@@ -37,3 +37,71 @@ communication:
         ai_3: { address: [12,13], group: h_r, type: float }
         ai_4: { address: [14,15], group: h_r, type: float }
 
+scenarios:
+  all_clear:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(di_1): 0
+      $in(di_2): 0
+      $in(di_3): 0
+      $in(di_4): 0
+      $in(do_1): 0
+      $in(do_2): 0
+      $in(do_3): 0
+      $in(do_4): 0
+      $in(ai_1): 4.0
+      $in(ai_2): 4.5
+      $in(ai_3): 5.0
+      $in(ai_4): 5.5
+
+  alarm_trip:
+    enabled: true
+    duration: 8.0
+    overrides:
+      $in(di_1): 1
+      $in(di_2): 1
+      $in(di_3): 0
+      $in(di_4): 0
+      $in(do_1): 1
+      $in(do_2): 1
+      $in(do_3): 0
+      $in(do_4): 0
+      $in(ai_1): 18.5
+      $in(ai_2): 19.0
+      $in(ai_3): 2.0
+      $in(ai_4): 2.2
+
+  analog_ramp_high:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(di_1): 0
+      $in(di_2): 1
+      $in(di_3): 0
+      $in(di_4): 1
+      $in(do_1): 0
+      $in(do_2): 0
+      $in(do_3): 1
+      $in(do_4): 1
+      $in(ai_1): 15.0
+      $in(ai_2): 12.0
+      $in(ai_3): 8.0
+      $in(ai_4): 6.0
+
+  maintenance_loopback:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(di_1): 1
+      $in(di_2): 0
+      $in(di_3): 1
+      $in(di_4): 0
+      $in(do_1): 1
+      $in(do_2): 0
+      $in(do_3): 1
+      $in(do_4): 0
+      $in(ai_1): 10.0
+      $in(ai_2): 10.0
+      $in(ai_3): 10.0
+      $in(ai_4): 10.0

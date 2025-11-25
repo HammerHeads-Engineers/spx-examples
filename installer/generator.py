@@ -17,7 +17,7 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.12"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.15"
 SPX_UI_SERVICE_NAME = "spx-ui"
 SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.28"
 
@@ -134,6 +134,8 @@ fi
 
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
+echo "[spx-start] Active container ports:"
+docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps
 __BOOTSTRAP_CMD_SH__"""
         start_script = start_script.replace("__BOOTSTRAP_CMD_SH__", bootstrap_cmd_sh).strip("\n")
         start_script_ps1 = r"""
@@ -228,7 +230,9 @@ try {
     }
 
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
-    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d
+    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d | Out-Null
+    Write-Host "[spx-start] Active container ports:"
+    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps
 __BOOTSTRAP_CMD_PS__
 }
 catch {

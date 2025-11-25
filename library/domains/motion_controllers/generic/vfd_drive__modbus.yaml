@@ -50,6 +50,12 @@ actions:
     description: Raise overload alarm when torque exceeds 100%.
     call: 1 if $in(torque_percent) >= 100.0 else 0
 
+  - function: $in(alarm_drive_fault)
+    name: detect_drive_fault
+    description: Flag drive fault when slip between command and feedback stays excessive.
+    slip_limit_rpm: 200.0
+    call: 1 if ($in(enable) == 1 and abs($in(speed_set_rpm) - $in(speed_actual_rpm)) > slip_limit_rpm) else 0
+
   - function: $in(status_word)
     name: build_status_word
     description: Encode basic RUN/FAULT bits into a status word.
@@ -76,3 +82,30 @@ communication:
         alarm_overload:     { address: [13,13], group: h_r, type: uint_16 }
         alarm_drive_fault:  { address: [14,14], group: h_r, type: uint_16 }
         status_word:        { address: [15,15], group: h_r, type: uint_16 }
+
+scenarios:
+  speed_step_profile:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 1800.0
+      $in(accel_ramp_s): 1.2
+      $in(decel_ramp_s): 1.5
+
+  torque_overload:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 2200.0
+      $in(torque_limit_percent): 90.0
+
+  emergency_stop_fault:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 0.0
+      $in(decel_ramp_s): 0.2
+      $in(accel_ramp_s): 0.5

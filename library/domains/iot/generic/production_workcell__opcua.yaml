@@ -1,0 +1,336 @@
+# SPDX-License-Identifier: MIT
+
+name: production_workcell__opcua
+description: |
+  OPC UA-enabled machining/assembly workcell exposing station state, spindle and robot
+  telemetry as well as quality counters. Useful for validating OPC UA client behaviour
+  around bidirectional setpoints, alarms, and basic scheduling data.
+
+attributes:
+  machine_state: idle           # idle, running, fault
+  station_mode: auto            # auto or manual
+  order_id: "ORDER-001"
+  latest_serial: ""
+  part_present: 0
+  clamp_closed: 0
+
+  cycle_progress_percent: 0.0
+  target_cycle_time_s: 22.0
+  actual_cycle_time_s: 22.0
+  cycle_counter_total: 0
+  cycle_counter_ok: 0
+  cycle_counter_nok: 0
+  quality_flag: 1
+
+  robot_position_deg: 0.0
+  robot_target_deg: 0.0
+  spindle_rpm: 0.0
+  spindle_target_rpm: 3500.0
+  tool_temperature_c: 45.0
+  tool_temperature_limit_c: 80.0
+
+  maintenance_timer_hours: 120.0
+  maintenance_threshold_hours: 8.0
+
+  alarm_safety_gate: 0
+  alarm_tool_overtemp: 0
+  alarm_robot_fault: 0
+
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(machine_state)
+    name: update_machine_state
+    description: Transition machine state based on alarms and progress.
+    call: (
+          "fault" if ($in(alarm_safety_gate) or $in(alarm_tool_overtemp) or $in(alarm_robot_fault))
+          else (
+            "running" if ($in(station_mode) == "auto" and $in(part_present) == 1)
+            else "idle"
+          )
+        )
+
+  - function: $in(robot_position_deg)
+    name: track_robot_position
+    description: Slew robot axis toward the requested pose.
+    slew_rate: 8.0
+    call: (
+          $in(robot_target_deg)
+          if abs($in(robot_target_deg) - $in(robot_position_deg)) <= slew_rate
+          else (
+            $in(robot_position_deg)
+            + (slew_rate if $in(robot_target_deg) > $in(robot_position_deg) else -slew_rate)
+          )
+        )
+
+  - function: $in(spindle_rpm)
+    name: track_spindle_speed
+    description: Track spindle speed toward the setpoint when running.
+    ramp: 400.0
+    call: (
+          0.0 if $in(machine_state) != "running"
+          else (
+            $in(spindle_target_rpm)
+            if abs($in(spindle_target_rpm) - $in(spindle_rpm)) <= ramp
+            else (
+              $in(spindle_rpm)
+              + (ramp if $in(spindle_target_rpm) > $in(spindle_rpm) else -ramp)
+            )
+          )
+        )
+
+  - function: $in(tool_temperature_c)
+    name: update_tool_temperature
+    description: Tool heats with spindle speed and cools otherwise.
+    call: max(
+          20.0,
+          min(
+            120.0,
+            $in(tool_temperature_c)
+            + 0.002 * $in(spindle_rpm)
+            - 0.3 * (1 if $in(spindle_rpm) <= 50 else 0)
+          )
+        )
+
+  - function: $in(alarm_tool_overtemp)
+    name: detect_tool_overtemp
+    call: 1 if $in(tool_temperature_c) >= $in(tool_temperature_limit_c) else 0
+
+  - function: $in(cycle_progress_percent)
+    name: integrate_cycle_progress
+    description: Track cycle progress for automatic operations.
+    call: (
+          0.0 if $in(machine_state) != "running"
+          else min(100.0, $in(cycle_progress_percent) + 100.0 * cycle_time_s / max(1.0, $in(target_cycle_time_s)))
+        )
+
+  - function: $in(cycle_counter_total)
+    name: complete_cycle
+    description: Increment counters once progress reaches 100%.
+    call: (
+          $in(cycle_counter_total) + 1
+          if $in(cycle_progress_percent) >= 100.0 and $in(machine_state) == "running"
+          else $in(cycle_counter_total)
+        )
+
+  - function: $in(cycle_counter_ok)
+    name: update_quality_counters
+    description: Split totals into OK / NOK counts using the quality flag.
+    call: (
+          $in(cycle_counter_ok) + 1
+          if $in(cycle_progress_percent) >= 100.0 and $in(machine_state) == "running" and $in(quality_flag) == 1
+          else $in(cycle_counter_ok)
+        )
+
+  - function: $in(cycle_counter_nok)
+    call: (
+          $in(cycle_counter_nok) + 1
+          if $in(cycle_progress_percent) >= 100.0 and $in(machine_state) == "running" and $in(quality_flag) == 0
+          else $in(cycle_counter_nok)
+        )
+
+  - function: $in(cycle_progress_percent)
+    name: reset_progress_after_completion
+    call: (
+          0.0 if $in(cycle_progress_percent) >= 100.0 else $in(cycle_progress_percent)
+        )
+
+  - function: $in(latest_serial)
+    name: stamp_latest_serial
+    description: Generate a serial number when a cycle completes.
+    call: (
+          $in(latest_serial)
+          if $in(cycle_progress_percent) < 100.0
+          else "SN-{0:06d}".format(int($in(cycle_counter_total)))
+        )
+
+  - function: $in(quality_flag)
+    name: toggle_quality_flag
+    description: Alternate quality result to make telemetry more interesting.
+    call: (
+          $in(quality_flag)
+          if $in(cycle_progress_percent) < 100.0
+          else (0 if $in(quality_flag) == 1 else 1)
+        )
+
+  - function: $in(maintenance_timer_hours)
+    name: drain_maintenance_timer
+    description: Maintenance timer decreases with production hours.
+    call: max(
+          0.0,
+          $in(maintenance_timer_hours)
+          - (cycle_time_s / 3600.0 if $in(machine_state) == "running" else 0.0)
+        )
+
+  - function: $in(alarm_safety_gate)
+    name: auto_reset_safety_gate
+    call: 0 if $in(station_mode) == "auto" else $in(alarm_safety_gate)
+
+communication:
+  - opcua_server:
+      endpoint: opc.tcp://0.0.0.0:4841/spx/workcell
+      namespace_uri: urn:spx:examples:opcua:workcell
+      security:
+        policy: NoSecurity
+        user_tokens:
+          - type: anonymous
+          - type: username
+            username: maint
+            password: changeme
+      sections:
+        - name: station
+          browse_path: ["Workcell"]
+          bindings:
+            - name: MachineState
+              direction: outbound
+              attributes: "#attr(machine_state)"
+              node:
+                browse_path: ["State"]
+                data_type: String
+            - name: StationMode
+              direction: bidirectional
+              attributes: "#attr(station_mode)"
+              node:
+                browse_path: ["Mode"]
+                data_type: String
+            - name: OrderId
+              direction: bidirectional
+              attributes: "#attr(order_id)"
+              node:
+                browse_path: ["OrderId"]
+                data_type: String
+            - name: LatestSerial
+              direction: outbound
+              attributes: "#attr(latest_serial)"
+              node:
+                browse_path: ["LatestSerial"]
+                data_type: String
+            - name: PartPresent
+              direction: outbound
+              attributes: "#attr(part_present)"
+              node:
+                browse_path: ["PartPresent"]
+                data_type: Boolean
+            - name: ClampClosed
+              direction: outbound
+              attributes: "#attr(clamp_closed)"
+              node:
+                browse_path: ["ClampClosed"]
+                data_type: Boolean
+            - name: CycleProgress
+              direction: outbound
+              attributes: "#attr(cycle_progress_percent)"
+              node:
+                browse_path: ["Cycle","Progress"]
+                data_type: Double
+            - name: CycleCounters
+              direction: outbound
+              attributes:
+                - "#attr(cycle_counter_total)"
+                - "#attr(cycle_counter_ok)"
+                - "#attr(cycle_counter_nok)"
+              node:
+                browse_path: ["Cycle","Counters"]
+                data_type: Double
+        - name: motion
+          browse_path: ["Workcell","Motion"]
+          bindings:
+            - name: RobotPosition
+              direction: outbound
+              attributes: "#attr(robot_position_deg)"
+              node:
+                browse_path: ["Robot","ActualPosition"]
+                data_type: Double
+            - name: RobotTarget
+              direction: bidirectional
+              attributes: "#attr(robot_target_deg)"
+              node:
+                browse_path: ["Robot","TargetPosition"]
+                data_type: Double
+            - name: SpindleSpeed
+              direction: outbound
+              attributes: "#attr(spindle_rpm)"
+              node:
+                browse_path: ["Spindle","ActualRPM"]
+                data_type: Double
+            - name: SpindleTarget
+              direction: bidirectional
+              attributes: "#attr(spindle_target_rpm)"
+              node:
+                browse_path: ["Spindle","TargetRPM"]
+                data_type: Double
+            - name: ToolTemperature
+              direction: outbound
+              attributes: "#attr(tool_temperature_c)"
+              node:
+                browse_path: ["Spindle","ToolTemperature"]
+                data_type: Double
+        - name: quality
+          browse_path: ["Workcell","Quality"]
+          bindings:
+            - name: QualityFlag
+              direction: outbound
+              attributes: "#attr(quality_flag)"
+              node:
+                browse_path: ["QualityFlag"]
+                data_type: Boolean
+        - name: alarms
+          browse_path: ["Workcell","Alarms"]
+          bindings:
+            - name: SafetyGate
+              direction: bidirectional
+              attributes: "#attr(alarm_safety_gate)"
+              node:
+                browse_path: ["SafetyGate"]
+                data_type: Boolean
+            - name: ToolOvertemp
+              direction: outbound
+              attributes: "#attr(alarm_tool_overtemp)"
+              node:
+                browse_path: ["ToolOvertemp"]
+                data_type: Boolean
+            - name: RobotFault
+              direction: bidirectional
+              attributes: "#attr(alarm_robot_fault)"
+              node:
+                browse_path: ["RobotFault"]
+                data_type: Boolean
+        - name: maintenance
+          browse_path: ["Workcell","Maintenance"]
+          bindings:
+            - name: RemainingHours
+              direction: outbound
+              attributes: "#attr(maintenance_timer_hours)"
+              node:
+                browse_path: ["RemainingHours"]
+                data_type: Double
+            - name: Threshold
+              direction: bidirectional
+              attributes: "#attr(maintenance_threshold_hours)"
+              node:
+                browse_path: ["Threshold"]
+                data_type: Double
+
+scenarios:
+  auto_cycle:
+    enabled: true
+    duration: 30.0
+    overrides:
+      $in(station_mode): auto
+      $in(part_present): 1
+      $in(clamp_closed): 1
+
+  safety_gate_fault:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(alarm_safety_gate): 1
+      $in(part_present): 0
+
+  maintenance_pause:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(station_mode): manual
+      $in(robot_target_deg): 0.0
+      $in(spindle_target_rpm): 0.0

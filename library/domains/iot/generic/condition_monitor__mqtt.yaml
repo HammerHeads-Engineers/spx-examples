@@ -74,3 +74,30 @@ communication:
         - attribute: $ext(alarm_temperature)
           topic: telemetry/alarms/temperature
           direction: publish
+
+scenarios:
+  bearing_fault_spike:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(vib_rms_x): 8.0
+      $in(vib_rms_y): 7.5
+      $in(vib_rms_z): 6.2
+
+  thermal_warning:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(temp_stator_c): 105.0
+      $in(vib_rms_x): 3.0
+      $in(vib_rms_y): 2.8
+      $in(vib_rms_z): 2.6
+
+  sensor_dropout:
+    enabled: true
+    duration: 6.0
+    overrides:
+      $in(vib_rms_x): 0.2
+      $in(vib_rms_y): 0.2
+      $in(vib_rms_z): 0.2
+      $in(temp_stator_c): 40.0

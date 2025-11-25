@@ -161,6 +161,24 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
     profiles: [iiot_monitoring]
+  - id: Process.ProcessCell.OpcUa
+    name: Process Cell (OPC UA)
+    path: library/domains/iot/generic/process_cell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]
+  - id: Process.Workcell.OpcUa
+    name: Production Workcell (OPC UA)
+    path: library/domains/iot/generic/production_workcell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]
   - id: Logistics.AGVVehicle.Mqtt
     name: AGV Vehicle (MQTT)
     path: library/domains/iot/generic/agv_vehicle__mqtt.yaml
@@ -179,3 +197,12 @@ models:
       - id: http_gateway
     packages: [industrial_iiot_pack]
     profiles: [iiot_monitoring]
+  - id: Process.PackagingLine.OpcUa
+    name: Packaging Line (OPC UA)
+    path: library/domains/iot/generic/packaging_line__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [opcua_line_quickstart]

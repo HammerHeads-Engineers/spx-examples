@@ -129,6 +129,30 @@ actions:
     torque_velocity_gain: 0.2
     call: torque_idle_offset + torque_velocity_gain * abs($in(velocity_command))
 
+  - function: $in(alarm_torque)
+    name: detect_torque_alarm
+    description: Raise a torque alarm when the estimated load exceeds the programmed limit.
+    call: 1 if $in(torque_load) >= $in(torque_limit) else 0
+
+  - function: $in(alarm_limit)
+    name: detect_limit_alarm
+    description: Assert limit alarm when either soft limit switch is active.
+    call: 1 if $in(pos_limit_switch) == 1 or $in(neg_limit_switch) == 1 else 0
+
+  - function: $in(alarm_drive_fault)
+    name: detect_drive_fault
+    description: Aggregate drive fault flag using torque and limit alarms.
+    call: 1 if ($in(enable) == 1 and ($in(alarm_limit) == 1 or $in(alarm_torque) == 1)) else 0
+
+  - function: $in(homed)
+    name: update_homed_state
+    description: Treat homing as complete when request is high and position is within tolerance of zero.
+    tolerance: 0.2
+    call: (
+          0 if $in(homing_request) == 0
+          else (1 if abs($in(position_feedback)) <= tolerance else $in(homed))
+        )
+
 distortions:
   actions:
     - noise: $out(position_feedback)
@@ -159,3 +183,34 @@ communication:
         alarm_torque:       { address: [28,28], group: h_r, type: uint_16 }
         alarm_drive_fault:  { address: [29,29], group: h_r, type: uint_16 }
         step_mode:          { address: [30,31], group: h_r, type: uint_32 }
+
+scenarios:
+  homing_cycle:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(enable): 1
+      $in(homing_request): 1
+      $in(position_command): 0.0
+      $in(max_speed): 6.0
+      $in(max_accel): 0.35
+      $in(max_decel): 0.45
+
+  limit_overtravel:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(enable): 1
+      $in(position_command): 520.0
+      $in(soft_limit_pos): 500.0
+      $in(max_speed): 8.0
+      $in(torque_limit): 60.0
+
+  torque_overload_test:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(enable): 1
+      $in(position_command): 300.0
+      $in(max_speed): 20.0
+      $in(torque_limit): 30.0

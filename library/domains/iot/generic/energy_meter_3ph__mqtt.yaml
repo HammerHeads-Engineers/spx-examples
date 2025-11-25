@@ -10,17 +10,34 @@ attributes:
   voltage_l1: 400.0       # [V]
   voltage_l2: 400.0       # [V]
   voltage_l3: 400.0       # [V]
+  voltage_nominal: 400.0
+  voltage_drop_per_amp: 1.5
+  voltage_unbalance_gain: 0.8
+  voltage_floor: 340.0
+  voltage_ceiling: 420.0
+
   current_l1: 12.0        # [A]
   current_l2: 10.5        # [A]
   current_l3: 11.2        # [A]
+  current_nominal: 10.0
+
   frequency_hz: 50.0      # [Hz]
+  frequency_nominal_hz: 50.0
+  frequency_droop_per_kw: 0.03
+  frequency_floor_hz: 47.5
+  frequency_ceiling_hz: 51.5
+
   power_factor: 0.95      # cos(phi)
+  power_factor_leading: 0
 
   active_power_kw: 0.0    # instantaneous active power [kW]
   energy_import_kwh: 0.0  # accumulated imported energy [kWh]
+  reactive_power_kvar: 0.0
 
   overload_threshold_kw: 45.0  # threshold for overload alarm
   overload_alarm: 0            # 1 = overload
+
+  nominal_power_kw: 30.0
 
   cycle_time_s: 1.0            # integration step
 
@@ -28,16 +45,13 @@ actions:
   - function: $in(active_power_kw)
     name: compute_active_power
     description: Estimate active power from three-phase voltage, currents, and power factor.
-    call: max(
-          0.0,
-          1e-3
-          * $in(power_factor)
-          * (
-              $in(voltage_l1) * $in(current_l1)
-              + $in(voltage_l2) * $in(current_l2)
-              + $in(voltage_l3) * $in(current_l3)
-            )
-        )
+    call: 1e-3
+         * $in(power_factor)
+         * (
+             $in(voltage_l1) * $in(current_l1)
+             + $in(voltage_l2) * $in(current_l2)
+             + $in(voltage_l3) * $in(current_l3)
+           )
 
   - function: $in(energy_import_kwh)
     name: integrate_energy
@@ -48,6 +62,99 @@ actions:
     name: detect_overload
     description: Raise overload alarm when power exceeds the threshold.
     call: 1 if $in(active_power_kw) >= $in(overload_threshold_kw) else 0
+
+  - function: $in(reactive_power_kvar)
+    name: compute_reactive_power
+    description: Approximate reactive power magnitude from the present power factor.
+    call: (
+          (
+            max(
+              0.0,
+              (
+                (
+                  abs($in(active_power_kw))
+                  / max(0.05, min(1.0, abs($in(power_factor))))
+                )
+                ** 2
+                - ($in(active_power_kw) ** 2)
+              )
+            )
+          )
+          ** 0.5
+        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(voltage_l1)
+    name: adjust_voltage_l1
+    description: Apply load-dependent sag and unbalance effects on phase L1 voltage.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l1) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l1)
+                  - (($in(current_l2) + $in(current_l3)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(voltage_l2)
+    name: adjust_voltage_l2
+    description: Same sag/unbalance logic for phase L2.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l2) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l2)
+                  - (($in(current_l1) + $in(current_l3)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(voltage_l3)
+    name: adjust_voltage_l3
+    description: Same sag/unbalance logic for phase L3.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l3) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l3)
+                  - (($in(current_l1) + $in(current_l2)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(frequency_hz)
+    name: droop_frequency
+    description: Simple droop control to emulate weak grid behaviour.
+    call: max(
+          $in(frequency_floor_hz),
+          min(
+            $in(frequency_ceiling_hz),
+            $in(frequency_nominal_hz)
+            - $in(frequency_droop_per_kw)
+              * max(0.0, $in(active_power_kw) - $in(nominal_power_kw))
+          )
+        )
 
 communication:
   - mqtt:
@@ -82,9 +189,66 @@ communication:
         - attribute: $ext(energy_import_kwh)
           topic: telemetry/energy_import_kwh
           direction: publish
+        - attribute: $ext(frequency_hz)
+          topic: telemetry/frequency_hz
+          direction: publish
+        - attribute: $ext(power_factor)
+          topic: telemetry/power_factor
+          direction: publish
+        - attribute: $ext(reactive_power_kvar)
+          topic: telemetry/reactive_power_kvar
+          direction: publish
         - attribute: $ext(overload_alarm)
           topic: telemetry/alarms/overload
           direction: publish
         - attribute: $attr(overload_threshold_kw)
           topic: command/overload_threshold_kw
           direction: subscribe
+        - attribute: $attr(power_factor)
+          topic: command/power_factor
+          direction: subscribe
+        - attribute: $attr(power_factor_leading)
+          topic: command/power_factor_leading
+          direction: subscribe
+
+scenarios:
+  balanced_load_step:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(current_l1): 18.0
+      $in(current_l2): 17.5
+      $in(current_l3): 18.2
+      $in(power_factor): 0.92
+
+  unbalanced_phase_l2:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(current_l1): 9.0
+      $in(current_l2): 24.0
+      $in(current_l3): 8.5
+      $in(power_factor): 0.88
+
+  voltage_sag_event:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(voltage_nominal): 390.0
+      $in(voltage_drop_per_amp): 2.5
+      $in(power_factor): 0.9
+
+  pv_backfeed_disturbance:
+    enabled: true
+    duration: 18.0
+    overrides:
+      $in(current_l1): -14.0
+      $in(current_l2): -11.5
+      $in(current_l3): -15.2
+      $in(power_factor): 0.98
+      $in(power_factor_leading): 1
+      $in(voltage_nominal): 415.0
+      $in(voltage_drop_per_amp): 0.8
+      $in(voltage_unbalance_gain): 1.4
+      $in(frequency_droop_per_kw): 0.07
+      $in(nominal_power_kw): 18.0

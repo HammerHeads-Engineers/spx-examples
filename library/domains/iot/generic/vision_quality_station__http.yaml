@@ -105,3 +105,29 @@ communication:
             part_id: "#attr(last_part_id)"
             result: "#attr(last_result)"
             defect_code: "#attr(last_defect_code)"
+
+scenarios:
+  steady_ok_run:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(sample_queued): 1
+      $in(last_result): ok
+      $in(last_defect_code): none
+
+  defect_burst:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(sample_queued): 1
+      $in(last_result): nok
+      $in(last_defect_code): scratch
+      $in(last_part_id): "PART-DEF-001"
+
+  maintenance_pause:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(sample_queued): 0
+      $in(last_result): ok
+      $in(last_defect_code): none
