@@ -1,0 +1,155 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: smart_plug__matter
+description: |
+  Matter OnOff smart plug / relay that talks to python-matter-server (used by Home Assistant).
+  Uses command counters to emit On/Off commands and subscribes to the OnOff attribute for feedback.
+
+attributes:
+  switch_state: 0           # 0/1, live state from the Matter device (OnOff attribute)
+  desired_state: 0          # 0/1, target state driven by BMS logic or scenarios
+  command_issued_state: 0   # remembers the last target we already dispatched
+  command_on_counter: 0     # monotonically increasing trigger for On commands
+  command_off_counter: 0    # monotonically increasing trigger for Off commands
+  retry_timer_s: 0.0        # accumulates time while device state mismatches the target
+  retry_interval_s: 8.0     # resend command if mismatch persists beyond this interval
+  load_power_w: 45.0        # nominal load when ON (used for synthetic telemetry)
+  active_power_w: 0.0       # derived power reading
+  energy_wh: 0.0            # synthetic energy accumulator
+  status_text: "OFF"
+
+actions:
+  - function: $in(command_on_counter)
+    name: trigger_on
+    description: Send an On command when the desired state flips to on.
+    call: (
+          $in(command_on_counter) + 1
+          if $in(desired_state) == 1 and $in(command_issued_state) != 1
+          else $in(command_on_counter)
+        )
+
+  - function: $in(command_off_counter)
+    name: trigger_off
+    description: Send an Off command when the desired state flips to off.
+    call: (
+          $in(command_off_counter) + 1
+          if $in(desired_state) == 0 and $in(command_issued_state) != 0
+          else $in(command_off_counter)
+        )
+
+  - function: $in(retry_timer_s)
+    name: track_retry
+    description: Accumulate retry timer while the device state differs from the target.
+    tick: 1.0
+    call: (
+          0.0
+          if $in(switch_state) == $in(desired_state)
+          else (
+            0.0 if $in(retry_timer_s) >= $in(retry_interval_s)
+            else min($in(retry_interval_s), $in(retry_timer_s) + tick)
+          )
+        )
+
+  - function: $in(command_on_counter)
+    name: retry_on
+    description: Re-issue On command if the plug stays off beyond the retry interval.
+    call: (
+          $in(command_on_counter) + 1
+          if (
+            $in(desired_state) == 1
+            and $in(switch_state) == 0
+            and $in(retry_timer_s) >= $in(retry_interval_s)
+          )
+          else $in(command_on_counter)
+        )
+
+  - function: $in(command_off_counter)
+    name: retry_off
+    description: Re-issue Off command if the plug stays on beyond the retry interval.
+    call: (
+          $in(command_off_counter) + 1
+          if (
+            $in(desired_state) == 0
+            and $in(switch_state) == 1
+            and $in(retry_timer_s) >= $in(retry_interval_s)
+          )
+          else $in(command_off_counter)
+        )
+
+  - function: $in(command_issued_state)
+    name: latch_command_state
+    description: Remember the target we've already dispatched to avoid duplicate triggers.
+    call: $in(desired_state)
+
+  - function: $in(active_power_w)
+    name: derive_power
+    description: Synthetic power curve for dashboards when the plug only reports OnOff.
+    call: (
+          max(0.0, $in(load_power_w))
+          if $in(switch_state) == 1
+          else 0.0
+        )
+
+  - function: $in(energy_wh)
+    name: integrate_energy
+    description: Basic Wh accumulator assuming a ~1 s tick cadence.
+    call: max(0.0, $in(energy_wh) + ($in(active_power_w) / 3600.0))
+
+  - function: $in(status_text)
+    name: report_status
+    description: Human-friendly status string for dashboards.
+    call: (
+          ("ON" if $in(switch_state) == 1 else "OFF")
+          + (
+            " (pending)" if $in(switch_state) != $in(desired_state) else ""
+          )
+        )
+
+communication:
+  - matter:
+      controller:
+        fabric_id: "0x1"
+        ws_url: "ws://matter-server:5580/ws"
+      default_payload_codec: tlv
+      bindings:
+        # Replace node_id/endpoint with the commissioned device values (see scripts/matter_client.py list-nodes).
+        - name: plug_state_feedback
+          direction: inbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: OnOff
+          attribute: OnOff
+          subscription:
+            min_interval: 1.0
+          write_attribute: "#attr(switch_state)"
+
+        - name: plug_command_on
+          direction: outbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: OnOff
+          command: On
+          read_attribute: "#attr(command_on_counter)"
+
+        - name: plug_command_off
+          direction: outbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: OnOff
+          command: Off
+          read_attribute: "#attr(command_off_counter)"
+
+scenarios:
+  plug_on:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(desired_state): 1
+
+  plug_off:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(desired_state): 0

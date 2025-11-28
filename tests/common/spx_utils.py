@@ -133,8 +133,8 @@ def bootstrap_model_instance(
     model_changed = ensure_model(client, model_key, model_def)
 
     overrides = dict(attribute_overrides or {})
-    if unit_id is not None:
-        overrides.setdefault("communication/modbus_tcp/id", unit_id)
+    # if unit_id is not None:
+    #     overrides.setdefault("communication/modbus_slave/id", unit_id)
 
     instance = ensure_instance(
         client,

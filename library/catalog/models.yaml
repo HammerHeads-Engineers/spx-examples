@@ -26,6 +26,60 @@ models:
       - id: http_gateway
     packages: [smart_building_pack, industrial_iiot_pack]
     profiles: [bms_quickstart, iiot_monitoring]
+  - id: Building.BMSController.OpcUa
+    name: BMS Controller (OPC UA)
+    path: library/domains/iot/generic/bms_controller__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.LightingPanel.OpcUa
+    name: Lighting Panel (OPC UA)
+    path: library/domains/iot/generic/lighting_panel__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.RoomController.Knx
+    name: Room Controller (KNX)
+    path: library/domains/iot/generic/room_controller__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.LightingZone.Knx
+    name: Lighting Zone (KNX)
+    path: library/domains/iot/generic/lighting_zone__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.Thermostat.Matter
+    name: Thermostat (Matter)
+    path: library/domains/iot/generic/thermostat__matter.yaml
+    domain: iot
+    protocols: [matter]
+    services:
+      - id: matter_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.SmartPlug.Matter
+    name: Smart Plug / Relay (Matter)
+    path: library/domains/iot/generic/smart_plug__matter.yaml
+    domain: iot
+    protocols: [matter]
+    services:
+      - id: matter_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Weather.WeatherFeed.Http
     name: Weather Forecast Feed
     path: library/domains/weather/weather_forecast__http.yaml
@@ -152,6 +206,24 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack, energy_pack]
     profiles: [iiot_monitoring]
+  - id: Energy.EVSE.Ocpp
+    name: EVSE / Charge Point (OCPP 1.6)
+    path: library/domains/energy/emobility/evse__ocpp.yaml
+    domain: energy
+    protocols: [ocpp]
+    services:
+      - id: ocpp_central_system
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
+  - id: Energy.CSMS.Ocpp
+    name: CSMS Control Simulator (OCPP 1.6)
+    path: library/domains/energy/emobility/csms__ocpp.yaml
+    domain: energy
+    protocols: [ocpp]
+    services:
+      - id: ocpp_central_system
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
   - id: Process.PressureTransmitter.Modbus
     name: Pressure Transmitter (Modbus)
     path: library/domains/iot/generic/pressure_transmitter__modbus.yaml

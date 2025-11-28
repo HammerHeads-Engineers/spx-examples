@@ -71,10 +71,10 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
         self.model = self.__class__._instance
         wait_seconds(0.5)
 
-        self.sut = ModbusVacuumGaugeSUTExample(unit_id=2, timeout=1.0)
+        self.sut = ModbusVacuumGaugeSUTExample(host="127.0.0.1", port=5020, unit_id=1, timeout=1.0)
         if not self.sut.connect():
             self.skipTest(
-                "Modbus server not reachable at 127.0.0.1:502 (unit 1)"
+                "Modbus server not reachable at 127.0.0.1:5020 (unit 1)"
             )
         wait_seconds(0.2)
 
@@ -129,7 +129,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
     def test_discharge_spike_scenario(self):
         discharge_pressure = float(
-            self.model["attributes"]["discharge_pressure"].internal_value
+            self.model["actions"]["function_2"].discharge_pressure
         )
         self._prime_pressures(rough=0.1, high=0.05)
         wait_for_condition(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)

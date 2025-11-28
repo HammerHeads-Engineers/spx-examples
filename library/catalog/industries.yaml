@@ -4,8 +4,8 @@ industries:
     description: >-
       Building automation starter kit with MQTT/LwM2M sensors, Modbus HVAC controllers
       and weather services for immediate BMS demos.
-    protocols: [mqtt, lwm2m, coap, http, modbus]
-    services: [mqtt_broker, lwm2m_server, modbus_tcp_gateway, http_gateway, knx_gateway, homeassistant_bridge, matter_server]
+    protocols: [mqtt, lwm2m, coap, http, modbus, opcua, knx, matter]
+    services: [mqtt_broker, lwm2m_server, modbus_tcp_gateway, http_gateway, knx_gateway, homeassistant_bridge, matter_server, opcua_server]
     profiles:
       - profiles/smart_building_pack/bms_quickstart.yaml
     default_instances:
@@ -19,16 +19,29 @@ industries:
         instance: spx_weather_feed
       - model: Env.AirQualityStation.Http
         instance: spx_air_quality_feed
+      - model: Building.BMSController.OpcUa
+        instance: spx_bms_controller_opcua
+      - model: Building.LightingPanel.OpcUa
+        instance: spx_lighting_panel_opcua
+      - model: Building.RoomController.Knx
+        instance: spx_room_controller_knx
+      - model: Building.LightingZone.Knx
+        instance: spx_lighting_zone_knx
     path: library/industries/smart_building_pack
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)
     description: >-
-      DER orchestration scaffold; currently reuses shared telemetry/controllers until
-      dedicated OCPP/SunSpec device twins land.
-    protocols: [mqtt, http, modbus]
-    services: [mqtt_broker, modbus_tcp_gateway, http_gateway]
+      DER orchestration scaffold with OCPP 1.6 EVSE/CSMS twins and shared telemetry/controllers
+      while SunSpec device models land.
+    protocols: [mqtt, http, modbus, ocpp]
+    services: [mqtt_broker, modbus_tcp_gateway, http_gateway, ocpp_central_system]
     profiles:
       - profiles/energy_pack/ev_csms_demo.yaml
+    default_instances:
+      - model: Energy.CSMS.Ocpp
+        instance: spx_csms_ocpp
+      - model: Energy.EVSE.Ocpp
+        instance: spx_evse_ocpp
     path: library/industries/energy_pack
   - id: embedded_lab_pack
     name: Embedded & Lab Pack

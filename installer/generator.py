@@ -17,7 +17,7 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.15"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.26"
 SPX_UI_SERVICE_NAME = "spx-ui"
 SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.28"
 
@@ -273,6 +273,7 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
         builtin_ports: List[str] = []
         docker_services: Dict[str, ServiceManifest] = {}
         native_services: List[ServiceManifest] = []
+        modbus_enabled = False
 
         for service_id in service_ids:
             manifest = self.index.services.get(service_id)
@@ -285,6 +286,12 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
                 docker_services[service_id] = manifest
             else:
                 native_services.append(manifest)
+            if service_id == "modbus_tcp_gateway":
+                modbus_enabled = True
+
+        if modbus_enabled:
+            # Expose an extended Modbus TCP range for multi-instance demos.
+            builtin_ports.extend([f"{port}:{port}" for port in range(5020, 5121)])
 
         services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root)
         if include_ui:

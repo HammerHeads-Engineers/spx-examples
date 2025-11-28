@@ -1,12 +1,10 @@
 name: ev_csms_demo
 description: |
-  Placeholder EV/DER orchestration profile built from the models we already ship.
-  Extend it with OCPP/SunSpec assets as they land in the domains catalog.
+  Minimal EV/DER orchestration profile showcasing the built-in OCPP 1.6 handshake
+  between a simulated charge point and central system (BootNotification + Heartbeat +
+  StatusNotification/MeterValues).
 models:
-  - library/domains/iot/generic/environment_sensor__mqtt.yaml
-  - library/domains/weather/weather_forecast__http.yaml
-  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+  - library/domains/energy/emobility/csms__ocpp.yaml
+  - library/domains/energy/emobility/evse__ocpp.yaml
 services:
-  - mqtt_broker
-  - modbus_tcp_gateway
-  - http_gateway
+  - ocpp_central_system

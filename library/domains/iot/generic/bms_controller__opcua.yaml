@@ -1,0 +1,368 @@
+# SPDX-License-Identifier: MIT
+
+name: bms_controller__opcua
+description: |
+  Building-management controller twin exposing AHU/chilled-water telemetry and energy data over OPC UA.
+  Ideal for testing BAS integrations that read/write setpoints, schedules and alarm states.
+
+attributes:
+  hvac_mode: auto
+  schedule_override: none
+  occupancy_percent: 35.0
+  occupancy_target_percent: 50.0
+
+  supply_air_temp_c: 16.5
+  supply_air_setpoint_c: 16.0
+  supply_air_command_c: 16.0
+  return_air_temp_c: 24.0
+  zone_temp_average_c: 22.2
+
+  fan_speed_percent: 55.0
+  fan_command_percent: 55.0
+  fan_status_text: "RUN"
+
+  filter_dp_pa: 120.0
+  filter_dp_limit_pa: 250.0
+
+  chilled_supply_temp_c: 6.5
+  chilled_return_temp_c: 11.2
+  chilled_setpoint_c: 6.0
+  pump_speed_percent: 60.0
+  pump_command_percent: 60.0
+  valve_position_percent: 45.0
+
+  energy_consumption_kwh: 1280.0
+  demand_limit_kw: 90.0
+  power_draw_kw: 78.0
+
+  alarm_chiller: 0
+  alarm_fan: 0
+  alarm_filter: 0
+
+  cycle_time_s: 1.0
+
+actions:
+  - function: $in(occupancy_percent)
+    name: slew_occupancy
+    description: Blend occupancy toward a scenario/weather target.
+    rate: 2.0
+    call: (
+          $in(occupancy_target_percent)
+          if abs($in(occupancy_target_percent) - $in(occupancy_percent)) <= rate
+          else $in(occupancy_percent)
+               + (rate if $in(occupancy_target_percent) > $in(occupancy_percent) else -rate)
+        )
+
+  - function: $in(supply_air_setpoint_c)
+    name: track_supply_setpoint
+    description: Slew actual supply setpoint toward the operator command.
+    call: (
+          $in(supply_air_command_c)
+          if abs($in(supply_air_command_c) - $in(supply_air_setpoint_c)) <= 0.2
+          else (
+            $in(supply_air_setpoint_c)
+            + (0.2 if $in(supply_air_command_c) > $in(supply_air_setpoint_c) else -0.2)
+          )
+        )
+
+  - function: $in(pump_speed_percent)
+    name: track_pump_speed
+    description: Pump speed follows the command with minor lag.
+    call: (
+          $in(pump_command_percent)
+          if abs($in(pump_command_percent) - $in(pump_speed_percent)) <= 1.5
+          else (
+            $in(pump_speed_percent)
+            + (1.5 if $in(pump_command_percent) > $in(pump_speed_percent) else -1.5)
+          )
+        )
+
+  - function: $in(fan_speed_percent)
+    name: track_fan_speed
+    description: Fan response with gating from mode/alarm state.
+    call: (
+          0.0 if $in(hvac_mode) == "off" or $in(alarm_fan) == 1
+          else (
+            $in(fan_command_percent)
+            if abs($in(fan_command_percent) - $in(fan_speed_percent)) <= 2.5
+            else (
+              $in(fan_speed_percent)
+              + (2.5 if $in(fan_command_percent) > $in(fan_speed_percent) else -2.5)
+            )
+          )
+        )
+
+  - function: $in(fan_status_text)
+    name: derive_fan_status
+    call: (
+          "FAULT" if $in(alarm_fan) == 1
+          else (
+            "STOP" if $in(fan_speed_percent) < 5.0
+            else "RUN"
+          )
+        )
+
+  - function: $in(supply_air_temp_c)
+    name: update_supply_air
+    description: Basic AHU temperature dynamics.
+    call: (
+          $in(supply_air_temp_c)
+          + 0.4 * ($in(supply_air_setpoint_c) - $in(supply_air_temp_c))
+          + 0.05 * ($in(zone_temp_average_c) - $in(supply_air_temp_c))
+        )
+
+  - function: $in(zone_temp_average_c)
+    name: update_zone_temp
+    description: Zone temps react to occupancy and supply air.
+    call: (
+          $in(zone_temp_average_c)
+          + 0.02 * ($in(occupancy_percent) - 30.0)
+          - 0.05 * ($in(supply_air_temp_c) - 16.0)
+          + 0.05 * ($in(return_air_temp_c) - $in(zone_temp_average_c))
+        )
+
+  - function: $in(return_air_temp_c)
+    name: update_return_air
+    call: (
+          $in(return_air_temp_c)
+          + 0.2 * ($in(zone_temp_average_c) - $in(return_air_temp_c))
+        )
+
+  - function: $in(chilled_supply_temp_c)
+    name: update_chilled_water
+    call: (
+          $in(chilled_supply_temp_c)
+          + 0.3 * ($in(chilled_setpoint_c) - $in(chilled_supply_temp_c))
+          + 0.02 * ($in(chilled_return_temp_c) - $in(chilled_supply_temp_c))
+        )
+
+  - function: $in(chilled_return_temp_c)
+    call: (
+          $in(chilled_return_temp_c)
+          + 0.1 * ($in(zone_temp_average_c) - $in(chilled_return_temp_c))
+          + 0.05 * ($in(chilled_supply_temp_c) - $in(chilled_return_temp_c))
+        )
+
+  - function: $in(valve_position_percent)
+    name: compute_valve_position
+    description: Valve responds to temp error.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            30.0 + 0.8 * ($in(supply_air_temp_c) - $in(supply_air_setpoint_c)) * -1.0
+          )
+        )
+
+  - function: $in(power_draw_kw)
+    name: compute_power_draw
+    description: Approximate power draw from major loads.
+    call: max(
+          10.0,
+          min(
+            120.0,
+            0.4 * $in(fan_speed_percent) + 0.6 * $in(pump_speed_percent) + 20.0
+          )
+        )
+
+  - function: $in(energy_consumption_kwh)
+    name: integrate_energy
+    description: Integrate energy usage over time.
+    call: $in(energy_consumption_kwh) + $in(power_draw_kw) * cycle_time_s / 3600.0
+
+  - function: $in(alarm_filter)
+    name: detect_filter_alarm
+    call: 1 if $in(filter_dp_pa) >= $in(filter_dp_limit_pa) else 0
+
+  - function: $in(alarm_chiller)
+    name: detect_chiller_alarm
+    call: 1 if $in(chilled_supply_temp_c) - $in(chilled_setpoint_c) > 3.0 else 0
+
+  - function: $in(alarm_fan)
+    name: detect_fan_alarm
+    call: 1 if $in(fan_speed_percent) < 5.0 and $in(fan_command_percent) > 30.0 else 0
+
+communication:
+  - opcua_server:
+      endpoint: opc.tcp://0.0.0.0:4843/spx/bms-controller
+      namespace_uri: urn:spx:examples:opcua:bms-controller
+      security:
+        policy: NoSecurity
+        user_tokens:
+          - type: anonymous
+          - type: username
+            username: operator
+            password: bas123
+      sections:
+        - name: building
+          browse_path: ["BMS"]
+          bindings:
+            - name: HVACMode
+              direction: bidirectional
+              attributes: "#attr(hvac_mode)"
+              node:
+                browse_path: ["HVACMode"]
+                data_type: String
+            - name: ScheduleOverride
+              direction: bidirectional
+              attributes: "#attr(schedule_override)"
+              node:
+                browse_path: ["ScheduleOverride"]
+                data_type: String
+            - name: Occupancy
+              direction: outbound
+              attributes: "#attr(occupancy_percent)"
+              node:
+                browse_path: ["OccupancyPercent"]
+                data_type: Double
+            - name: ZoneTemp
+              direction: outbound
+              attributes: "#attr(zone_temp_average_c)"
+              node:
+                browse_path: ["ZoneTemperature"]
+                data_type: Double
+        - name: air_handling
+          browse_path: ["BMS","AirHandling"]
+          bindings:
+            - name: SupplyTemp
+              direction: outbound
+              attributes: "#attr(supply_air_temp_c)"
+              node:
+                browse_path: ["SupplyTemperature"]
+                data_type: Double
+            - name: SupplySetpoint
+              direction: bidirectional
+              attributes:
+                - "#attr(supply_air_setpoint_c)"
+                - "#attr(supply_air_command_c)"
+              read_attribute: "#attr(supply_air_setpoint_c)"
+              write_attribute: "#attr(supply_air_command_c)"
+              node:
+                browse_path: ["SupplySetpoint"]
+                data_type: Double
+            - name: ReturnTemp
+              direction: outbound
+              attributes: "#attr(return_air_temp_c)"
+              node:
+                browse_path: ["ReturnTemperature"]
+                data_type: Double
+            - name: FanSpeed
+              direction: bidirectional
+              attributes:
+                - "#attr(fan_speed_percent)"
+                - "#attr(fan_command_percent)"
+              read_attribute: "#attr(fan_speed_percent)"
+              write_attribute: "#attr(fan_command_percent)"
+              node:
+                browse_path: ["Fan","Speed"]
+                data_type: Double
+            - name: FanStatus
+              direction: outbound
+              attributes: "#attr(fan_status_text)"
+              node:
+                browse_path: ["Fan","Status"]
+                data_type: String
+            - name: FilterDP
+              direction: outbound
+              attributes: "#attr(filter_dp_pa)"
+              node:
+                browse_path: ["Filter","DifferentialPressure"]
+                data_type: Double
+        - name: chilled_water
+          browse_path: ["BMS","ChilledWater"]
+          bindings:
+            - name: SupplyTemp
+              direction: outbound
+              attributes: "#attr(chilled_supply_temp_c)"
+              node:
+                browse_path: ["SupplyTemperature"]
+                data_type: Double
+            - name: ReturnTemp
+              direction: outbound
+              attributes: "#attr(chilled_return_temp_c)"
+              node:
+                browse_path: ["ReturnTemperature"]
+                data_type: Double
+            - name: PumpSpeed
+              direction: bidirectional
+              attributes:
+                - "#attr(pump_speed_percent)"
+                - "#attr(pump_command_percent)"
+              read_attribute: "#attr(pump_speed_percent)"
+              write_attribute: "#attr(pump_command_percent)"
+              node:
+                browse_path: ["PumpSpeed"]
+                data_type: Double
+            - name: ValvePosition
+              direction: outbound
+              attributes: "#attr(valve_position_percent)"
+              node:
+                browse_path: ["ValvePosition"]
+                data_type: Double
+        - name: energy
+          browse_path: ["BMS","Energy"]
+          bindings:
+            - name: DemandLimit
+              direction: bidirectional
+              attributes: "#attr(demand_limit_kw)"
+              node:
+                browse_path: ["DemandLimit"]
+                data_type: Double
+            - name: PowerDraw
+              direction: outbound
+              attributes: "#attr(power_draw_kw)"
+              node:
+                browse_path: ["PowerDraw"]
+                data_type: Double
+            - name: EnergyConsumption
+              direction: outbound
+              attributes: "#attr(energy_consumption_kwh)"
+              node:
+                browse_path: ["EnergyConsumption"]
+                data_type: Double
+        - name: alarms
+          browse_path: ["BMS","Alarms"]
+          bindings:
+            - name: ChillerAlarm
+              direction: outbound
+              attributes: "#attr(alarm_chiller)"
+              node:
+                browse_path: ["Chiller"]
+                data_type: Boolean
+            - name: FanAlarm
+              direction: outbound
+              attributes: "#attr(alarm_fan)"
+              node:
+                browse_path: ["Fan"]
+                data_type: Boolean
+            - name: FilterAlarm
+              direction: outbound
+              attributes: "#attr(alarm_filter)"
+              node:
+                browse_path: ["Filter"]
+                data_type: Boolean
+
+scenarios:
+  morning_warmup:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(schedule_override): occupied
+      $in(occupancy_target_percent): 60.0
+      $in(supply_air_command_c): 15.0
+
+  demand_response:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(demand_limit_kw): 60.0
+      $in(fan_command_percent): 40.0
+      $in(pump_command_percent): 45.0
+
+  maintenance_stop:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(hvac_mode): off
+      $in(fan_command_percent): 0.0
+      $in(pump_command_percent): 0.0

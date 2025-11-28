@@ -31,6 +31,19 @@ services:
     deployment:
       runtime: builtin
       provider: spx-server
+  - id: ocpp_central_system
+    name: OCPP Central System
+    protocol: ocpp
+    description: WebSocket central system endpoint for OCPP 1.6J charge points.
+    ports:
+      - transport: tcp
+        host: 9000
+        container: 9000
+        purpose: OCPP /ocpp WebSocket
+    deployment:
+      runtime: builtin
+      provider: spx-server
+      notes: "Runs inside spx-server; expose the port if external charge points should connect."
   - id: opcua_server
     name: OPC UA Server
     protocol: opcua
@@ -48,6 +61,14 @@ services:
         host: 4842
         container: 4842
         purpose: OPC UA endpoint (Packaging Line)
+      - transport: tcp
+        host: 4843
+        container: 4843
+        purpose: OPC UA endpoint (BMS Controller)
+      - transport: tcp
+        host: 4844
+        container: 4844
+        purpose: OPC UA endpoint (Lighting Panel)
       - transport: tcp
         host: 53530
         container: 53530

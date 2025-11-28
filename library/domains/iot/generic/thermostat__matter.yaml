@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: MIT
+
+name: thermostat__matter
+description: |
+  Virtual thermostat published over Matter clusters. Matches python-matter-server API surface
+  used by Home Assistant; values are scaled to the 0.01 °C resolution Matter expects.
+
+attributes:
+  room_temperature_c: 22.5
+  room_setpoint_c: 22.0
+  room_command_raw: 2200           # 0.01 °C units written by Matter
+  room_command_c: 22.0
+  measured_value_raw: 2250         # TemperatureMeasurement.MeasuredValue (0.01 °C)
+  heating_setpoint_raw: 2200       # Thermostat.OccupiedHeatingSetpoint (0.01 °C)
+  hvac_mode: heat                  # heat/cool/auto/off
+  hvac_mode_code: 3                # Thermostat.SystemMode: 0=off,1=auto,2=cool,3=heat
+  hvac_active: 1
+
+  min_setpoint_c: 15.0
+  max_setpoint_c: 28.0
+  setpoint_step_k: 0.5
+
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(room_command_c)
+    name: convert_command_raw_to_c
+    description: Convert inbound Matter raw setpoint to °C.
+    call: $in(room_command_raw) / 100.0
+
+  - function: $in(room_setpoint_c)
+    name: track_setpoint
+    description: Slew controller setpoint toward the Matter command with clamps.
+    call: max(
+          $in(min_setpoint_c),
+          min(
+            $in(max_setpoint_c),
+            (
+              $in(room_command_c)
+              if abs($in(room_command_c) - $in(room_setpoint_c)) <= $in(setpoint_step_k)
+              else (
+                $in(room_setpoint_c)
+                + ($in(setpoint_step_k) if $in(room_command_c) > $in(room_setpoint_c) else -$in(setpoint_step_k))
+              )
+            )
+          )
+        )
+
+  - function: $in(room_temperature_c)
+    name: update_room_temperature
+    description: Simple first-order dynamic toward the setpoint.
+    call: (
+          $in(room_temperature_c)
+          + 0.25 * ($in(room_setpoint_c) - $in(room_temperature_c))
+        )
+
+  - function: $in(measured_value_raw)
+    name: encode_measured_value
+    description: Matter TemperatureMeasurement encodes 0.01 °C units.
+    call: int(round($in(room_temperature_c) * 100.0))
+
+  - function: $in(heating_setpoint_raw)
+    name: encode_heating_setpoint
+    description: Matter Thermostat setpoint in 0.01 °C units.
+    call: int(round($in(room_setpoint_c) * 100.0))
+
+  - function: $in(hvac_mode_code)
+    name: derive_hvac_mode_code
+    description: Map string mode to Matter SystemMode enumeration.
+    call: (
+          0 if $in(hvac_mode) == "off"
+          else 2 if $in(hvac_mode) == "cool"
+          else 1 if $in(hvac_mode) == "auto"
+          else 3
+        )
+
+  - function: $in(hvac_active)
+    name: detect_activity
+    description: Active when on and temperature error exists.
+    call: 1 if $in(hvac_mode) != "off" and abs($in(room_setpoint_c) - $in(room_temperature_c)) > 0.3 else 0
+
+communication:
+  - matter:
+      controller:
+        fabric_id: "0x1"
+        ws_url: "ws://matter-server:5580/ws"
+      default_payload_codec: tlv
+      bindings:
+        - name: temperature_report
+          direction: outbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: TemperatureMeasurement
+          attribute: MeasuredValue
+          read_attribute: "#attr(measured_value_raw)"
+        - name: heating_setpoint
+          direction: bidirectional
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: Thermostat
+          attribute: OccupiedHeatingSetpoint
+          read_attribute: "#attr(heating_setpoint_raw)"
+          write_attribute: "#attr(room_command_raw)"
+        - name: system_mode
+          direction: outbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: Thermostat
+          attribute: SystemMode
+          read_attribute: "#attr(hvac_mode_code)"
+        - name: hvac_active
+          direction: outbound
+          node_id: "0x1234"
+          endpoint: 1
+          cluster: OnOff
+          attribute: OnOff
+          read_attribute: "#attr(hvac_active)"

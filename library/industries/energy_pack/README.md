@@ -1,9 +1,9 @@
 # Energy Pack (e-Mobility & DER)
 
-Foundation for DER / EMS / e-mobility scenarios. The current snapshot reuses
-weather services and edge controllers while we grow the dedicated OCPP/SunSpec
-models.
+Foundation for DER / EMS / e-mobility scenarios. Now includes an OCPP 1.6 charge
+point + CSMS handshake alongside the shared telemetry/controllers already in the
+catalog.
 
-- **Protocols**: HTTP, MQTT, Modbus TCP (more coming: OCPP, SunSpec, OPC UA).
-- **Models**: telemetry feeds and controllers relevant to DER orchestration.
-- **Quickstart**: `profiles/energy_pack/ev_csms_demo.yaml` (placeholder manifest).
+- **Protocols**: HTTP, MQTT, Modbus TCP, OCPP (SunSpec/OPC UA coming next).
+- **Models**: OCPP 1.6 EVSE + CSMS twins, plus reusable telemetry/controllers for DER.
+- **Quickstart**: `profiles/energy_pack/ev_csms_demo.yaml` (OCPP BootNotification/Heartbeat demo).

@@ -8,8 +8,17 @@ models:
   - library/domains/iot/generic/air_quality_station__http.yaml
   - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
   - library/domains/weather/weather_forecast__http.yaml
+  - library/domains/iot/generic/bms_controller__opcua.yaml
+  - library/domains/iot/generic/lighting_panel__opcua.yaml
+  - library/domains/iot/generic/room_controller__knx.yaml
+  - library/domains/iot/generic/lighting_zone__knx.yaml
+  - library/domains/iot/generic/thermostat__matter.yaml
+  - library/domains/iot/generic/smart_plug__matter.yaml
 services:
   - mqtt_broker
   - modbus_tcp_gateway
   - lwm2m_server
   - http_gateway
+  - opcua_server
+  - knx_gateway
+  - matter_server

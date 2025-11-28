@@ -7,6 +7,10 @@ domains:
     name: Weather & Forecasting
     description: Static/dynamic weather feeds via HTTP.
     path: library/domains/weather
+  - id: energy
+    name: Energy & e-Mobility
+    description: EVSE/CSMS twins and DER-oriented telemetry for OCPP/SunSpec.
+    path: library/domains/energy
   - id: motion_controllers
     name: Motion Controllers
     description: Actuator/drive models exposed over Modbus.

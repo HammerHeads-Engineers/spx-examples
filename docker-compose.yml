@@ -106,7 +106,7 @@ services:
   #   restart: unless-stopped
 
   spx-server:
-    image: simplephysx/spx-server:v1.0.0-rc.15
+    image: simplephysx/spx-server:v1.0.0-rc.21
     container_name: spx-server
     ports:
       - "8000:8000"

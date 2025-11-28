@@ -181,30 +181,30 @@ actions:
     std: 5.0e-5
     mode: proportional
 
-# communication:
-#   - modbus_tcp:
-#       poll_interval: 0.2
-#       mapping:
-#         rough_pressure:        { address: [0,1],  group: h_r, type: float }
-#         high_pressure:         { address: [2,3],  group: h_r, type: float }
-#         ionizer_enabled:       { address: [4,4],  group: c_o, type: uint_16 }
-#         ionizer_available:     { address: [5,5],  group: h_r, type: uint_16 }
-#         ionizer_interlock:     { address: [6,6],  group: h_r, type: uint_16 }
-#         leak_event:            { address: [7,7],  group: c_o, type: uint_16 }
-#         pumpdown_target:       { address: [8,9],  group: h_r, type: float }
-#         upset_target:          { address: [10,11], group: h_r, type: float }
-#         relay_setpoint_1:      { address: [12,13], group: h_r, type: float }
-#         relay_setpoint_2:      { address: [14,15], group: h_r, type: float }
-#         relay_setpoint_3:      { address: [16,17], group: h_r, type: float }
-#         relay_setpoint_4:      { address: [18,19], group: h_r, type: float }
-#         relay_setpoint_5:      { address: [20,21], group: h_r, type: float }
-#         relay_output_1:        { address: [22,22], group: h_r, type: uint_16 }
-#         relay_output_2:        { address: [23,23], group: h_r, type: uint_16 }
-#         relay_output_3:        { address: [24,24], group: h_r, type: uint_16 }
-#         relay_output_4:        { address: [25,25], group: h_r, type: uint_16 }
-#         relay_output_5:        { address: [26,26], group: h_r, type: uint_16 }
-#         # discharge_event:       { address: [27,27], group: c_o, type: uint_16 }
-#         # discharge_decay:       { address: [30,31], group: h_r, type: float }
+communication:
+  - modbus_slave:
+      # poll_interval: 0.2
+      mapping:
+        rough_pressure:        { address: [0,1],  group: h_r, type: float }
+        high_pressure:         { address: [2,3],  group: h_r, type: float }
+        ionizer_enabled:       { address: [4,4],  group: c_o, type: uint_16 }
+        ionizer_available:     { address: [5,5],  group: h_r, type: uint_16 }
+        ionizer_interlock:     { address: [6,6],  group: h_r, type: uint_16 }
+        leak_event:            { address: [7,7],  group: c_o, type: uint_16 }
+        pumpdown_target:       { address: [8,9],  group: h_r, type: float }
+        upset_target:          { address: [10,11], group: h_r, type: float }
+        relay_setpoint_1:      { address: [12,13], group: h_r, type: float }
+        relay_setpoint_2:      { address: [14,15], group: h_r, type: float }
+        relay_setpoint_3:      { address: [16,17], group: h_r, type: float }
+        relay_setpoint_4:      { address: [18,19], group: h_r, type: float }
+        relay_setpoint_5:      { address: [20,21], group: h_r, type: float }
+        relay_output_1:        { address: [22,22], group: h_r, type: uint_16 }
+        relay_output_2:        { address: [23,23], group: h_r, type: uint_16 }
+        relay_output_3:        { address: [24,24], group: h_r, type: uint_16 }
+        relay_output_4:        { address: [25,25], group: h_r, type: uint_16 }
+        relay_output_5:        { address: [26,26], group: h_r, type: uint_16 }
+        # discharge_event:       { address: [27,27], group: c_o, type: uint_16 }
+        # discharge_decay:       { address: [30,31], group: h_r, type: float }
 
 scenarios:
   discharge_spike:
@@ -214,44 +214,44 @@ scenarios:
     overrides:
       $in(discharge_event): 1
 
-  # slow_leak:
-  #   name: Slow Leak
-  #   enabled: true
-  #   description: Holds the leak flag active long enough to raise pressures gradually.
-  #   duration: 15.0
-  #   overrides:
-  #     $in(leak_event): 1
-  #     $in(rough_upset_gain): 0.05
-  #     $in(hv_upset_gain): 0.04
+  slow_leak:
+    name: Slow Leak
+    enabled: true
+    description: Holds the leak flag active long enough to raise pressures gradually.
+    duration: 15.0
+    overrides:
+      $in(leak_event): 1
+      $in(rough_upset_gain): 0.05
+      $in(hv_upset_gain): 0.04
 
-  # ionizer_trip:
-  #   name: Ionizer Trip
-  #   enabled: true
-  #   description: Requests the ioniser while nudging thresholds so the interlock triggers.
-  #   duration: 5.0
-  #   overrides:
-  #     $in(ionizer_enabled): 1
-  #     $in(hv_threshold_disable): 5.0e-6
+  ionizer_trip:
+    name: Ionizer Trip
+    enabled: true
+    description: Requests the ioniser while nudging thresholds so the interlock triggers.
+    duration: 5.0
+    overrides:
+      $in(ionizer_enabled): 1
+      $in(hv_threshold_disable): 5.0e-6
 
-  # modbus_disconnect:
-  #   name: Modbus Disconnect
-  #   enabled: true
-  #   duration: 2.0
-  #   call:
-  #     path: communication.modbus_tcp.detach
-  #     stop_path: communication.modbus_tcp.attach
+  modbus_disconnect:
+    name: Modbus Disconnect
+    enabled: true
+    duration: 2.0
+    call:
+      path: communication.modbus_tcp.detach
+      stop_path: communication.modbus_tcp.attach
 
-  # relay_sweep:
-  #   name: Relay Sweep
-  #   enabled: true
-  #   duration: 6.0
-  #   description: Sweeps relay setpoints to exercise output transitions.
-  #   overrides:
-  #     relay_setpoint_1: 5.0e-1
-  #     relay_setpoint_2: 1.0e-2
-  #     relay_setpoint_3: 5.0e-4
-  #     relay_setpoint_4: 1.0e-5
-  #     relay_setpoint_5: 5.0e-7
+  relay_sweep:
+    name: Relay Sweep
+    enabled: true
+    duration: 6.0
+    description: Sweeps relay setpoints to exercise output transitions.
+    overrides:
+      relay_setpoint_1: 5.0e-1
+      relay_setpoint_2: 1.0e-2
+      relay_setpoint_3: 5.0e-4
+      relay_setpoint_4: 1.0e-5
+      relay_setpoint_5: 5.0e-7
 
   sensor_drift:
     # name: Sensor Drift

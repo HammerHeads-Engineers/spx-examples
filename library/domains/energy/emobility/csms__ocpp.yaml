@@ -1,0 +1,167 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: csms__ocpp
+description: |
+  Simulated OCPP 1.6 central system (CSMS) responding to a single charge point.
+  Implements BootNotification + Heartbeat responses per the spx-server integration
+  tests and records StatusNotification/MeterValues telemetry for dashboards.
+
+attributes:
+  csms_current_time: "2025-01-01T00:00:00Z"
+  heartbeat_interval_s: 30
+  registration_status: "Accepted"
+
+  last_boot_vendor: ""
+  last_boot_model: ""
+  last_boot_serial: ""
+
+  last_connector_id: 1
+  last_connector_status: "Available"
+  last_error_code: "NoError"
+  last_status_info: ""
+  last_vendor_id: ""
+  last_transaction_id: 0
+
+  last_meter_values: []
+  last_energy_wh: 0.0
+  last_power_w: 0.0
+
+  status_text: "CSMS idle"
+
+actions:
+  - function: $in(last_energy_wh)
+    name: derive_energy_from_meter_values
+    description: Extract energy register from the most recent MeterValues payload.
+    call: (
+          float($in(last_meter_values)[0]["sampledValue"][0]["value"])
+          if (
+            isinstance($in(last_meter_values), list)
+            and len($in(last_meter_values)) > 0
+            and isinstance($in(last_meter_values)[0], dict)
+            and "sampledValue" in $in(last_meter_values)[0]
+            and len($in(last_meter_values)[0]["sampledValue"]) > 0
+            and isinstance($in(last_meter_values)[0]["sampledValue"][0], dict)
+            and "value" in $in(last_meter_values)[0]["sampledValue"][0]
+          )
+          else $in(last_energy_wh)
+        )
+
+  - function: $in(last_power_w)
+    name: derive_power_from_meter_values
+    description: Capture instantaneous power from the latest sampled value list.
+    call: (
+          float(
+            next(
+              (
+                entry.get("value")
+                for entry in $in(last_meter_values)[0].get("sampledValue", [])
+                if entry.get("measurand") == "Power.Active.Import"
+              ),
+              $in(last_power_w),
+            )
+          )
+          if (
+            isinstance($in(last_meter_values), list)
+            and len($in(last_meter_values)) > 0
+            and isinstance($in(last_meter_values)[0], dict)
+          )
+          else $in(last_power_w)
+        )
+
+  - function: $in(status_text)
+    name: render_status_text
+    description: Summarise latest CP state for dashboards.
+    call: (
+          "Accepted CP boot from " + ($in(last_boot_serial) or "unknown")
+          + " / status=" + $in(last_connector_status)
+          + " / error=" + $in(last_error_code)
+        )
+
+communication:
+  - ocpp:
+      role: central_system
+      charge_point_id: "spx-csms"
+      server:
+        host: "0.0.0.0"
+        port: 9000
+        path: "/ocpp"
+        subprotocol: "ocpp1.6"
+      bindings:
+        boot_request:
+          direction: inbound
+          frame_type: call
+          action: BootNotification
+          payload:
+            chargePointVendor: "#attr(last_boot_vendor)"
+            chargePointModel: "#attr(last_boot_model)"
+            chargePointSerialNumber: "#attr(last_boot_serial)"
+        boot_response:
+          direction: outbound
+          frame_type: call_result
+          action: BootNotification
+          payload:
+            status: "#attr(registration_status)"
+            currentTime: "#attr(csms_current_time)"
+            heartbeatInterval: "#attr(heartbeat_interval_s)"
+        heartbeat_request:
+          direction: inbound
+          frame_type: call
+          action: Heartbeat
+          payload: {}
+        heartbeat_response:
+          direction: outbound
+          frame_type: call_result
+          action: Heartbeat
+          payload:
+            currentTime: "#attr(csms_current_time)"
+        status_notification_request:
+          direction: inbound
+          frame_type: call
+          action: StatusNotification
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            status: "#attr(last_connector_status)"
+            errorCode: "#attr(last_error_code)"
+            info: "#attr(last_status_info)"
+            vendorId: "#attr(last_vendor_id)"
+        status_notification_response:
+          direction: outbound
+          frame_type: call_result
+          action: StatusNotification
+          payload: {}
+        meter_values_request:
+          direction: inbound
+          frame_type: call
+          action: MeterValues
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            transactionId: "#attr(last_transaction_id)"
+            meterValue: "#attr(last_meter_values)"
+        meter_values_response:
+          direction: outbound
+          frame_type: call_result
+          action: MeterValues
+          payload: {}
+
+scenarios:
+  accept_evse:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(registration_status): "Accepted"
+      $in(heartbeat_interval_s): 30
+      $in(csms_current_time): "2025-01-01T00:00:00Z"
+  reject_evse:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(registration_status): "Rejected"
+      $in(heartbeat_interval_s): 0
+  fast_heartbeat:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(heartbeat_interval_s): 10
+      $in(csms_current_time): "2025-01-01T00:00:00Z"
