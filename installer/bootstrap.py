@@ -43,7 +43,7 @@ def wait_for_server(api_url: str, timeout: float = 60.0) -> None:
     raise RuntimeError(f"SPX server at {api_url} did not become healthy within {timeout} seconds")
 
 
-def bootstrap(bundle_path: Path, api_url: str) -> None:
+def bootstrap(bundle_path: Path, api_url: str, *, skip_instances: bool = False) -> None:
     bundle = load_bundle(bundle_path)
     models = bundle.get("models", [])
     instances = bundle.get("instances", [])
@@ -56,21 +56,31 @@ def bootstrap(bundle_path: Path, api_url: str) -> None:
         client = spx_python.init(address=api_url, product_key=bundle.get("license_key", ""))
         for entry in models:
             register_via_sdk(client, entry)
-        for entry in instances:
-            create_instance_via_sdk(client, entry)
+        if skip_instances:
+            if instances:
+                print("[bootstrap] Instance creation skipped (--skip-instances).")
+        else:
+            for entry in instances:
+                create_instance_via_sdk(client, entry)
     else:
         register_via_http(api_url, bundle.get("license_key", ""), models)
         if instances:
-            print("[bootstrap] Instance creation skipped (spx_python not available).")
+            reason = "spx_python not available" if not skip_instances else "--skip-instances"
+            print(f"[bootstrap] Instance creation skipped ({reason}).")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Bootstrap models/instances into SPX server")
     parser.add_argument("--bundle", required=True, help="Path to bundle JSON produced by installer")
     parser.add_argument("--api-url", default=DEFAULT_API, help="SPX server API base URL")
+    parser.add_argument(
+        "--skip-instances",
+        action="store_true",
+        help="Register models only (do not create instances from bundle.json).",
+    )
     args = parser.parse_args(argv)
 
-    bootstrap(Path(args.bundle), args.api_url)
+    bootstrap(Path(args.bundle), args.api_url, skip_instances=bool(args.skip_instances))
     return 0
 
 

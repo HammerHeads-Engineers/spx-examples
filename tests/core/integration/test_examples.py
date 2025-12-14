@@ -11,7 +11,9 @@ import unittest
 import urllib.error
 import urllib.request
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+from tests.common.repo import repo_root
+
+ROOT = repo_root()
 EXAMPLES_DIR = ROOT / "examples"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 
@@ -73,7 +75,7 @@ def _run_script(path: pathlib.Path, timeout: int = 120) -> subprocess.CompletedP
     )
 
 
-@unittest.skip("Temporarily disable example tests")
+@unittest.skip("Temporarily disabled example tests")
 class TestExampleScripts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

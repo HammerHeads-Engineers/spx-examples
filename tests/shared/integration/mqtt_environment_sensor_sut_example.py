@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration tests for the SimpleMqttEnvironmentSensorSUT helper."""
+"""Shared integration tests for the SimpleMqttEnvironmentSensorSUT helper."""
 
 from __future__ import annotations
 

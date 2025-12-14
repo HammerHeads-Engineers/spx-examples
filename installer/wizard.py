@@ -9,6 +9,7 @@ from shutil import get_terminal_size
 from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
+from .selection import resolve_model_ids, resolve_service_ids
 from . import ui
 
 
@@ -47,16 +48,8 @@ class InstallerWizard:
         )
         license_key = self._prompt_license_key()
 
-        model_ids = self._resolve_model_ids(packages, profiles, protocol_filters, index)
-        service_ids = sorted(
-            {
-                service_id
-                for model_id in model_ids
-                for service_id in index.models[model_id].services
-            }
-            | {srv for pkg in packages for srv in index.industries[pkg].services}
-            | {srv for profile in profiles for srv in index.profiles[profile].services}
-        )
+        model_ids = resolve_model_ids(packages, profiles, protocol_filters, index)
+        service_ids = resolve_service_ids(model_ids, packages, profiles, index)
 
         self._print_summary(
             packages,
@@ -257,39 +250,6 @@ class InstallerWizard:
                 print(ui.warn(f"  Values must be between 1 and {max_index}."))
                 continue
             return sorted(set(values))
-
-    def _resolve_model_ids(
-        self,
-        packages: Sequence[str],
-        profiles: Sequence[str],
-        protocols: Sequence[str],
-        index: ManifestIndex,
-    ) -> List[str]:
-        result = {
-            model_id
-            for model_id, manifest in index.models.items()
-            if any(pkg in manifest.packages for pkg in packages)
-        }
-        if protocols:
-            result.update(
-                {
-                    model_id
-                    for model_id, manifest in index.models.items()
-                    if any(proto in manifest.protocols for proto in protocols)
-                }
-            )
-        profile_model_paths = {
-            path
-            for profile_id in profiles
-            for path in index.profiles[profile_id].models
-        }
-        if profile_model_paths:
-            path_to_model = {manifest.path: model_id for model_id, manifest in index.models.items()}
-            for profile_path in profile_model_paths:
-                model_id = path_to_model.get(profile_path)
-                if model_id:
-                    result.add(model_id)
-        return sorted(result)
 
     def _print_summary(
         self,

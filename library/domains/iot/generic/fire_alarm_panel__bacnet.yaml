@@ -1,0 +1,170 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: fire_alarm_panel__bacnet
+description: |
+  Fire detection and alarm system exposing smoke/heat zones plus evacuation outputs over BACnet/IP.
+  Supports remote monitoring of detectors, manual call points and siren command with alarm enrollment.
+
+attributes:
+  # sensing
+  smoke_zone1_ppm: 35.0
+  smoke_zone2_ppm: 18.0
+  heat_zone1_c: 28.0
+  heat_zone2_c: 26.0
+  manual_callpoint: 0        # 1 when break-glass is pressed
+
+  # states/outputs
+  alarm_active: 0
+  siren_command: 0
+  system_status: 1           # 1=normal, 2=pre-alarm, 3=alarm, 4=fault
+  alarm_text: "NORMAL"
+
+  # thresholds
+  smoke_alarm_threshold_ppm: 80.0
+  heat_alarm_threshold_c: 68.0
+  prealarm_margin_ppm: 20.0
+
+conditions:
+  # Raise alarm on smoke/heat/manual trigger.
+  - if: (
+        $in(smoke_zone1_ppm) >= $in(smoke_alarm_threshold_ppm)
+        or $in(smoke_zone2_ppm) >= $in(smoke_alarm_threshold_ppm)
+        or $in(heat_zone1_c) >= $in(heat_alarm_threshold_c)
+        or $in(heat_zone2_c) >= $in(heat_alarm_threshold_c)
+        or $in(manual_callpoint) == 1
+      )
+    actions:
+      - set: $in(alarm_active)
+        value: 1
+      - set: $in(siren_command)
+        value: 1
+      - set: $in(system_status)
+        value: 3
+      - set: $in(alarm_text)
+        value: "ALARM"
+
+  # Pre-alarm when approaching smoke threshold.
+  - if: (
+        $in(alarm_active) == 0
+        and (
+          $in(smoke_zone1_ppm) >= ($in(smoke_alarm_threshold_ppm) - $in(prealarm_margin_ppm))
+          or $in(smoke_zone2_ppm) >= ($in(smoke_alarm_threshold_ppm) - $in(prealarm_margin_ppm))
+        )
+      )
+    actions:
+      - set: $in(system_status)
+        value: 2
+      - set: $in(alarm_text)
+        value: "PRE-ALARM"
+
+  # Clear alarm when all inputs return to safe values.
+  - if: (
+        $in(alarm_active) == 1
+        and $in(smoke_zone1_ppm) < ($in(smoke_alarm_threshold_ppm) - 10.0)
+        and $in(smoke_zone2_ppm) < ($in(smoke_alarm_threshold_ppm) - 10.0)
+        and $in(heat_zone1_c) < ($in(heat_alarm_threshold_c) - 5.0)
+        and $in(heat_zone2_c) < ($in(heat_alarm_threshold_c) - 5.0)
+        and $in(manual_callpoint) == 0
+      )
+    actions:
+      - set: $in(alarm_active)
+        value: 0
+      - set: $in(siren_command)
+        value: 0
+      - set: $in(system_status)
+        value: 1
+      - set: $in(alarm_text)
+        value: "NORMAL"
+
+communication:
+  - bacnet:
+      host: 0.0.0.0
+      port: 47808
+      device:
+        instance_id: 3010
+        vendor_id: 999
+        name: "SPX BACnet Fire Panel"
+        model_name: "spx-server"
+      timing:
+        poll_interval: 0.5
+        poll_jitter: 0.05
+      objects:
+        smoke_zone_1:
+          type: analogInput
+          instance: 1
+          properties:
+            presentValue:
+              read: "#attr(smoke_zone1_ppm)"
+            units: "partsPerMillion"
+        smoke_zone_2:
+          type: analogInput
+          instance: 2
+          properties:
+            presentValue:
+              read: "#attr(smoke_zone2_ppm)"
+            units: "partsPerMillion"
+        heat_zone_1:
+          type: analogInput
+          instance: 3
+          properties:
+            presentValue:
+              read: "#attr(heat_zone1_c)"
+            units: "degreesCelsius"
+        heat_zone_2:
+          type: analogInput
+          instance: 4
+          properties:
+            presentValue:
+              read: "#attr(heat_zone2_c)"
+            units: "degreesCelsius"
+        manual_call_point:
+          type: binaryInput
+          instance: 30
+          properties:
+            presentValue:
+              read: "#attr(manual_callpoint)"
+              states:
+                0: "normal"
+                1: "activated"
+        siren_output:
+          type: binaryOutput
+          instance: 40
+          priority: 8
+          properties:
+            presentValue:
+              read: "#attr(siren_command)"
+              write: "#attr(siren_command)"
+              states:
+                0: "off"
+                1: "on"
+            relinquishDefault: 0
+        system_status:
+          type: multiStateValue
+          instance: 50
+          properties:
+            presentValue:
+              read: "#attr(system_status)"
+              states:
+                1: "normal"
+                2: "pre-alarm"
+                3: "alarm"
+                4: "fault"
+            numberOfStates: 4
+            stateText:
+              - "normal"
+              - "pre-alarm"
+              - "alarm"
+              - "fault"
+      alarms:
+        fire_alarm:
+          instance: 400
+          properties:
+            monitoredObjectIdentifier: "multiStateValue,50"
+            eventEnable: [true, true, true]
+            eventMessageTexts:
+              value:
+                - "Fire alarm active"
+                - "Fire fault"
+                - "Fire normal"

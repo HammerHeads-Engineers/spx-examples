@@ -1,4 +1,4 @@
-# Industrial / IIoT Pack
+# Industrial Pack (Industry 4.0)
 
 OPC UA/Modbus/MQTT/SNMP-oriented kit for line automation, process control and
 factory monitoring. The present iteration links the models we already maintain;

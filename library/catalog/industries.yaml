@@ -4,8 +4,8 @@ industries:
     description: >-
       Building automation starter kit with MQTT/LwM2M sensors, Modbus HVAC controllers
       and weather services for immediate BMS demos.
-    protocols: [mqtt, lwm2m, coap, http, modbus, opcua, knx, matter]
-    services: [mqtt_broker, lwm2m_server, modbus_tcp_gateway, http_gateway, knx_gateway, homeassistant_bridge, matter_server, opcua_server]
+    protocols: [mqtt, lwm2m, coap, http, modbus, opcua, knx, matter, bacnet]
+    services: [mqtt_broker, lwm2m_server, modbus_tcp_gateway, http_gateway, knx_gateway, homeassistant_bridge, matter_server, opcua_server, bacnet_gateway]
     profiles:
       - profiles/smart_building_pack/bms_quickstart.yaml
     default_instances:
@@ -54,7 +54,7 @@ industries:
       - profiles/embedded_lab_pack/scpi_lab.yaml
     path: library/industries/embedded_lab_pack
   - id: industrial_iiot_pack
-    name: Industrial + IIoT Pack
+    name: Industrial Pack (Industry 4.0)
     description: >-
       Motion/process control and monitoring bundle mixing Modbus, MQTT and SCPI
       instrumentation for factory/QA flows.

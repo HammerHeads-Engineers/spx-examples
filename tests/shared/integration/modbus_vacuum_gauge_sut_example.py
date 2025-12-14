@@ -5,7 +5,6 @@
 """Integration coverage for the example Modbus vacuum gauge SUT device implementation."""
 
 import os
-import pathlib
 import unittest
 
 from tests.common.spx_utils import (
@@ -13,13 +12,14 @@ from tests.common.spx_utils import (
     wait_for_condition,
     wait_seconds,
 )
+from tests.common.repo import repo_root
 from tests.devices.modbus_vacuum_gauge_sut_example import (
     ModbusVacuumGaugeSUTExample,
     ModbusTcpClient,
 )
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = (
     ROOT
     / "library"

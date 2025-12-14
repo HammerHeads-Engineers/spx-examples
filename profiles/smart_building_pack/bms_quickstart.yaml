@@ -14,6 +14,8 @@ models:
   - library/domains/iot/generic/lighting_zone__knx.yaml
   - library/domains/iot/generic/thermostat__matter.yaml
   - library/domains/iot/generic/smart_plug__matter.yaml
+  - library/domains/iot/generic/fire_alarm_panel__bacnet.yaml
+  - library/domains/iot/generic/security_access_controller__bacnet.yaml
 services:
   - mqtt_broker
   - modbus_tcp_gateway

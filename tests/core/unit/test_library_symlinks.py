@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests.common.repo import repo_root
+
+ROOT = repo_root()
 
 
 def _iter_industry_model_files() -> list[Path]:

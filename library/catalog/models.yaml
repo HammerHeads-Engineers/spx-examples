@@ -62,6 +62,15 @@ models:
       - id: knx_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Building.PresenceDetector.ThebenP360.Knx
+    name: Presence Detector (Theben theRonda P360 KNX)
+    path: library/domains/iot/theben/theronda_p360__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Building.Thermostat.Matter
     name: Thermostat (Matter)
     path: library/domains/iot/generic/thermostat__matter.yaml
@@ -80,6 +89,24 @@ models:
       - id: matter_server
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Building.FireAlarmPanel.Bacnet
+    name: Fire Alarm Panel (BACnet)
+    path: library/domains/iot/generic/fire_alarm_panel__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.SecurityAccessController.Bacnet
+    name: Security Access Controller (BACnet)
+    path: library/domains/iot/generic/security_access_controller__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Weather.WeatherFeed.Http
     name: Weather Forecast Feed
     path: library/domains/weather/weather_forecast__http.yaml
@@ -96,6 +123,14 @@ models:
     protocols: [modbus]
     services:
       - id: modbus_tcp_gateway
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, opcua_line_quickstart]
+  - id: Process.ThermalController.Advanced
+    name: Thermal Controller (Advanced)
+    path: library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml
+    domain: thermal_controllers
+    protocols: []
+    services: []
     packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
     profiles: [bms_quickstart, ev_csms_demo, opcua_line_quickstart]
   - id: Motion.StepperController.Modbus

@@ -1,0 +1,240 @@
+name: vacuum_gauge_multichannel__modbus
+description: Multichannel vacuum gauge / impulse counter exposed over Modbus with dwell-based measurement handoff.
+
+attributes:
+  measure_done:
+    type: int
+    default: 1
+  measure_start:
+    type: int
+    default: 0
+  measure_config: 0
+  dwell_time: 100               # ms (1s default)
+  ch_1_impulse: 0
+  ch_2_impulse: 0
+  ch_3_impulse: 0
+  ch_4_impulse: 0
+  ch_5_impulse: 0
+  ch_6_impulse: 0
+  ch_7_impulse: 0
+  ch_1_comparator: 0
+  ch_2_comparator: 0
+  ch_3_comparator: 0
+  ch_4_comparator: 0
+  ch_5_comparator: 0
+  ch_6_comparator: 0
+  ch_7_comparator: 0
+  _start_ms: 0
+
+  auto_trigger_enable: 0
+
+actions:
+  # channel impulses: hold during measurement, latch new value after measurement window
+  - function: $in(ch_1_impulse)
+    name: update_ch_1_impulse
+    description: Simulate channel 1 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_1_comparator)"
+      seed: 101
+      base_min: 5.0
+      base_max: 15.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_1_impulse) if ($in(measure_done)==0) else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_2_impulse)
+    name: update_ch_2_impulse
+    description: Simulate channel 2 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_2_comparator)"
+      seed: 203
+      base_min: 3.0
+      base_max: 12.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_2_impulse) if ($in(measure_done)==0) else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_3_impulse)
+    name: update_ch_3_impulse
+    description: Simulate channel 3 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_3_comparator)"
+      seed: 307
+      base_min: 8.0
+      base_max: 25.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_3_impulse) if ($in(measure_done)==0) else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_4_impulse)
+    name: update_ch_4_impulse
+    description: Simulate channel 4 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_4_comparator)"
+      seed: 409
+      base_min: 15.0
+      base_max: 40.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_4_impulse) if ($in(measure_done)==0) else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_5_impulse)
+    name: update_ch_5_impulse
+    description: Simulate channel 5 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_5_comparator)"
+      seed: 503
+      base_min: 5.0
+      base_max: 15.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_5_impulse) if ($in(measure_done)==0) else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_6_impulse)
+    name: update_ch_6_impulse
+    description: Simulate channel 6 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_6_comparator)"
+      seed: 601
+      base_min: 5.0
+      base_max: 15.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_6_impulse) if $in(measure_done)==0 else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+  - function: $in(ch_7_impulse)
+    name: update_ch_7_impulse
+    description: Simulate channel 7 impulse count with dwell-based latching.
+    imports: [random]
+    params:
+      comparator: "$in(ch_7_comparator)"
+      seed: 709
+      base_min: 5.0
+      base_max: 15.0
+      dt: "$(~.polling.interval) or 0.01"
+    call: |
+      (
+        $in(ch_7_impulse) if $in(measure_done)==0 else
+        int(
+          random.Random(int($in(_start_ms)) + seed).uniform(base_min, base_max)
+          * max(1, int(max(1.0, $in(dwell_time)) / (dt * 1000.0)))
+          / (1.0 + max(0, comparator) / 50.0)
+        )
+      )
+
+conditions:
+  - if: $in(measure_start) == 1
+    actions:
+      - function: $in(_start_ms)
+        imports: [time]
+        call: time.monotonic()*1000
+      - set: $in(measure_start)
+        value: 0
+      - set: $in(measure_done)
+        value: 0
+  - if: $in(measure_done) == 0
+    actions:
+      - function: $in(measure_done)
+        imports: [time]
+        call: >
+          0 if (time.monotonic()*1000 - $in(_start_ms) < $in(dwell_time))
+          else 1
+  - if: $in(auto_trigger_enable) == 1 and $in(measure_done) == 1
+    actions:
+      - set: $in(measure_start)
+        value: 1
+
+polling:
+  interval: 0.002    # tighten responsiveness for fast start/done handoff
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        measure_done:          { address: [0,0],    group: h_r, type: uint_16 }
+        measure_start:         { address: [1,1],    group: h_r, type: uint_16 }
+        measure_config:        { address: [2,2],    group: h_r, type: uint_16 }
+        dwell_time:            { address: [3,3],    group: h_r, type: uint_16 }
+        ch_1_impulse:          { address: [4,5],    group: h_r, type: uint_32 }
+        ch_2_impulse:          { address: [6,7],    group: h_r, type: uint_32 }
+        ch_3_impulse:          { address: [8,9],    group: h_r, type: uint_32 }
+        ch_4_impulse:          { address: [10,11],  group: h_r, type: uint_32 }
+        ch_5_impulse:          { address: [12,13],  group: h_r, type: uint_32 }
+        ch_6_impulse:          { address: [14,15],  group: h_r, type: uint_32 }
+        ch_7_impulse:          { address: [16,17],  group: h_r, type: uint_32 }
+        ch_1_comparator:       { address: [18,18],  group: h_r, type: uint_16 }
+        ch_2_comparator:       { address: [19,19],  group: h_r, type: uint_16 }
+        ch_3_comparator:       { address: [20,20],  group: h_r, type: uint_16 }
+        ch_4_comparator:       { address: [21,21],  group: h_r, type: uint_16 }
+        ch_5_comparator:       { address: [22,22],  group: h_r, type: uint_16 }
+        ch_6_comparator:       { address: [23,23],  group: h_r, type: uint_16 }
+        ch_7_comparator:       { address: [24,24],  group: h_r, type: uint_16 }
+
+scenarios:
+  modbus_disconnect:
+    name: Modbus Disconnect
+    enabled: true
+    duration: 2.0
+    call:
+      path: communication.modbus_slave.detach
+      stop_path: communication.modbus_slave.attach
+
+  channel_3_dropout:
+    name: Channel 3 Dropout
+    enabled: true
+    duration: 20.0
+    description: Forces channel 3 impulse output to a fixed value during a short window.
+    actions:
+      - function: $out(ch_3_impulse)
+        params:
+          dropout_start: 5.0
+          dropout_end: 8.0
+          dropout_value: 0
+        call: |
+          (lambda t, v:
+            dropout_value if (t >= dropout_start and t < dropout_end) else v
+          )($attr(timer.time), $out(ch_3_impulse))

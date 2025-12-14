@@ -41,6 +41,17 @@ files = [
 ]
 
 [[package]]
+name = "bacpypes"
+version = "0.19.0"
+description = "BACnet Communications Library"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "bacpypes-0.19.0-py3-none-any.whl", hash = "sha256:317fbe440474845978dab134f8aefb5f45a41a13926cbdf87b9b8afe6e79131b"},
+]
+
+[[package]]
 name = "black"
 version = "25.9.0"
 description = "The uncompromising code formatter."
@@ -2176,4 +2187,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "ed06e310ed1faea5672e82cf264040d2567cbcceeeb0bc410527f949c010ab6d"
+content-hash = "582dc7b265a4b89d1fb8a95d6c485dfc9fe46a69100e280aecff9cea0c1622d3"

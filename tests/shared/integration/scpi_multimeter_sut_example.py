@@ -2,10 +2,9 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the example SCPI multimeter SUT implementation."""
+"""Shared integration coverage for the example SCPI multimeter SUT implementation."""
 
 import os
-import pathlib
 import socket
 import statistics
 import time
@@ -13,10 +12,11 @@ import unittest
 from typing import Optional
 
 from tests.common.spx_utils import bootstrap_model_instance, wait_seconds, wait_for_condition
+from tests.common.repo import repo_root
 from tests.devices.scpi_multimeter_sut_example import ScpiMultimeterSUTExample
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = ROOT / "library" / "domains" / "measurement_instruments" / "generic" / "multimeter__scpi.yaml"
 MODEL_KEY = "tests__scpi_multimeter"
 INSTANCE_KEY = "generic_scpi_multimeter"

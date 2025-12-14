@@ -2,15 +2,15 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the OpenMeteoStaticSUT helper."""
+"""Shared integration coverage for the OpenMeteoStaticSUT helper."""
 
 from __future__ import annotations
 
 import os
-import pathlib
 from pprint import pprint
 import unittest
 from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition
+from tests.common.repo import repo_root
 from tests.devices.open_meteo_static_sut import OpenMeteoStaticSUT
 
 try:
@@ -22,7 +22,7 @@ else:
     _REQUESTS_IMPORT_ERROR = None
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = ROOT / "library" / "domains" / "weather" / "weather_forecast__http.yaml"
 MODEL_KEY = "tests__open_meteo_static"
 INSTANCE_KEY = "tests_open_meteo_static_instance"

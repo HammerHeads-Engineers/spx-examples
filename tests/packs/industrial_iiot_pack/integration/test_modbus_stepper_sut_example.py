@@ -6,15 +6,15 @@
 
 import contextlib
 import os
-import pathlib
 import time
 import unittest
 from typing import Optional
 
 from tests.common.spx_utils import bootstrap_model_instance, wait_seconds
+from tests.common.repo import repo_root
 from tests.devices.modbus_stepper_sut_example import ModbusStepperSUTExample, ModbusTcpClient
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = (
     ROOT
     / "library"

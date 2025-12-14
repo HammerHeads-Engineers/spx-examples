@@ -22,6 +22,7 @@ pymodbus = "*"
 paho-mqtt = "^2.1.0"
 bleak = "^1.1.1"
 colorama = "^0.4.6"
+bacpypes = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

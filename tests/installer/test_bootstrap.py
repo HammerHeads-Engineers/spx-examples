@@ -78,3 +78,27 @@ def test_bootstrap_uses_sdk_when_available(monkeypatch: pytest.MonkeyPatch, mode
     bootstrap.bootstrap(model_bundle, "http://example")
     assert "dummy" in fake_client["models"]
     assert "inst_1" in fake_client["instances"]
+
+
+def test_bootstrap_skip_instances(monkeypatch: pytest.MonkeyPatch, model_bundle: Path) -> None:
+    class FakeClient(dict):
+        def __init__(self) -> None:
+            super().__init__()
+            self["models"] = {}
+            self["instances"] = {}
+
+    fake_client = FakeClient()
+
+    class FakeSPX(SimpleNamespace):
+        @staticmethod
+        def init(address, product_key):
+            assert address == "http://example"
+            assert product_key == "XYZ"
+            return fake_client
+
+    monkeypatch.setattr(bootstrap, "spx_python", FakeSPX)
+    monkeypatch.setattr(bootstrap, "wait_for_server", lambda api_url: None)
+
+    bootstrap.bootstrap(model_bundle, "http://example", skip_instances=True)
+    assert "dummy" in fake_client["models"]
+    assert fake_client["instances"] == {}

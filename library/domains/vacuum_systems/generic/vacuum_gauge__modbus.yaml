@@ -183,6 +183,10 @@ actions:
 
 communication:
   - modbus_slave:
+      host: 0.0.0.0
+      port: 5020
+      unit_id: 1
+      zero_fill: true
       # poll_interval: 0.2
       mapping:
         rough_pressure:        { address: [0,1],  group: h_r, type: float }
@@ -238,8 +242,8 @@ scenarios:
     enabled: true
     duration: 2.0
     call:
-      path: communication.modbus_tcp.detach
-      stop_path: communication.modbus_tcp.attach
+      path: communication.modbus_slave.detach
+      stop_path: communication.modbus_slave.attach
 
   relay_sweep:
     name: Relay Sweep

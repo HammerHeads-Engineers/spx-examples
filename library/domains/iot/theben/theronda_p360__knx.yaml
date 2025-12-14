@@ -1,0 +1,460 @@
+# SPDX-License-Identifier: MIT
+
+name: theronda_p360__knx
+description: |
+  Telegram-level simulator of the Theben theRonda P360 KNX presence detector.
+
+  Scope (v1):
+  - Lighting channels C1/C2: switching logic, shared time delay, standby window, basic manual override via KNX writes.
+  - Brightness: internal/external source selection, room correction factor scaling, brightness value output.
+  - Presence channels C4/C5: switch-on delay + presence time delay, basic ON/OFF output (switch-command style).
+  - Parallel switching: trigger pulse output (no remote-trigger aggregation yet).
+
+attributes:
+  # --- Environment inputs ---
+  motion_detected: 0               # 0/1 - simulate PIR detection
+  brightness_ceiling_lux: 280.0    # lux - "internal" sensor measurement (pre room-correction)
+  brightness_external_lux: 280.0   # lux - provided via KNX object 10 when external measurement is used
+
+  # --- General parameters (ETS-like) ---
+  operating_mode: master           # master|slave
+  master_operating_mode: individual_switching  # individual_switching|parallel_switching
+  parallel_switching_cycle_s: 60.0 # 30,60,120,180,240 (manual)
+
+  brightness_measurement_source: internal  # internal|external
+  room_correction_factor: 0.3      # 0.05..2.0 (manual)
+
+  lighting_channel_c1_function: switching  # switching|constant_light|constant_light_no_presence|inactive
+  lighting_channel_c2_function: switching  # switching|constant_light|constant_light_no_presence|inactive
+  lighting_configuration_type: fully_automatic  # fully_automatic|semi_automatic
+
+  brightness_setpoint_lux: 500.0
+  brightness_alt_setpoint_lux: 400.0
+  lighting_time_delay_s: 600.0     # 30..3600 (manual)
+  lighting_standby_enabled_param: 1          # 0/1 - standby time feature enabled in parameters
+  lighting_standby_duration_s: 1800.0        # 30..3600 (manual)
+  lighting_standby_value_percent: 10.0       # 1..25 (manual)
+
+  # --- Presence channels parameters (C4/C5) ---
+  presence_c4_enabled: 1
+  presence_c4_switch_on_delay_s: 0.0         # 0..1800 (manual)
+  presence_c4_time_delay_s: 900.0            # 10..7200 (manual)
+  presence_c4_send_second_telegram: 0        # 0/1 -> enables C4.2 in addition to C4.1
+
+  presence_c5_enabled: 1
+  presence_c5_switch_on_delay_s: 0.0
+  presence_c5_time_delay_s: 900.0
+  presence_c5_send_second_telegram: 0
+
+  # --- KNX objects (inputs / configuration via bus) ---
+  obj10_external_brightness_lux_in: 280.0
+  obj22_select_alt_setpoint_in: 0
+  obj25_standby_enable_in: 1
+  obj27_lighting_time_delay_in_s: 600.0
+  obj28_lighting_block_in: 0
+  obj29_central_command_in: 0
+  obj33_presence_c4_block_in: 0
+  obj36_presence_c5_block_in: 0
+
+  # Push button overrides share the same group address as outputs. We model them as inbound commands
+  # feeding internal override state, while outputs are sent on separate attributes.
+  obj0_c1_switch_cmd_in: 0
+  obj11_c2_switch_cmd_in: 0
+
+  # --- Internal state/timers ---
+  lighting_timer_s: 0.0
+  standby_timer_s: 0.0
+
+  c1_cmd_prev: 0
+  c2_cmd_prev: 0
+  central_cmd_prev: 0
+
+  c1_manual_on_timer_s: 0.0
+  c2_manual_on_timer_s: 0.0
+  c1_manual_force_off: 0
+  c2_manual_force_off: 0
+
+  presence_c4_on_delay_timer_s: 0.0
+  presence_c4_timer_s: 0.0
+  presence_c5_on_delay_timer_s: 0.0
+  presence_c5_timer_s: 0.0
+
+  trigger_timer_s: 0.0
+  motion_prev: 0
+
+  # --- Derived values / outputs (KNX objects) ---
+  brightness_lux: 280.0
+  active_setpoint_lux: 500.0
+
+  obj9_brightness_out_lux: 280.0
+  obj8_room_correction_factor_out_scaled: 30.0   # factor * 100, reported as 2-byte float
+
+  obj0_c1_switch_out: 0
+  obj11_c2_switch_out: 0
+
+  obj31_presence_c4_1_out: 0
+  obj32_presence_c4_2_out: 0
+  obj34_presence_c5_1_out: 0
+  obj35_presence_c5_2_out: 0
+
+  obj41_parallel_trigger_out: 0
+
+actions:
+  - function: $in(room_correction_factor)
+    call: max(0.05, min(2.0, $in(room_correction_factor)))
+
+  - function: $in(brightness_external_lux)
+    call: max(0.0, $in(obj10_external_brightness_lux_in))
+
+  - function: $in(lighting_time_delay_s)
+    call: max(30.0, min(3600.0, $in(obj27_lighting_time_delay_in_s)))
+
+  - function: $in(active_setpoint_lux)
+    call: ($in(brightness_alt_setpoint_lux) if $in(obj22_select_alt_setpoint_in) == 1 else $in(brightness_setpoint_lux))
+
+  - function: $in(brightness_lux)
+    call: (
+          max(0.0, $in(brightness_external_lux))
+          if $in(brightness_measurement_source) == "external"
+          else max(0.0, $in(brightness_ceiling_lux) / $in(room_correction_factor))
+        )
+
+  - function: $in(obj9_brightness_out_lux)
+    call: $in(brightness_lux)
+
+  - function: $in(obj8_room_correction_factor_out_scaled)
+    call: $in(room_correction_factor) * 100.0
+
+  # --- Edge detection for push-button / central telegrams ---
+  - function: $in(c1_manual_on_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      rise: "(($in(obj0_c1_switch_cmd_in) == 1) and ($in(c1_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
+      fall: "(($in(obj0_c1_switch_cmd_in) == 0) and ($in(c1_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
+    call: (
+          1800.0 if rise
+          else 0.0 if fall
+          else max(0.0, $in(c1_manual_on_timer_s) - dt)
+        )
+
+  - function: $in(c2_manual_on_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      rise: "(($in(obj11_c2_switch_cmd_in) == 1) and ($in(c2_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
+      fall: "(($in(obj11_c2_switch_cmd_in) == 0) and ($in(c2_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
+    call: (
+          1800.0 if rise
+          else 0.0 if fall
+          else max(0.0, $in(c2_manual_on_timer_s) - dt)
+        )
+
+  - function: $in(c1_manual_force_off)
+    params:
+      fall: "(($in(obj0_c1_switch_cmd_in) == 0) and ($in(c1_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
+      rise: "(($in(obj0_c1_switch_cmd_in) == 1) and ($in(c1_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
+    call: (
+          1 if fall
+          else 0 if rise
+          else (0 if ($in(c1_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c1_manual_force_off))
+        )
+
+  - function: $in(c2_manual_force_off)
+    params:
+      fall: "(($in(obj11_c2_switch_cmd_in) == 0) and ($in(c2_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
+      rise: "(($in(obj11_c2_switch_cmd_in) == 1) and ($in(c2_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
+    call: (
+          1 if fall
+          else 0 if rise
+          else (0 if ($in(c2_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c2_manual_force_off))
+        )
+
+  - function: $in(c1_cmd_prev)
+    call: $in(obj0_c1_switch_cmd_in)
+
+  - function: $in(c2_cmd_prev)
+    call: $in(obj11_c2_switch_cmd_in)
+
+  - function: $in(central_cmd_prev)
+    call: $in(obj29_central_command_in)
+
+  # --- Lighting time delay + standby window ---
+  - function: $in(lighting_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      any_lighting: "($in(lighting_channel_c1_function) != \"inactive\") or ($in(lighting_channel_c2_function) != \"inactive\")"
+    call: (
+          0.0
+          if ($in(operating_mode) == "slave") or (not any_lighting)
+          else (
+            $in(lighting_time_delay_s)
+            if $in(motion_detected) == 1
+            else max(0.0, $in(lighting_timer_s) - dt)
+          )
+        )
+
+  - function: $in(standby_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+    call: (
+          $in(lighting_standby_duration_s)
+          if $in(lighting_timer_s) > 0
+          else max(0.0, $in(standby_timer_s) - dt)
+        )
+
+  - function: $in(obj0_c1_switch_out)
+    params:
+      measurement_off: "$in(active_setpoint_lux) <= 0.0"
+      blocked: "$in(obj28_lighting_block_in) == 1"
+      standby_active: "($in(lighting_standby_enabled_param) == 1) and ($in(obj25_standby_enable_in) == 1) and ($in(lighting_timer_s) == 0) and ($in(standby_timer_s) > 0)"
+      should_auto_on: "($in(lighting_timer_s) > 0) and (measurement_off or ($in(c1_manual_on_timer_s) > 0) or ($in(brightness_lux) < $in(active_setpoint_lux)))"
+      should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c1_manual_on_timer_s) > 0)"
+    call: (
+          0
+          if ($in(operating_mode) == "slave")
+             or ($in(lighting_channel_c1_function) == "inactive")
+             or blocked
+          else (
+            0 if $in(c1_manual_force_off) == 1
+            else (
+              1 if standby_active
+              else (
+                1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on)
+                else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0)
+              )
+            )
+          )
+        )
+
+  - function: $in(obj11_c2_switch_out)
+    params:
+      measurement_off: "$in(active_setpoint_lux) <= 0.0"
+      blocked: "$in(obj28_lighting_block_in) == 1"
+      standby_active: "($in(lighting_standby_enabled_param) == 1) and ($in(obj25_standby_enable_in) == 1) and ($in(lighting_timer_s) == 0) and ($in(standby_timer_s) > 0)"
+      should_auto_on: "($in(lighting_timer_s) > 0) and (measurement_off or ($in(c2_manual_on_timer_s) > 0) or ($in(brightness_lux) < $in(active_setpoint_lux)))"
+      should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c2_manual_on_timer_s) > 0)"
+    call: (
+          0
+          if ($in(operating_mode) == "slave")
+             or ($in(lighting_channel_c2_function) == "inactive")
+             or blocked
+          else (
+            0 if $in(c2_manual_force_off) == 1
+            else (
+              1 if standby_active
+              else (
+                1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on)
+                else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0)
+              )
+            )
+          )
+        )
+
+  # --- Presence channels C4/C5 (basic ON/OFF behavior, switch command style) ---
+  - function: $in(presence_c4_on_delay_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+    call: (
+          0.0
+          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or ($in(motion_detected) == 0 and $in(presence_c4_timer_s) == 0)
+          else (
+            min($in(presence_c4_switch_on_delay_s), $in(presence_c4_on_delay_timer_s) + dt)
+            if $in(motion_detected) == 1
+            else $in(presence_c4_on_delay_timer_s)
+          )
+        )
+
+  - function: $in(presence_c4_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      delay_ok: "$in(presence_c4_on_delay_timer_s) >= $in(presence_c4_switch_on_delay_s)"
+    call: (
+          0.0
+          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or (not delay_ok)
+          else (
+            $in(presence_c4_time_delay_s) if $in(motion_detected) == 1 else max(0.0, $in(presence_c4_timer_s) - dt)
+          )
+        )
+
+  - function: $in(obj31_presence_c4_1_out)
+    call: 1 if ($in(presence_c4_enabled) == 1 and $in(obj33_presence_c4_block_in) == 0 and $in(presence_c4_timer_s) > 0) else 0
+
+  - function: $in(obj32_presence_c4_2_out)
+    call: (
+          $in(obj31_presence_c4_1_out)
+          if $in(presence_c4_send_second_telegram) == 1
+          else 0
+        )
+
+  - function: $in(presence_c5_on_delay_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+    call: (
+          0.0
+          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or ($in(motion_detected) == 0 and $in(presence_c5_timer_s) == 0)
+          else (
+            min($in(presence_c5_switch_on_delay_s), $in(presence_c5_on_delay_timer_s) + dt)
+            if $in(motion_detected) == 1
+            else $in(presence_c5_on_delay_timer_s)
+          )
+        )
+
+  - function: $in(presence_c5_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      delay_ok: "$in(presence_c5_on_delay_timer_s) >= $in(presence_c5_switch_on_delay_s)"
+    call: (
+          0.0
+          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or (not delay_ok)
+          else (
+            $in(presence_c5_time_delay_s) if $in(motion_detected) == 1 else max(0.0, $in(presence_c5_timer_s) - dt)
+          )
+        )
+
+  - function: $in(obj34_presence_c5_1_out)
+    call: 1 if ($in(presence_c5_enabled) == 1 and $in(obj36_presence_c5_block_in) == 0 and $in(presence_c5_timer_s) > 0) else 0
+
+  - function: $in(obj35_presence_c5_2_out)
+    call: (
+          $in(obj34_presence_c5_1_out)
+          if $in(presence_c5_send_second_telegram) == 1
+          else 0
+        )
+
+  # --- Parallel switching trigger (pulse/toggle) ---
+  - function: $in(obj41_parallel_trigger_out)
+    params:
+      enabled: "($in(operating_mode) == \"slave\") or ($in(master_operating_mode) == \"parallel_switching\")"
+    call: 1 if (enabled and $in(motion_detected) == 1 and (($in(motion_prev) == 0) or ($in(trigger_timer_s) >= $in(parallel_switching_cycle_s)))) else 0
+
+  - function: $in(trigger_timer_s)
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+      enabled: "($in(operating_mode) == \"slave\") or ($in(master_operating_mode) == \"parallel_switching\")"
+    call: (
+          0.0
+          if (not enabled) or ($in(motion_detected) == 0)
+          else (
+            0.0 if $in(trigger_timer_s) >= $in(parallel_switching_cycle_s)
+            else min($in(parallel_switching_cycle_s), $in(trigger_timer_s) + dt)
+          )
+        )
+
+  - function: $in(motion_prev)
+    call: $in(motion_detected)
+
+communication:
+  - knx_ip:
+      router:
+        host: knx_gateway
+        port: 3671
+        route_back: true
+      poll_interval: 0.3
+      bindings:
+        # Lighting channel C1
+        - name: obj0_c1_switch
+          direction: bidirectional
+          group_address: "3/0/1"
+          value_codec: bool
+          read_attribute: "#attr(obj0_c1_switch_out)"
+          write_attribute: "#attr(obj0_c1_switch_cmd_in)"
+        - name: obj4_c1_setpoint
+          direction: bidirectional
+          group_address: "3/0/5"
+          dpt: 9.004
+          read_attribute: "#attr(brightness_setpoint_lux)"
+          write_attribute: "#attr(brightness_setpoint_lux)"
+        - name: obj6_c1_alt_setpoint
+          direction: bidirectional
+          group_address: "3/0/7"
+          dpt: 9.004
+          read_attribute: "#attr(brightness_alt_setpoint_lux)"
+          write_attribute: "#attr(brightness_alt_setpoint_lux)"
+        - name: obj8_room_correction_factor
+          direction: outbound
+          group_address: "3/0/9"
+          dpt: 9.001
+          read_attribute: "#attr(obj8_room_correction_factor_out_scaled)"
+        - name: obj9_brightness_value
+          direction: outbound
+          group_address: "3/0/10"
+          dpt: 9.004
+          read_attribute: "#attr(obj9_brightness_out_lux)"
+        - name: obj10_external_brightness
+          direction: inbound
+          group_address: "3/0/11"
+          dpt: 9.004
+          write_attribute: "#attr(obj10_external_brightness_lux_in)"
+
+        # Lighting channel C2
+        - name: obj11_c2_switch
+          direction: bidirectional
+          group_address: "3/1/1"
+          value_codec: bool
+          read_attribute: "#attr(obj11_c2_switch_out)"
+          write_attribute: "#attr(obj11_c2_switch_cmd_in)"
+
+        # Shared lighting control objects
+        - name: obj22_select_alt_setpoint
+          direction: inbound
+          group_address: "3/2/1"
+          value_codec: bool
+          write_attribute: "#attr(obj22_select_alt_setpoint_in)"
+        - name: obj25_standby_function
+          direction: inbound
+          group_address: "3/2/3"
+          value_codec: bool
+          write_attribute: "#attr(obj25_standby_enable_in)"
+        - name: obj27_lighting_time_delay
+          direction: inbound
+          group_address: "3/2/4"
+          dpt: 7.005
+          write_attribute: "#attr(obj27_lighting_time_delay_in_s)"
+        - name: obj28_lighting_block
+          direction: inbound
+          group_address: "3/2/5"
+          value_codec: bool
+          write_attribute: "#attr(obj28_lighting_block_in)"
+        - name: obj29_central_command
+          direction: inbound
+          group_address: "3/2/6"
+          value_codec: bool
+          write_attribute: "#attr(obj29_central_command_in)"
+
+        # Presence channels
+        - name: obj31_presence_c4_1
+          direction: outbound
+          group_address: "3/3/1"
+          value_codec: bool
+          read_attribute: "#attr(obj31_presence_c4_1_out)"
+        - name: obj32_presence_c4_2
+          direction: outbound
+          group_address: "3/3/2"
+          value_codec: bool
+          read_attribute: "#attr(obj32_presence_c4_2_out)"
+        - name: obj33_presence_c4_block
+          direction: inbound
+          group_address: "3/3/3"
+          value_codec: bool
+          write_attribute: "#attr(obj33_presence_c4_block_in)"
+        - name: obj34_presence_c5_1
+          direction: outbound
+          group_address: "3/3/4"
+          value_codec: bool
+          read_attribute: "#attr(obj34_presence_c5_1_out)"
+        - name: obj35_presence_c5_2
+          direction: outbound
+          group_address: "3/3/5"
+          value_codec: bool
+          read_attribute: "#attr(obj35_presence_c5_2_out)"
+        - name: obj36_presence_c5_block
+          direction: inbound
+          group_address: "3/3/6"
+          value_codec: bool
+          write_attribute: "#attr(obj36_presence_c5_block_in)"
+
+        # Parallel switching trigger
+        - name: obj41_parallel_trigger
+          direction: outbound
+          group_address: "3/4/1"
+          value_codec: bool
+          read_attribute: "#attr(obj41_parallel_trigger_out)"

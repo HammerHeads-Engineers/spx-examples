@@ -2,10 +2,9 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the example Modbus thermal controller SUT device implementation."""
+"""Shared integration coverage for the example Modbus thermal controller SUT device implementation."""
 
 import os
-import pathlib
 import unittest
 
 from tests.common.spx_utils import (
@@ -13,13 +12,14 @@ from tests.common.spx_utils import (
     wait_for_condition,
     wait_seconds,
 )
+from tests.common.repo import repo_root
 from tests.devices.thermal_controller_sut_example import (
     ModbusThermalControllerSUTExample,
     ModbusTcpClient,
 )
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = (
     ROOT
     / "library"

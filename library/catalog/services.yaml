@@ -31,6 +31,23 @@ services:
     deployment:
       runtime: builtin
       provider: spx-server
+  - id: bacnet_gateway
+    name: BACnet/IP Gateway
+    protocol: bacnet
+    description: BACnet/IP stack exposing SPX attributes as BACnet objects.
+    ports:
+      - transport: udp
+        host: 47808
+        container: 47808
+        purpose: BACnet fire panel example
+      - transport: udp
+        host: 47818
+        container: 47818
+        purpose: BACnet security/access example
+    deployment:
+      runtime: builtin
+      provider: spx-server
+      notes: "Expose ports only when BACnet models are enabled."
   - id: ocpp_central_system
     name: OCPP Central System
     protocol: ocpp

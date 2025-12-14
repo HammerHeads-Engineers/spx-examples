@@ -105,10 +105,19 @@ def ensure_instance(
             inst.put_attr(attr_path, value)
     if ensure_running:
         try:
-            state = inst.get().get("state")
+            instance_doc = inst.get()
+            state = None
+            if isinstance(instance_doc, dict):
+                state = instance_doc.get("state")
+                if state is None:
+                    attr = instance_doc.get("attr")
+                    if isinstance(attr, dict):
+                        state_attr = attr.get("state")
+                        if isinstance(state_attr, dict):
+                            state = state_attr.get("value")
         except Exception:
             state = None
-        if state not in {"running", "RUNNING"}:
+        if str(state).lower() != "running":
             try:
                 inst.start()
             except Exception:

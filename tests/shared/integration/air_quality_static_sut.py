@@ -2,15 +2,15 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the AirQualityStaticSUT helper."""
+"""Shared integration coverage for the AirQualityStaticSUT helper."""
 
 from __future__ import annotations
 
 import os
-import pathlib
 import unittest
 
 from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition
+from tests.common.repo import repo_root
 from tests.devices.air_quality_static_sut import AirQualityStaticSUT
 
 try:
@@ -22,7 +22,7 @@ else:
     _REQUESTS_IMPORT_ERROR = None
 
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = repo_root()
 MODEL_PATH = (
     ROOT
     / "library"
