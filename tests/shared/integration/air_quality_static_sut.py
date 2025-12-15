@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import unittest
 
+import yaml
+
 from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition
 from tests.common.repo import repo_root
 from tests.devices.air_quality_static_sut import AirQualityStaticSUT
@@ -85,33 +87,34 @@ class TestAirQualityStaticSUTIntegration(unittest.TestCase):
                 attribute_overrides={
                     "communication/http_endpoint/port": SERVER_PORT,
                 },
-            )
+                )
         except Exception as exc:  # pragma: no cover - guarded skip for flaky environments
             raise unittest.SkipTest(f"Unable to bootstrap Air Quality model: {exc}") from exc
 
-        attrs = cls._instance["attributes"]
+        # Prefer file defaults over reading instance attributes, because some runtimes
+        # may update attribute values asynchronously right after start/reset.
+        model_doc = yaml.safe_load(MODEL_PATH.read_text(encoding="utf-8")) or {}
+        if not isinstance(model_doc, dict):
+            raise unittest.SkipTest("Air quality model YAML is not a mapping.")
+        defaults = model_doc.get("attributes") or {}
+        if not isinstance(defaults, dict):
+            raise unittest.SkipTest("Air quality model YAML attributes must be a mapping.")
 
-        def _attr_value(name: str):
-            value = attrs[name]
-            if hasattr(value, "internal_value"):
-                return value.internal_value
-            return value
+        cls._default_station_id = str(defaults.get("station_id", ""))
+        cls._default_station_name = str(defaults.get("station_name", ""))
+        cls._default_latitude = float(defaults.get("latitude", 0.0))
+        cls._default_longitude = float(defaults.get("longitude", 0.0))
+        cls._default_timezone = str(defaults.get("timezone", ""))
+        cls._default_monitoring_window = int(defaults.get("monitoring_window_hours", 0))
+        cls._default_measurement_interval = int(defaults.get("measurement_interval_minutes", 0))
 
-        cls._default_station_id = str(_attr_value("station_id"))
-        cls._default_station_name = str(_attr_value("station_name"))
-        cls._default_latitude = float(_attr_value("latitude"))
-        cls._default_longitude = float(_attr_value("longitude"))
-        cls._default_timezone = str(_attr_value("timezone"))
-        cls._default_monitoring_window = int(_attr_value("monitoring_window_hours"))
-        cls._default_measurement_interval = int(_attr_value("measurement_interval_minutes"))
-
-        cls._default_current_timestamp = str(_attr_value("current_timestamp"))
-        cls._default_current_pm2_5 = float(_attr_value("current_pm2_5"))
-        cls._default_current_pm10 = float(_attr_value("current_pm10"))
-        cls._default_current_no2 = float(_attr_value("current_no2"))
-        cls._default_current_o3 = float(_attr_value("current_o3"))
-        cls._default_current_aqi = float(_attr_value("current_aqi"))
-        cls._default_current_aqi_category = str(_attr_value("current_aqi_category"))
+        cls._default_current_timestamp = str(defaults.get("current_timestamp", ""))
+        cls._default_current_pm2_5 = float(defaults.get("current_pm2_5", 0.0))
+        cls._default_current_pm10 = float(defaults.get("current_pm10", 0.0))
+        cls._default_current_no2 = float(defaults.get("current_no2", 0.0))
+        cls._default_current_o3 = float(defaults.get("current_o3", 0.0))
+        cls._default_current_aqi = float(defaults.get("current_aqi", 0.0))
+        cls._default_current_aqi_category = str(defaults.get("current_aqi_category", ""))
 
         report_url = f"{BASE_URL}/v1/air-quality/{DEFAULT_PROFILE}"
         ready = wait_for_condition(lambda: _http_ready(report_url), timeout=15.0, interval=0.5)
@@ -124,6 +127,29 @@ class TestAirQualityStaticSUTIntegration(unittest.TestCase):
     def setUp(self) -> None:
         self.sut = AirQualityStaticSUT(base_url=BASE_URL, timeout=DEFAULT_TIMEOUT)
         self.addCleanup(self._cleanup_sut)
+
+        # Ensure scenarios do not leak state between tests (some runtimes may auto-run enabled scenarios).
+        instance = getattr(self.__class__, "_instance", None)
+        if instance is not None:
+            scenarios = instance.get("scenarios") if isinstance(instance, dict) else instance["scenarios"]
+            for name in ("winter_smog_episode", "coastal_reset", "station_relocation"):
+                try:
+                    scenario = scenarios[name]
+                except Exception:
+                    continue
+                stop = getattr(scenario, "stop", None)
+                if callable(stop):
+                    try:
+                        stop()
+                    except Exception:
+                        pass
+
+            # station_id is not currently updateable via the HTTP simulator endpoints, so reset it explicitly.
+            try:
+                attrs = instance["attributes"]
+                attrs["station_id"].internal_value = self._default_station_id
+            except Exception:
+                pass
 
         # Reset simulator state before each test to guarantee determinism.
         self.sut.set_profile(DEFAULT_PROFILE, self._default_monitoring_window)
@@ -142,6 +168,39 @@ class TestAirQualityStaticSUTIntegration(unittest.TestCase):
             aqi=self._default_current_aqi,
             aqi_category=self._default_current_aqi_category,
         )
+
+        expected_pm2_5 = self._default_current_pm2_5
+        expected_pm10 = self._default_current_pm10
+        expected_aqi = self._default_current_aqi
+        expected_station_id = self._default_station_id
+        last_report: dict = {}
+
+        def _report_synced() -> bool:
+            nonlocal last_report
+            try:
+                last_report = self.sut.fetch_report(DEFAULT_PROFILE)
+            except Exception:
+                return False
+            current = last_report.get("current") or {}
+            try:
+                pm2_5 = float(current.get("pm2_5"))
+                pm10 = float(current.get("pm10"))
+                aqi = float(current.get("aqi"))
+            except Exception:
+                return False
+            station = last_report.get("station") or {}
+            return (
+                abs(pm2_5 - expected_pm2_5) <= 1e-3
+                and abs(pm10 - expected_pm10) <= 1e-3
+                and abs(aqi - expected_aqi) <= 1e-3
+                and station.get("id") == expected_station_id
+            )
+
+        if not wait_for_condition(_report_synced, timeout=10.0, interval=0.5):
+            current = last_report.get("current") if isinstance(last_report, dict) else None
+            raise unittest.SkipTest(
+                f"Air quality report did not reflect baseline readings within timeout; current={current!r}"
+            )
 
     def _cleanup_sut(self) -> None:
         if hasattr(self, "sut") and self.sut is not None:

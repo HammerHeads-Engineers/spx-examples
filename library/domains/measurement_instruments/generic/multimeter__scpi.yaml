@@ -14,7 +14,7 @@ attributes:
 
 communication:
   ascii:
-    port: 5025
+    # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
     terminator: "\n"
     response_delay: 0.01
     response_jitter: 0.0

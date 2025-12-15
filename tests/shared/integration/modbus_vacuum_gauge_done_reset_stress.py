@@ -7,6 +7,7 @@
 import os
 import unittest
 
+from tests.common.modbus_utils import wait_for_modbus_endpoint
 from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition, wait_seconds
 from tests.common.repo import repo_root
 from tests.devices.modbus_vacuum_gauge_multichannel_sut_example import (
@@ -26,7 +27,6 @@ MODEL_PATH = (
 )
 MODEL_KEY = "tests__vacuum_gauge_multichannel"
 INSTANCE_KEY = "generic_vacuum_gauge_multichannel"
-MODBUS_PORT = 5020
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 
 
@@ -68,13 +68,44 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
 
     def setUp(self):
         self.model = self.__class__._instance
-        wait_seconds(0.5)
+        wait_seconds(0.2)
+
+        # Keep the communication adapter attached; some runtimes may auto-run enabled scenarios.
+        try:
+            scenario = self.model["scenarios"]["modbus_disconnect"]
+        except Exception:
+            scenario = None
+        stop = getattr(scenario, "stop", None) if scenario is not None else None
+        if callable(stop):
+            try:
+                stop()
+            except Exception:
+                pass
+            wait_seconds(0.1)
+
+        try:
+            comm = self.model["communication"]["modbus_slave"]
+            attach = getattr(comm, "attach", None)
+            if callable(attach):
+                attach()
+        except Exception:
+            pass
+
+        try:
+            port, unit_id = wait_for_modbus_endpoint(
+                self.model,
+                comm_keys=("modbus_slave", "modbus_tcp"),
+                timeout=10.0,
+                interval=0.2,
+            )
+        except TimeoutError as exc:
+            self.skipTest(str(exc))
 
         self.sut = ModbusVacuumGaugeMultichannelSUTExample(
-            host="127.0.0.1", port=MODBUS_PORT, unit_id=1, timeout=1.0
+            host="127.0.0.1", port=port, unit_id=unit_id, timeout=1.0
         )
-        if not self.sut.connect():
-            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{MODBUS_PORT} (unit 1)")
+        if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):
+            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})")
         wait_seconds(0.1)
 
     def tearDown(self):

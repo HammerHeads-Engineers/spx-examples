@@ -169,6 +169,10 @@ services:
         host: 5025
         container: 5025
         purpose: SCPI socket server for VISA/TCP clients
+      - transport: tcp
+        host: 5026
+        container: 5026
+        purpose: SCPI socket server for additional instruments
     deployment:
       runtime: builtin
       provider: spx-server

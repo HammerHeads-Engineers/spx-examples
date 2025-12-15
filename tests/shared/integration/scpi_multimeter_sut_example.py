@@ -11,6 +11,7 @@ import time
 import unittest
 from typing import Optional
 
+from tests.common.ascii_utils import wait_for_ascii_port
 from tests.common.spx_utils import bootstrap_model_instance, wait_seconds, wait_for_condition
 from tests.common.repo import repo_root
 from tests.devices.scpi_multimeter_sut_example import ScpiMultimeterSUTExample
@@ -56,18 +57,35 @@ class TestScpiMultimeterSUTExample(unittest.TestCase):
         if self.instance is None:  # pragma: no cover - defensive
             self.skipTest("SCPI multimeter instance not initialised")
 
-        debug = bool(int(os.environ.get("SCPI_TEST_DEBUG", "1")))
-        self.sut = ScpiMultimeterSUTExample(debug=debug)
-        try:
-            if not self.sut.connect():
-                self.skipTest("ASCII/SCPI server not reachable at 127.0.0.1:5025")
-        except OSError as exc:
-            self.skipTest(f"Unable to connect to SCPI server: {exc}")
-        wait_seconds(0.2)
         self._ensure_scenario_stopped("voltage_static")
         self._ensure_scenario_stopped("ascii_disconnect")
         self._ensure_scenario_stopped("ascii_response_delay_spike")
         self._ensure_scenario_stopped("discharge_spike")
+        wait_seconds(0.1)
+
+        # Ensure the ASCII adapter is attached and resolve the effective port before connecting.
+        try:
+            comm = self.instance["communication"]["ascii"]
+            attach = getattr(comm, "attach", None)
+            if callable(attach):
+                attach()
+        except Exception:
+            pass
+
+        try:
+            port = wait_for_ascii_port(self.instance, timeout=10.0, interval=0.2)
+        except TimeoutError as exc:
+            self.skipTest(str(exc))
+
+        debug = bool(int(os.environ.get("SCPI_TEST_DEBUG", "1")))
+        self.sut = ScpiMultimeterSUTExample(port=port, debug=debug)
+        try:
+            connected = wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2)
+        except OSError as exc:
+            self.skipTest(f"Unable to connect to SCPI server on port {port}: {exc}")
+        if not connected:
+            self.skipTest(f"ASCII/SCPI server not reachable at 127.0.0.1:{port}")
+        wait_seconds(0.2)
 
     def tearDown(self):
         if hasattr(self, "sut") and self.sut:
@@ -91,7 +109,10 @@ class TestScpiMultimeterSUTExample(unittest.TestCase):
             return
         stop = getattr(scenario, "stop", None)
         if callable(stop):
-            stop()
+            try:
+                stop()
+            except Exception:
+                return
             wait_seconds(0.1)
 
     def _read_ascii_response_delay(self) -> Optional[float]:

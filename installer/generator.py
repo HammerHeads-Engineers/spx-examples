@@ -17,7 +17,7 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.40"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.41"
 SPX_UI_SERVICE_NAME = "spx-ui"
 SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.35"
 

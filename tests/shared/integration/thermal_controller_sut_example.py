@@ -7,6 +7,7 @@
 import os
 import unittest
 
+from tests.common.modbus_utils import wait_for_modbus_endpoint
 from tests.common.spx_utils import (
     bootstrap_model_instance,
     wait_for_condition,
@@ -31,6 +32,14 @@ MODEL_PATH = (
 MODEL_KEY = "tests__thermal_controller"
 INSTANCE_KEY = "generic_thermal_controller"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+
+
+def _try_call(fn) -> bool:
+    try:
+        fn()
+    except Exception:
+        return False
+    return True
 
 
 class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
@@ -69,13 +78,65 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
 
     def setUp(self):
         self.model = self.__class__._instance
-        wait_seconds(0.3)
+        wait_seconds(0.2)
 
-        self.sut = ModbusThermalControllerSUTExample(unit_id=3, timeout=1.0)
-        if not self.sut.connect():
-            self.skipTest("Modbus server not reachable at 127.0.0.1:502 (unit 3)")
+        # Ensure scenarios do not leak state between tests (some runtimes may auto-run enabled scenarios).
+        for scenario_name in ("heatup_nominal", "overload_trip_test", "powered_cooldown"):
+            try:
+                scenario = self.model["scenarios"][scenario_name]
+            except Exception:
+                continue
+            stop = getattr(scenario, "stop", None)
+            if callable(stop):
+                try:
+                    stop()
+                except Exception:
+                    pass
+        wait_seconds(0.1)
+
+        # Ensure the Modbus adapter is attached before talking to it.
+        for comm_key in ("modbus_slave", "modbus_tcp"):
+            try:
+                comm = self.model["communication"][comm_key]
+            except Exception:
+                continue
+            attach = getattr(comm, "attach", None)
+            if callable(attach):
+                try:
+                    attach()
+                except Exception:
+                    pass
+
+        try:
+            port, unit_id = wait_for_modbus_endpoint(
+                self.model,
+                comm_keys=("modbus_slave", "modbus_tcp"),
+                timeout=10.0,
+                interval=0.2,
+            )
+        except TimeoutError as exc:
+            self.skipTest(str(exc))
+
+        self._modbus_port = port
+        self._modbus_unit_id = unit_id
+
+        self.sut = ModbusThermalControllerSUTExample(
+            host="127.0.0.1",
+            port=port,
+            unit_id=unit_id,
+            timeout=1.0,
+        )
+        if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):
+            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})")
         self._reset_model_state()
-        self.sut.set_power_state(True)
+        self.assertTrue(
+            wait_for_condition(
+                lambda: _try_call(lambda: self.sut.set_power_state(True)),
+                timeout=3.0,
+                interval=0.2,
+            ),
+            f"Unable to write power_on coil via Modbus (port={port}, unit_id={unit_id})",
+        )
 
     def tearDown(self):
         if hasattr(self, "sut") and self.sut:

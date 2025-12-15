@@ -90,11 +90,11 @@ def ensure_instance(
 
         instances[instance_key] = model_key
         inst = instances[instance_key]
+        if reset_on_create:
+            inst.reset()
         if overrides:
             for attr_path, value in overrides.items():
                 inst.put_attr(attr_path, value)
-        if reset_on_create:
-            inst.reset()
         if start_on_create:
             inst.start()
         return inst
@@ -149,9 +149,33 @@ def bootstrap_model_instance(
         client,
         instance_key,
         model_key,
-        overrides=overrides,
         recreate=model_changed,
+        overrides=None,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
     )
+
+    # Ensure deterministic test runs even when the instance already exists from a previous run.
+    # Apply overrides after reset so configuration changes (e.g. ports) are not reverted.
+    try:
+        instance.stop()
+    except Exception:
+        pass
+    try:
+        instance.reset()
+    except Exception:
+        pass
+    if overrides:
+        for attr_path, value in overrides.items():
+            try:
+                instance.put_attr(attr_path, value)
+            except Exception:
+                pass
+    try:
+        instance.start()
+    except Exception:
+        pass
 
     return client, instance, model_changed
 

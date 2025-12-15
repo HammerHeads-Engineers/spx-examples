@@ -7,6 +7,7 @@
 import os
 import unittest
 
+from tests.common.modbus_utils import wait_for_modbus_endpoint
 from tests.common.spx_utils import (
     bootstrap_model_instance,
     wait_for_condition,
@@ -31,6 +32,8 @@ MODEL_PATH = (
 MODEL_KEY = "tests__vacuum_gauge"
 INSTANCE_KEY = "generic_vacuum_gauge"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+PUMPDOWN_PRESSURE_LIMIT = float(os.environ.get("VACUUM_GAUGE_PUMPDOWN_LIMIT", "5e-3"))
+PUMPDOWN_TIMEOUT = float(os.environ.get("VACUUM_GAUGE_PUMPDOWN_TIMEOUT", "20.0"))
 
 
 class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
@@ -69,14 +72,62 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
     def setUp(self):
         self.model = self.__class__._instance
-        wait_seconds(0.5)
-
-        self.sut = ModbusVacuumGaugeSUTExample(host="127.0.0.1", port=5020, unit_id=1, timeout=1.0)
-        if not self.sut.connect():
-            self.skipTest(
-                "Modbus server not reachable at 127.0.0.1:5020 (unit 1)"
-            )
         wait_seconds(0.2)
+
+        # Ensure scenarios do not leak state between tests (some runtimes may auto-run enabled scenarios).
+        for scenario_name in (
+            "discharge_spike",
+            "slow_leak",
+            "ionizer_trip",
+            "modbus_disconnect",
+            "relay_sweep",
+            "sensor_drift",
+        ):
+            try:
+                scenario = self.model["scenarios"][scenario_name]
+            except Exception:
+                continue
+            stop = getattr(scenario, "stop", None)
+            if callable(stop):
+                try:
+                    stop()
+                except Exception:
+                    pass
+        wait_seconds(0.1)
+
+        try:
+            comm = self.model["communication"]["modbus_slave"]
+            attach = getattr(comm, "attach", None)
+            if callable(attach):
+                attach()
+        except Exception:
+            pass
+
+        try:
+            port, unit_id = wait_for_modbus_endpoint(
+                self.model,
+                comm_keys=("modbus_slave", "modbus_tcp"),
+                timeout=10.0,
+                interval=0.2,
+            )
+        except TimeoutError as exc:
+            self.skipTest(str(exc))
+
+        self.sut = ModbusVacuumGaugeSUTExample(
+            host="127.0.0.1",
+            port=port,
+            unit_id=unit_id,
+            timeout=1.0,
+        )
+        if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):
+            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})")
+        wait_seconds(0.2)
+
+        try:
+            self.sut.set_coil("leak_event", 0)
+            self.sut.set_coil("discharge_event", 0)
+        except Exception:
+            pass
 
     def tearDown(self):
         if hasattr(self, "sut") and self.sut:
@@ -132,7 +183,23 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             self.model["actions"]["function_2"].discharge_pressure
         )
         self._prime_pressures(rough=0.1, high=0.05)
-        wait_for_condition(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
+
+        last_high: float | None = None
+
+        def _high_pressure_stable() -> bool:
+            nonlocal last_high
+            try:
+                last_high = float(self._read_pressures()[1])
+                return last_high < PUMPDOWN_PRESSURE_LIMIT
+            except Exception:
+                return False
+
+        self.assertTrue(
+            wait_for_condition(_high_pressure_stable, timeout=PUMPDOWN_TIMEOUT, interval=0.2),
+            "Expected high-vacuum pressure to pump down below "
+            f"{PUMPDOWN_PRESSURE_LIMIT:g} before discharge spike "
+            f"(timeout={PUMPDOWN_TIMEOUT:g}s, last_high={last_high!r})",
+        )
         baseline_rough, baseline_high = self._read_pressures()
 
         # scenario = self.model["scenarios"]["discharge_spike"]
@@ -162,7 +229,23 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
     def test_leak_event_causes_pressure_rise_and_recovery(self):
         self._prime_pressures(rough=0.05, high=0.05)
-        wait_for_condition(lambda: self._read_pressures()[1] < 5e-3, timeout=10.0)
+
+        last_high: float | None = None
+
+        def _high_pressure_stable() -> bool:
+            nonlocal last_high
+            try:
+                last_high = float(self._read_pressures()[1])
+                return last_high < PUMPDOWN_PRESSURE_LIMIT
+            except Exception:
+                return False
+
+        self.assertTrue(
+            wait_for_condition(_high_pressure_stable, timeout=PUMPDOWN_TIMEOUT, interval=0.2),
+            "Expected high-vacuum pressure to pump down below "
+            f"{PUMPDOWN_PRESSURE_LIMIT:g} before leak event "
+            f"(timeout={PUMPDOWN_TIMEOUT:g}s, last_high={last_high!r})",
+        )
 
         baseline_rough, baseline_high = self._read_pressures()
         upset_target = float(self.model["attributes"]["upset_target"].internal_value)
