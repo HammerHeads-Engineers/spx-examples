@@ -396,9 +396,15 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
     def _format_ports(self, manifest: ServiceManifest) -> List[str]:
         entries = []
         for port in manifest.ports:
-            entry = f"{port.host}:{port.container}"
-            if port.transport.lower() == "udp":
-                entry = f"{port.host}:{port.container}/udp"
+            transport = port.transport.lower()
+            if transport == "udp":
+                if manifest.id == "bacnet_gateway":
+                    bind = "${BACNET_BIND_ADDR:-127.0.0.1}"
+                    entry = f"{bind}:{port.host}:{port.container}/udp"
+                else:
+                    entry = f"{port.host}:{port.container}/udp"
+            else:
+                entry = f"{port.host}:{port.container}"
             entries.append(entry)
         return entries
 

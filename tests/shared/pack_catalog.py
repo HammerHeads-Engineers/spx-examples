@@ -80,4 +80,3 @@ def models_for_pack(pack_id: str, *, root: Optional[Path] = None) -> List[Dict[s
         if isinstance(packages, list) and pack_id in packages:
             result.append(model)
     return result
-

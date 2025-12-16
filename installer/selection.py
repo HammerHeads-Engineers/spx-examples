@@ -103,4 +103,3 @@ def resolve_default_instances(
             instances.append({"model_id": key[0], "instance_key": key[1]})
 
     return instances
-

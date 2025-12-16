@@ -220,4 +220,3 @@ def test_generate_requires_product_key_by_default(
             ]
         )
     assert "Missing SPX product key" in str(exc.value)
-

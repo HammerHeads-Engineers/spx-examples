@@ -146,4 +146,3 @@ def wait_for_ascii_port(
 
 
 __all__ = ["resolve_ascii_port", "wait_for_ascii_port"]
-

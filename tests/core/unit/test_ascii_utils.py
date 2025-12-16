@@ -40,4 +40,3 @@ def test_wait_for_ascii_port_waits_until_available() -> None:
 
     port = wait_for_ascii_port(instance, timeout=0.2, interval=0.0)
     assert port == 5045
-

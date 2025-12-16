@@ -57,4 +57,3 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(
             cls._instance.start()
         except Exception:
             pass
-

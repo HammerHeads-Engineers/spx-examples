@@ -86,4 +86,3 @@ class TestAirQualityStaticSUTIntegration(shared_aq.TestAirQualityStaticSUTIntegr
                 f"Air Quality HTTP endpoint not reachable at {report_url}. "
                 "Ensure the SPX instance is running and the port is forwarded."
             )
-

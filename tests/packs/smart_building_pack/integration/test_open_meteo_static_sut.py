@@ -73,4 +73,3 @@ class TestOpenMeteoStaticSUTIntegration(shared_om.TestOpenMeteoStaticSUTIntegrat
                 f"Open-Meteo HTTP endpoint not reachable at {forecast_url}. "
                 "Ensure the SPX instance is running and the port is forwarded."
             )
-

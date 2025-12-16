@@ -7,25 +7,16 @@
 import os
 import unittest
 
-from tests.common.spx_utils import (
-    ensure_instance,
-    ensure_model,
-    load_model_definition,
-    wait_for_condition,
-    wait_seconds,
-)
-from tests.common.repo import repo_root
+from tests.common.spx_utils import require_existing_instance, wait_for_condition, wait_seconds
 from tests.devices.bacnet_client import (
     BACPYPES_AVAILABLE,
     BacnetTestClient,
 )
 
 
-ROOT = repo_root()
-MODEL_PATH = ROOT / "library" / "domains" / "iot" / "generic" / "fire_alarm_panel__bacnet.yaml"
-MODEL_KEY = "tests__fire_alarm_bacnet"
-INSTANCE_KEY = "fire_alarm_bacnet"
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+INSTANCE_KEY = "spx_fire_alarm_panel_bacnet"
+MODEL_ID = "Building.FireAlarmPanel.Bacnet"
 BACNET_HOST = os.environ.get("BACNET_TEST_HOST", "127.0.0.1")
 BACNET_PORT = 47808
 
@@ -43,29 +34,30 @@ class TestFireAlarmBacnetIntegration(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
-        cls._spx = spx_python
-        client = spx_python.init(address=SPX_API_URL, product_key=product_key)
-
-        model_def = load_model_definition(MODEL_PATH)
-        # Use a fixed port to simplify client targeting.
-        comm_list = model_def.setdefault("communication", [])
-        if not comm_list:
-            comm_list.append({"bacnet": {}})
-        bacnet_cfg = comm_list[0].setdefault("bacnet", {})
-        bacnet_cfg["host"] = "0.0.0.0"
-        bacnet_cfg["port"] = BACNET_PORT
-
-        model_changed = ensure_model(client, MODEL_KEY, model_def)
-        cls._instance = ensure_instance(
-            client,
+        cls._client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._instance = require_existing_instance(
+            cls._client,
             INSTANCE_KEY,
-            MODEL_KEY,
-            recreate=model_changed,
-            ensure_running=True,
+            expected_model_id=MODEL_ID,
+            ensure_running=False,
         )
+
+        try:
+            cls._instance.stop()
+        except Exception:
+            pass
+        try:
+            cls._instance.reset()
+        except Exception:
+            pass
+        try:
+            cls._instance.start()
+        except Exception:
+            pass
 
     def setUp(self):
         self.model = self.__class__._instance
+
         # Ensure instance is running before attempting BACnet IO.
         def _state():
             try:

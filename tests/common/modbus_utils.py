@@ -161,4 +161,3 @@ def wait_for_modbus_endpoint(
         "Unable to resolve Modbus endpoint from instance communication; "
         f"last port={last_port!r} unit_id={last_unit_id!r}."
     )
-

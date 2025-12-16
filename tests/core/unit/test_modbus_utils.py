@@ -67,4 +67,3 @@ def test_wait_for_modbus_endpoint_waits_until_available() -> None:
     port, unit_id = wait_for_modbus_endpoint(instance, timeout=0.2, interval=0.0)
     assert port == 5040
     assert unit_id == 2
-

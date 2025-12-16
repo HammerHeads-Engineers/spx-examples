@@ -54,4 +54,3 @@ class TestThermalControllerSUTExampleIntegration(shared_tc.TestThermalController
             cls._instance.start()
         except Exception:
             pass
-

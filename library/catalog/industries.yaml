@@ -27,6 +27,10 @@ industries:
         instance: spx_room_controller_knx
       - model: Building.LightingZone.Knx
         instance: spx_lighting_zone_knx
+      - model: Building.FireAlarmPanel.Bacnet
+        instance: spx_fire_alarm_panel_bacnet
+      - model: Building.SecurityAccessController.Bacnet
+        instance: spx_security_access_controller_bacnet
     path: library/industries/smart_building_pack
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)

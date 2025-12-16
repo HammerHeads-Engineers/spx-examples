@@ -45,6 +45,17 @@ def build_index() -> ManifestIndex:
             ports=[ServicePort(transport="tcp", host=502, container=502, purpose="modbus")],
             deployment=ServiceDeployment(runtime="builtin"),
         ),
+        "bacnet_gateway": ServiceManifest(
+            id="bacnet_gateway",
+            name="BACnet/IP",
+            protocol="bacnet",
+            description="Built-in",
+            ports=[
+                ServicePort(transport="udp", host=47808, container=47808, purpose="bacnet fire"),
+                ServicePort(transport="udp", host=47818, container=47818, purpose="bacnet security"),
+            ],
+            deployment=ServiceDeployment(runtime="builtin"),
+        ),
     }
     models = {
         "sensor": ModelManifest(
@@ -189,3 +200,28 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
     assert ui_service["environment"]["SPX_PRODUCT_KEY"] == "${SPX_PRODUCT_KEY}"
     assert ui_service["command"] == ["--product-key", "${SPX_PRODUCT_KEY}"]
     assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
+
+
+def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=True,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="ABC-123",
+        model_ids=["sensor"],
+        service_ids=["mqtt_broker", "modbus_tcp_gateway", "bacnet_gateway"],
+    )
+
+    output_dir = tmp_path / "out-bacnet"
+    generator.generate(selection, output_dir)
+
+    compose_path = output_dir / "docker-compose.generated.yml"
+    data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    ports = data["services"]["spx-server"]["ports"]
+    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" in ports
+    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47818:47818/udp" in ports
