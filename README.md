@@ -9,11 +9,11 @@ Runnable examples and best practices for the SPX ecosystem (SDK + Server). Cover
 
 ## Quickstart
 
-Follow these steps after cloning the repository to spin up the SPX stack, materialise the sample models, and explore them in the UI.
+Follow these steps after cloning the repository to start a local SPX server, seed demo models/instances by running the tests, and (optionally) bring up the UI via the installer.
 
 1. **Check prerequisites**
-   - Docker and Docker Compose available in your shell (Compose v2+ recommended).
-   - Python 3.11 or newer for running the tests and local tooling.
+   - Docker Engine/Desktop + Docker Compose v2 (`docker compose`).
+   - Python 3.9+ (CI runs 3.9–3.12).
    - (Optional) [Poetry](https://python-poetry.org/) for dependency management.
 
 2. **Provide your SPX credentials**
@@ -21,7 +21,7 @@ Follow these steps after cloning the repository to spin up the SPX stack, materi
      ```bash
      cat <<'EOF' > .env
      SPX_PRODUCT_KEY=your-product-key
-     # SPX_LICENSE_KEY=optional-license-if-required
+     # SPX_API_URL=http://localhost:8000
      EOF
      ```
    - Docker Compose and the test suite both read these variables, so keeping them in `.env` keeps everything in sync.
@@ -32,31 +32,39 @@ Follow these steps after cloning the repository to spin up the SPX stack, materi
      poetry install --with dev
      ```
 
-4. **Start the SPX services**
-   - Bring the stack up; this launches both the API server and the UI:
+4. **Start the SPX server**
+   - Bring the stack up (this repository's `docker-compose.yml` starts `spx-server` only):
      ```bash
      docker compose up --detach
      ```
+   - The API is available at [http://localhost:8000](http://localhost:8000) (Swagger UI at [http://localhost:8000/docs](http://localhost:8000/docs)).
    - Wait for the health check to pass (`docker compose ps` or watch the logs) before running the tests.
 
 5. **Seed the examples by running the tests**
-   - Execute the full test suite; each integration test bootstraps its model, creates an instance, runs assertions, and leaves the instance online when it exits:
+   - Execute the full test suite; integration tests register models, create/update instances, run assertions, and leave the instances online:
      ```bash
      poetry run pytest
      ```
-   - If the product or license key is missing/invalid the SPX API returns 404s, so double-check `.env` if you see those errors.
+   - Some tests are skipped unless supporting services are running (e.g. MQTT broker, BACnet); use the installer workflow + packs for the full stack.
 
 6. **Explore the playground**
-   - With the tests complete, the freshly created instances stay active. Open [http://localhost:3000](http://localhost:3000) (served by the `spx-ui` container) to inspect and interact with them.
+   - API docs: [http://localhost:8000/docs](http://localhost:8000/docs) (OpenAPI JSON at [http://localhost:8000/docs/openapi.json](http://localhost:8000/docs/openapi.json)).
+   - SPX UI (optional): generate a bundle with the installer including UI, start it, then open [http://localhost:3000](http://localhost:3000).
 
 When you are done, tear everything down with:
 ```bash
 docker compose down
 ```
 
+## Troubleshooting
+
+- `docker compose up` fails with `Conflict. The container name "/spx-server" is already in use` — stop/remove the existing container (`docker rm -f spx-server`) or tear down the other stack (installer bundles use the same container name).
+- `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
+- Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (and `SPX_API_URL` if you are not using `http://localhost:8000`).
+
 ## Installer workflow
 
-Prefer running an interactive wizard and sharing a self-contained bundle? Use the installer scripts.
+Prefer running an interactive wizard and sharing a self-contained bundle (optionally including the UI + supporting protocol services)? Use the installer scripts.
 
 ### 1. Run the wizard
 
