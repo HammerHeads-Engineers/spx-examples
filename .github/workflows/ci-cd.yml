@@ -82,7 +82,6 @@ jobs:
 
   pack-tests:
     needs: tests
-    if: ${{ secrets.SPX_PRODUCT_KEY != '' }}
     runs-on: ubuntu-latest
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
@@ -100,21 +99,37 @@ jobs:
           - smart_building_pack
 
     steps:
+      - name: Gate pack tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "SPX_PRODUCT_KEY is not set; skipping pack tests."
+          fi
+
       - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/setup-python@v4
         with:
           python-version: 3.10.14
 
       - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: pipx install poetry
 
       - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
       - name: Generate installer artifacts (non-interactive)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
@@ -128,6 +143,7 @@ jobs:
             --print-selection json > "${OUT_DIR}/selection.json"
 
       - name: Start stack (generated spx-start.sh)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
@@ -139,6 +155,7 @@ jobs:
           "${OUT_DIR}/spx-start.sh"
 
       - name: Wait for SPX server health
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         run: |
           for i in {1..36}; do
@@ -149,6 +166,7 @@ jobs:
           echo "SPX server failed to become healthy"; exit 1
 
       - name: Wait for MQTT broker port
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         run: |
           for i in {1..30}; do
@@ -159,12 +177,13 @@ jobs:
           echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
 
       - name: Run pack tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         run: |
           poetry run pytest -q "tests/packs/${{ matrix.pack }}"
 
       - name: Show stack logs on failure
-        if: failure()
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
         shell: bash
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
@@ -172,7 +191,7 @@ jobs:
           docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
 
       - name: Stop stack
-        if: always()
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
         shell: bash
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
