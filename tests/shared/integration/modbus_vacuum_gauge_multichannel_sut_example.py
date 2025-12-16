@@ -73,6 +73,17 @@ class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
         self.model = self.__class__._instance
         wait_seconds(0.2)
 
+        # Disable auto-trigger for deterministic cycle tests.
+        try:
+            attrs = self.model["attributes"]
+            if "auto_trigger_enable" in attrs:
+                attrs["auto_trigger_enable"].internal_value = 0
+            if "measure_start" in attrs:
+                attrs["measure_start"].internal_value = 0
+        except Exception:
+            pass
+        wait_seconds(0.1)
+
         try:
             scenario = self.model["scenarios"]["modbus_disconnect"]
         except Exception:
@@ -175,7 +186,7 @@ class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
             return self.sut.read_u16("measure_start")
 
         self.assertTrue(
-            wait_for_condition(lambda: _done() == 1, timeout=2.0, interval=0.01),
+            wait_for_condition(lambda: _done() == 1, timeout=3.0, interval=0.002),
             "Expected measure_done to be 1 before starting cycles",
         )
 

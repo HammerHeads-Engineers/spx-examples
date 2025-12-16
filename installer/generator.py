@@ -17,7 +17,7 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.41"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.42"
 SPX_UI_SERVICE_NAME = "spx-ui"
 SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.35"
 
@@ -34,6 +34,11 @@ class DeploymentGenerator:
 
         assets_root = output_dir / "assets"
         assets_root.mkdir(parents=True, exist_ok=True)
+
+        # Bundle local extensions so generated artifacts remain self-contained.
+        extensions_src = self.repo_root / "extensions"
+        if extensions_src.exists():
+            shutil.copytree(extensions_src, output_dir / "extensions", dirs_exist_ok=True)
 
         compose_data = self._build_compose(selection.service_ids, assets_root, selection.install_spx_ui)
         compose_path = output_dir / "docker-compose.generated.yml"
@@ -318,6 +323,9 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
         service = {
             "image": SPX_SERVER_IMAGE,
             "container_name": "spx-server",
+            # Ensure host.docker.internal resolves on Linux (Docker Engine) for models
+            # that reference host-mapped service ports (e.g., MQTT, LwM2M, BLE bridge).
+            "extra_hosts": ["host.docker.internal:host-gateway"],
             "ports": ports,
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",

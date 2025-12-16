@@ -114,6 +114,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "spx-ui" not in services
     assert "mqtt_broker" in services
     assert "8000:8000" in services["spx-server"]["ports"]
+    assert "host.docker.internal:host-gateway" in services["spx-server"].get("extra_hosts", [])
     assert "502:502" in services["spx-server"]["ports"]
     assert "1883:1883" in services["mqtt_broker"]["ports"]
     mqtt_volumes = services["mqtt_broker"].get("volumes", [])
@@ -124,6 +125,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
 
     asset_file = output_dir / "assets" / "mosquitto" / "mosquitto.conf"
     assert asset_file.exists()
+    assert (output_dir / "extensions").exists()
 
     bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
     assert bundle["license_key"] == "ABC-123"

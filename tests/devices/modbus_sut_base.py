@@ -185,6 +185,25 @@ class ModbusSUTBase:
 
     def _write_registers(self, address: int, registers: Sequence[int]) -> None:
         self._ensure_connected()
+        # Some runtimes (including SPX Modbus adapters) can reject or not respond to
+        # FC16 (write multiple registers) when writing a single holding register.
+        # Prefer FC06 (write single register) for the 1-register case, with FC16 as fallback.
+        if len(registers) == 1:
+            value = int(registers[0]) & 0xFFFF
+            try:
+                result = self._call_with_unit_kwarg("write_register", address, value)
+            except Exception:
+                result = None
+            else:
+                if result is None:
+                    return
+                is_error = getattr(result, "isError", None)
+                if callable(is_error) and not result.isError():  # pragma: no cover - delegated
+                    return
+            # Fall back to FC16 if FC06 is unavailable/errored.
+            self._call_with_unit_kwarg("write_registers", address, [value])
+            return
+
         self._call_with_unit_kwarg("write_registers", address, registers)
 
 

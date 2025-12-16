@@ -315,34 +315,34 @@ scenarios:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.05
+      activityIntensity: 0.05
 
   focused_work:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.35
+      activityIntensity: 0.35
 
   brisk_walk:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.6
+      activityIntensity: 0.6
 
   interval_training:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.9
+      activityIntensity: 0.9
 
   acute_stress_event:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.8
+      activityIntensity: 0.8
 
   cooldown_recovery:
     enabled: true
     duration: 10.0
     overrides:
-      $in(activityIntensity): 0.2
+      activityIntensity: 0.2

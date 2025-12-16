@@ -184,6 +184,7 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
+      port: 5021
       unit_id: 1
       zero_fill: true
       # poll_interval: 0.2

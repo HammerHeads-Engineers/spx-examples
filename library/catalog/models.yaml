@@ -151,6 +151,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, opcua_line_quickstart]
+  - id: Process.VacuumGaugeMultichannel.Modbus
+    name: Vacuum Gauge Multichannel (Modbus)
+    path: library/domains/vacuum_systems/generic/vacuum_gauge_multichannel__modbus.yaml
+    domain: vacuum_systems
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: []
   - id: Lab.Multimeter.Scpi
     name: SCPI Multimeter
     path: library/domains/measurement_instruments/generic/multimeter__scpi.yaml

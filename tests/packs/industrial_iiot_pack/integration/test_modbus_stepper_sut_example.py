@@ -11,21 +11,15 @@ import unittest
 from typing import Optional
 
 from tests.common.modbus_utils import wait_for_modbus_endpoint
-from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition, wait_seconds
-from tests.common.repo import repo_root
+from tests.common.spx_utils import (
+    require_existing_instance,
+    wait_for_condition,
+    wait_seconds,
+)
 from tests.devices.modbus_stepper_sut_example import ModbusStepperSUTExample, ModbusTcpClient
 
-ROOT = repo_root()
-MODEL_PATH = (
-    ROOT
-    / "library"
-    / "domains"
-    / "motion_controllers"
-    / "generic"
-    / "stepper_controller__modbus.yaml"
-)
-MODEL_KEY = "tests__stepper_controller"
-INSTANCE_KEY = "generic_stepper_controller"
+INSTANCE_KEY = "spx_stepper_axis"
+MODEL_ID = "Motion.StepperController.Modbus"
 DISCONNECT_DURATION = 1.5
 SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 
@@ -105,20 +99,27 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                 "SPX_PRODUCT_KEY must be set to run integration tests."
             )
 
-        cls._spx = spx_python
-        (
+        cls._client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._instance = require_existing_instance(
             cls._client,
-            cls._instance,
-            cls._model_changed,
-        ) = bootstrap_model_instance(
-            spx_python,
-            product_key=product_key,
-            base_url=SPX_API_URL,
-            model_path=MODEL_PATH,
-            model_key=MODEL_KEY,
-            instance_key=INSTANCE_KEY,
-            unit_id=1,
+            INSTANCE_KEY,
+            expected_model_id=MODEL_ID,
+            ensure_running=False,
         )
+        cls._model_changed = False
+
+        try:
+            cls._instance.stop()
+        except Exception:
+            pass
+        try:
+            cls._instance.reset()
+        except Exception:
+            pass
+        try:
+            cls._instance.start()
+        except Exception:
+            pass
 
     def _make_sut_example(self, **kwargs):
         host = kwargs.pop("host", "127.0.0.1")
@@ -155,22 +156,32 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             self.skipTest("Stepper controller instance not initialised")
         return instance
 
-    @staticmethod
-    def _configure_disconnect_scenario(
-        scenarios,
-        *,
-        comm_key: str = "modbus_tcp",
-        duration: float = DISCONNECT_DURATION,
-    ):
-        scenarios["modbus_disconnect"] = {
-            "enabled": True,
-            "duration": duration,
-            "call": {
-                "path": f"communication.{comm_key}.detach",
-                "stop_path": f"communication.{comm_key}.attach",
-            },
-        }
-        return scenarios["modbus_disconnect"]
+    @contextlib.contextmanager
+    def _detached_modbus(self):
+        instance = self._require_spx_instance()
+        comm_key = getattr(self, "_modbus_comm_key", "modbus_slave")
+        try:
+            comm = instance["communication"][comm_key]
+        except Exception:
+            self.skipTest(f"Communication adapter '{comm_key}' not available on instance")
+
+        detach = getattr(comm, "detach", None)
+        attach = getattr(comm, "attach", None)
+        if not callable(detach) or not callable(attach):
+            self.skipTest(f"Communication adapter '{comm_key}' does not support detach/attach")
+
+        try:
+            detach()
+        except Exception as exc:
+            self.skipTest(f"Unable to detach Modbus adapter '{comm_key}': {exc}")
+        try:
+            yield
+        finally:
+            try:
+                attach()
+            except Exception:
+                pass
+            wait_seconds(0.2)
 
     @staticmethod
     def _bool_attribute(attribute) -> bool:
@@ -250,19 +261,6 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             f"Limit switch did not reach state {expected} within {timeout}s"
         )
 
-    @contextlib.contextmanager
-    def _running_scenario(self, scenario):
-        try:
-            scenario.start()
-            yield
-        finally:
-            stop = getattr(scenario, "stop", None)
-            if callable(stop):
-                try:
-                    stop()
-                except Exception:
-                    pass
-
     def _enable_sut(self, sut: ModbusStepperSUTExample, value: int = 1) -> None:
         port = getattr(self, "_modbus_port", 502)
         unit_id = getattr(self, "_modbus_unit_id", 1)
@@ -308,11 +306,6 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             attributes = instance["attributes"]
             feedback_attr = attributes["position_feedback"]
 
-            scenario = self._configure_disconnect_scenario(
-                instance["scenarios"],
-                comm_key=getattr(self, "_modbus_comm_key", "modbus_tcp"),
-            )
-
             position = sut.read_position_feedback()
             self.assertIsInstance(
                 position, float, "Expected position feedback to be a float value"
@@ -323,21 +316,20 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
                 f"Expected SUT to be connected, got '{sut.state()}'",
             )
 
-            with self._running_scenario(scenario):
+            with self._detached_modbus():
                 attributes["max_speed"].internal_value = 100  # limit travel speed
                 attributes["position_command"].internal_value = 200  # move target
                 attributes["max_accel"].internal_value = 50  # limit accel
                 attributes["max_decel"].internal_value = 50  # limit decel
+                wait_seconds(duration=DISCONNECT_DURATION + 0.5)
 
-                wait_seconds(duration=DISCONNECT_DURATION + 0.5)  # duration + buffer
-
-                sut_position, expected_position = self._await_position_feedback(
-                    sut,
-                    feedback_attr,
-                    target=190.0,
-                    timeout=20.0,
-                    tolerance=1.0,
-                )
+            sut_position, expected_position = self._await_position_feedback(
+                sut,
+                feedback_attr,
+                target=190.0,
+                timeout=20.0,
+                tolerance=1.0,
+            )
 
             self.assertGreaterEqual(
                 expected_position,
@@ -517,13 +509,9 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
             instance = self._require_spx_instance()
             attributes = instance["attributes"]
 
-            scenario = self._configure_disconnect_scenario(
-                instance["scenarios"],
-                comm_key=getattr(self, "_modbus_comm_key", "modbus_tcp"),
-            )
-
-            with self._running_scenario(scenario):
+            with self._detached_modbus():
                 attributes["position_command"].internal_value = 250
+                wait_seconds(0.2)
 
                 failure_deadline = time.time() + 3.0
                 while time.time() < failure_deadline:

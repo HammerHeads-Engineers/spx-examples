@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+import unittest
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
@@ -201,3 +202,82 @@ def wait_for_condition(
             return True
         time.sleep(interval)
     return False
+
+
+def _extract_instance_state(instance: Any) -> Optional[str]:
+    try:
+        doc = instance.get()
+    except Exception:
+        doc = None
+
+    if isinstance(doc, dict):
+        state = doc.get("state")
+        if isinstance(state, str):
+            return state
+        attr = doc.get("attr")
+        if isinstance(attr, dict):
+            state_attr = attr.get("state")
+            if isinstance(state_attr, dict):
+                value = state_attr.get("value")
+                if isinstance(value, str):
+                    return value
+    state = getattr(instance, "state", None)
+    if isinstance(state, str):
+        return state
+    return None
+
+
+def _extract_instance_model_id(instance: Any) -> Optional[str]:
+    model_id = getattr(instance, "model_id", None)
+    if isinstance(model_id, str) and model_id:
+        return model_id
+
+    model = getattr(instance, "model", None)
+    if isinstance(model, str) and model:
+        return model
+
+    try:
+        doc = instance.get()
+    except Exception:
+        doc = None
+
+    if isinstance(doc, dict):
+        for key in ("model_id", "model", "modelId"):
+            value = doc.get(key)
+            if isinstance(value, str) and value:
+                return value
+
+    return None
+
+
+def require_existing_instance(
+    client: Any,
+    instance_key: str,
+    *,
+    expected_model_id: Optional[str] = None,
+    ensure_running: bool = True,
+):
+    """Return an existing instance; skip if missing, assert if model id mismatches."""
+    try:
+        instance = client["instances"][instance_key]
+    except Exception as exc:
+        raise unittest.SkipTest(
+            f"SPX instance '{instance_key}' not found (did you run installer/bootstrap?): {exc}"
+        ) from exc
+
+    if expected_model_id:
+        actual_model_id = _extract_instance_model_id(instance)
+        if actual_model_id and actual_model_id != expected_model_id:
+            raise AssertionError(
+                f"SPX instance '{instance_key}' uses model '{actual_model_id}', expected '{expected_model_id}'"
+            )
+
+    if ensure_running:
+        state = (_extract_instance_state(instance) or "").lower()
+        if state != "running":
+            try:
+                instance.start()
+            except Exception:
+                pass
+
+    return instance

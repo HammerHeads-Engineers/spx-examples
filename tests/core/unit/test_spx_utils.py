@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pytest
+import unittest
 
 from tests.common import spx_utils
 
@@ -30,6 +31,8 @@ class _FakeModels:
 class _FakeInstance:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
+        self._doc: dict[str, Any] = {"state": "stopped"}
+        self.model_id: Optional[str] = None
 
     def stop(self) -> None:
         self.calls.append(("stop", None))
@@ -39,9 +42,13 @@ class _FakeInstance:
 
     def start(self) -> None:
         self.calls.append(("start", None))
+        self._doc["state"] = "running"
 
     def put_attr(self, path: str, value: Any) -> None:
         self.calls.append(("put_attr", (path, value)))
+
+    def get(self) -> dict[str, Any]:
+        return dict(self._doc)
 
 
 class _FakeInstances:
@@ -138,3 +145,35 @@ def test_bootstrap_model_instance_resets_and_applies_overrides_after_reset(tmp_p
     assert names_after.count("reset") == 2
     assert names_after.count("start") == 2
 
+
+def test_require_existing_instance_skips_when_missing() -> None:
+    client = _FakeClient()
+    with pytest.raises(unittest.SkipTest):
+        spx_utils.require_existing_instance(client, "missing")
+
+
+def test_require_existing_instance_starts_when_not_running() -> None:
+    client = _FakeClient()
+    client["instances"]["inst"] = "model"
+    instance = client["instances"]["inst"]
+    instance._doc["state"] = "stopped"
+
+    resolved = spx_utils.require_existing_instance(client, "inst", ensure_running=True)
+    assert resolved is instance
+    assert any(name == "start" for name, _payload in instance.calls)
+
+
+def test_require_existing_instance_validates_model_id() -> None:
+    client = _FakeClient()
+    client["instances"]["inst"] = "model"
+    instance = client["instances"]["inst"]
+    instance.model_id = "Actual.Model"
+    instance._doc["state"] = "running"
+
+    with pytest.raises(AssertionError):
+        spx_utils.require_existing_instance(
+            client,
+            "inst",
+            expected_model_id="Expected.Model",
+            ensure_running=False,
+        )

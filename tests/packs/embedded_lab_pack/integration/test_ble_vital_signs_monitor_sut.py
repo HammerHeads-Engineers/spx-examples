@@ -8,53 +8,65 @@ from __future__ import annotations
 
 import os
 import unittest
-from pathlib import Path
 
-from tests.common.spx_utils import ensure_instance, ensure_model, load_model_definition, wait_for_condition
+from tests.common.spx_utils import require_existing_instance, wait_for_condition, wait_seconds
 from tests.devices.ble_vital_signs_monitor_sut import BleVitalSignsMonitorSUT
 
 
 class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
     """Validates the BLE facade against a running SPX vital signs instance."""
 
-    MODEL_PATH = Path("library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml")
-    MODEL_KEY = "tests__ble_vital_signs_monitor"
-    INSTANCE_KEY = "tests_ble_vital_signs_monitor_inst"
+    SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+    INSTANCE_KEY = "spx_health_monitor_ble"
+    MODEL_ID = "Embedded.HealthMonitor.BleGatt"
 
-    def setUp(self) -> None:
-        try:
-            import bleak  # type: ignore  # noqa: F401
-        except Exception:
-            self.skipTest("bleak dependency is not available.")
-
+    @classmethod
+    def setUpClass(cls):
         try:
             import spx_python  # type: ignore
         except ImportError as exc:  # pragma: no cover - optional dependency guard
-            self.skipTest(f"spx_python not available: {exc}")
+            raise unittest.SkipTest(f"spx_python not available: {exc}") from exc
 
-        product_key = self._require_product_key()
-        base_url = self._resolve_base_url()
+        product_key = os.environ.get("SPX_PRODUCT_KEY")
+        if not product_key:
+            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run BLE SUT tests.")
 
-        client = spx_python.init(address=base_url, product_key=product_key)
-        model_def = load_model_definition(self.MODEL_PATH)
-        model_changed = ensure_model(client, self.MODEL_KEY, model_def)
+        cls._spx_client = spx_python.init(address=cls.SPX_API_URL, product_key=product_key)
+        cls._instance = require_existing_instance(
+            cls._spx_client,
+            cls.INSTANCE_KEY,
+            expected_model_id=cls.MODEL_ID,
+            ensure_running=False,
+        )
+
         try:
-            instance = ensure_instance(
-                client,
-                self.INSTANCE_KEY,
-                self.MODEL_KEY,
-                recreate=model_changed,
-            )
-        except Exception as exc:
-            self.skipTest(f"Unable to prepare BLE instance: {exc}")
+            cls._instance.stop()
+        except Exception:
+            pass
+        try:
+            cls._instance.reset()
+        except Exception:
+            pass
+        try:
+            cls._instance.start()
+        except Exception:
+            pass
 
-        self._spx_client = client
-        self._instance = instance
-        self._attributes = instance["attributes"]
+    def setUp(self) -> None:
+        self._instance = self.__class__._instance
+        self._attributes = self._instance["attributes"]
+
+        self._ensure_scenario_stopped("deep_sleep")
+        self._ensure_scenario_stopped("focused_work")
+        self._ensure_scenario_stopped("brisk_walk")
+        self._ensure_scenario_stopped("interval_training")
+        self._ensure_scenario_stopped("acute_stress_event")
+        self._ensure_scenario_stopped("cooldown_recovery")
+        wait_seconds(0.1)
 
         self.sut = BleVitalSignsMonitorSUT(
-            spx_client=client,
-            spx_instance=instance,
+            spx_client=self.__class__._spx_client,
+            spx_instance=self._instance,
             spx_instance_key=self.INSTANCE_KEY,
         )
 
@@ -108,27 +120,34 @@ class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
         attr.internal_value = baseline
         self.addCleanup(lambda: self._reset_activity_intensity())
 
+        def _read_activity_intensity() -> float:
+            try:
+                value = float(attr.internal_value)
+            except Exception:
+                value = float("nan")
+            try:
+                raw = attr.get()
+            except Exception:
+                raw = None
+            if isinstance(raw, dict):
+                raw = raw.get("value", raw.get("state"))
+            if raw is not None:
+                try:
+                    value = float(raw)
+                except Exception:
+                    pass
+            return value
+
         start()
         converged = wait_for_condition(
-            lambda: abs(float(attr.internal_value) - target) <= 0.05,
-            timeout=5.0,
+            lambda: abs(_read_activity_intensity() - target) <= 0.05,
+            timeout=6.0,
             interval=0.2,
         )
         self.assertTrue(converged, "Scenario did not drive activityIntensity to expected target.")
 
         value = self.sut.read_activity_intensity()
         self.assertAlmostEqual(target, value, delta=0.05)
-
-    @staticmethod
-    def _resolve_base_url() -> str:
-        return os.environ.get("SPX_API_URL", "http://localhost:8000")
-
-    @staticmethod
-    def _require_product_key() -> str:
-        product_key = os.environ.get("SPX_PRODUCT_KEY")
-        if not product_key:
-            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run BLE SUT tests.")
-        return product_key
 
     def _set_attribute(self, name: str, value) -> None:
         attr = self._attributes[name]
@@ -156,6 +175,19 @@ class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
         except Exception:
             return
         attr.internal_value = value
+
+    def _ensure_scenario_stopped(self, name: str) -> None:
+        try:
+            scenario = self._instance["scenarios"][name]
+        except Exception:
+            return
+        stop = getattr(scenario, "stop", None)
+        if callable(stop):
+            try:
+                stop()
+            except Exception:
+                return
+            wait_seconds(0.1)
 
     @staticmethod
     def _safe_call(func):

@@ -26,7 +26,7 @@ BROKER_PORT = int(os.environ.get("MQTT_TEST_BROKER_PORT", "1883"))
 BROKER_CONTAINER_HOST = os.environ.get("MQTT_TEST_BROKER_HOST_CONTAINER")
 if BROKER_CONTAINER_HOST is None:
     if os.environ.get("CI"):
-        BROKER_CONTAINER_HOST = "mosquitto"
+        BROKER_CONTAINER_HOST = "mqtt_broker"
     elif BROKER_HOST in {"127.0.0.1", "localhost"}:
         BROKER_CONTAINER_HOST = "host.docker.internal"
     else:

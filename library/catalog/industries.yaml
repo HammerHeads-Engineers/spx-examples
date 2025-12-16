@@ -42,6 +42,12 @@ industries:
         instance: spx_csms_ocpp
       - model: Energy.EVSE.Ocpp
         instance: spx_evse_ocpp
+      - model: Env.EnvSensor.Mqtt
+        instance: spx_env_sensor_mqtt
+      - model: Weather.WeatherFeed.Http
+        instance: spx_weather_feed
+      - model: Process.ThermalController.Modbus
+        instance: spx_process_heater
     path: library/industries/energy_pack
   - id: embedded_lab_pack
     name: Embedded & Lab Pack
@@ -52,6 +58,21 @@ industries:
     profiles:
       - profiles/embedded_lab_pack/mhealth_ci.yaml
       - profiles/embedded_lab_pack/scpi_lab.yaml
+    default_instances:
+      - model: Embedded.HealthMonitor.BleGatt
+        instance: spx_health_monitor_ble
+      - model: Embedded.TempSensor.BleGatt
+        instance: spx_temp_sensor_ble
+      - model: Env.EnvSensor.Mqtt
+        instance: spx_env_sensor_mqtt
+      - model: Env.EnvSensor.Lwm2m
+        instance: spx_env_sensor_lwm2m
+      - model: Lab.Multimeter.Scpi
+        instance: spx_lab_multimeter
+      - model: Process.VacuumGauge.Modbus
+        instance: spx_vacuum_gauge
+      - model: Process.VacuumGaugeMultichannel.Modbus
+        instance: spx_vacuum_gauge_multichannel
     path: library/industries/embedded_lab_pack
   - id: industrial_iiot_pack
     name: Industrial Pack (Industry 4.0)
@@ -70,6 +91,12 @@ industries:
         instance: spx_process_heater
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
+      - model: Process.VacuumGaugeMultichannel.Modbus
+        instance: spx_vacuum_gauge_multichannel
+      - model: Env.EnvSensor.Mqtt
+        instance: spx_env_sensor_mqtt
+      - model: Env.AirQualityStation.Http
+        instance: spx_air_quality_feed
       - model: IIoT.LineCounter.Mqtt
         instance: spx_line_counter
       - model: Energy.EnergyMeter3Ph.Mqtt

@@ -49,9 +49,11 @@ jobs:
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
       - name: Start SPX server (Docker Compose)
+        if: ${{ env.SPX_PRODUCT_KEY != '' }}
         run: docker compose up -d
 
       - name: Wait for SPX server health
+        if: ${{ env.SPX_PRODUCT_KEY != '' }}
         shell: bash
         run: |
           for i in {1..24}; do
@@ -71,12 +73,111 @@ jobs:
           fi
 
       - name: Show server logs on failure
-        if: failure()
+        if: ${{ failure() && env.SPX_PRODUCT_KEY != '' }}
         run: docker compose logs --no-color
 
       - name: Stop SPX server
         if: always()
         run: docker compose down --remove-orphans
+
+  pack-tests:
+    needs: tests
+    if: ${{ secrets.SPX_PRODUCT_KEY != '' }}
+    runs-on: ubuntu-latest
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_API_URL: http://localhost:8000
+      MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
+      OPEN_METEO_TEST_HOST: 127.0.0.1
+      AIR_QUALITY_TEST_HOST: 127.0.0.1
+    strategy:
+      fail-fast: false
+      matrix:
+        pack:
+          - industrial_iiot_pack
+          - embedded_lab_pack
+          - energy_pack
+          - smart_building_pack
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.14
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Generate installer artifacts (non-interactive)
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          mkdir -p "${OUT_DIR}"
+          poetry run python -m installer generate \
+            --packages "${{ matrix.pack }}" \
+            --output "${OUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            --print-selection json > "${OUT_DIR}/selection.json"
+
+      - name: Start stack (generated spx-start.sh)
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          export PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
+          mkdir -p "${NPM_CONFIG_PREFIX}"
+          export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
+          "${OUT_DIR}/spx-start.sh"
+
+      - name: Wait for SPX server health
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/36)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; exit 1
+
+      - name: Wait for MQTT broker port
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/1883) >/dev/null 2>&1; then
+              echo "MQTT broker is reachable"; exit 0; fi
+            echo "Waiting for MQTT broker... ($i/30)"; sleep 2;
+          done
+          echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
+
+      - name: Run pack tests
+        shell: bash
+        run: |
+          poetry run pytest -q "tests/packs/${{ matrix.pack }}"
+
+      - name: Show stack logs on failure
+        if: failure()
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
+
+      - name: Stop stack
+        if: always()
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          "${OUT_DIR}/spx-stop.sh"
 
   build-installer:
     needs: tests
