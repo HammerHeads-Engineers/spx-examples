@@ -18,7 +18,7 @@ SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
 INSTANCE_KEY = "spx_fire_alarm_panel_bacnet"
 MODEL_ID = "Building.FireAlarmPanel.Bacnet"
 BACNET_HOST = os.environ.get("BACNET_TEST_HOST", "127.0.0.1")
-BACNET_PORT = 47808
+BACNET_PORT = 47828
 
 
 @unittest.skipUnless(BACPYPES_AVAILABLE, "BACpypes is required for BACnet integration tests")

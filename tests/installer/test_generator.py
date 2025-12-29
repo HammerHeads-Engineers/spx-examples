@@ -51,8 +51,9 @@ def build_index() -> ManifestIndex:
             protocol="bacnet",
             description="Built-in",
             ports=[
-                ServicePort(transport="udp", host=47808, container=47808, purpose="bacnet fire"),
+                ServicePort(transport="udp", host=47808, container=47808, purpose="bacnet flexit"),
                 ServicePort(transport="udp", host=47818, container=47818, purpose="bacnet security"),
+                ServicePort(transport="udp", host=47828, container=47828, purpose="bacnet fire"),
             ],
             deployment=ServiceDeployment(runtime="builtin"),
         ),
@@ -225,3 +226,4 @@ def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:
     ports = data["services"]["spx-server"]["ports"]
     assert "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" in ports
     assert "${BACNET_BIND_ADDR:-127.0.0.1}:47818:47818/udp" in ports
+    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47828:47828/udp" in ports

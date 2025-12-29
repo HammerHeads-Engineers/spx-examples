@@ -1,0 +1,600 @@
+# SPDX-License-Identifier: MIT
+
+name: abb_jra_s4_230_5_1__knx
+description: |
+  ABB JRA/S 4.230.5.1 (Sim) – 4-channel KNX blind / roller shutter actuator.
+
+  Exposes KNX group objects commonly mapped by Home Assistant KNX covers:
+  - move_long (up/down, 1-bit)
+  - stop (1-bit)
+  - position_set (0..100%, DPT 5.001)
+  - position_state (0..100%, DPT 5.001)
+
+  Group address plan (3-level):
+  - move_long:      2/1/1 .. 2/1/4
+  - stop:           2/2/1 .. 2/2/4
+  - position_set:   2/3/1 .. 2/3/4
+  - position_state: 2/4/1 .. 2/4/4
+
+attributes:
+  cycle_time_s: 0.2
+  invert_move_long: 1
+  invert_position: 1
+  position_tolerance_pct: 0.5
+
+  c1_position_pct: 10.0
+  c1_target_pct: 10.0
+  c1_target_active: 0
+  c1_moving: 0            # -1=down, 0=stop, +1=up
+  c1_travel_time_s: 42.0
+  c1_move_long_cmd: 2      # 0=down, 1=up, 2=no command (cleared by model)
+  c1_stop_cmd: 0
+  c1_position_set_raw_cmd: -1.0
+  c1_position_state_raw: 26
+
+  c2_position_pct: 40.0
+  c2_target_pct: 40.0
+  c2_target_active: 0
+  c2_moving: 0
+  c2_travel_time_s: 42.0
+  c2_move_long_cmd: 2
+  c2_stop_cmd: 0
+  c2_position_set_raw_cmd: -1.0
+  c2_position_state_raw: 102
+
+  c3_position_pct: 70.0
+  c3_target_pct: 70.0
+  c3_target_active: 0
+  c3_moving: 0
+  c3_travel_time_s: 42.0
+  c3_move_long_cmd: 2
+  c3_stop_cmd: 0
+  c3_position_set_raw_cmd: -1.0
+  c3_position_state_raw: 178
+
+  c4_position_pct: 0.0
+  c4_target_pct: 0.0
+  c4_target_active: 0
+  c4_moving: 0
+  c4_travel_time_s: 42.0
+  c4_move_long_cmd: 2
+  c4_stop_cmd: 0
+  c4_position_set_raw_cmd: -1.0
+  c4_position_state_raw: 0
+
+actions:
+  # ------------------------------------------------------------------
+  # Channel 1
+  # ------------------------------------------------------------------
+  - function: $in(c1_target_pct)
+    name: latch_target_c1
+    params:
+      raw_pct: "(max(0.0, min(255.0, $in(c1_position_set_raw_cmd))) / 255.0) * 100.0"
+    call: (
+          max(
+            0.0,
+            min(
+              100.0,
+              (100.0 - raw_pct) if $in(invert_position) == 1 else raw_pct,
+            ),
+          )
+          if $in(c1_position_set_raw_cmd) >= 0.0
+          else $in(c1_target_pct)
+        )
+
+  - function: $in(c1_target_active)
+    name: latch_target_active_c1
+    call: (
+          1 if $in(c1_position_set_raw_cmd) >= 0.0
+          else 0 if $in(c1_move_long_cmd) != 2
+          else $in(c1_target_active)
+        )
+
+  - function: $in(c1_moving)
+    name: apply_commands_c1
+    call: (
+          0
+          if $in(c1_stop_cmd) == 1
+          else (
+            (
+              0
+              if abs($in(c1_target_pct) - $in(c1_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(c1_target_pct) > $in(c1_position_pct) else -1)
+            )
+            if $in(c1_position_set_raw_cmd) >= 0.0
+            else (
+              (
+                1
+                if $in(c1_move_long_cmd) == (0 if $in(invert_move_long) == 1 else 1)
+                else -1
+              )
+              if $in(c1_move_long_cmd) != 2
+              else $in(c1_moving)
+            )
+          )
+        )
+
+  - function: $in(c1_position_pct)
+    name: integrate_position_c1
+    params:
+      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c1_travel_time_s))) * 100.0"
+    call: (
+          (
+            min(
+              100.0,
+              (
+                min($in(c1_target_pct), $in(c1_position_pct) + delta_pct)
+                if $in(c1_target_active) == 1
+                else ($in(c1_position_pct) + delta_pct)
+              ),
+            )
+            if $in(c1_moving) == 1
+            else (
+              max(
+                0.0,
+                (
+                  max($in(c1_target_pct), $in(c1_position_pct) - delta_pct)
+                  if $in(c1_target_active) == 1
+                  else ($in(c1_position_pct) - delta_pct)
+                ),
+              )
+              if $in(c1_moving) == -1
+              else $in(c1_position_pct)
+            )
+          )
+        )
+
+  - function: $in(c1_moving)
+    name: stop_when_reached_c1
+    call: (
+          0
+          if (
+            ($in(c1_moving) == 1 and $in(c1_position_pct) >= 99.9)
+            or ($in(c1_moving) == -1 and $in(c1_position_pct) <= 0.1)
+            or ($in(c1_target_active) == 1 and abs($in(c1_target_pct) - $in(c1_position_pct)) <= $in(position_tolerance_pct))
+          )
+          else $in(c1_moving)
+        )
+
+  - function: $in(c1_move_long_cmd)
+    name: clear_move_long_cmd_c1
+    call: 2
+
+  - function: $in(c1_stop_cmd)
+    name: clear_stop_cmd_c1
+    call: 0
+
+  - function: $in(c1_position_state_raw)
+    name: encode_position_state_raw_c1
+    params:
+      pos_pct: "(100.0 - $in(c1_position_pct)) if $in(invert_position) == 1 else $in(c1_position_pct)"
+    call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
+
+  - function: $in(c1_position_set_raw_cmd)
+    name: clear_position_set_raw_cmd_c1
+    call: -1.0
+
+  # ------------------------------------------------------------------
+  # Channel 2
+  # ------------------------------------------------------------------
+  - function: $in(c2_target_pct)
+    name: latch_target_c2
+    params:
+      raw_pct: "(max(0.0, min(255.0, $in(c2_position_set_raw_cmd))) / 255.0) * 100.0"
+    call: (
+          max(
+            0.0,
+            min(
+              100.0,
+              (100.0 - raw_pct) if $in(invert_position) == 1 else raw_pct,
+            ),
+          )
+          if $in(c2_position_set_raw_cmd) >= 0.0
+          else $in(c2_target_pct)
+        )
+
+  - function: $in(c2_target_active)
+    name: latch_target_active_c2
+    call: (
+          1 if $in(c2_position_set_raw_cmd) >= 0.0
+          else 0 if $in(c2_move_long_cmd) != 2
+          else $in(c2_target_active)
+        )
+
+  - function: $in(c2_moving)
+    name: apply_commands_c2
+    call: (
+          0
+          if $in(c2_stop_cmd) == 1
+          else (
+            (
+              0
+              if abs($in(c2_target_pct) - $in(c2_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(c2_target_pct) > $in(c2_position_pct) else -1)
+            )
+            if $in(c2_position_set_raw_cmd) >= 0.0
+            else (
+              (
+                1
+                if $in(c2_move_long_cmd) == (0 if $in(invert_move_long) == 1 else 1)
+                else -1
+              )
+              if $in(c2_move_long_cmd) != 2
+              else $in(c2_moving)
+            )
+          )
+        )
+
+  - function: $in(c2_position_pct)
+    name: integrate_position_c2
+    params:
+      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c2_travel_time_s))) * 100.0"
+    call: (
+          (
+            min(
+              100.0,
+              (
+                min($in(c2_target_pct), $in(c2_position_pct) + delta_pct)
+                if $in(c2_target_active) == 1
+                else ($in(c2_position_pct) + delta_pct)
+              ),
+            )
+            if $in(c2_moving) == 1
+            else (
+              max(
+                0.0,
+                (
+                  max($in(c2_target_pct), $in(c2_position_pct) - delta_pct)
+                  if $in(c2_target_active) == 1
+                  else ($in(c2_position_pct) - delta_pct)
+                ),
+              )
+              if $in(c2_moving) == -1
+              else $in(c2_position_pct)
+            )
+          )
+        )
+
+  - function: $in(c2_moving)
+    name: stop_when_reached_c2
+    call: (
+          0
+          if (
+            ($in(c2_moving) == 1 and $in(c2_position_pct) >= 99.9)
+            or ($in(c2_moving) == -1 and $in(c2_position_pct) <= 0.1)
+            or ($in(c2_target_active) == 1 and abs($in(c2_target_pct) - $in(c2_position_pct)) <= $in(position_tolerance_pct))
+          )
+          else $in(c2_moving)
+        )
+
+  - function: $in(c2_move_long_cmd)
+    name: clear_move_long_cmd_c2
+    call: 2
+
+  - function: $in(c2_stop_cmd)
+    name: clear_stop_cmd_c2
+    call: 0
+
+  - function: $in(c2_position_state_raw)
+    name: encode_position_state_raw_c2
+    params:
+      pos_pct: "(100.0 - $in(c2_position_pct)) if $in(invert_position) == 1 else $in(c2_position_pct)"
+    call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
+
+  - function: $in(c2_position_set_raw_cmd)
+    name: clear_position_set_raw_cmd_c2
+    call: -1.0
+
+  # ------------------------------------------------------------------
+  # Channel 3
+  # ------------------------------------------------------------------
+  - function: $in(c3_target_pct)
+    name: latch_target_c3
+    params:
+      raw_pct: "(max(0.0, min(255.0, $in(c3_position_set_raw_cmd))) / 255.0) * 100.0"
+    call: (
+          max(
+            0.0,
+            min(
+              100.0,
+              (100.0 - raw_pct) if $in(invert_position) == 1 else raw_pct,
+            ),
+          )
+          if $in(c3_position_set_raw_cmd) >= 0.0
+          else $in(c3_target_pct)
+        )
+
+  - function: $in(c3_target_active)
+    name: latch_target_active_c3
+    call: (
+          1 if $in(c3_position_set_raw_cmd) >= 0.0
+          else 0 if $in(c3_move_long_cmd) != 2
+          else $in(c3_target_active)
+        )
+
+  - function: $in(c3_moving)
+    name: apply_commands_c3
+    call: (
+          0
+          if $in(c3_stop_cmd) == 1
+          else (
+            (
+              0
+              if abs($in(c3_target_pct) - $in(c3_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(c3_target_pct) > $in(c3_position_pct) else -1)
+            )
+            if $in(c3_position_set_raw_cmd) >= 0.0
+            else (
+              (
+                1
+                if $in(c3_move_long_cmd) == (0 if $in(invert_move_long) == 1 else 1)
+                else -1
+              )
+              if $in(c3_move_long_cmd) != 2
+              else $in(c3_moving)
+            )
+          )
+        )
+
+  - function: $in(c3_position_pct)
+    name: integrate_position_c3
+    params:
+      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c3_travel_time_s))) * 100.0"
+    call: (
+          (
+            min(
+              100.0,
+              (
+                min($in(c3_target_pct), $in(c3_position_pct) + delta_pct)
+                if $in(c3_target_active) == 1
+                else ($in(c3_position_pct) + delta_pct)
+              ),
+            )
+            if $in(c3_moving) == 1
+            else (
+              max(
+                0.0,
+                (
+                  max($in(c3_target_pct), $in(c3_position_pct) - delta_pct)
+                  if $in(c3_target_active) == 1
+                  else ($in(c3_position_pct) - delta_pct)
+                ),
+              )
+              if $in(c3_moving) == -1
+              else $in(c3_position_pct)
+            )
+          )
+        )
+
+  - function: $in(c3_moving)
+    name: stop_when_reached_c3
+    call: (
+          0
+          if (
+            ($in(c3_moving) == 1 and $in(c3_position_pct) >= 99.9)
+            or ($in(c3_moving) == -1 and $in(c3_position_pct) <= 0.1)
+            or ($in(c3_target_active) == 1 and abs($in(c3_target_pct) - $in(c3_position_pct)) <= $in(position_tolerance_pct))
+          )
+          else $in(c3_moving)
+        )
+
+  - function: $in(c3_move_long_cmd)
+    name: clear_move_long_cmd_c3
+    call: 2
+
+  - function: $in(c3_stop_cmd)
+    name: clear_stop_cmd_c3
+    call: 0
+
+  - function: $in(c3_position_state_raw)
+    name: encode_position_state_raw_c3
+    params:
+      pos_pct: "(100.0 - $in(c3_position_pct)) if $in(invert_position) == 1 else $in(c3_position_pct)"
+    call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
+
+  - function: $in(c3_position_set_raw_cmd)
+    name: clear_position_set_raw_cmd_c3
+    call: -1.0
+
+  # ------------------------------------------------------------------
+  # Channel 4
+  # ------------------------------------------------------------------
+  - function: $in(c4_target_pct)
+    name: latch_target_c4
+    params:
+      raw_pct: "(max(0.0, min(255.0, $in(c4_position_set_raw_cmd))) / 255.0) * 100.0"
+    call: (
+          max(
+            0.0,
+            min(
+              100.0,
+              (100.0 - raw_pct) if $in(invert_position) == 1 else raw_pct,
+            ),
+          )
+          if $in(c4_position_set_raw_cmd) >= 0.0
+          else $in(c4_target_pct)
+        )
+
+  - function: $in(c4_target_active)
+    name: latch_target_active_c4
+    call: (
+          1 if $in(c4_position_set_raw_cmd) >= 0.0
+          else 0 if $in(c4_move_long_cmd) != 2
+          else $in(c4_target_active)
+        )
+
+  - function: $in(c4_moving)
+    name: apply_commands_c4
+    call: (
+          0
+          if $in(c4_stop_cmd) == 1
+          else (
+            (
+              0
+              if abs($in(c4_target_pct) - $in(c4_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(c4_target_pct) > $in(c4_position_pct) else -1)
+            )
+            if $in(c4_position_set_raw_cmd) >= 0.0
+            else (
+              (
+                1
+                if $in(c4_move_long_cmd) == (0 if $in(invert_move_long) == 1 else 1)
+                else -1
+              )
+              if $in(c4_move_long_cmd) != 2
+              else $in(c4_moving)
+            )
+          )
+        )
+
+  - function: $in(c4_position_pct)
+    name: integrate_position_c4
+    params:
+      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c4_travel_time_s))) * 100.0"
+    call: (
+          (
+            min(
+              100.0,
+              (
+                min($in(c4_target_pct), $in(c4_position_pct) + delta_pct)
+                if $in(c4_target_active) == 1
+                else ($in(c4_position_pct) + delta_pct)
+              ),
+            )
+            if $in(c4_moving) == 1
+            else (
+              max(
+                0.0,
+                (
+                  max($in(c4_target_pct), $in(c4_position_pct) - delta_pct)
+                  if $in(c4_target_active) == 1
+                  else ($in(c4_position_pct) - delta_pct)
+                ),
+              )
+              if $in(c4_moving) == -1
+              else $in(c4_position_pct)
+            )
+          )
+        )
+
+  - function: $in(c4_moving)
+    name: stop_when_reached_c4
+    call: (
+          0
+          if (
+            ($in(c4_moving) == 1 and $in(c4_position_pct) >= 99.9)
+            or ($in(c4_moving) == -1 and $in(c4_position_pct) <= 0.1)
+            or ($in(c4_target_active) == 1 and abs($in(c4_target_pct) - $in(c4_position_pct)) <= $in(position_tolerance_pct))
+          )
+          else $in(c4_moving)
+        )
+
+  - function: $in(c4_move_long_cmd)
+    name: clear_move_long_cmd_c4
+    call: 2
+
+  - function: $in(c4_stop_cmd)
+    name: clear_stop_cmd_c4
+    call: 0
+
+  - function: $in(c4_position_state_raw)
+    name: encode_position_state_raw_c4
+    params:
+      pos_pct: "(100.0 - $in(c4_position_pct)) if $in(invert_position) == 1 else $in(c4_position_pct)"
+    call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
+
+  - function: $in(c4_position_set_raw_cmd)
+    name: clear_position_set_raw_cmd_c4
+    call: -1.0
+
+communication:
+  - knx_ip:
+      router:
+        host: knx_gateway
+        port: 3671
+        route_back: true
+      poll_interval: 0.2
+      bindings:
+        - name: c1_move_long
+          direction: inbound
+          group_address: "2/1/1"
+          value_codec: bool
+          write_attribute: "#attr(c1_move_long_cmd)"
+        - name: c1_stop
+          direction: inbound
+          group_address: "2/2/1"
+          value_codec: bool
+          write_attribute: "#attr(c1_stop_cmd)"
+        - name: c1_position_set
+          direction: inbound
+          group_address: "2/3/1"
+          value_codec: uint8
+          write_attribute: "#attr(c1_position_set_raw_cmd)"
+        - name: c1_position_state
+          direction: outbound
+          group_address: "2/4/1"
+          value_codec: uint8
+          read_attribute: "#attr(c1_position_state_raw)"
+
+        - name: c2_move_long
+          direction: inbound
+          group_address: "2/1/2"
+          value_codec: bool
+          write_attribute: "#attr(c2_move_long_cmd)"
+        - name: c2_stop
+          direction: inbound
+          group_address: "2/2/2"
+          value_codec: bool
+          write_attribute: "#attr(c2_stop_cmd)"
+        - name: c2_position_set
+          direction: inbound
+          group_address: "2/3/2"
+          value_codec: uint8
+          write_attribute: "#attr(c2_position_set_raw_cmd)"
+        - name: c2_position_state
+          direction: outbound
+          group_address: "2/4/2"
+          value_codec: uint8
+          read_attribute: "#attr(c2_position_state_raw)"
+
+        - name: c3_move_long
+          direction: inbound
+          group_address: "2/1/3"
+          value_codec: bool
+          write_attribute: "#attr(c3_move_long_cmd)"
+        - name: c3_stop
+          direction: inbound
+          group_address: "2/2/3"
+          value_codec: bool
+          write_attribute: "#attr(c3_stop_cmd)"
+        - name: c3_position_set
+          direction: inbound
+          group_address: "2/3/3"
+          value_codec: uint8
+          write_attribute: "#attr(c3_position_set_raw_cmd)"
+        - name: c3_position_state
+          direction: outbound
+          group_address: "2/4/3"
+          value_codec: uint8
+          read_attribute: "#attr(c3_position_state_raw)"
+
+        - name: c4_move_long
+          direction: inbound
+          group_address: "2/1/4"
+          value_codec: bool
+          write_attribute: "#attr(c4_move_long_cmd)"
+        - name: c4_stop
+          direction: inbound
+          group_address: "2/2/4"
+          value_codec: bool
+          write_attribute: "#attr(c4_stop_cmd)"
+        - name: c4_position_set
+          direction: inbound
+          group_address: "2/3/4"
+          value_codec: uint8
+          write_attribute: "#attr(c4_position_set_raw_cmd)"
+        - name: c4_position_state
+          direction: outbound
+          group_address: "2/4/4"
+          value_codec: uint8
+          read_attribute: "#attr(c4_position_state_raw)"

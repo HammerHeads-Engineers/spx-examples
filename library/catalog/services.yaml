@@ -39,11 +39,15 @@ services:
       - transport: udp
         host: 47808
         container: 47808
-        purpose: BACnet fire panel example
+        purpose: BACnet Flexit Nordic HVAC example
       - transport: udp
         host: 47818
         container: 47818
         purpose: BACnet security/access example
+      - transport: udp
+        host: 47828
+        container: 47828
+        purpose: BACnet fire panel example
     deployment:
       runtime: builtin
       provider: spx-server

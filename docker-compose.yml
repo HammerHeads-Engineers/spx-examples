@@ -106,7 +106,7 @@ services:
   #   restart: unless-stopped
 
   spx-server:
-    image: simplephysx/spx-server:v1.0.0-rc.42
+    image: simplephysx/spx-server:v1.0.0-rc.43
     container_name: spx-server
     ports:
       - "8000:8000"
@@ -115,8 +115,9 @@ services:
       - "502:502"
       - "5025:5025"      # SCPI/ASCII instrument #1 (multimeter)
       - "5026:5026"      # SCPI/ASCII instrument #2 (future use)
-      - "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" # BACnet fire panel example
+      - "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" # BACnet Flexit Nordic HVAC example
       - "${BACNET_BIND_ADDR:-127.0.0.1}:47818:47818/udp" # BACnet security example
+      - "${BACNET_BIND_ADDR:-127.0.0.1}:47828:47828/udp" # BACnet fire panel example
     environment:
       SPX_PRODUCT_KEY: ${SPX_PRODUCT_KEY}
     healthcheck:

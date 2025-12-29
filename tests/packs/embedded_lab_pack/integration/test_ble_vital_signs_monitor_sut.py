@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import unittest
 
-from tests.common.spx_utils import require_existing_instance, wait_for_condition, wait_seconds
+from tests.common.spx_utils import require_existing_instance, wait_seconds
 from tests.devices.ble_vital_signs_monitor_sut import BleVitalSignsMonitorSUT
 
 

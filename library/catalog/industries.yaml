@@ -15,8 +15,14 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Process.ThermalController.Modbus
         instance: spx_hvac_controller
+      - model: Building.HvacFlexitNordic.Bacnet
+        instance: spx_hvac_flexit_nordic_bacnet
+      - model: Energy.EnergyMeterIem3000.Modbus
+        instance: spx_energy_meter_iem3000_modbus
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
+      - model: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
+        instance: spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
       - model: Env.AirQualityStation.Http
         instance: spx_air_quality_feed
       - model: Building.BMSController.OpcUa
@@ -27,6 +33,10 @@ industries:
         instance: spx_room_controller_knx
       - model: Building.LightingZone.Knx
         instance: spx_lighting_zone_knx
+      - model: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
+        instance: spx_abb_sa_s12_16_5_1_knx
+      - model: Building.CoverActuator.AbbJraS4_230_5_1.Knx
+        instance: spx_abb_jra_s4_230_5_1_knx
       - model: Building.FireAlarmPanel.Bacnet
         instance: spx_fire_alarm_panel_bacnet
       - model: Building.SecurityAccessController.Bacnet

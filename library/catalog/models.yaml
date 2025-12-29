@@ -71,6 +71,24 @@ models:
       - id: knx_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
+    name: ABB SA/S12.16.5.1 Switch Actuator (KNX)
+    path: library/domains/iot/abb/abb_sa_s12_16_5_1__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.CoverActuator.AbbJraS4_230_5_1.Knx
+    name: ABB JRA/S 4.230.5.1 Cover Actuator (KNX)
+    path: library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Building.Thermostat.Matter
     name: Thermostat (Matter)
     path: library/domains/iot/generic/thermostat__matter.yaml
@@ -107,6 +125,15 @@ models:
       - id: bacnet_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Building.HvacFlexitNordic.Bacnet
+    name: Flexit Nordic HVAC (BACnet)
+    path: library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Weather.WeatherFeed.Http
     name: Weather Forecast Feed
     path: library/domains/weather/weather_forecast__http.yaml
@@ -116,6 +143,15 @@ models:
       - id: http_gateway
     packages: [smart_building_pack, energy_pack]
     profiles: [bms_quickstart, ev_csms_demo]
+  - id: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
+    name: Weather Gateway (WAGO PFC200 + Vaisala WXT530, MQTT Discovery)
+    path: library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
+    domain: weather
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Process.ThermalController.Modbus
     name: Thermal Controller (Modbus)
     path: library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
@@ -250,6 +286,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack, energy_pack]
     profiles: [iiot_monitoring]
+  - id: Energy.EnergyMeterIem3000.Modbus
+    name: Schneider Acti9 iEM3000 Energy Meter (Modbus)
+    path: library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EVSE.Ocpp
     name: EVSE / Charge Point (OCPP 1.6)
     path: library/domains/energy/emobility/evse__ocpp.yaml

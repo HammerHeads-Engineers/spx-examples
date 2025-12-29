@@ -1,0 +1,391 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: weather_gateway_wago_pfc200__vaisala_wxt530__mqtt
+description: |
+  Enterprise-style weather station telemetry published by WAGO PFC200 gateway from Vaisala WXT530 (sim), using HA MQTT Discovery.
+
+attributes:
+  outdoor_temperature_c: 5.0
+  wind_speed_ms: 3.0
+  wind_gust_ms: 6.0
+  brightness_lux: 20000.0
+  rain:
+    type: int
+    default: 0
+  wind_direction_deg:
+    type: int
+    default: 180
+
+  availability: "online"
+  cycle_time_s: 1.0
+  uptime_s: 0.0
+
+  storm_mode:
+    type: int
+    default: 0
+  gust_peak_ms: 18.0
+  rain_probability: 0.01
+
+  day_period_s: 180.0
+  base_temperature_c: 5.0
+  temperature_day_amplitude_c: 4.0
+  max_brightness_lux: 65000.0
+  storm_brightness_factor: 0.35
+
+  ha_discovery_outdoor_temperature_config: |-
+    {
+      "name": "Outdoor Temperature",
+      "unique_id": "spx_weather_outdoor_temperature",
+      "state_topic": "spx/weather/outdoor_temperature_c",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "°C",
+      "device_class": "temperature",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  ha_discovery_gateway_availability_config: |-
+    {
+      "name": "Weather Gateway Availability",
+      "unique_id": "spx_weather_gateway_availability",
+      "state_topic": "spx/weather/availability",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "entity_category": "diagnostic",
+      "enabled_by_default": false,
+      "device": {
+        "identifiers": ["wago_pfc200_gateway_1"],
+        "manufacturer": "WAGO",
+        "model": "PFC200 (Sim)",
+        "name": "Weather Gateway",
+        "sw_version": "SPX"
+      }
+    }
+
+  ha_discovery_wind_speed_config: |-
+    {
+      "name": "Wind Speed",
+      "unique_id": "spx_weather_wind_speed",
+      "state_topic": "spx/weather/wind_speed_ms",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "m/s",
+      "device_class": "wind_speed",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  ha_discovery_wind_gust_config: |-
+    {
+      "name": "Wind Gust",
+      "unique_id": "spx_weather_wind_gust",
+      "state_topic": "spx/weather/wind_gust_ms",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "m/s",
+      "device_class": "wind_speed",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  ha_discovery_brightness_config: |-
+    {
+      "name": "Brightness",
+      "unique_id": "spx_weather_brightness",
+      "state_topic": "spx/weather/brightness_lux",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "lx",
+      "device_class": "illuminance",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  ha_discovery_rain_config: |-
+    {
+      "name": "Rain",
+      "unique_id": "spx_weather_rain",
+      "state_topic": "spx/weather/rain",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "payload_on": "1",
+      "payload_off": "0",
+      "device_class": "moisture",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  ha_discovery_wind_direction_config: |-
+    {
+      "name": "Wind Direction",
+      "unique_id": "spx_weather_wind_direction",
+      "state_topic": "spx/weather/wind_direction_deg",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "°",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+actions:
+  - function: $in(uptime_s)
+    name: advance_clock
+    description: Advance simulated clock for day/night and deterministic noise seeds.
+    call: $in(uptime_s) + $in(cycle_time_s)
+
+  - function: $in(outdoor_temperature_c)
+    name: update_temperature
+    description: Day/night sinusoid with small noise; storm mode cools the air slightly.
+    imports: [random, math.sin]
+    noise_amplitude: 0.15
+    storm_temp_offset_c: -2.0
+    call: (
+          $in(base_temperature_c)
+          + $in(temperature_day_amplitude_c)
+            * sin(
+                2 * 3.14159 * $in(uptime_s) / max(10.0, $in(day_period_s))
+                - 1.5708
+              )
+          + (storm_temp_offset_c if $in(storm_mode) == 1 else 0.0)
+          + random.Random(int($in(uptime_s) * 1000) + 11).uniform(-noise_amplitude, noise_amplitude)
+        )
+
+  - function: $in(wind_speed_ms)
+    name: update_wind_speed
+    description: Random-walk wind speed with tighter bounds outside storm mode.
+    imports: [random]
+    calm_min_ms: 1.0
+    calm_max_ms: 6.0
+    calm_step_ms: 0.4
+    storm_min_ms: 8.0
+    storm_max_ms: 15.0
+    storm_step_ms: 1.0
+    call: (
+          max(
+            calm_min_ms,
+            min(
+              calm_max_ms,
+              $in(wind_speed_ms)
+              + random.Random(int($in(uptime_s) * 1000) + 21).uniform(-calm_step_ms, calm_step_ms),
+            ),
+          )
+          if $in(storm_mode) == 0
+          else max(
+            storm_min_ms,
+            min(
+              storm_max_ms,
+              $in(wind_speed_ms)
+              + random.Random(int($in(uptime_s) * 1000) + 21).uniform(-storm_step_ms, storm_step_ms),
+            ),
+          )
+        )
+
+  - function: $in(wind_gust_ms)
+    name: update_wind_gust
+    description: Gusts track wind speed with occasional peaks (more frequent in storm mode).
+    imports: [random]
+    calm_gust_min_ms: 3.0
+    calm_gust_max_ms: 10.0
+    storm_gust_min_ms: 15.0
+    storm_gust_max_ms: 25.0
+    calm_spike_probability: 0.03
+    storm_spike_probability: 0.12
+    call: max(
+          $in(wind_speed_ms) + 0.5,
+          (
+            max(
+              random.Random(int($in(uptime_s) * 1000) + 31).uniform(
+                storm_gust_min_ms if $in(storm_mode) == 1 else calm_gust_min_ms,
+                storm_gust_max_ms if $in(storm_mode) == 1 else calm_gust_max_ms,
+              ),
+              $in(gust_peak_ms) * random.Random(int($in(uptime_s) * 1000) + 130).uniform(0.85, 1.15),
+            )
+            if random.Random(int($in(uptime_s) * 1000) + 77).random()
+               < (storm_spike_probability if $in(storm_mode) == 1 else calm_spike_probability)
+            else random.Random(int($in(uptime_s) * 1000) + 31).uniform(
+              storm_gust_min_ms if $in(storm_mode) == 1 else calm_gust_min_ms,
+              storm_gust_max_ms if $in(storm_mode) == 1 else calm_gust_max_ms,
+            )
+          ),
+        )
+
+  - function: $in(wind_direction_deg)
+    name: update_wind_direction
+    description: Slowly rotate wind direction (faster variance in storm mode).
+    imports: [random]
+    calm_step_deg: 3.0
+    storm_step_deg: 9.0
+    call: int(
+          (
+            $in(wind_direction_deg)
+            + (
+              random.Random(int($in(uptime_s) * 1000) + 41).uniform(-calm_step_deg, calm_step_deg)
+              if $in(storm_mode) == 0
+              else random.Random(int($in(uptime_s) * 1000) + 41).uniform(-storm_step_deg, storm_step_deg)
+            )
+          )
+          % 360
+        )
+
+  - function: $in(brightness_lux)
+    name: update_brightness
+    description: Day/night sinusoid with storm-mode attenuation and light noise.
+    imports: [random, math.sin]
+    noise_amplitude_lux: 250.0
+    call: max(
+          0.0,
+          (
+            $in(max_brightness_lux)
+            * max(0.0, sin(2 * 3.14159 * $in(uptime_s) / max(10.0, $in(day_period_s))))
+            * ($in(storm_brightness_factor) if $in(storm_mode) == 1 else 1.0)
+            + random.Random(int($in(uptime_s) * 1000) + 51).uniform(-noise_amplitude_lux, noise_amplitude_lux)
+          ),
+        )
+
+  - function: $in(rain)
+    name: update_rain
+    description: Probabilistic rain flag with higher incidence during storms.
+    imports: [random]
+    storm_rain_probability: 0.35
+    call: (
+          1
+          if random.Random(int($in(uptime_s) * 1000) + 61).random()
+             < (storm_rain_probability if $in(storm_mode) == 1 else $in(rain_probability))
+          else 0
+        )
+
+communication:
+  - mqtt:
+      broker: mosquitto-server
+      port: 1883
+      client_id: spx_weather_gateway_1
+      publish_interval: 1.0
+      topic_prefix: spx/weather
+      default_qos: 1
+      default_retain: false
+      birth_topic: availability
+      birth_payload: online
+      birth_retain: true
+      will_topic: availability
+      will_payload: offline
+      will_retain: true
+      bindings:
+        - attribute: $ext(outdoor_temperature_c)
+          topic: outdoor_temperature_c
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(wind_speed_ms)
+          topic: wind_speed_ms
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(wind_gust_ms)
+          topic: wind_gust_ms
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(brightness_lux)
+          topic: brightness_lux
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(rain)
+          topic: rain
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(wind_direction_deg)
+          topic: wind_direction_deg
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(availability)
+          topic: availability
+          direction: publish
+          retain: true
+          publish_on_change: false
+
+  - mqtt:
+      broker: mosquitto-server
+      port: 1883
+      client_id: spx_weather_gateway_1_discovery
+      publish_interval: 1.0
+      topic_prefix: homeassistant
+      default_qos: 1
+      default_retain: true
+      bindings:
+        - attribute: $ext(ha_discovery_outdoor_temperature_config)
+          topic: sensor/spx_weather_outdoor_temperature/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_gateway_availability_config)
+          topic: sensor/spx_weather_gateway_availability/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_wind_speed_config)
+          topic: sensor/spx_weather_wind_speed/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_wind_gust_config)
+          topic: sensor/spx_weather_wind_gust/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_brightness_config)
+          topic: sensor/spx_weather_brightness/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_rain_config)
+          topic: binary_sensor/spx_weather_rain/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(ha_discovery_wind_direction_config)
+          topic: sensor/spx_weather_wind_direction/config
+          direction: publish
+          retain: true
+          publish_on_change: true
