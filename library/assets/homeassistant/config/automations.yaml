@@ -1,1 +1,106 @@
-[]
+- id: '1767345066240'
+  alias: 'Blinds: night by brightness + temp; sunny shading; otherwise open'
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+    - sensor.vaisala_wxt530_weather_transmitter_brightness
+  actions:
+  - choose:
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+        below: 1000
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+        below: 20
+      sequence:
+      - action: cover.set_cover_position
+        target:
+          entity_id:
+          - cover.blind_1
+          - cover.blind_2
+          - cover.blind_3
+          - cover.blind_4
+        data:
+          position: 0
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+        below: 1000
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+        above: 19.999
+      sequence:
+      - action: cover.set_cover_position
+        target:
+          entity_id:
+          - cover.blind_1
+          - cover.blind_2
+          - cover.blind_3
+          - cover.blind_4
+        data:
+          position: 100
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+        above: 45000
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+        above: 20
+      sequence:
+      - action: cover.set_cover_position
+        target:
+          entity_id:
+          - cover.blind_1
+          - cover.blind_2
+          - cover.blind_3
+          - cover.blind_4
+        data:
+          position: 50
+    default:
+    - action: cover.set_cover_position
+      target:
+        entity_id:
+        - cover.blind_1
+        - cover.blind_2
+        - cover.blind_3
+        - cover.blind_4
+      data:
+        position: 100
+  mode: restart
+- id: '1767347335849'
+  alias: 'Outdoor lights: ABB SA/S Ch01–Ch04 by illuminance'
+  description: ''
+  triggers:
+  - trigger: numeric_state
+    entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+    below: 5000
+  - trigger: numeric_state
+    entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+    above: 5000
+  - trigger: homeassistant
+    event: start
+  actions:
+  - choose:
+    - conditions:
+      - condition: numeric_state
+        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
+        below: 5000
+      sequence:
+      - action: switch.turn_on
+        target:
+          entity_id:
+          - switch.abb_sa_s_ch01
+          - switch.abb_sa_s_ch02
+          - switch.abb_sa_s_ch03
+          - switch.abb_sa_s_ch04
+    default:
+    - action: switch.turn_off
+      target:
+        entity_id:
+        - switch.abb_sa_s_ch01
+        - switch.abb_sa_s_ch02
+        - switch.abb_sa_s_ch03
+        - switch.abb_sa_s_ch04
+  mode: restart

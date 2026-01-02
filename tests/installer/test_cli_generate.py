@@ -148,6 +148,7 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     assert selection["models"] == ["sensor"]
     assert selection["services"] == ["mqtt_broker"]
     assert selection["instances"] == [{"model_id": "sensor", "instance_key": "pack_sensor_01"}]
+    assert selection["start_instances"] == []
     assert selection["product_key_present"] is True
     assert "SECRET-KEY" not in captured.out
     assert "SECRET-KEY" not in captured.err

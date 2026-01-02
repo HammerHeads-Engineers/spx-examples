@@ -41,6 +41,12 @@ industries:
         instance: spx_fire_alarm_panel_bacnet
       - model: Building.SecurityAccessController.Bacnet
         instance: spx_security_access_controller_bacnet
+    start_instances:
+      - spx_hvac_flexit_nordic_bacnet
+      - spx_energy_meter_iem3000_modbus
+      - spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
+      - spx_abb_sa_s12_16_5_1_knx
+      - spx_abb_jra_s4_230_5_1_knx
     path: library/industries/smart_building_pack
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)

@@ -113,6 +113,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         license_key="ABC-123",
         model_ids=["sensor"],
         service_ids=["mqtt_broker", "modbus_tcp_gateway"],
+        instances=[{"model_id": "sensor", "instance_key": "inst_001"}],
+        start_instances=["inst_001"],
     )
 
     output_dir = tmp_path / "out"
@@ -145,6 +147,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
     assert bundle.get("instances") == [{"model_id": "sensor", "instance_key": "inst_001"}]
+    assert bundle.get("start_instances") == ["inst_001"]
 
     start_path = output_dir / "spx-start.sh"
     stop_path = output_dir / "spx-stop.sh"
@@ -186,6 +189,8 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
         license_key="KEY-456",
         model_ids=["sensor"],
         service_ids=["mqtt_broker", "modbus_tcp_gateway"],
+        instances=[{"model_id": "sensor", "instance_key": "inst_001"}],
+        start_instances=["inst_001"],
     )
 
     output_dir = tmp_path / "out-ui"
@@ -216,6 +221,8 @@ def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:
         license_key="ABC-123",
         model_ids=["sensor"],
         service_ids=["mqtt_broker", "modbus_tcp_gateway", "bacnet_gateway"],
+        instances=[{"model_id": "sensor", "instance_key": "inst_001"}],
+        start_instances=["inst_001"],
     )
 
     output_dir = tmp_path / "out-bacnet"

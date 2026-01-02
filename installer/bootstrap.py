@@ -47,6 +47,7 @@ def bootstrap(bundle_path: Path, api_url: str, *, skip_instances: bool = False) 
     bundle = load_bundle(bundle_path)
     models = bundle.get("models", [])
     instances = bundle.get("instances", [])
+    start_instances = [str(key).strip() for key in bundle.get("start_instances", []) or [] if str(key).strip()]
     if not models:
         print("[bootstrap] No models defined in bundle; nothing to do.")
         return
@@ -59,14 +60,20 @@ def bootstrap(bundle_path: Path, api_url: str, *, skip_instances: bool = False) 
         if skip_instances:
             if instances:
                 print("[bootstrap] Instance creation skipped (--skip-instances).")
+            if start_instances:
+                print("[bootstrap] Instance start skipped (--skip-instances).")
         else:
             for entry in instances:
                 create_instance_via_sdk(client, entry)
+            for instance_key in start_instances:
+                start_instance_via_sdk(client, instance_key)
     else:
         register_via_http(api_url, bundle.get("license_key", ""), models)
         if instances:
             reason = "spx_python not available" if not skip_instances else "--skip-instances"
             print(f"[bootstrap] Instance creation skipped ({reason}).")
+        if start_instances:
+            print("[bootstrap] Instance start skipped (spx_python not available).")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -103,6 +110,21 @@ def create_instance_via_sdk(client, entry: Dict[str, Any]) -> None:
         return
     client["instances"][instance_key] = model_id
     print(f"  - Created instance {instance_key} from {model_id}")
+
+
+def start_instance_via_sdk(client, instance_key: str) -> None:
+    if not instance_key:
+        return
+    try:
+        instance = client["instances"][instance_key]
+    except Exception:
+        print(f"  - Skipping start for {instance_key} (instance not found)")
+        return
+    try:
+        instance.start()
+        print(f"  - Started instance {instance_key}")
+    except Exception as exc:
+        print(f"  - Failed to start instance {instance_key}: {exc}")
 
 
 def register_via_http(api_url: str, product_key: str, models: list[Dict[str, Any]]) -> None:

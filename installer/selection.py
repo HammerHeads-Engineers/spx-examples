@@ -103,3 +103,34 @@ def resolve_default_instances(
             instances.append({"model_id": key[0], "instance_key": key[1]})
 
     return instances
+
+
+def resolve_start_instances(
+    packages: Sequence[str],
+    index: ManifestIndex,
+) -> List[str]:
+    """Resolve instance keys that should be started after creation."""
+    start_instances: List[str] = []
+    seen: Set[str] = set()
+
+    for pkg in packages:
+        manifest = index.industries.get(pkg)
+        if manifest is None:
+            continue
+        default_keys = {
+            entry.get("instance")
+            for entry in manifest.default_instances
+            if isinstance(entry, dict) and entry.get("instance")
+        }
+        for entry in manifest.start_instances:
+            key = str(entry).strip()
+            if not key:
+                continue
+            if default_keys and key not in default_keys:
+                continue
+            if key in seen:
+                continue
+            seen.add(key)
+            start_instances.append(key)
+
+    return start_instances

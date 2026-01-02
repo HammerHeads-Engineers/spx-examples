@@ -15,7 +15,12 @@ from typing import Iterable, List, Optional
 
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
-from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
+from .selection import (
+    resolve_default_instances,
+    resolve_model_ids,
+    resolve_service_ids,
+    resolve_start_instances,
+)
 from .wizard import InstallerWizard, WizardSelection
 
 
@@ -231,6 +236,9 @@ def _build_noninteractive_selection(
             + ", ".join(sorted(set(unknown_services)))
         )
 
+    instances = resolve_default_instances(packages, index) if install_examples else []
+    start_instances = resolve_start_instances(packages, index) if install_examples else []
+
     return WizardSelection(
         packages=packages,
         profiles=profile_ids,
@@ -241,6 +249,8 @@ def _build_noninteractive_selection(
         license_key=product_key,
         model_ids=model_ids,
         service_ids=service_ids,
+        instances=instances,
+        start_instances=start_instances,
     )
 
 
@@ -253,7 +263,8 @@ def _print_selection(selection: WizardSelection, *, index) -> None:
         "install_spx_ui": bool(selection.install_spx_ui),
         "models": selection.model_ids,
         "services": selection.service_ids,
-        "instances": resolve_default_instances(selection.packages, index),
+        "instances": selection.instances,
+        "start_instances": selection.start_instances,
         "product_key_present": bool(selection.license_key and selection.license_key != "REPLACE_ME"),
     }
     print(json.dumps(payload, indent=2, sort_keys=True))

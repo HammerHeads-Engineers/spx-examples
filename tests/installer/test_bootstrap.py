@@ -24,6 +24,7 @@ def model_bundle(tmp_path: Path) -> Path:
         "instances": [
             {"model_id": "dummy", "instance_key": "inst_1"},
         ],
+        "start_instances": ["inst_1"],
     }
     bundle_path = tmp_path / "bundle.json"
     bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
@@ -57,11 +58,28 @@ def test_bootstrap_uses_http_when_sdk_missing(monkeypatch: pytest.MonkeyPatch, m
 
 
 def test_bootstrap_uses_sdk_when_available(monkeypatch: pytest.MonkeyPatch, model_bundle: Path) -> None:
+    class FakeInstance:
+        def __init__(self) -> None:
+            self.started = False
+
+        def start(self) -> None:
+            self.started = True
+
+    class FakeInstances:
+        def __init__(self) -> None:
+            self._store = {}
+
+        def __getitem__(self, key: str) -> FakeInstance:
+            return self._store[key]
+
+        def __setitem__(self, key: str, model_id: str) -> None:  # noqa: ARG002
+            self._store[key] = FakeInstance()
+
     class FakeClient(dict):
         def __init__(self) -> None:
             super().__init__()
             self["models"] = {}
-            self["instances"] = {}
+            self["instances"] = FakeInstances()
 
     fake_client = FakeClient()
 
@@ -77,15 +95,23 @@ def test_bootstrap_uses_sdk_when_available(monkeypatch: pytest.MonkeyPatch, mode
 
     bootstrap.bootstrap(model_bundle, "http://example")
     assert "dummy" in fake_client["models"]
-    assert "inst_1" in fake_client["instances"]
+    assert "inst_1" in fake_client["instances"]._store
+    assert fake_client["instances"]["inst_1"].started is True
 
 
 def test_bootstrap_skip_instances(monkeypatch: pytest.MonkeyPatch, model_bundle: Path) -> None:
+    class FakeInstances:
+        def __init__(self) -> None:
+            self._store = {}
+
+        def __setitem__(self, key: str, model_id: str) -> None:  # noqa: ARG002
+            self._store[key] = object()
+
     class FakeClient(dict):
         def __init__(self) -> None:
             super().__init__()
             self["models"] = {}
-            self["instances"] = {}
+            self["instances"] = FakeInstances()
 
     fake_client = FakeClient()
 
@@ -101,4 +127,4 @@ def test_bootstrap_skip_instances(monkeypatch: pytest.MonkeyPatch, model_bundle:
 
     bootstrap.bootstrap(model_bundle, "http://example", skip_instances=True)
     assert "dummy" in fake_client["models"]
-    assert fake_client["instances"] == {}
+    assert fake_client["instances"]._store == {}

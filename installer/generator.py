@@ -484,6 +484,7 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
             "license_key": selection.license_key,
             "models": model_entries,
             "instances": self._collect_instances(selection),
+            "start_instances": list(selection.start_instances),
             "services": selection.service_ids,
         }
         bundle_path = output_dir / "bundle.json"
@@ -491,17 +492,7 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
         self._copy_model_sources(model_paths, output_dir)
 
     def _collect_instances(self, selection) -> list[dict[str, str]]:
-        instances: list[dict[str, str]] = []
-        for pkg in selection.packages:
-            manifest = self.index.industries.get(pkg)
-            if not manifest:
-                continue
-            for entry in manifest.default_instances:
-                model_id = entry.get("model")
-                instance_key = entry.get("instance")
-                if model_id and instance_key:
-                    instances.append({"model_id": model_id, "instance_key": instance_key})
-        return instances
+        return list(selection.instances)
 
     def _copy_model_sources(self, model_paths: Set[Path], output_dir: Path) -> None:
         for rel in model_paths:
@@ -570,6 +561,7 @@ def bootstrap(bundle_path: Path, api_url: str) -> None:
     bundle = load_bundle(bundle_path)
     models = bundle.get("models", [])
     instances = bundle.get("instances", [])
+    start_instances = [str(key).strip() for key in bundle.get("start_instances", []) or [] if str(key).strip()]
     if not models:
         print("[bootstrap] No models defined in bundle; nothing to do.")
         return
@@ -581,10 +573,14 @@ def bootstrap(bundle_path: Path, api_url: str) -> None:
             register_via_sdk(client, entry)
         for entry in instances:
             create_instance_via_sdk(client, entry)
+        for instance_key in start_instances:
+            start_instance_via_sdk(client, instance_key)
     else:
         register_via_http(api_url, bundle.get("license_key", ""), models)
         if instances:
             print("[bootstrap] Instance creation skipped (spx_python not available).")
+        if start_instances:
+            print("[bootstrap] Instance start skipped (spx_python not available).")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -617,6 +613,21 @@ def create_instance_via_sdk(client, entry: Dict[str, Any]) -> None:
         return
     client["instances"][instance_key] = model_id
     print(f"  - Created instance {instance_key} from {model_id}")
+
+
+def start_instance_via_sdk(client, instance_key: str) -> None:
+    if not instance_key:
+        return
+    try:
+        instance = client["instances"][instance_key]
+    except Exception:
+        print(f"  - Skipping start for {instance_key} (instance not found)")
+        return
+    try:
+        instance.start()
+        print(f"  - Started instance {instance_key}")
+    except Exception as exc:
+        print(f"  - Failed to start instance {instance_key}: {exc}")
 
 
 def register_via_http(api_url: str, product_key: str, models: list[Dict[str, Any]]) -> None:

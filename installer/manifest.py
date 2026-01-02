@@ -81,6 +81,7 @@ class IndustryManifest:
     profiles: List[str]
     path: Path
     default_instances: List[Dict[str, str]] = field(default_factory=list)
+    start_instances: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -246,6 +247,7 @@ class ManifestLoader:
                 profiles=[Path(p).stem for p in entry.get("profiles", [])],
                 path=Path(entry.get("path", "")),
                 default_instances=list(entry.get("default_instances", []) or []),
+                start_instances=list(entry.get("start_instances", []) or []),
             )
         return industries
 

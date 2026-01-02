@@ -9,7 +9,7 @@ from shutil import get_terminal_size
 from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
-from .selection import resolve_model_ids, resolve_service_ids
+from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
 from . import ui
 
 
@@ -24,6 +24,8 @@ class WizardSelection:
     license_key: str
     model_ids: List[str]
     service_ids: List[str]
+    instances: List[Dict[str, str]]
+    start_instances: List[str]
 
 
 class InstallerWizard:
@@ -41,6 +43,9 @@ class InstallerWizard:
         packages, protocol_filters = self._prompt_packages(index.industries, index)
         profiles = self._prompt_profiles(packages, index)
         install_examples = self._prompt_yes_no("\nInstall bundled example models/tests? [Y/n]: ", default=True)
+        start_instances: List[str] = []
+        if install_examples:
+            start_instances = self._prompt_start_instances(packages, index)
         install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
         offline_bundle = self._prompt_yes_no(
             "Prepare offline installation bundle instead of immediate launch? [y/N]: ",
@@ -50,6 +55,10 @@ class InstallerWizard:
 
         model_ids = resolve_model_ids(packages, profiles, protocol_filters, index)
         service_ids = resolve_service_ids(model_ids, packages, profiles, index)
+        instances = resolve_default_instances(packages, index) if install_examples else []
+        if install_examples:
+            allowed = {entry.get("instance_key") for entry in instances if entry.get("instance_key")}
+            start_instances = [key for key in start_instances if key in allowed]
 
         self._print_summary(
             packages,
@@ -61,6 +70,8 @@ class InstallerWizard:
             license_key,
             model_ids,
             service_ids,
+            instances,
+            start_instances,
             index,
         )
 
@@ -74,6 +85,8 @@ class InstallerWizard:
             license_key=license_key,
             model_ids=model_ids,
             service_ids=service_ids,
+            instances=instances,
+            start_instances=start_instances,
         )
 
     # Internal helpers -------------------------------------------------------
@@ -164,6 +177,43 @@ class InstallerWizard:
             allow_empty=True,
         )
         return [sorted(available_profiles)[i - 1] for i in choices]
+
+    def _prompt_start_instances(
+        self,
+        packages: Sequence[str],
+        index: ManifestIndex,
+    ) -> List[str]:
+        if not packages:
+            return []
+
+        selected: List[str] = []
+        seen: set[str] = set()
+        for pkg_id in packages:
+            manifest = index.industries.get(pkg_id)
+            if not manifest or not manifest.start_instances:
+                continue
+            start_keys = [str(entry).strip() for entry in manifest.start_instances if str(entry).strip()]
+            if not start_keys:
+                continue
+            instance_models = {
+                entry.get("instance"): entry.get("model")
+                for entry in manifest.default_instances
+                if isinstance(entry, dict) and entry.get("instance")
+            }
+            print(ui.heading(f"\nInstances to start for {manifest.name}:"))
+            for instance_key in start_keys:
+                model_id = instance_models.get(instance_key)
+                if model_id:
+                    print(f"  • {instance_key} ({model_id})")
+                else:
+                    print(f"  • {instance_key}")
+            if self._prompt_yes_no("Start these instances after creation? [Y/n]: ", default=True):
+                for instance_key in start_keys:
+                    if instance_key in seen:
+                        continue
+                    seen.add(instance_key)
+                    selected.append(instance_key)
+        return selected
 
     def _prompt_yes_no(self, prompt: str, *, default: bool) -> bool:
         while True:
@@ -262,6 +312,8 @@ class InstallerWizard:
         license_key: str,
         model_ids: Sequence[str],
         service_ids: Sequence[str],
+        instances: Sequence[Dict[str, str]],
+        start_instances: Sequence[str],
         index: ManifestIndex,
     ) -> None:
         print(ui.heading("\nSummary"))
@@ -290,6 +342,23 @@ class InstallerWizard:
         for model_id in model_ids:
             manifest = index.models[model_id]
             print(f"  • {manifest.name} [{', '.join(manifest.protocols)}]")
+        print("\nDefault instances:")
+        if instances:
+            for entry in instances:
+                instance_key = entry.get("instance_key", "")
+                model_id = entry.get("model_id", "")
+                if instance_key and model_id:
+                    print(f"  • {instance_key} ({model_id})")
+                elif instance_key:
+                    print(f"  • {instance_key}")
+        else:
+            print("  • (none selected)")
+        print("\nInstances to start:")
+        if start_instances:
+            for instance_key in start_instances:
+                print(f"  • {instance_key}")
+        else:
+            print("  • (none selected)")
         print("\nServices:")
         for service_id in service_ids:
             manifest = index.services[service_id]
