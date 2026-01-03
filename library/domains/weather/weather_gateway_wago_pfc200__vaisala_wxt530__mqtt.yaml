@@ -19,6 +19,7 @@ attributes:
     default: 180
 
   availability: "online"
+  test_logs: []
 
   _ha_discovery_outdoor_temperature_config: |-
     {

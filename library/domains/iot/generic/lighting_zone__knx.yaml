@@ -83,7 +83,7 @@ actions:
 communication:
   - knx_ip:
       router:
-        host: 127.0.0.1
+        host: knx_gateway
         port: 3671
         route_back: true
       poll_interval: 0.3

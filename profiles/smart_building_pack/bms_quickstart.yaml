@@ -24,8 +24,10 @@ models:
 services:
   - mqtt_broker
   - modbus_tcp_gateway
+  - bacnet_gateway
   - lwm2m_server
   - http_gateway
   - opcua_server
   - knx_gateway
+  - homeassistant_bridge
   - matter_server

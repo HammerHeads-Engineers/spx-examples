@@ -17,6 +17,7 @@ Follow these steps after cloning the repository to start a local SPX server, see
    - (Optional) [Poetry](https://python-poetry.org/) for dependency management.
 
 2. **Provide your SPX credentials**
+   - Get your SPX product key after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type (Community, Trial, etc.).
    - Create a `.env` file in the project root (or export the variables in your shell) with at least your product key:
      ```bash
      cat <<'EOF' > .env
@@ -56,11 +57,24 @@ When you are done, tear everything down with:
 docker compose down
 ```
 
+## Packs
+
+Industry packs group models, services, and quickstart profiles around a specific domain.
+
+- Smart-Building Pack (BMS): `library/industries/smart_building_pack/README.md`
+  (quickstart: `profiles/smart_building_pack/bms_quickstart.yaml`)
+- Energy Pack (e-Mobility & DER): `library/industries/energy_pack/README.md`
+  (quickstart: `profiles/energy_pack/ev_csms_demo.yaml`)
+- Embedded & Lab Pack: `library/industries/embedded_lab_pack/README.md`
+  (quickstarts: `profiles/embedded_lab_pack/mhealth_ci.yaml`, `profiles/embedded_lab_pack/scpi_lab.yaml`)
+- Industrial Pack (Industry 4.0): `library/industries/industrial_iiot_pack/README.md`
+  (quickstarts: `profiles/industrial_iiot_pack/opcua_line_quickstart.yaml`, `profiles/industrial_iiot_pack/iiot_monitoring.yaml`)
+
 ## Troubleshooting
 
 - `docker compose up` fails with `Conflict. The container name "/spx-server" is already in use` — stop/remove the existing container (`docker rm -f spx-server`) or tear down the other stack (installer bundles use the same container name).
 - `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
-- Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (and `SPX_API_URL` if you are not using `http://localhost:8000`).
+- Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_API_URL` if you are not using `http://localhost:8000`.
 
 ## Installer workflow
 
@@ -82,7 +96,7 @@ Both wrappers:
 Inside `build/spx-generated/` you will see:
 
 - `docker-compose.generated.yml` – only the services selected in the wizard.
-- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key.
+- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key from [simplephysx.com](https://simplephysx.com) after selecting a subscription type.
 - `bundle.json` – consumed by `python -m installer bootstrap`.
 - `spx-start.sh` / `spx-stop.sh` and `spx-start.ps1` / `spx-stop.ps1` – start/stop helpers for Bash/zsh and PowerShell.
 - `assets/` and `extensions/` – copied resources referenced by the selected services.
