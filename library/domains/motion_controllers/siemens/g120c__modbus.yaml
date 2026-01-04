@@ -100,7 +100,7 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5025
+      port: 5028
       unit_id: 1
       zero_fill: true
       mapping:
