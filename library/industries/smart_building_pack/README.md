@@ -47,6 +47,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 - Use the installer wizard (`./spx-install.sh`) or generate non-interactively:
   `python -m installer generate --packages smart_building_pack --profile-ids bms_quickstart`
 - Integration tests: `poetry run pytest tests/packs/smart_building_pack/integration`
+- Notebook: `examples/packs/smart_building_pack/smart_building_pack_weather_gateway.ipynb`
 
 ## Connection matrix
 

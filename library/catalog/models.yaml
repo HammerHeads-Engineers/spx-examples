@@ -160,7 +160,25 @@ models:
     services:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, ev_csms_demo, opcua_line_quickstart]
+    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
+  - id: Process.PressureController.Eurotherm3504.Modbus
+    name: Eurotherm 3504 Pressure Controller (Modbus TCP)
+    path: library/domains/thermal_controllers/eurotherm/eurotherm_3504__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Process.ThermalController.Eurotherm3216.Modbus
+    name: Eurotherm 3216 Temperature Controller (Modbus TCP)
+    path: library/domains/thermal_controllers/eurotherm/eurotherm_3216__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
   - id: Process.ThermalController.Advanced
     name: Thermal Controller (Advanced)
     path: library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml
@@ -168,7 +186,7 @@ models:
     protocols: []
     services: []
     packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, ev_csms_demo, opcua_line_quickstart]
+    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
   - id: Motion.StepperController.Modbus
     name: Stepper Controller (Modbus)
     path: library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
@@ -177,7 +195,7 @@ models:
     services:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]
   - id: Process.VacuumGauge.Modbus
     name: Vacuum Gauge (Modbus)
     path: library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
@@ -186,7 +204,7 @@ models:
     services:
       - id: modbus_tcp_gateway
     packages: [embedded_lab_pack, industrial_iiot_pack]
-    profiles: [scpi_lab, opcua_line_quickstart]
+    profiles: [scpi_lab, process_cell_quickstart]
   - id: Process.VacuumGaugeMultichannel.Modbus
     name: Vacuum Gauge Multichannel (Modbus)
     path: library/domains/vacuum_systems/generic/vacuum_gauge_multichannel__modbus.yaml
@@ -258,7 +276,16 @@ models:
     services:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]
+  - id: Motion.VFDrive.SiemensG120C.Modbus
+    name: Siemens SINAMICS G120C VFD (Modbus TCP)
+    path: library/domains/motion_controllers/siemens/g120c__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
   - id: IO.IOModule.Modbus
     name: IO Module (Modbus)
     path: library/domains/iot/generic/io_module__modbus.yaml
@@ -268,6 +295,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
     profiles: [iiot_monitoring]
+  - id: IO.IOModule.Wago750_8000.Modbus
+    name: WAGO 750-8000 I/O System (Modbus TCP)
+    path: library/domains/iot/wago/wago_750_8000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
   - id: Process.PIDController.Modbus
     name: PID Process Controller (Modbus)
     path: library/domains/thermal_controllers/generic/pid_process_controller__modbus.yaml
@@ -276,7 +312,7 @@ models:
     services:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]
   - id: Energy.EnergyMeter3Ph.Modbus
     name: 3-Phase Energy Meter (Modbus)
     path: library/domains/iot/generic/energy_meter_3ph__modbus.yaml
@@ -330,7 +366,16 @@ models:
     services:
       - id: opcua_server
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]
+  - id: Process.ProcessCell.SiemensS7_1500.OpcUa
+    name: Siemens SIMATIC S7-1500 Process Cell (OPC UA)
+    path: library/domains/iot/siemens/s7_1500_process_cell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: []
   - id: Process.Workcell.OpcUa
     name: Production Workcell (OPC UA)
     path: library/domains/iot/generic/production_workcell__opcua.yaml
@@ -339,7 +384,7 @@ models:
     services:
       - id: opcua_server
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]
   - id: Logistics.AGVVehicle.Mqtt
     name: AGV Vehicle (MQTT)
     path: library/domains/iot/generic/agv_vehicle__mqtt.yaml
@@ -366,4 +411,4 @@ models:
     services:
       - id: opcua_server
     packages: [industrial_iiot_pack]
-    profiles: [opcua_line_quickstart]
+    profiles: [process_cell_quickstart]

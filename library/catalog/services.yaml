@@ -91,6 +91,10 @@ services:
         container: 4844
         purpose: OPC UA endpoint (Lighting Panel)
       - transport: tcp
+        host: 4845
+        container: 4845
+        purpose: OPC UA endpoint (Siemens S7-1500 Process Cell)
+      - transport: tcp
         host: 53530
         container: 53530
         purpose: OPC UA discovery / sample compatibility

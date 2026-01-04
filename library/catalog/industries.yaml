@@ -102,13 +102,17 @@ industries:
     protocols: [modbus, mqtt, http, scpi, opcua]
     services: [modbus_tcp_gateway, mqtt_broker, http_gateway, scpi_tcp_stack, opcua_server]
     profiles:
-      - profiles/industrial_iiot_pack/opcua_line_quickstart.yaml
+      - profiles/industrial_iiot_pack/process_cell_quickstart.yaml
       - profiles/industrial_iiot_pack/iiot_monitoring.yaml
     default_instances:
       - model: Motion.StepperController.Modbus
         instance: spx_stepper_axis
       - model: Process.ThermalController.Modbus
         instance: spx_process_heater
+      - model: Process.ThermalController.Eurotherm3216.Modbus
+        instance: spx_eurotherm_3216_temp
+      - model: Process.PressureController.Eurotherm3504.Modbus
+        instance: spx_eurotherm_3504_pressure
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
@@ -131,8 +135,12 @@ industries:
         instance: spx_vision_station
       - model: Motion.VFDrive.Modbus
         instance: spx_vfd_drive
+      - model: Motion.VFDrive.SiemensG120C.Modbus
+        instance: spx_g120c_vfd
       - model: IO.IOModule.Modbus
         instance: spx_io_module
+      - model: IO.IOModule.Wago750_8000.Modbus
+        instance: spx_wago_750_8000_io
       - model: Process.PIDController.Modbus
         instance: spx_pid_controller
       - model: Energy.EnergyMeter3Ph.Modbus
@@ -141,8 +149,16 @@ industries:
         instance: spx_pressure_transmitter
       - model: Process.ProcessCell.OpcUa
         instance: spx_process_cell_opcua
+      - model: Process.ProcessCell.SiemensS7_1500.OpcUa
+        instance: spx_s7_1500_process_cell
       - model: Process.Workcell.OpcUa
         instance: spx_workcell_opcua
       - model: Process.PackagingLine.OpcUa
         instance: spx_packaging_line_opcua
+    start_instances:
+      - spx_eurotherm_3216_temp
+      - spx_eurotherm_3504_pressure
+      - spx_g120c_vfd
+      - spx_wago_750_8000_io
+      - spx_s7_1500_process_cell
     path: library/industries/industrial_iiot_pack

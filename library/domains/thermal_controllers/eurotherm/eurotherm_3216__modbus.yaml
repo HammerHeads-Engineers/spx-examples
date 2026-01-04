@@ -1,0 +1,192 @@
+# SPDX-License-Identifier: MIT
+
+name: eurotherm_3216__modbus
+description: |
+  Eurotherm 3216 temperature controller (Sim) with a minimal Modbus parameter
+  map for demo-grade loop control. Uses Modbus TCP slave with 0.1 resolution
+  (scaled integer). Addresses follow the 3200 series engineering handbook Modbus list
+  referenced by the installation/operating manual (Modbus index starts at 1).
+
+  Implemented registers:
+    - 1   PV.IN   (PV input value)
+    - 2   TG.SP   (Target setpoint)
+    - 3   MAN.OP  (Manual output value)
+    - 4   WRK.OP  (Working output)
+    - 5   WKG.SP  (Working setpoint)
+    - 273 A-M     (Mode of the loop: 0=Auto, 1=Manual)
+
+attributes:
+  temperature_c: 25.0
+  setpoint_c: 30.0
+  working_setpoint_c: 30.0
+  output_pct: 0.0
+  manual_out_pct: 0.0
+  auto_man: 0
+
+  ambient_c: 22.0
+  heat_coeff: 0.25
+  cool_coeff: 0.03
+  power_gain: 1.5
+  power_integral: 0.0
+  power_integral_gain: 0.2
+  power_integral_leak: 0.05
+  power_derivative: 0.0
+  power_derivative_gain: 0.8
+  power_error_prev: 0.0
+
+  temp_min_c: 0.0
+  temp_max_c: 200.0
+  sp_min_c: 0.0
+  sp_max_c: 200.0
+  out_min: 0.0
+  out_max: 100.0
+  scale_0p1: 10.0
+
+  pv_raw: 250
+  target_sp_raw: 300
+  manual_out_raw: 0
+  working_out_raw: 0
+  working_sp_raw: 300
+  auto_man_raw: 0
+
+actions:
+  - function: $in(auto_man)
+    name: sync_auto_man
+    description: Resolve auto/manual mode from the Modbus register.
+    call: 1 if $in(auto_man_raw) else 0
+
+  - function: $in(setpoint_c)
+    name: sync_target_sp
+    description: Decode Target SP (0.1 resolution scaled integer).
+    call: max($in(sp_min_c), min($in(sp_max_c), $in(target_sp_raw) / $in(scale_0p1)))
+
+  - function: $in(manual_out_pct)
+    name: sync_manual_out
+    description: Decode Manual Output (0.1 resolution scaled integer).
+    call: max($in(out_min), min($in(out_max), $in(manual_out_raw) / $in(scale_0p1)))
+
+  - function: $in(working_setpoint_c)
+    name: sync_working_sp
+    description: Use Target SP as Working SP for the minimal simulation.
+    call: $in(setpoint_c)
+
+  - function: $in(power_derivative)
+    name: update_derivative
+    description: Derivative contribution based on PV error slope.
+    call: 0.0 if $in(auto_man) == 1
+          else $in(power_derivative_gain) * (($in(setpoint_c) - $in(temperature_c)) - $in(power_error_prev))
+
+  - function: $in(power_error_prev)
+    name: update_error_prev
+    call: 0.0 if $in(auto_man) == 1 else ($in(setpoint_c) - $in(temperature_c))
+
+  - function: $in(power_integral)
+    name: update_integral
+    description: Integrator bias to offset steady-state error.
+    call: 0.0 if $in(auto_man) == 1
+          else (
+            max(0, $in(power_integral) * (1 - $in(power_integral_leak)))
+            if ($in(setpoint_c) - $in(temperature_c) <= 0)
+            else max(
+              0,
+              min(
+                $in(out_max),
+                $in(power_integral) + $in(power_integral_gain) * ($in(setpoint_c) - $in(temperature_c))
+              )
+            )
+          )
+
+  - function: $in(output_pct)
+    name: compute_output
+    description: Use PID output in auto, manual out value in manual.
+    call: (
+          max(
+            $in(out_min),
+            min(
+              $in(out_max),
+              $in(power_gain) * ($in(setpoint_c) - $in(temperature_c)) + $in(power_integral) + $in(power_derivative)
+            )
+          )
+          if $in(auto_man) == 0
+          else max($in(out_min), min($in(out_max), $in(manual_out_pct)))
+        )
+
+  - function: $in(temperature_c)
+    name: update_pv
+    description: First-order thermal response toward the setpoint.
+    call: max(
+          $in(temp_min_c),
+          min(
+            $in(temp_max_c),
+            $in(temperature_c)
+            + 0.2
+              * (
+                $in(heat_coeff) * $in(output_pct)
+                - $in(cool_coeff) * ($in(temperature_c) - $in(ambient_c))
+              )
+          )
+        )
+
+  - function: $in(pv_raw)
+    name: encode_pv_raw
+    description: Encode PV into 0.1 resolution register.
+    call: int(round($in(temperature_c) * $in(scale_0p1)))
+
+  - function: $in(target_sp_raw)
+    name: encode_target_sp_raw
+    description: Clamp and encode Target SP.
+    call: int(round($in(setpoint_c) * $in(scale_0p1)))
+
+  - function: $in(working_out_raw)
+    name: encode_working_out_raw
+    call: int(round($in(output_pct) * $in(scale_0p1)))
+
+  - function: $in(working_sp_raw)
+    name: encode_working_sp_raw
+    call: int(round($in(working_setpoint_c) * $in(scale_0p1)))
+
+  - function: $in(manual_out_raw)
+    name: encode_manual_out_raw
+    call: int(round($in(manual_out_pct) * $in(scale_0p1)))
+
+  - function: $in(auto_man_raw)
+    name: encode_auto_man_raw
+    call: 1 if $in(auto_man) == 1 else 0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5026
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        pv_raw:          { address: [1,1], group: h_r, type: uint_16 }
+        target_sp_raw:   { address: [2,2], group: h_r, type: uint_16 }
+        manual_out_raw:  { address: [3,3], group: h_r, type: uint_16 }
+        working_out_raw: { address: [4,4], group: h_r, type: uint_16 }
+        working_sp_raw:  { address: [5,5], group: h_r, type: uint_16 }
+        auto_man_raw:    { address: [273,273], group: h_r, type: uint_16 }
+
+scenarios:
+  auto_heat_step:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(auto_man_raw): 0
+      $in(target_sp_raw): 600
+      $in(manual_out_raw): 0
+
+  auto_cool_step:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(auto_man_raw): 0
+      $in(target_sp_raw): 250
+
+  manual_hold_35:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(auto_man_raw): 1
+      $in(manual_out_raw): 350
+      $in(target_sp_raw): 350

@@ -1,0 +1,263 @@
+# SPDX-License-Identifier: MIT
+
+name: s7_1500_process_cell__opcua
+description: |
+  Siemens SIMATIC S7-1500 process cell (Sim) exposing temperature/flow/pressure
+  tags over OPC UA for SCADA/MES demos. The dynamics and alarms mirror the
+  generic process cell while providing a vendor-specific OPC UA endpoint.
+
+attributes:
+  temperature_c: 28.0
+  temperature_setpoint_c: 32.0
+  operator_setpoint_c: 32.0
+  ambient_c: 24.0
+  temperature_gain: 0.18
+  heat_loss_gain: 0.04
+
+  pump_speed_percent: 45.0
+  pump_command_percent: 45.0
+  valve_position_percent: 35.0
+
+  flow_target_lpm: 48.0
+  flow_rate_lpm: 45.0
+
+  pressure_bar: 1.2
+  pressure_target_bar: 1.5
+  pressure_override_bar: 0.0
+
+  alarm_overtemp: 0
+  alarm_pressure: 0
+  alarm_low_flow: 0
+  status_text: "IDLE"
+
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(temperature_setpoint_c)
+    name: slew_temperature_setpoint
+    description: Slew the applied setpoint toward the commanded value.
+    call: (
+          $in(operator_setpoint_c)
+          if abs($in(operator_setpoint_c) - $in(temperature_setpoint_c)) <= 0.2
+          else (
+            $in(temperature_setpoint_c)
+            + (0.2 if $in(operator_setpoint_c) > $in(temperature_setpoint_c) else -0.2)
+          )
+        )
+
+  - function: $in(temperature_c)
+    name: update_temperature
+    description: Approach the setpoint with ambient losses for a simple thermal loop.
+    call: (
+          $in(temperature_c)
+          + $in(temperature_gain) * ($in(temperature_setpoint_c) - $in(temperature_c))
+          + $in(heat_loss_gain) * ($in(ambient_c) - $in(temperature_c))
+        )
+
+  - function: $in(pump_speed_percent)
+    name: track_pump_speed
+    description: Track pump speed toward the commanded value.
+    slew_rate: 1.5
+    call: (
+          $in(pump_command_percent)
+          if abs($in(pump_command_percent) - $in(pump_speed_percent)) <= slew_rate
+          else (
+            $in(pump_speed_percent)
+            + (slew_rate if $in(pump_command_percent) > $in(pump_speed_percent) else -slew_rate)
+          )
+        )
+
+  - function: $in(valve_position_percent)
+    name: compute_valve_position
+    description: Valve follows pump speed with a soft clamp.
+    call: max(0.0, min(100.0, 0.8 * $in(pump_speed_percent)))
+
+  - function: $in(flow_target_lpm)
+    name: derive_flow_target
+    description: Target flow is derived from pump speed and valve position.
+    call: max(
+          5.0,
+          min(
+            120.0,
+            0.9 * $in(pump_speed_percent) + 0.4 * $in(valve_position_percent)
+          )
+        )
+
+  - function: $in(flow_rate_lpm)
+    name: track_flow
+    description: Actual flow slews toward the target.
+    call: (
+          $in(flow_target_lpm)
+          if abs($in(flow_target_lpm) - $in(flow_rate_lpm)) <= 0.5
+          else (
+            $in(flow_rate_lpm)
+            + (0.5 if $in(flow_target_lpm) > $in(flow_rate_lpm) else -0.5)
+          )
+        )
+
+  - function: $in(pressure_override_bar)
+    name: clamp_pressure_override
+    description: Ensure overrides stay within the physical window (write 0 to release override).
+    call: max(0.0, min(3.5, $in(pressure_override_bar)))
+
+  - function: $in(pressure_target_bar)
+    name: compute_pressure_target
+    description: Flow-induced pressure target with optional OPC UA override.
+    call: (
+          $in(pressure_override_bar)
+          if $in(pressure_override_bar) > 0.0
+          else max(0.4, min(3.5, 0.8 + 0.015 * $in(flow_rate_lpm)))
+        )
+
+  - function: $in(pressure_bar)
+    name: track_pressure
+    description: Pressure tracks the target with damping.
+    call: max(
+          0.3,
+          min(
+            4.0,
+            $in(pressure_bar) + 0.1 * ($in(pressure_target_bar) - $in(pressure_bar))
+          )
+        )
+
+  - function: $in(status_text)
+    name: derive_status_text
+    description: Simple textual summary for dashboards.
+    call: >-
+          (
+            "FAULT" if $in(alarm_overtemp) or $in(alarm_pressure) or $in(alarm_low_flow)
+            else (
+              "HEATING" if $in(temperature_setpoint_c) - $in(temperature_c) > 0.5
+              else (
+                "COOLING" if $in(temperature_c) - $in(temperature_setpoint_c) > 0.5
+                else "IDLE"
+              )
+            )
+          )
+
+  - function: $in(alarm_overtemp)
+    name: detect_overtemp_alarm
+    call: 1 if $in(temperature_c) >= 65.0 else 0
+
+  - function: $in(alarm_pressure)
+    name: detect_pressure_alarm
+    call: 1 if $in(pressure_bar) >= 2.5 or $in(pressure_bar) <= 0.5 else 0
+
+  - function: $in(alarm_low_flow)
+    name: detect_low_flow
+    call: 1 if $in(flow_rate_lpm) <= 15.0 else 0
+
+communication:
+  - opcua_server:
+      endpoint: opc.tcp://0.0.0.0:4845/spx/s7-1500/process-cell
+      namespace_uri: urn:spx:examples:opcua:siemens:s7-1500:process-cell
+      security:
+        policy: NoSecurity
+        user_tokens:
+          - type: anonymous
+          - type: username
+            username: operator
+            password: changeme
+      sections:
+        - name: process
+          browse_path: ["ProcessCell"]
+          bindings:
+            - name: temperature
+              direction: outbound
+              attributes: "#attr(temperature_c)"
+              node:
+                browse_path: ["Temperature"]
+                data_type: Double
+            - name: temperature_setpoint
+              direction: bidirectional
+              attributes:
+                - "#attr(temperature_setpoint_c)"
+                - "#attr(operator_setpoint_c)"
+              read_attribute: "#attr(temperature_setpoint_c)"
+              write_attribute: "#attr(operator_setpoint_c)"
+              node:
+                browse_path: ["TemperatureSetpoint"]
+                data_type: Double
+            - name: pump_speed
+              direction: bidirectional
+              attributes:
+                - "#attr(pump_speed_percent)"
+                - "#attr(pump_command_percent)"
+              read_attribute: "#attr(pump_speed_percent)"
+              write_attribute: "#attr(pump_command_percent)"
+              node:
+                browse_path: ["PumpSpeed"]
+                data_type: Double
+            - name: flow_rate
+              direction: outbound
+              attributes: "#attr(flow_rate_lpm)"
+              node:
+                browse_path: ["FlowRate"]
+                data_type: Double
+            - name: status
+              direction: outbound
+              attributes: "#attr(status_text)"
+              node:
+                browse_path: ["Status"]
+                data_type: String
+        - name: diagnostics
+          browse_path: ["ProcessCell", "Diagnostics"]
+          bindings:
+            - name: pressure
+              direction: outbound
+              attributes: "#attr(pressure_bar)"
+              node:
+                browse_path: ["TankPressure"]
+                data_type: Double
+            - name: pressure_target
+              direction: bidirectional
+              attributes:
+                - "#attr(pressure_target_bar)"
+                - "#attr(pressure_override_bar)"
+              read_attribute: "#attr(pressure_target_bar)"
+              write_attribute: "#attr(pressure_override_bar)"
+              node:
+                browse_path: ["PressureTarget"]
+                data_type: Double
+            - name: alarm_overtemp
+              direction: outbound
+              attributes: "#attr(alarm_overtemp)"
+              node:
+                browse_path: ["Alarms", "Overtemp"]
+                data_type: Boolean
+            - name: alarm_pressure
+              direction: outbound
+              attributes: "#attr(alarm_pressure)"
+              node:
+                browse_path: ["Alarms", "Pressure"]
+                data_type: Boolean
+            - name: alarm_flow
+              direction: outbound
+              attributes: "#attr(alarm_low_flow)"
+              node:
+                browse_path: ["Alarms", "LowFlow"]
+                data_type: Boolean
+
+scenarios:
+  heatup_cycle:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(operator_setpoint_c): 70.0
+      $in(pump_command_percent): 55.0
+
+  pressure_upset:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(flow_target_lpm): 95.0
+      $in(pressure_override_bar): 2.8
+      $in(pump_command_percent): 80.0
+
+  maintenance_idle:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(operator_setpoint_c): 30.0
+      $in(pump_command_percent): 5.0
+      $in(pressure_override_bar): 0.0

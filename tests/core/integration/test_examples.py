@@ -36,7 +36,7 @@ def discover_examples():
 
     You can restrict which scripts run by setting SPX_EXAMPLES_ONLY
     to a comma-separated list of paths relative to examples/ (e.g.,
-    "01-hello-world.py,first_simulation.py").
+    "core/first_simulation.py,core/add_mqtt_minimal.py").
     """
     if not EXAMPLES_DIR.exists():
         return []

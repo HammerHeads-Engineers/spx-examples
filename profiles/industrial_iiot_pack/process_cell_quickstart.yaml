@@ -1,4 +1,4 @@
-name: opcua_line_quickstart
+name: process_cell_quickstart
 description: |
   Quick baseline for motion/process control containing the stepper axis, thermal
   loop, and vacuum instrumentation mapped through Modbus.

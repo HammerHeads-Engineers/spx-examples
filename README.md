@@ -68,12 +68,13 @@ Industry packs group models, services, and quickstart profiles around a specific
 - Embedded & Lab Pack: `library/industries/embedded_lab_pack/README.md`
   (quickstarts: `profiles/embedded_lab_pack/mhealth_ci.yaml`, `profiles/embedded_lab_pack/scpi_lab.yaml`)
 - Industrial Pack (Industry 4.0): `library/industries/industrial_iiot_pack/README.md`
-  (quickstarts: `profiles/industrial_iiot_pack/opcua_line_quickstart.yaml`, `profiles/industrial_iiot_pack/iiot_monitoring.yaml`)
+  (quickstarts: `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`, `profiles/industrial_iiot_pack/iiot_monitoring.yaml`, connection matrix: `library/industries/industrial_iiot_pack/README.md`)
 
 ## Troubleshooting
 
 - `docker compose up` fails with `Conflict. The container name "/spx-server" is already in use` — stop/remove the existing container (`docker rm -f spx-server`) or tear down the other stack (installer bundles use the same container name).
 - `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
+- Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
 - Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_API_URL` if you are not using `http://localhost:8000`.
 
 ## Installer workflow
