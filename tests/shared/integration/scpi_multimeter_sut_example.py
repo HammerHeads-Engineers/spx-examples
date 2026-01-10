@@ -21,7 +21,7 @@ ROOT = repo_root()
 MODEL_PATH = ROOT / "library" / "domains" / "measurement_instruments" / "generic" / "multimeter__scpi.yaml"
 MODEL_KEY = "tests__scpi_multimeter"
 INSTANCE_KEY = "generic_scpi_multimeter"
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
 class TestScpiMultimeterSUTExample(unittest.TestCase):
@@ -46,7 +46,7 @@ class TestScpiMultimeterSUTExample(unittest.TestCase):
         ) = bootstrap_model_instance(
             spx_python,
             product_key=product_key,
-            base_url=SPX_API_URL,
+            base_url=SPX_BASE_URL,
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,

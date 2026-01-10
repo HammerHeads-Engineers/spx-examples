@@ -14,7 +14,7 @@ from tests.devices.bacnet_client import (
 )
 
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEY = "spx_fire_alarm_panel_bacnet"
 MODEL_ID = "Building.FireAlarmPanel.Bacnet"
 BACNET_HOST = os.environ.get("BACNET_TEST_HOST", "127.0.0.1")
@@ -34,7 +34,7 @@ class TestFireAlarmBacnetIntegration(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
-        cls._client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._client,
             INSTANCE_KEY,

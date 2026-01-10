@@ -102,7 +102,7 @@ class TestInstancesGenerateClient(unittest.TestCase):
         if not cls._product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run SPX integration tests.")
 
-        cls._api_url = os.environ.get("SPX_API_URL", "http://localhost:8000")
+        cls._api_url = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
         if not _server_available(cls._api_url):
             raise unittest.SkipTest(f"SPX server not reachable at {cls._api_url}")
 
@@ -189,7 +189,7 @@ class TestKnxInstancesGenerateClient(unittest.TestCase):
         if not cls._product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run SPX integration tests.")
 
-        cls._api_url = os.environ.get("SPX_API_URL", "http://localhost:8000")
+        cls._api_url = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
         if not _server_available(cls._api_url):
             raise unittest.SkipTest(f"SPX server not reachable at {cls._api_url}")
 

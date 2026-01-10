@@ -27,7 +27,7 @@ MODEL_PATH = ROOT / "library" / "domains" / "weather" / "weather_forecast__http.
 MODEL_KEY = "tests__open_meteo_static"
 INSTANCE_KEY = "tests_open_meteo_static_instance"
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 SPX_PRODUCT_KEY_ENV = "SPX_PRODUCT_KEY"
 
 DEFAULT_PROFILE = "clear"
@@ -70,7 +70,7 @@ class TestOpenMeteoStaticSUTIntegration(unittest.TestCase):
             ) = bootstrap_model_instance(
                 spx_python,
                 product_key=product_key,
-                base_url=SPX_API_URL,
+                base_url=SPX_BASE_URL,
                 model_path=MODEL_PATH,
                 model_key=MODEL_KEY,
                 instance_key=INSTANCE_KEY,

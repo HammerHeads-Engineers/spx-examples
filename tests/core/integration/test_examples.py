@@ -15,7 +15,7 @@ from tests.common.repo import repo_root
 
 ROOT = repo_root()
 EXAMPLES_DIR = ROOT / "examples"
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
 def _server_healthy(url: str, timeout: int = 5) -> bool:
@@ -62,7 +62,7 @@ EXAMPLE_SCRIPTS = discover_examples()
 
 def _run_script(path: pathlib.Path, timeout: int = 120) -> subprocess.CompletedProcess:
     env = os.environ.copy()
-    env.setdefault("SPX_API_URL", SPX_API_URL)
+    env.setdefault("SPX_BASE_URL", SPX_BASE_URL)
     env.setdefault("MPLBACKEND", "Agg")  # Ensure non-interactive plotting backend.
     return subprocess.run(
         [sys.executable, str(path)],
@@ -79,8 +79,8 @@ def _run_script(path: pathlib.Path, timeout: int = 120) -> subprocess.CompletedP
 class TestExampleScripts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not _server_healthy(SPX_API_URL, timeout=5):
-            raise unittest.SkipTest(f"SPX server not healthy at {SPX_API_URL}")
+        if not _server_healthy(SPX_BASE_URL, timeout=5):
+            raise unittest.SkipTest(f"SPX server not healthy at {SPX_BASE_URL}")
 
     def test_example_runs_without_errors(self):
         for script_path in EXAMPLE_SCRIPTS:

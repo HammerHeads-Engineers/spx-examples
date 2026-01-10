@@ -37,7 +37,7 @@ BROKER_CONTAINER_PORT = int(
 MODEL_PATH = Path("library/domains/iot/generic/environment_sensor__mqtt.yaml")
 MODEL_KEY = "tests__generic_mqtt_environment_sensor"
 INSTANCE_KEY = "tests_generic_mqtt_environment_sensor_inst"
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
 COMMAND_SETPOINT_TOPIC = "spx/examples/env/command/setpoint_c"
@@ -68,7 +68,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run MQTT integration tests.")
 
-        cls._spx_client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._spx_client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         model_def = load_model_definition(MODEL_PATH)
 
         model_def["communication"][0]["mqtt"]["broker"] = BROKER_CONTAINER_HOST

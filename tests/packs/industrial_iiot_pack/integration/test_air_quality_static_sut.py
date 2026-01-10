@@ -10,7 +10,7 @@ import tests.shared.integration.air_quality_static_sut as shared_aq
 from tests.common.spx_utils import require_existing_instance
 
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEY = "spx_air_quality_feed"
 MODEL_ID = "Env.AirQualityStation.Http"
 
@@ -32,7 +32,7 @@ class TestAirQualityStaticSUTIntegration(shared_aq.TestAirQualityStaticSUTIntegr
                 f"{shared_aq.SPX_PRODUCT_KEY_ENV} must be set to run Air Quality integration tests."
             )
 
-        cls._spx_client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._spx_client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._spx_client,
             INSTANCE_KEY,

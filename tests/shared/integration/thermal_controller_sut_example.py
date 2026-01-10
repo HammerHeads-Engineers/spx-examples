@@ -31,7 +31,7 @@ MODEL_PATH = (
 )
 MODEL_KEY = "tests__thermal_controller"
 INSTANCE_KEY = "generic_thermal_controller"
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
 def _try_call(fn) -> bool:
@@ -69,7 +69,7 @@ class TestThermalControllerSUTExampleIntegration(unittest.TestCase):
         ) = bootstrap_model_instance(
             spx_python,
             product_key=product_key,
-            base_url=SPX_API_URL,
+            base_url=SPX_BASE_URL,
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,

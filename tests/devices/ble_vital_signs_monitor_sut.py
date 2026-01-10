@@ -71,7 +71,7 @@ class BleVitalSignsMonitorSUT:
         spx_instance_key:
             Instance key to resolve in SPX mode (defaults to ``ble_vital_signs_monitor``).
         spx_base_url:
-            Base URL used when instantiating an SPX client (defaults to ``SPX_API_URL`` env or localhost).
+            Base URL used when instantiating an SPX client (defaults to ``SPX_BASE_URL`` env or localhost).
         spx_product_key:
             Product key used for SPX authentication (defaults to ``SPX_PRODUCT_KEY`` env).
         """
@@ -84,7 +84,7 @@ class BleVitalSignsMonitorSUT:
         self._spx_client = spx_client
         self._spx_instance = spx_instance
         self._spx_instance_key = spx_instance_key or self.DEFAULT_INSTANCE_KEY
-        self._spx_base_url = spx_base_url or os.environ.get("SPX_API_URL", "http://localhost:8000")
+        self._spx_base_url = spx_base_url or os.environ.get("SPX_BASE_URL", "http://localhost:8000")
         self._spx_product_key = spx_product_key or os.environ.get("SPX_PRODUCT_KEY")
 
         if client_factory is not None:

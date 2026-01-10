@@ -1646,14 +1646,14 @@ files = [
 
 [[package]]
 name = "spx-python"
-version = "1.0.0rc2"
+version = "1.0.0rc3"
 description = "A Python library for managing spx server."
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "spx_python-1.0.0rc2-py3-none-any.whl", hash = "sha256:76570d04cfcafccea7b5aac4f78f67da57906cddb156c2f68e743b77f1e84232"},
-    {file = "spx_python-1.0.0rc2.tar.gz", hash = "sha256:40b320d0da72c72067e0fbc6951f7b44a36d3b6035fecd1eee7d19f9e53ab29d"},
+    {file = "spx_python-1.0.0rc3-py3-none-any.whl", hash = "sha256:46e5e14e3f0f47d0498aa68d401dc3c78ed1051ef6ce7a14938fc18b47cca4a9"},
+    {file = "spx_python-1.0.0rc3.tar.gz", hash = "sha256:4d882b596ecee97eec1e2e1c89c083a155c7e5e4be42c097a620613bf9c2c0f9"},
 ]
 
 [package.dependencies]
@@ -2187,4 +2187,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "d04fc436fbbef4846096878e9f13befd2c09ce299bb0e9a78873138f1aaa6b67"
+content-hash = "0581dbda9b969ca71c527f7e0f799121822e2c79f5ee26235a8d2e7120e39bcb"

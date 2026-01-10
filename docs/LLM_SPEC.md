@@ -17,6 +17,7 @@ Single source of truth for LLM and agent contributions.
 - Keep file names `lower_snake_case`; for new or updated models, align `name` with the file stem.
 - For new or updated models, include `name`, `description`, and `attributes` when feasible (legacy models may omit `name` or `description`).
 - Consult `library/industries/<pack>/SPEC.md` when changing a specific pack.
+- When writing tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 - Add scenario `description` or `display_name` for user-facing scenarios.
 - If you use time-aware actions (`ramp`, `saw`, `interpolate`, `pid`), include `timer` config
   or confirm the stack provides a timer component.

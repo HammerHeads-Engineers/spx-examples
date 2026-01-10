@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-      SPX_API_URL: http://localhost:8000
+      SPX_BASE_URL: http://localhost:8000
     strategy:
       fail-fast: false
       matrix:
@@ -88,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-      SPX_API_URL: http://localhost:8000
+      SPX_BASE_URL: http://localhost:8000
       MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
       OPEN_METEO_TEST_HOST: 127.0.0.1
       AIR_QUALITY_TEST_HOST: 127.0.0.1

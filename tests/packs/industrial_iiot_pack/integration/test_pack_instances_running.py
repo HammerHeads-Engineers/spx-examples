@@ -9,7 +9,7 @@ from typing import Optional
 from tests.common.spx_utils import require_existing_instance, wait_for_condition
 
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 INSTANCE_KEYS = [
     "spx_eurotherm_3216_temp",
@@ -71,7 +71,7 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
-        cls._client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instances = {
             key: require_existing_instance(cls._client, key, ensure_running=False)
             for key in INSTANCE_KEYS

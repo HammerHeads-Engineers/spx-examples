@@ -526,7 +526,7 @@ except Exception:  # pragma: no cover
     spx_python = None
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_API = os.environ.get("SPX_API_URL", "http://localhost:8000")
+DEFAULT_API = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
 def load_bundle(path: Path) -> Dict[str, Any]:

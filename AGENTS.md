@@ -28,6 +28,7 @@ This file is the entry point for automated agents and contributors.
 ## How to add tests
 - Use pytest under `tests/` and follow existing fixtures in `tests/conftest.py`.
 - Pack-specific integration tests live in `tests/packs/<pack>/integration/`.
+- For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
 ## Local validation and tests
 ```bash

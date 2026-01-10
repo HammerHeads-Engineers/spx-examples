@@ -8,7 +8,7 @@ import tests.shared.integration.modbus_vacuum_gauge_multichannel_sut_example as 
 from tests.common.spx_utils import require_existing_instance
 
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEY = "spx_vacuum_gauge_multichannel"
 MODEL_ID = "Process.VacuumGaugeMultichannel.Modbus"
 
@@ -35,7 +35,7 @@ class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
         cls._spx = spx_python
-        cls._client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._client,
             INSTANCE_KEY,

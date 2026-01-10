@@ -16,7 +16,7 @@ from tests.devices.ble_vital_signs_monitor_sut import BleVitalSignsMonitorSUT
 class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
     """Validates the BLE facade against a running SPX vital signs instance."""
 
-    SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+    SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
     INSTANCE_KEY = "spx_health_monitor_ble"
     MODEL_ID = "Embedded.HealthMonitor.BleGatt"
 
@@ -31,7 +31,7 @@ class TestBleVitalSignsMonitorSUTIntegration(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run BLE SUT tests.")
 
-        cls._spx_client = spx_python.init(address=cls.SPX_API_URL, product_key=product_key)
+        cls._spx_client = spx_python.init(address=cls.SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._spx_client,
             cls.INSTANCE_KEY,

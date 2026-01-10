@@ -15,6 +15,7 @@ This repository is prepared for LLM-first contributions so expanding or using SP
 - `docs/LLM_TASK_TEMPLATE.md` standardizes the LLM work plan and PR summary.
 - `library/industries/<pack>/SPEC.md` captures per-pack guidance and expectations.
 - `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
+- For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
 ## Quickstart
 
@@ -31,7 +32,7 @@ Follow these steps after cloning the repository to start a local SPX server, see
      ```bash
      cat <<'EOF' > .env
      SPX_PRODUCT_KEY=your-product-key
-     # SPX_API_URL=http://localhost:8000
+     # SPX_BASE_URL=http://localhost:8000
      EOF
      ```
    - Docker Compose and the test suite both read these variables, so keeping them in `.env` keeps everything in sync.
@@ -84,7 +85,7 @@ Industry packs group models, services, and quickstart profiles around a specific
 - `docker compose up` fails with `Conflict. The container name "/spx-server" is already in use` — stop/remove the existing container (`docker rm -f spx-server`) or tear down the other stack (installer bundles use the same container name).
 - `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
 - Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
-- Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_API_URL` if you are not using `http://localhost:8000`.
+- Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_BASE_URL` if you are not using `http://localhost:8000`.
 
 ## Installer workflow
 

@@ -8,7 +8,7 @@ import tests.shared.integration.mqtt_environment_sensor_sut_example as shared_mq
 from tests.common.spx_utils import require_existing_instance
 
 
-SPX_API_URL = os.environ.get("SPX_API_URL", "http://localhost:8000")
+SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEY = "spx_env_sensor_mqtt"
 MODEL_ID = "Env.EnvSensor.Mqtt"
 
@@ -38,7 +38,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run MQTT integration tests.")
 
-        cls._spx_client = spx_python.init(address=SPX_API_URL, product_key=product_key)
+        cls._spx_client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._spx_client,
             INSTANCE_KEY,
