@@ -48,6 +48,9 @@ jobs:
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
+      - name: Validate model definitions
+        run: poetry run python tools/validate_models.py
+
       - name: Start SPX server (Docker Compose)
         if: ${{ env.SPX_PRODUCT_KEY != '' }}
         run: docker compose up -d

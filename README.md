@@ -7,6 +7,15 @@ See the accompanying LICENSE file for terms.
 # spx-examples
 Runnable examples and best practices for the SPX ecosystem (SDK + Server). Covers components, models, actions, polling, PythonFile bindings, snapshots, and API v3 flows. Each example is self-contained with concise docs and tests to help you learn, prototype, and verify behavior.
 
+## LLM-first development
+
+This repository is prepared for LLM-first contributions so expanding or using SPX is straightforward with agent help:
+- `AGENTS.md` provides the onboarding flow, conventions, and local commands.
+- `docs/LLM_SPEC.md` and `docs/MODEL_LANGUAGE.md` define the contribution rules and model DSL.
+- `docs/LLM_TASK_TEMPLATE.md` standardizes the LLM work plan and PR summary.
+- `library/industries/<pack>/SPEC.md` captures per-pack guidance and expectations.
+- `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
+
 ## Quickstart
 
 Follow these steps after cloning the repository to start a local SPX server, seed demo models/instances by running the tests, and (optionally) bring up the UI via the installer.

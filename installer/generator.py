@@ -17,10 +17,10 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-# SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.43"
-SPX_SERVER_IMAGE = "spx-server:trial"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.45"
+# SPX_SERVER_IMAGE = "spx-server:trial"
 SPX_UI_SERVICE_NAME = "spx-ui"
-SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.35"
+SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.45"
 
 
 class DeploymentGenerator:

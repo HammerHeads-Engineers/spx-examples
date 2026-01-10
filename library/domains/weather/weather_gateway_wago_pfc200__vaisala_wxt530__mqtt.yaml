@@ -18,6 +18,12 @@ attributes:
     type: int
     default: 180
 
+  humidity_percent: 62.0
+  pressure_hpa: 1012.0
+  rain_rate_mm_h: 0.0
+  dew_point_c: -2.6
+  wind_chill_c: 1.8
+
   availability: "online"
   test_logs: []
 
@@ -159,7 +165,84 @@ attributes:
       }
     }
 
-actions: []
+  _ha_discovery_humidity_config: |-
+    {
+      "name": "Humidity",
+      "unique_id": "spx_weather_humidity",
+      "state_topic": "spx/weather/humidity_percent",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "%",
+      "device_class": "humidity",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  _ha_discovery_pressure_config: |-
+    {
+      "name": "Pressure",
+      "unique_id": "spx_weather_pressure",
+      "state_topic": "spx/weather/pressure_hpa",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "hPa",
+      "device_class": "pressure",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+  _ha_discovery_rain_rate_config: |-
+    {
+      "name": "Rain Rate",
+      "unique_id": "spx_weather_rain_rate",
+      "state_topic": "spx/weather/rain_rate_mm_h",
+      "availability_topic": "spx/weather/availability",
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "unit_of_measurement": "mm/h",
+      "device_class": "precipitation_intensity",
+      "state_class": "measurement",
+      "device": {
+        "identifiers": ["vaisala_wxt530_1"],
+        "manufacturer": "Vaisala",
+        "model": "WXT530 (Sim)",
+        "name": "Vaisala WXT530 Weather Transmitter",
+        "via_device": "wago_pfc200_gateway_1"
+      }
+    }
+
+actions:
+  - function: $in(dew_point_c)
+    name: Dew Point Estimate
+    description: Approximate dew point from ambient temperature and relative humidity.
+    call: |
+      (lambda rh:
+        $in(outdoor_temperature_c) - (100.0 - rh) / 5.0
+      )(max(0.0, min(100.0, $in(humidity_percent))))
+
+  - function: $in(wind_chill_c)
+    name: Wind Chill Estimate
+    description: Compute wind chill for cold/windy conditions; otherwise use ambient temperature.
+    call: |
+      (lambda t, v_kmh:
+        (13.12 + 0.6215 * t - 11.37 * (v_kmh ** 0.16) + 0.3965 * t * (v_kmh ** 0.16))
+        if (t <= 10.0 and v_kmh >= 4.68)
+        else t
+      )($in(outdoor_temperature_c), $in(wind_speed_ms) * 3.6)
 
 communication:
   - mqtt:
@@ -181,6 +264,14 @@ communication:
           topic: outdoor_temperature_c
           direction: publish
           publish_on_change: false
+        - attribute: $ext(humidity_percent)
+          topic: humidity_percent
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(pressure_hpa)
+          topic: pressure_hpa
+          direction: publish
+          publish_on_change: false
         - attribute: $ext(wind_speed_ms)
           topic: wind_speed_ms
           direction: publish
@@ -195,6 +286,10 @@ communication:
           publish_on_change: false
         - attribute: $ext(rain)
           topic: rain
+          direction: publish
+          publish_on_change: false
+        - attribute: $ext(rain_rate_mm_h)
+          topic: rain_rate_mm_h
           direction: publish
           publish_on_change: false
         - attribute: $ext(wind_direction_deg)
@@ -218,6 +313,16 @@ communication:
       bindings:
         - attribute: $ext(_ha_discovery_outdoor_temperature_config)
           topic: sensor/spx_weather_outdoor_temperature/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(_ha_discovery_humidity_config)
+          topic: sensor/spx_weather_humidity/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - attribute: $ext(_ha_discovery_pressure_config)
+          topic: sensor/spx_weather_pressure/config
           direction: publish
           retain: true
           publish_on_change: true
@@ -246,6 +351,11 @@ communication:
           direction: publish
           retain: true
           publish_on_change: true
+        - attribute: $ext(_ha_discovery_rain_rate_config)
+          topic: sensor/spx_weather_rain_rate/config
+          direction: publish
+          retain: true
+          publish_on_change: true
         - attribute: $ext(_ha_discovery_wind_direction_config)
           topic: sensor/spx_weather_wind_direction/config
           direction: publish
@@ -253,62 +363,416 @@ communication:
           publish_on_change: true
 
 scenarios:
-  clear_day:
-    enabled: true
+  Clear sunny day:
     duration: 20.0
     overrides:
       $in(outdoor_temperature_c): 22.0
+      $in(humidity_percent): 45.0
+      $in(pressure_hpa): 1018.0
       $in(wind_speed_ms): 2.5
       $in(wind_gust_ms): 5.0
       $in(brightness_lux): 48000.0
       $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
       $in(wind_direction_deg): 190
 
-  overcast_cool:
-    enabled: true
+  Overcast cool day:
     duration: 20.0
     overrides:
       $in(outdoor_temperature_c): 9.0
+      $in(humidity_percent): 72.0
+      $in(pressure_hpa): 1010.0
       $in(wind_speed_ms): 4.0
       $in(wind_gust_ms): 7.0
       $in(brightness_lux): 12000.0
       $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
       $in(wind_direction_deg): 230
 
-  rainy_breeze:
-    enabled: true
+  Rainy breeze:
     duration: 20.0
     overrides:
       $in(outdoor_temperature_c): 11.5
+      $in(humidity_percent): 88.0
+      $in(pressure_hpa): 1006.0
       $in(wind_speed_ms): 5.0
       $in(wind_gust_ms): 9.0
       $in(brightness_lux): 8000.0
       $in(rain): 1
+      $in(rain_rate_mm_h): 2.5
       $in(wind_direction_deg): 210
 
-  summer_storm:
-    enabled: true
+  Summer storm:
     duration: 20.0
     overrides:
       $in(outdoor_temperature_c): 18.0
+      $in(humidity_percent): 92.0
+      $in(pressure_hpa): 1002.0
       $in(wind_speed_ms): 12.0
       $in(wind_gust_ms): 22.0
       $in(brightness_lux): 4500.0
       $in(rain): 1
+      $in(rain_rate_mm_h): 15.0
       $in(wind_direction_deg): 265
 
-  cold_night:
-    enabled: true
+  Cold night:
     duration: 20.0
     overrides:
       $in(outdoor_temperature_c): -3.0
+      $in(humidity_percent): 78.0
+      $in(pressure_hpa): 1024.0
       $in(wind_speed_ms): 1.5
       $in(wind_gust_ms): 3.5
       $in(brightness_lux): 0.0
       $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
       $in(wind_direction_deg): 140
 
-  wind_sensor_noise:
+  Warm summer night:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): 23.0
+      $in(humidity_percent): 68.0
+      $in(pressure_hpa): 1016.0
+      $in(wind_speed_ms): 1.2
+      $in(wind_gust_ms): 2.5
+      $in(brightness_lux): 0.0
+      $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
+      $in(wind_direction_deg): 160
+
+  Foggy morning:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): 7.0
+      $in(humidity_percent): 98.0
+      $in(pressure_hpa): 1022.0
+      $in(wind_speed_ms): 0.8
+      $in(wind_gust_ms): 1.8
+      $in(brightness_lux): 600.0
+      $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
+      $in(wind_direction_deg): 80
+
+  Humid hot day:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): 30.0
+      $in(humidity_percent): 78.0
+      $in(pressure_hpa): 1009.0
+      $in(wind_speed_ms): 3.5
+      $in(wind_gust_ms): 6.0
+      $in(brightness_lux): 65000.0
+      $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
+      $in(wind_direction_deg): 170
+
+  Frosty high pressure:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): -8.0
+      $in(humidity_percent): 65.0
+      $in(pressure_hpa): 1032.0
+      $in(wind_speed_ms): 1.0
+      $in(wind_gust_ms): 2.5
+      $in(brightness_lux): 12000.0
+      $in(rain): 0
+      $in(rain_rate_mm_h): 0.0
+      $in(wind_direction_deg): 40
+
+  Tropical downpour:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): 26.0
+      $in(humidity_percent): 98.0
+      $in(pressure_hpa): 1003.0
+      $in(wind_speed_ms): 8.0
+      $in(wind_gust_ms): 15.0
+      $in(brightness_lux): 1200.0
+      $in(rain): 1
+      $in(rain_rate_mm_h): 35.0
+      $in(wind_direction_deg): 200
+
+  Blizzard whiteout:
+    duration: 20.0
+    overrides:
+      $in(outdoor_temperature_c): -9.0
+      $in(humidity_percent): 92.0
+      $in(pressure_hpa): 998.0
+      $in(wind_speed_ms): 14.0
+      $in(wind_gust_ms): 26.0
+      $in(brightness_lux): 400.0
+      $in(rain): 1
+      $in(rain_rate_mm_h): 6.0
+      $in(wind_direction_deg): 230
+
+  Frontal passage sequence:
+    duration: 60.0
+    conditions:
+      - if: $attr(timer.time) < 20.0
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params: {temp: 24.0}
+            call: temp
+          - function: $in(humidity_percent)
+            params: {humidity: 55.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params: {pressure: 1013.0}
+            call: pressure
+          - function: $in(wind_speed_ms)
+            params: {speed: 4.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 8.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 52000.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 0}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 0.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params: {direction: 190}
+            call: direction
+      - if: ($attr(timer.time) >= 20.0) and ($attr(timer.time) < 40.0)
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params:
+              temp_start: 24.0
+              temp_end: 13.0
+              ramp_start: 20.0
+              ramp_duration: 20.0
+            call: |
+              (lambda t:
+                temp_start + (temp_end - temp_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
+              )($attr(timer.time))
+          - function: $in(humidity_percent)
+            params: {humidity: 88.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params:
+              press_start: 1011.0
+              press_end: 1004.0
+              ramp_start: 20.0
+              ramp_duration: 20.0
+            call: |
+              (lambda t:
+                press_start + (press_end - press_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
+              )($attr(timer.time))
+          - function: $in(wind_speed_ms)
+            params: {speed: 14.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 26.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 2000.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 1}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 18.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params:
+              dir_start: 190.0
+              dir_end: 260.0
+              ramp_start: 20.0
+              ramp_duration: 20.0
+            call: |
+              (lambda t:
+                int(
+                  dir_start + (dir_end - dir_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
+                )
+              )($attr(timer.time))
+      - if: $attr(timer.time) >= 40.0
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params: {temp: 12.0}
+            call: temp
+          - function: $in(humidity_percent)
+            params: {humidity: 65.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params: {pressure: 1016.0}
+            call: pressure
+          - function: $in(wind_speed_ms)
+            params: {speed: 6.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 10.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 30000.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 0}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 0.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params: {direction: 270}
+            call: direction
+
+  Thunderstorm cell sequence:
+    duration: 40.0
+    conditions:
+      - if: $attr(timer.time) < 10.0
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params: {temp: 28.0}
+            call: temp
+          - function: $in(humidity_percent)
+            params: {humidity: 72.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params: {pressure: 1008.0}
+            call: pressure
+          - function: $in(wind_speed_ms)
+            params: {speed: 3.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 6.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 62000.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 0}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 0.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params: {direction: 170}
+            call: direction
+      - if: ($attr(timer.time) >= 10.0) and ($attr(timer.time) < 25.0)
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params:
+              temp_start: 28.0
+              temp_end: 20.0
+              ramp_start: 10.0
+              ramp_duration: 15.0
+            call: |
+              (lambda t:
+                temp_start + (temp_end - temp_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
+              )($attr(timer.time))
+          - function: $in(humidity_percent)
+            params: {humidity: 95.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params: {pressure: 1002.0}
+            call: pressure
+          - function: $in(wind_speed_ms)
+            params: {speed: 10.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 24.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 1200.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 1}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 28.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params: {direction: 210}
+            call: direction
+      - if: $attr(timer.time) >= 25.0
+        actions:
+          - function: $in(outdoor_temperature_c)
+            params: {temp: 21.0}
+            call: temp
+          - function: $in(humidity_percent)
+            params: {humidity: 70.0}
+            call: humidity
+          - function: $in(pressure_hpa)
+            params: {pressure: 1011.0}
+            call: pressure
+          - function: $in(wind_speed_ms)
+            params: {speed: 4.0}
+            call: speed
+          - function: $in(wind_gust_ms)
+            params: {gust: 8.0}
+            call: gust
+          - function: $in(brightness_lux)
+            params: {brightness: 32000.0}
+            call: brightness
+          - function: $in(rain)
+            params: {rain_state: 0}
+            call: rain_state
+          - function: $in(rain_rate_mm_h)
+            params: {rate: 0.0}
+            call: rate
+          - function: $in(wind_direction_deg)
+            params: {direction: 230}
+            call: direction
+
+  Squall line bursts:
+    duration: 45.0
+    actions:
+      - function: $in(outdoor_temperature_c)
+        params: {temp: 18.0}
+        call: temp
+      - function: $in(humidity_percent)
+        params: {humidity: 76.0}
+        call: humidity
+      - function: $in(pressure_hpa)
+        params: {pressure: 1005.0}
+        call: pressure
+      - function: $in(wind_speed_ms)
+        params: {speed: 8.0}
+        call: speed
+      - function: $in(wind_direction_deg)
+        params: {direction: 250}
+        call: direction
+      - function: $in(wind_gust_ms)
+        params:
+          base_gust: 12.0
+          burst_gust: 28.0
+          period: 8.0
+          burst_window: 2.0
+        call: |
+          (lambda t:
+            burst_gust if (t % period) < burst_window else base_gust
+          )($attr(timer.time))
+      - function: $in(rain_rate_mm_h)
+        params:
+          base_rate: 0.0
+          burst_rate: 12.0
+          period: 8.0
+          burst_window: 2.0
+        call: |
+          (lambda t:
+            burst_rate if (t % period) < burst_window else base_rate
+          )($attr(timer.time))
+      - function: $in(rain)
+        params:
+          period: 8.0
+          burst_window: 2.0
+        call: 1 if (($attr(timer.time) % period) < burst_window) else 0
+      - function: $in(brightness_lux)
+        params:
+          base_brightness: 14000.0
+          storm_brightness: 3500.0
+          period: 8.0
+          burst_window: 2.0
+        call: |
+          (lambda t:
+            storm_brightness if (t % period) < burst_window else base_brightness
+          )($attr(timer.time))
+
+  Wind sensor noise:
     actions:
       - noise: $out(wind_speed_ms)
         name: Wind Speed Noise
