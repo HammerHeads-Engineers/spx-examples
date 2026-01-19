@@ -179,6 +179,18 @@ jobs:
           done
           echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
 
+      - name: Wait for Home Assistant
+        if: ${{ steps.gate.outputs.enabled == 'true' && matrix.pack == 'smart_building_pack' }}
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            status="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/api/ || true)"
+            if [ "$status" = "200" ] || [ "$status" = "401" ]; then
+              echo "Home Assistant API is reachable (HTTP ${status})"; exit 0; fi
+            echo "Waiting for Home Assistant... ($i/60)"; sleep 2;
+          done
+          echo "Home Assistant did not become reachable on http://localhost:8123/api/"; exit 1
+
       - name: Run pack tests
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
