@@ -204,10 +204,15 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
 
         attrs = weather_instance["attributes"]
         brightness_attr = attrs["brightness_lux"]
+        temperature_attr = attrs["outdoor_temperature_c"]
         initial_brightness = _spx_attr_float(brightness_attr)
         if initial_brightness is None:
             self.fail("Could not read initial brightness_lux from SPX weather instance.")
+        initial_temperature = _spx_attr_float(temperature_attr)
+        if initial_temperature is None:
+            self.fail("Could not read initial outdoor_temperature_c from SPX weather instance.")
         self._log_step("brightness_initial", value=initial_brightness)
+        self._log_step("temperature_initial", value=initial_temperature)
 
         switch_attrs = switch_instance["attributes"]
         cover_attrs = cover_instance["attributes"]
@@ -248,6 +253,12 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
                 brightness_attr.internal_value = value
             else:
                 weather_instance.put_attr("attributes/brightness_lux", value)
+
+        def _set_temperature(value: float) -> None:
+            if hasattr(temperature_attr, "internal_value"):
+                temperature_attr.internal_value = value
+            else:
+                weather_instance.put_attr("attributes/outdoor_temperature_c", value)
 
         def _set_cover_attr(attr_name: str, value: object) -> None:
             try:
@@ -355,33 +366,35 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
         closed_positions = _wait_for_blinds_position(closed_target, "closed")
         self._log_step("blinds_closed_state", expected=closed_target, actual=closed_positions)
 
-        if initial_brightness < BRIGHTNESS_THRESHOLD:
-            first_value = BRIGHTNESS_HIGH
-            first_expected = 0
-            second_value = BRIGHTNESS_LOW
-            second_expected = 1
-        else:
-            first_value = BRIGHTNESS_LOW
-            first_expected = 1
-            second_value = BRIGHTNESS_HIGH
-            second_expected = 0
+        first_brightness = 48000.0
+        first_temperature = 30.0
+        first_expected = 0
+
+        second_brightness = 600.0
+        second_temperature = 10.0
+        second_expected = 1
 
         try:
-            _set_brightness(first_value)
-            self._log_step("set_brightness", value=first_value)
+            _set_temperature(first_temperature)
+            self._log_step("set_temperature", value=first_temperature)
+            _set_brightness(first_brightness)
+            self._log_step("set_brightness", value=first_brightness)
             cover_positions = _wait_for_blinds_change(closed_positions, "from closed")
             self._log_step("blinds_state", expected="moved_from_closed", actual=cover_positions)
             switch_states = _wait_for_switches(first_expected)
             self._log_step("switches_state", expected=first_expected, actual=switch_states)
 
-            _set_brightness(second_value)
-            self._log_step("set_brightness", value=second_value)
+            _set_temperature(second_temperature)
+            self._log_step("set_temperature", value=second_temperature)
+            _set_brightness(second_brightness)
+            self._log_step("set_brightness", value=second_brightness)
             switch_states = _wait_for_switches(second_expected)
             self._log_step("switches_state", expected=second_expected, actual=switch_states)
 
         finally:
             try:
                 _set_brightness(initial_brightness)
+                _set_temperature(initial_temperature)
             except Exception:
                 pass
 
