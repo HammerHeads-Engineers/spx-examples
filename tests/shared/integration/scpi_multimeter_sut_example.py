@@ -459,7 +459,7 @@ class TestScpiMultimeterSUTExample(unittest.TestCase):
             self._ensure_scenario_stopped("ascii_response_delay_spike")
 
     def test_discharge_spike_scenario_overrides_voltage_once(self):
-        unittest.skip("Flaky test, needs investigation")
+        self.skipTest("Flaky test, needs investigation")
         scenarios = self.instance["scenarios"]
         scenario = scenarios["discharge_spike"]
         attr = self.instance["attributes"]["voltage"]
