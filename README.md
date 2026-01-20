@@ -60,6 +60,7 @@ Follow these steps after cloning the repository to start a local SPX server, see
 
 6. **Explore the playground**
    - API docs: [http://localhost:8000/docs](http://localhost:8000/docs) (OpenAPI JSON at [http://localhost:8000/docs/openapi.json](http://localhost:8000/docs/openapi.json)).
+   - SPX documentation: [https://docs.simplephysx.com](https://docs.simplephysx.com).
    - SPX UI (optional): generate a bundle with the installer including UI, start it, then open [http://localhost:3000](http://localhost:3000).
 
 When you are done, tear everything down with:
