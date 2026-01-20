@@ -311,17 +311,17 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
         try:
             _set_brightness(first_value)
             self._log_step("set_brightness", value=first_value)
-            switch_states = _wait_for_switches(first_expected)
-            self._log_step("switches_state", expected=first_expected, actual=switch_states)
             cover_positions = _wait_for_blinds_open()
             self._log_step("blinds_state", expected=open_target, actual=cover_positions)
+            switch_states = _wait_for_switches(first_expected)
+            self._log_step("switches_state", expected=first_expected, actual=switch_states)
 
             _set_brightness(second_value)
             self._log_step("set_brightness", value=second_value)
-            switch_states = _wait_for_switches(second_expected)
-            self._log_step("switches_state", expected=second_expected, actual=switch_states)
             cover_positions = _wait_for_blinds_open()
             self._log_step("blinds_state", expected=open_target, actual=cover_positions)
+            switch_states = _wait_for_switches(second_expected)
+            self._log_step("switches_state", expected=second_expected, actual=switch_states)
 
         finally:
             try:
