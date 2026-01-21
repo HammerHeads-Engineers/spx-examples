@@ -252,6 +252,8 @@ jobs:
     concurrency: release
     needs: tests
     if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+    env:
+      SPX_PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
     steps:
       - name: Setup | Checkout Repository at workflow sha
         uses: actions/checkout@v4
@@ -304,13 +306,13 @@ jobs:
             --clobber
 
       - name: Skip GitHub Packages upload (missing SPX_PACKAGES_TOKEN)
-        if: steps.release.outputs.released == 'true' && secrets.SPX_PACKAGES_TOKEN == ''
+        if: steps.release.outputs.released == 'true' && env.SPX_PACKAGES_TOKEN == ''
         run: echo "SPX_PACKAGES_TOKEN not set; skipping GitHub Packages upload."
 
       - name: Publish installer to GitHub Packages
-        if: steps.release.outputs.released == 'true' && secrets.SPX_PACKAGES_TOKEN != ''
+        if: steps.release.outputs.released == 'true' && env.SPX_PACKAGES_TOKEN != ''
         env:
-          PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
+          PACKAGES_TOKEN: ${{ env.SPX_PACKAGES_TOKEN }}
         run: |
           PKG_NAME="spx-installer"
           VERSION="${{ steps.release.outputs.tag }}"
