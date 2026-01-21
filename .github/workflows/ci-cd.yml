@@ -303,10 +303,14 @@ jobs:
             "dist/spx-installer-${tag}.ps1" \
             --clobber
 
+      - name: Skip GitHub Packages upload (missing SPX_PACKAGES_TOKEN)
+        if: steps.release.outputs.released == 'true' && secrets.SPX_PACKAGES_TOKEN == ''
+        run: echo "SPX_PACKAGES_TOKEN not set; skipping GitHub Packages upload."
+
       - name: Publish installer to GitHub Packages
-        if: steps.release.outputs.released == 'true'
+        if: steps.release.outputs.released == 'true' && secrets.SPX_PACKAGES_TOKEN != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
         run: |
           PKG_NAME="spx-installer"
           VERSION="${{ steps.release.outputs.tag }}"
@@ -314,7 +318,7 @@ jobs:
             local file="$1"
             curl -L \
               -X PUT \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
               -H "Content-Type: application/octet-stream" \
               --data-binary @"${file}" \
               "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
