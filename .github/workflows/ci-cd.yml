@@ -283,3 +283,42 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
+
+      - name: Build installer artifacts
+        if: steps.release.outputs.released == 'true'
+        run: |
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh --package-name "spx-installer"
+          scripts/build_self_extractors.sh --version "${{ steps.release.outputs.tag }}"
+
+      - name: Upload installer assets to GitHub Release
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.release.outputs.tag }}"
+          gh release upload "${tag}" \
+            "dist/spx-installer.tgz" \
+            "dist/spx-installer-${tag}.run" \
+            "dist/spx-installer-${tag}.ps1" \
+            --clobber
+
+      - name: Publish installer to GitHub Packages
+        if: steps.release.outputs.released == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PKG_NAME="spx-installer"
+          VERSION="${{ steps.release.outputs.tag }}"
+          upload_pkg() {
+            local file="$1"
+            curl -L \
+              -X PUT \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"${file}" \
+              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
+          }
+          upload_pkg "dist/spx-installer.tgz"
+          upload_pkg "dist/spx-installer-${VERSION}.run"
+          upload_pkg "dist/spx-installer-${VERSION}.ps1"
