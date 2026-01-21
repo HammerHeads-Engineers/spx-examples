@@ -1,0 +1,225 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: evse__ocpp
+description: |
+  Simulated OCPP 1.6J charge point (EVSE) that boots against an SPX-hosted central
+  system, publishes status and meter values once per connection, and tracks a single
+  connector. Mirrors the BootNotification/Heartbeat flows covered by the spx-server
+  integration tests while adding StatusNotification + MeterValues telemetry.
+
+attributes:
+  cp_vendor: "Hammerheads EV"
+  cp_model: "SPX-EVSE"
+  cp_serial: "SPX-EVSE-01"
+  firmware_version: "1.0.0"
+  boot_status: ""
+  heartbeat_interval_s: 30
+  last_heartbeat_time: "2025-01-01T00:00:00Z"
+
+  ocpp_status: "Available"
+  error_code: "NoError"
+  status_info: ""
+  status_text: "Available / idle"
+  active_connector: 1
+  session_active: 0
+  transaction_id: 9001
+
+  commanded_current_a: 16.0
+  max_current_a: 32.0
+  current_a: 0.0
+  voltage_v: 400.0
+  power_kw: 0.0
+
+  energy_wh: 1200.0
+  session_energy_wh: 0.0
+  meter_timestamp: "2025-01-01T00:00:00Z"
+  meter_values_payload: []
+
+actions:
+  - function: $in(ocpp_status)
+    name: derive_status_from_session
+    description: Derive connector status from session / fault flags.
+    call: (
+          "Faulted" if $in(error_code) != "NoError"
+          else ("Charging" if $in(session_active) == 1 else "Available")
+        )
+
+  - function: $in(current_a)
+    name: clamp_current
+    description: Apply basic current limit and zero-out when idle.
+    call: (
+          0.0
+          if $in(ocpp_status) != "Charging"
+          else max(0.0, min($in(max_current_a), $in(commanded_current_a)))
+        )
+
+  - function: $in(power_kw)
+    name: derive_power
+    description: Compute active power from voltage and current.
+    call: round(max(0.0, ($in(voltage_v) * $in(current_a)) / 1000.0), 3)
+
+  - function: $in(energy_wh)
+    name: accumulate_energy
+    description: Integrate energy while charging (approx 1 s cadence).
+    call: (
+          $in(energy_wh)
+          + (($in(power_kw) * 1000.0) / 3600.0)
+          if $in(ocpp_status) == "Charging"
+          else $in(energy_wh)
+        )
+
+  - function: $in(session_energy_wh)
+    name: accumulate_session_energy
+    description: Track per-session energy and reset when idle.
+    call: (
+          0.0
+          if $in(session_active) == 0 or $in(ocpp_status) != "Charging"
+          else $in(session_energy_wh) + (($in(power_kw) * 1000.0) / 3600.0)
+        )
+
+  - function: $in(meter_timestamp)
+    name: sync_meter_timestamp
+    description: Reuse the last heartbeat time for meter samples.
+    call: $in(last_heartbeat_time)
+
+  - function: $in(meter_values_payload)
+    name: build_meter_values_payload
+    description: Prepare a single-sample MeterValues payload for the connector.
+    call: |
+          [
+            {
+              "timestamp": $in(meter_timestamp),
+              "sampledValue": [
+                {
+                  "value": str(round($in(energy_wh), 1)),
+                  "measurand": "Energy.Active.Import.Register",
+                  "unit": "Wh",
+                },
+                {
+                  "value": str(round($in(power_kw) * 1000.0, 1)),
+                  "measurand": "Power.Active.Import",
+                  "unit": "W",
+                },
+                {
+                  "value": str(round($in(current_a), 2)),
+                  "measurand": "Current.Import",
+                  "unit": "A",
+                },
+                {
+                  "value": str(round($in(voltage_v), 1)),
+                  "measurand": "Voltage",
+                  "unit": "V",
+                },
+              ],
+            }
+          ]
+
+  - function: $in(status_text)
+    name: render_status_text
+    description: Human-friendly status for dashboards.
+    call: (
+          ($in(ocpp_status) + " (" + $in(error_code) + ")")
+          if $in(error_code) != "NoError"
+          else (
+            $in(ocpp_status)
+            + (
+              " tx=" + str(int($in(transaction_id)))
+              if $in(session_active) == 1
+              else " idle"
+            )
+          )
+        )
+
+communication:
+  - ocpp:
+      role: charge_point
+      endpoint: "ws://localhost:9000/ocpp"
+      subprotocol: "ocpp1.6"
+      charge_point_id: "spx-evse-01"
+      bindings:
+        boot_notification:
+          direction: outbound
+          frame_type: call
+          action: BootNotification
+          payload:
+            chargePointVendor: "#attr(cp_vendor)"
+            chargePointModel: "#attr(cp_model)"
+            chargePointSerialNumber: "#attr(cp_serial)"
+            firmwareVersion: "#attr(firmware_version)"
+        boot_notification_response:
+          direction: inbound
+          frame_type: call_result
+          action: BootNotification
+          payload:
+            status: "#attr(boot_status)"
+            currentTime: "#attr(last_heartbeat_time)"
+            interval: "#attr(heartbeat_interval_s)"
+        heartbeat:
+          direction: outbound
+          frame_type: call
+          action: Heartbeat
+          interval: 30.0
+          payload: {}
+        heartbeat_response:
+          direction: inbound
+          frame_type: call_result
+          action: Heartbeat
+          payload:
+            currentTime: "#attr(last_heartbeat_time)"
+        status_notification:
+          direction: outbound
+          frame_type: call
+          action: StatusNotification
+          interval: 6.0
+          payload:
+            connectorId: "#attr(active_connector)"
+            status: "#attr(ocpp_status)"
+            errorCode: "#attr(error_code)"
+            info: "#attr(status_info)"
+            vendorId: "#attr(cp_vendor)"
+        status_notification_response:
+          direction: inbound
+          frame_type: call_result
+          action: StatusNotification
+          payload: {}
+        meter_values:
+          direction: outbound
+          frame_type: call
+          action: MeterValues
+          interval: 5.0
+          payload:
+            connectorId: "#attr(active_connector)"
+            transactionId: "#attr(transaction_id)"
+            meterValue: "#attr(meter_values_payload)"
+        meter_values_response:
+          direction: inbound
+          frame_type: call_result
+          action: MeterValues
+          payload: {}
+
+scenarios:
+  idle_available:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(session_active): 0
+      $in(commanded_current_a): 0.0
+      $in(error_code): "NoError"
+      $in(status_info): "waiting for EV"
+  session_charging:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(session_active): 1
+      $in(commanded_current_a): 24.0
+      $in(transaction_id): 9001
+      $in(status_info): "charging demo session"
+  fault_ground:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(session_active): 0
+      $in(error_code): "GroundFailure"
+      $in(status_info): "RCD tripped"

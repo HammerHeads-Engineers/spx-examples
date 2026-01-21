@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: MIT
+
+name: io_module__modbus
+description: |
+  Simple remote I/O module exposing digital inputs/outputs and analog inputs
+  over Modbus. Useful for testing PLC mappings and edge gateways.
+
+attributes:
+  di_1: 0
+  di_2: 0
+  di_3: 0
+  di_4: 0
+  do_1: 0
+  do_2: 0
+  do_3: 0
+  do_4: 0
+
+  ai_1: 0.0   # e.g., 4-20 mA scaled engineering value
+  ai_2: 0.0
+  ai_3: 0.0
+  ai_4: 0.0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.1
+      mapping:
+        di_1: { address: [0,0], group: h_r, type: uint_16 }
+        di_2: { address: [1,1], group: h_r, type: uint_16 }
+        di_3: { address: [2,2], group: h_r, type: uint_16 }
+        di_4: { address: [3,3], group: h_r, type: uint_16 }
+        do_1: { address: [4,4], group: c_o, type: uint_16 }
+        do_2: { address: [5,5], group: c_o, type: uint_16 }
+        do_3: { address: [6,6], group: c_o, type: uint_16 }
+        do_4: { address: [7,7], group: c_o, type: uint_16 }
+        ai_1: { address: [8,9], group: h_r, type: float }
+        ai_2: { address: [10,11], group: h_r, type: float }
+        ai_3: { address: [12,13], group: h_r, type: float }
+        ai_4: { address: [14,15], group: h_r, type: float }
+
+scenarios:
+  all_clear:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(di_1): 0
+      $in(di_2): 0
+      $in(di_3): 0
+      $in(di_4): 0
+      $in(do_1): 0
+      $in(do_2): 0
+      $in(do_3): 0
+      $in(do_4): 0
+      $in(ai_1): 4.0
+      $in(ai_2): 4.5
+      $in(ai_3): 5.0
+      $in(ai_4): 5.5
+
+  alarm_trip:
+    enabled: true
+    duration: 8.0
+    overrides:
+      $in(di_1): 1
+      $in(di_2): 1
+      $in(di_3): 0
+      $in(di_4): 0
+      $in(do_1): 1
+      $in(do_2): 1
+      $in(do_3): 0
+      $in(do_4): 0
+      $in(ai_1): 18.5
+      $in(ai_2): 19.0
+      $in(ai_3): 2.0
+      $in(ai_4): 2.2
+
+  analog_ramp_high:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(di_1): 0
+      $in(di_2): 1
+      $in(di_3): 0
+      $in(di_4): 1
+      $in(do_1): 0
+      $in(do_2): 0
+      $in(do_3): 1
+      $in(do_4): 1
+      $in(ai_1): 15.0
+      $in(ai_2): 12.0
+      $in(ai_3): 8.0
+      $in(ai_4): 6.0
+
+  maintenance_loopback:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(di_1): 1
+      $in(di_2): 0
+      $in(di_3): 1
+      $in(di_4): 0
+      $in(do_1): 1
+      $in(do_2): 0
+      $in(do_3): 1
+      $in(do_4): 0
+      $in(ai_1): 10.0
+      $in(ai_2): 10.0
+      $in(ai_3): 10.0
+      $in(ai_4): 10.0

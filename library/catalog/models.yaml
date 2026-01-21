@@ -1,0 +1,414 @@
+models:
+  - id: Env.EnvSensor.Mqtt
+    name: MQTT Environment Sensor
+    path: library/domains/iot/generic/environment_sensor__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [smart_building_pack, energy_pack, embedded_lab_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, iiot_monitoring]
+  - id: Env.EnvSensor.Lwm2m
+    name: LwM2M Environment Sensor
+    path: library/domains/iot/generic/environment_sensor__lwm2m.yaml
+    domain: iot
+    protocols: [lwm2m, coap]
+    services:
+      - id: lwm2m_server
+    packages: [smart_building_pack, embedded_lab_pack]
+    profiles: [bms_quickstart]
+  - id: Env.AirQualityStation.Http
+    name: Air Quality Station (HTTP)
+    path: library/domains/iot/generic/air_quality_station__http.yaml
+    domain: iot
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [smart_building_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, iiot_monitoring]
+  - id: Building.BMSController.OpcUa
+    name: BMS Controller (OPC UA)
+    path: library/domains/iot/generic/bms_controller__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.LightingPanel.OpcUa
+    name: Lighting Panel (OPC UA)
+    path: library/domains/iot/generic/lighting_panel__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.RoomController.Knx
+    name: Room Controller (KNX)
+    path: library/domains/iot/generic/room_controller__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.LightingZone.Knx
+    name: Lighting Zone (KNX)
+    path: library/domains/iot/generic/lighting_zone__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.PresenceDetector.ThebenP360.Knx
+    name: Presence Detector (Theben theRonda P360 KNX)
+    path: library/domains/iot/theben/theronda_p360__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
+    name: ABB SA/S12.16.5.1 Switch Actuator (KNX)
+    path: library/domains/iot/abb/abb_sa_s12_16_5_1__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.CoverActuator.AbbJraS4_230_5_1.Knx
+    name: ABB JRA/S 4.230.5.1 Cover Actuator (KNX)
+    path: library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml
+    domain: iot
+    protocols: [knx]
+    services:
+      - id: knx_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.Thermostat.Matter
+    name: Thermostat (Matter)
+    path: library/domains/iot/generic/thermostat__matter.yaml
+    domain: iot
+    protocols: [matter]
+    services:
+      - id: matter_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.SmartPlug.Matter
+    name: Smart Plug / Relay (Matter)
+    path: library/domains/iot/generic/smart_plug__matter.yaml
+    domain: iot
+    protocols: [matter]
+    services:
+      - id: matter_server
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.FireAlarmPanel.Bacnet
+    name: Fire Alarm Panel (BACnet)
+    path: library/domains/iot/generic/fire_alarm_panel__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.SecurityAccessController.Bacnet
+    name: Security Access Controller (BACnet)
+    path: library/domains/iot/generic/security_access_controller__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Building.HvacFlexitNordic.Bacnet
+    name: Flexit Nordic HVAC (BACnet)
+    path: library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
+    domain: iot
+    protocols: [bacnet]
+    services:
+      - id: bacnet_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Weather.WeatherFeed.Http
+    name: Weather Forecast Feed
+    path: library/domains/weather/weather_forecast__http.yaml
+    domain: weather
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [smart_building_pack, energy_pack]
+    profiles: [bms_quickstart, ev_csms_demo]
+  - id: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
+    name: Weather Gateway (WAGO PFC200 + Vaisala WXT530, MQTT Discovery)
+    path: library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
+    domain: weather
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Process.ThermalController.Modbus
+    name: Thermal Controller (Modbus)
+    path: library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
+  - id: Process.PressureController.Eurotherm3504.Modbus
+    name: Eurotherm 3504 Pressure Controller (Modbus TCP)
+    path: library/domains/thermal_controllers/eurotherm/eurotherm_3504__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Process.ThermalController.Eurotherm3216.Modbus
+    name: Eurotherm 3216 Temperature Controller (Modbus TCP)
+    path: library/domains/thermal_controllers/eurotherm/eurotherm_3216__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Process.ThermalController.Advanced
+    name: Thermal Controller (Advanced)
+    path: library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml
+    domain: thermal_controllers
+    protocols: []
+    services: []
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
+    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
+  - id: Motion.StepperController.Modbus
+    name: Stepper Controller (Modbus)
+    path: library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Process.VacuumGauge.Modbus
+    name: Vacuum Gauge (Modbus)
+    path: library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
+    domain: vacuum_systems
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: [scpi_lab, process_cell_quickstart]
+  - id: Process.VacuumGaugeMultichannel.Modbus
+    name: Vacuum Gauge Multichannel (Modbus)
+    path: library/domains/vacuum_systems/generic/vacuum_gauge_multichannel__modbus.yaml
+    domain: vacuum_systems
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: []
+  - id: Lab.Multimeter.Scpi
+    name: SCPI Multimeter
+    path: library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack, industrial_iiot_pack]
+    profiles: [scpi_lab, iiot_monitoring]
+  - id: Embedded.HealthMonitor.BleGatt
+    name: BLE Vital Signs Monitor
+    path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
+    domain: ble
+    protocols: [ble]
+    services:
+      - id: btvirt_adapter
+    packages: [embedded_lab_pack]
+    profiles: [mhealth_ci]
+  - id: Embedded.TempSensor.BleGatt
+    name: BLE Temperature Sensor
+    path: library/domains/ble/generic/temperature_sensor__ble_gatt.yaml
+    domain: ble
+    protocols: [ble]
+    services:
+      - id: btvirt_adapter
+    packages: [embedded_lab_pack]
+    profiles: [mhealth_ci]
+  - id: IIoT.LineCounter.Mqtt
+    name: Line Counter (MQTT)
+    path: library/domains/iot/generic/line_counter__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Energy.EnergyMeter3Ph.Mqtt
+    name: 3-Phase Energy Meter (MQTT)
+    path: library/domains/iot/generic/energy_meter_3ph__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack, energy_pack]
+    profiles: [iiot_monitoring]
+  - id: Condition.ConditionMonitor.Mqtt
+    name: Condition Monitor (MQTT)
+    path: library/domains/iot/generic/condition_monitor__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Motion.VFDrive.Modbus
+    name: VFD Drive (Modbus)
+    path: library/domains/motion_controllers/generic/vfd_drive__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Motion.VFDrive.SiemensG120C.Modbus
+    name: Siemens SINAMICS G120C VFD (Modbus TCP)
+    path: library/domains/motion_controllers/siemens/g120c__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: IO.IOModule.Modbus
+    name: IO Module (Modbus)
+    path: library/domains/iot/generic/io_module__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: IO.IOModule.Wago750_8000.Modbus
+    name: WAGO 750-8000 I/O System (Modbus TCP)
+    path: library/domains/iot/wago/wago_750_8000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Process.PIDController.Modbus
+    name: PID Process Controller (Modbus)
+    path: library/domains/thermal_controllers/generic/pid_process_controller__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Energy.EnergyMeter3Ph.Modbus
+    name: 3-Phase Energy Meter (Modbus)
+    path: library/domains/iot/generic/energy_meter_3ph__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack, energy_pack]
+    profiles: [iiot_monitoring]
+  - id: Energy.EnergyMeterIem3000.Modbus
+    name: Schneider Acti9 iEM3000 Energy Meter (Modbus)
+    path: library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EVSE.Ocpp
+    name: EVSE / Charge Point (OCPP 1.6)
+    path: library/domains/energy/emobility/evse__ocpp.yaml
+    domain: energy
+    protocols: [ocpp]
+    services:
+      - id: ocpp_central_system
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
+  - id: Energy.CSMS.Ocpp
+    name: CSMS Control Simulator (OCPP 1.6)
+    path: library/domains/energy/emobility/csms__ocpp.yaml
+    domain: energy
+    protocols: [ocpp]
+    services:
+      - id: ocpp_central_system
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
+  - id: Process.PressureTransmitter.Modbus
+    name: Pressure Transmitter (Modbus)
+    path: library/domains/iot/generic/pressure_transmitter__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Process.ProcessCell.OpcUa
+    name: Process Cell (OPC UA)
+    path: library/domains/iot/generic/process_cell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Process.ProcessCell.SiemensS7_1500.OpcUa
+    name: Siemens SIMATIC S7-1500 Process Cell (OPC UA)
+    path: library/domains/iot/siemens/s7_1500_process_cell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Process.Workcell.OpcUa
+    name: Production Workcell (OPC UA)
+    path: library/domains/iot/generic/production_workcell__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Logistics.AGVVehicle.Mqtt
+    name: AGV Vehicle (MQTT)
+    path: library/domains/iot/generic/agv_vehicle__mqtt.yaml
+    domain: iot
+    protocols: [mqtt]
+    services:
+      - id: mqtt_broker
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Quality.VisionStation.Http
+    name: Vision Quality Station (HTTP)
+    path: library/domains/iot/generic/vision_quality_station__http.yaml
+    domain: iot
+    protocols: [http]
+    services:
+      - id: http_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [iiot_monitoring]
+  - id: Process.PackagingLine.OpcUa
+    name: Packaging Line (OPC UA)
+    path: library/domains/iot/generic/packaging_line__opcua.yaml
+    domain: iot
+    protocols: [opcua]
+    services:
+      - id: opcua_server
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]

@@ -1,0 +1,272 @@
+# SPDX-License-Identifier: MIT
+# Advanced thermal controller without protocol bindings.
+# Uses FunctionAction imports/params to reduce duplication and improve physics fidelity.
+attributes:
+  # core state
+  temperature: 25.0
+  setpoint: 30.0
+  ambient: 22.0
+  power_on: 1
+
+  # actuator
+  heating_power_target: 0.0  # controller output [%]
+  heating_power: 0.0         # actuator output after lag [%]
+  actuator_tau: 0.75         # actuator inertia time constant [s]
+
+  # dynamics / environment
+  heat_coeff: 0.25
+  cool_coeff: 0.03
+  thermal_mass: 1.2
+
+  # PID terms
+  power_gain: 1.7
+  power_integral: 0.0
+  power_integral_gain: 0.25
+  power_integral_leak: 0.05
+  power_derivative: 0.0
+  power_derivative_gain: 0.8
+  power_error_prev: 0.0
+  controller_enabled: true  # cached enable flag (power_on && !overload)
+
+  # safety
+  overload: 0
+  overload_threshold: 100.0
+  overload_hyst: 2.0
+
+conditions:
+  # 1) Overload ON when temperature >= threshold
+  - if: $in(temperature) >= $in(overload_threshold)
+    actions:
+      - set: $in(overload)
+        value: 1
+
+  # 2) Overload OFF when temperature <= threshold - hysteresis
+  - if: $in(temperature) <= ($in(overload_threshold) - $in(overload_hyst))
+    actions:
+      - set: $in(overload)
+        value: 0
+
+
+actions:
+  - function: $in(controller_enabled)
+    call: ($in(power_on) == 1) and ($in(overload) == 0)
+
+  # Derivative term with explicit enable/error params (no repeated expressions)
+  - function: $in(power_derivative)
+    params:
+      error: "$in(setpoint) - $in(temperature)"
+    call: 0.0 if not $in(controller_enabled) else $in(power_derivative_gain) * (error - $in(power_error_prev))
+
+  # Error memory for derivative
+  - function: $in(power_error_prev)
+    params:
+      error: "$in(setpoint) - $in(temperature)"
+    call: 0.0 if not $in(controller_enabled) else error
+
+  # Integrator with leak and clipping
+  - function: $in(power_integral)
+    imports: {np: numpy}
+    params:
+      error: "$in(setpoint) - $in(temperature)"
+      integral_min: 0
+      integral_max: 120
+    call: |
+      0.0 if not $in(controller_enabled) else np.clip(
+        $in(power_integral) * (1 - $in(power_integral_leak)) if error <= 0
+        else $in(power_integral) + $in(power_integral_gain) * error,
+        integral_min, integral_max)
+
+  # PID blend for target power
+  - function: $in(heating_power_target)
+    imports: {np: numpy}
+    params:
+      error: "$in(setpoint) - $in(temperature)"
+      power_min: 0
+      power_max: 100
+    call: |
+      0.0 if not $in(controller_enabled) else np.clip(
+        $in(power_gain) * error
+        + $in(power_integral)
+        + $in(power_derivative),
+        power_min, power_max)
+
+  # Actuator lag (first-order) toward target power
+  - function: $in(heating_power)
+    imports: {first_order: "extensions.thermal_model.first_order_step"}
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+    call: |
+      first_order(
+        $in(heating_power),
+        $in(heating_power_target) if $in(controller_enabled) else 0.0,
+        dt,
+        $in(actuator_tau),
+      )
+
+  # Thermal physics using closed-form solution for linear system
+  - function: $in(temperature)
+    imports: {thermal_step: "extensions.thermal_model.thermal_step"}
+    params:
+      dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
+    call: |
+      thermal_step(
+        $in(temperature),
+        $in(ambient),
+        $in(heating_power) if $in(controller_enabled) else 0.0,
+        $in(heat_coeff),
+        $in(cool_coeff),
+        dt,
+        mass=$in(thermal_mass),
+      )
+
+scenarios:
+  fast_heatup:
+    duration: 40.0
+    overrides:
+      $in(power_on): 1
+      $in(setpoint): 90.0
+      $in(ambient): 24.0
+      $in(power_gain): 1.9
+
+  overload_trip_test:
+    duration: 20.0
+    overrides:
+      $in(power_on): 1
+      $in(setpoint): 130.0
+      $in(overload_threshold): 90.0
+      $in(overload_hyst): 3.0
+
+  powered_cooldown:
+    duration: 25.0
+    overrides:
+      $in(power_on): 0
+      $in(setpoint): 0.0
+      $in(ambient): 18.0
+      $in(power_integral): 0.0
+      $in(power_derivative_gain): 0.0
+
+  ramped_heatup:
+    duration: 40.0
+    actions:
+      - function: $in(setpoint)
+        params:
+          start_sp: 25.0
+          target_sp: 90.0
+          ramp_duration: 20.0
+        call: min(target_sp, start_sp + (target_sp - start_sp) * min(1.0, ($attr(timer.time) / ramp_duration)))
+      - function: $in(power_on)
+        params: {power_on_val: 1}
+        call: power_on_val
+      - function: $in(ambient)
+        params: {ambient_target: 24.0}
+        call: ambient_target
+
+  ambient_perturbation:
+    duration: 30.0
+    period: 5.0
+    actions:
+      # Alternate ambient ±3°C every 5s to test controller compensation
+      - function: $in(ambient)
+        params:
+          ambient_base: 22.0
+          ambient_amp: 3.0
+          toggle_period: 5.0
+        call: |
+          ambient_base + (ambient_amp if (int($attr(timer.time) / toggle_period) % 2 == 0) else -ambient_amp)
+
+  noisy_temperature_output:
+    actions:
+      - noise: $out(temperature)
+        name: Rough Gauge Noise
+        description: Adds proportional drift to the rough gauge output.
+        std: 5.0e-2
+        mode: proportional
+
+  ramped_cooldown:
+    duration: 40.0
+    actions:
+      - function: $in(setpoint)
+        params:
+          start_sp: 80.0
+          target_sp: 20.0
+          ramp_duration: 20.0
+        call: max(target_sp, start_sp - (start_sp - target_sp) * min(1.0, ($attr(timer.time) / ramp_duration)))
+      - function: $in(power_on)
+        params: {power_on_val: 1}
+        call: power_on_val
+      - function: $in(ambient)
+        params: {ambient_target: 20.0}
+        call: ambient_target
+
+  temperature_sensor_spike:
+    duration: 35.0
+    actions:
+      - function: $out(temperature)
+        params:
+          spike_start: 12.0
+          spike_end: 15.0
+          spike_value: 250.0
+        call: |
+          (lambda t, v:
+            spike_value if (t >= spike_start and t < spike_end) else v
+          )($attr(timer.time), $out(temperature))
+
+  heat_treat_sequence_if:
+    duration: 80.0
+    conditions:
+      - if: $attr(timer.time) < 20.0
+        actions:
+          - function: $in(setpoint)
+            params:
+              start_sp: 25.0
+              heat_target: 90.0
+              ramp_up_dur: 20.0
+            call: start_sp + (heat_target - start_sp) * min(1.0, $attr(timer.time) / ramp_up_dur)
+      - if: ($attr(timer.time) >= 20.0) and ($attr(timer.time) < 40.0)
+        actions:
+          - function: $in(setpoint)
+            params:
+              heat_target: 90.0
+            call: heat_target
+      - if: $attr(timer.time) >= 40.0
+        actions:
+          - function: $in(setpoint)
+            params:
+              heat_target: 90.0
+              cool_target: 40.0
+              cool_dur: 40.0
+            call: heat_target - (heat_target - cool_target) * min(1.0, max(0.0, ($attr(timer.time) - 40.0)) / cool_dur)
+
+  heat_treat_sequence_profile:
+    duration: 80.0
+    actions:
+      - function: $in(setpoint)
+        params:
+          start_sp: 25.0
+          heat_target: 90.0
+          cool_target: 40.0
+          ramp_up_dur: 20.0
+          soak_end: 40.0
+          cool_dur: 40.0
+        call: |
+          (lambda t:
+            start_sp + (heat_target - start_sp) * min(1.0, t / ramp_up_dur)
+            if t < ramp_up_dur else
+            heat_target if t < soak_end else
+            heat_target - (heat_target - cool_target) * min(1.0, max(0.0, (t - soak_end)) / cool_dur)
+          )($attr(timer.time))
+
+  power_cycle_recovery:
+    duration: 60.0
+    actions:
+      - function: $in(setpoint)
+        params: {target_sp: 70.0}
+        call: target_sp
+      - function: $in(power_on)
+        params:
+          off_start: 20.0
+          off_end: 30.0
+        call: 0 if (($attr(timer.time) >= off_start) and ($attr(timer.time) < off_end)) else 1
+      - function: $in(ambient)
+        params: {ambient_target: 23.0}
+        call: ambient_target

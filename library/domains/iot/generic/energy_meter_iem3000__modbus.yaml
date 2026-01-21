@@ -1,0 +1,166 @@
+# SPDX-License-Identifier: MIT
+
+name: energy_meter_iem3000__modbus
+description: |
+  Minimal Modbus TCP (slave) simulation of Schneider Electric Acti9 iEM3000 series
+  energy meters (e.g. iEM3255/iEM3355). The exposed registers follow the iEM3000
+  addressing commonly used in BMS/HA demos:
+    - 3000..3110: instantaneous measurements (Float32, input registers)
+    - 45100..45102: total active energy import/export (Float32, holding registers)
+
+attributes:
+  # Phase currents (A)
+  current_l1_a: 12.0
+  current_l2_a: 10.5
+  current_l3_a: 11.2
+  current_avg_a: 0.0
+
+  # Phase-to-neutral voltages (V)
+  voltage_l1_n_v: 230.0
+  voltage_l2_n_v: 229.5
+  voltage_l3_n_v: 231.0
+  voltage_ln_avg_v: 0.0
+
+  # Line-to-line voltages (V) (derived from L-N; suitable for demo dashboards)
+  voltage_l1_l2_v: 0.0
+  voltage_l2_l3_v: 0.0
+  voltage_l3_l1_v: 0.0
+  voltage_ll_avg_v: 0.0
+
+  # Power (kW/kVAR/kVA)
+  power_factor: 0.95
+  power_factor_leading: 0
+  active_power_l1_kw: 0.0
+  active_power_l2_kw: 0.0
+  active_power_l3_kw: 0.0
+  active_power_total_kw: 0.0
+  reactive_power_total_kvar: 0.0
+  apparent_power_total_kva: 0.0
+
+  # Frequency (Hz)
+  frequency_hz: 50.0
+
+  # Cumulative energy (kWh)
+  energy_import_total_kwh: 0.0
+  energy_export_total_kwh: 0.0
+
+  cycle_time_s: 1.0
+
+actions:
+  - function: $in(current_avg_a)
+    name: compute_current_avg
+    description: Average phase current.
+    call: ($in(current_l1_a) + $in(current_l2_a) + $in(current_l3_a)) / 3.0
+
+  - function: $in(voltage_ln_avg_v)
+    name: compute_voltage_ln_avg
+    description: Average phase-to-neutral voltage.
+    call: ($in(voltage_l1_n_v) + $in(voltage_l2_n_v) + $in(voltage_l3_n_v)) / 3.0
+
+  - function: $in(voltage_l1_l2_v)
+    name: compute_voltage_l1_l2
+    description: Approximate L1-L2 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(voltage_l1_n_v) + $in(voltage_l2_n_v)) / 2.0)
+
+  - function: $in(voltage_l2_l3_v)
+    name: compute_voltage_l2_l3
+    description: Approximate L2-L3 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(voltage_l2_n_v) + $in(voltage_l3_n_v)) / 2.0)
+
+  - function: $in(voltage_l3_l1_v)
+    name: compute_voltage_l3_l1
+    description: Approximate L3-L1 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(voltage_l3_n_v) + $in(voltage_l1_n_v)) / 2.0)
+
+  - function: $in(voltage_ll_avg_v)
+    name: compute_voltage_ll_avg
+    description: Average line-to-line voltage.
+    call: ($in(voltage_l1_l2_v) + $in(voltage_l2_l3_v) + $in(voltage_l3_l1_v)) / 3.0
+
+  - function: $in(apparent_power_total_kva)
+    name: compute_apparent_power
+    description: Total apparent power (sum of per-phase V*I).
+    call: 1e-3
+         * (
+             $in(voltage_l1_n_v) * $in(current_l1_a)
+             + $in(voltage_l2_n_v) * $in(current_l2_a)
+             + $in(voltage_l3_n_v) * $in(current_l3_a)
+           )
+
+  - function: $in(active_power_l1_kw)
+    name: compute_active_power_l1
+    description: Phase L1 active power.
+    call: 1e-3 * $in(power_factor) * $in(voltage_l1_n_v) * $in(current_l1_a)
+
+  - function: $in(active_power_l2_kw)
+    name: compute_active_power_l2
+    description: Phase L2 active power.
+    call: 1e-3 * $in(power_factor) * $in(voltage_l2_n_v) * $in(current_l2_a)
+
+  - function: $in(active_power_l3_kw)
+    name: compute_active_power_l3
+    description: Phase L3 active power.
+    call: 1e-3 * $in(power_factor) * $in(voltage_l3_n_v) * $in(current_l3_a)
+
+  - function: $in(active_power_total_kw)
+    name: compute_active_power_total
+    description: Total active power (sum of per-phase values).
+    call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw)
+
+  - function: $in(reactive_power_total_kvar)
+    name: compute_reactive_power_total
+    description: Approximate total reactive power magnitude from active/apparent power.
+    call: (
+          max(0.0, ($in(apparent_power_total_kva) ** 2) - ($in(active_power_total_kw) ** 2)) ** 0.5
+        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(energy_import_total_kwh)
+    name: integrate_energy_import
+    description: Integrate imported energy (kWh) from total active power (kW).
+    call: $in(energy_import_total_kwh) + max(0.0, $in(active_power_total_kw)) * $in(cycle_time_s) / 3600.0
+
+  - function: $in(energy_export_total_kwh)
+    name: integrate_energy_export
+    description: Integrate exported energy (kWh) from total active power (kW).
+    call: $in(energy_export_total_kwh) + max(0.0, -$in(active_power_total_kw)) * $in(cycle_time_s) / 3600.0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5023
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        # Currents (A) Float32
+        current_l1_a:        { address: [3000,3001], group: i_r, type: float }
+        current_l2_a:        { address: [3002,3003], group: i_r, type: float }
+        current_l3_a:        { address: [3004,3005], group: i_r, type: float }
+        current_avg_a:       { address: [3010,3011], group: i_r, type: float }
+
+        # Voltages (V) Float32
+        voltage_l1_l2_v:     { address: [3020,3021], group: i_r, type: float }
+        voltage_l2_l3_v:     { address: [3022,3023], group: i_r, type: float }
+        voltage_l3_l1_v:     { address: [3024,3025], group: i_r, type: float }
+        voltage_ll_avg_v:    { address: [3026,3027], group: i_r, type: float }
+        voltage_l1_n_v:      { address: [3028,3029], group: i_r, type: float }
+        voltage_l2_n_v:      { address: [3030,3031], group: i_r, type: float }
+        voltage_l3_n_v:      { address: [3032,3033], group: i_r, type: float }
+        voltage_ln_avg_v:    { address: [3036,3037], group: i_r, type: float }
+
+        # Active power (kW) Float32
+        active_power_l1_kw:  { address: [3054,3055], group: i_r, type: float }
+        active_power_l2_kw:  { address: [3056,3057], group: i_r, type: float }
+        active_power_l3_kw:  { address: [3058,3059], group: i_r, type: float }
+        active_power_total_kw: { address: [3060,3061], group: i_r, type: float }
+
+        # Optional power quality (kVAR/kVA) Float32
+        reactive_power_total_kvar: { address: [3068,3069], group: i_r, type: float }
+        apparent_power_total_kva:  { address: [3076,3077], group: i_r, type: float }
+
+        # Power factor + frequency Float32
+        power_factor:        { address: [3084,3085], group: i_r, type: float }
+        frequency_hz:        { address: [3110,3111], group: i_r, type: float }
+
+        # Energy totals (kWh) Float32
+        energy_import_total_kwh: { address: [45100,45101], group: h_r, type: float }
+        energy_export_total_kwh: { address: [45102,45103], group: h_r, type: float }

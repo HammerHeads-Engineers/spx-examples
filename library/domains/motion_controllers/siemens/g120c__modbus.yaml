@@ -1,0 +1,110 @@
+# SPDX-License-Identifier: MIT
+
+name: g120c__modbus
+description: |
+  Siemens SINAMICS G120C VFD (Sim) for pump control with a minimal Modbus TCP
+  interface based on the Siemens G120C Modbus RTU application note
+  (Entry-ID 109764623). Uses holding registers with 1 Hz resolution:
+
+    - 40100  STW1 control word
+    - 40101  Speed setpoint (Hz)
+    - 40102  ZSW1 status word (basic bits)
+    - 40103  Actual speed (Hz)
+
+attributes:
+  control_word_raw: 0
+  speed_setpoint_raw: 0
+  status_word_raw: 0
+  speed_actual_raw: 0
+
+  speed_setpoint_hz: 0.0
+  speed_actual_hz: 0.0
+  run_enable: 0
+  direction: 1
+  fault_active: 0
+
+  speed_max_hz: 60.0
+  speed_dev_hz: 0.5
+  accel_ramp_s: 2.0
+  decel_ramp_s: 3.0
+  cycle_time_s: 0.1
+
+actions:
+  - function: $in(speed_setpoint_hz)
+    name: decode_setpoint
+    description: Decode speed setpoint from the raw register (1 Hz resolution).
+    call: max(0.0, min($in(speed_max_hz), $in(speed_setpoint_raw)))
+
+  - function: $in(direction)
+    name: decode_direction
+    description: Direction reversal (STW1 bit 11).
+    call: -1 if int($in(control_word_raw) / 2048) % 2 == 1 else 1
+
+  - function: $in(run_enable)
+    name: decode_run_enable
+    description: Run enable from STW1 bits 0,1,2,3 and 6.
+    call: >-
+          1 if (
+            (int($in(control_word_raw) / 1) % 2 == 1)
+            and (int($in(control_word_raw) / 2) % 2 == 1)
+            and (int($in(control_word_raw) / 4) % 2 == 1)
+            and (int($in(control_word_raw) / 8) % 2 == 1)
+            and (int($in(control_word_raw) / 64) % 2 == 1)
+            and $in(fault_active) == 0
+          ) else 0
+
+  - function: $in(speed_actual_hz)
+    name: track_speed
+    description: First-order speed tracking with independent accel/decel ramps.
+    call: (
+          $in(speed_actual_hz)
+          + (
+              (
+                ($in(speed_setpoint_hz) * $in(direction) if $in(run_enable) == 1 else 0.0)
+                - $in(speed_actual_hz)
+              )
+              * (
+                $in(cycle_time_s)
+                / max(
+                    0.1,
+                    ($in(accel_ramp_s) if abs($in(speed_setpoint_hz)) > abs($in(speed_actual_hz)) else $in(decel_ramp_s))
+                  )
+              )
+            )
+        )
+
+  - function: $in(status_word_raw)
+    name: build_status_word
+    description: Encode basic ZSW1 bits (0..3, 8) for ready/run/deviation.
+    call: >-
+          (
+            (1 if $in(fault_active) == 0 else 0)
+            + (2 if ($in(run_enable) == 1 and $in(fault_active) == 0) else 0)
+            + (4 if ($in(run_enable) == 1 and abs($in(speed_actual_hz)) > 0.1 and $in(fault_active) == 0) else 0)
+            + (8 if $in(fault_active) == 1 else 0)
+            + (
+              256
+              if abs(
+                $in(speed_actual_hz)
+                - ($in(speed_setpoint_hz) * $in(direction) if $in(run_enable) == 1 else 0.0)
+              ) > $in(speed_dev_hz)
+              else 0
+            )
+          )
+
+  - function: $in(speed_actual_raw)
+    name: encode_speed_actual
+    description: Encode actual speed (Hz) into raw register.
+    call: int(round(abs($in(speed_actual_hz))))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5028
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        control_word_raw:     { address: [40100,40100], group: h_r, type: uint_16 }
+        speed_setpoint_raw:   { address: [40101,40101], group: h_r, type: uint_16 }
+        status_word_raw:      { address: [40102,40102], group: h_r, type: uint_16 }
+        speed_actual_raw:     { address: [40103,40103], group: h_r, type: uint_16 }

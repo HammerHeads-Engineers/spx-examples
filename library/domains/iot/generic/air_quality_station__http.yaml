@@ -1,0 +1,232 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: air_quality_static
+description: |
+  Static air quality monitoring station served over an HTTP endpoint.
+  Provides deterministic particulate matter and pollutant readings so
+  HTTP clients can be validated against the SPX simulator without
+  connecting to external APIs or sensors.
+
+attributes:
+  station_id: "PL-WAW-001"
+  station_name: "Warsaw Srodmiescie Monitor"
+  latitude: 52.2297
+  longitude: 21.0122
+  timezone: Europe/Warsaw
+  generation_time_ms: 11.2
+  measurement_interval_minutes: 60
+  monitoring_window_hours: 24
+  active_profile: urban-baseline
+
+  hourly_time:
+    - "2025-01-01T00:00"
+    - "2025-01-01T03:00"
+    - "2025-01-01T06:00"
+    - "2025-01-01T09:00"
+    - "2025-01-01T12:00"
+    - "2025-01-01T15:00"
+    - "2025-01-01T18:00"
+    - "2025-01-01T21:00"
+
+  hourly_pm2_5:
+    - 12.8
+    - 15.4
+    - 18.3
+    - 22.7
+    - 26.4
+    - 24.2
+    - 19.6
+    - 15.8
+
+  hourly_pm10:
+    - 20.1
+    - 24.5
+    - 28.8
+    - 34.2
+    - 39.5
+    - 36.1
+    - 30.4
+    - 24.9
+
+  hourly_no2:
+    - 18.5
+    - 20.1
+    - 22.4
+    - 25.7
+    - 28.3
+    - 26.5
+    - 23.6
+    - 21.0
+
+  hourly_o3:
+    - 61.0
+    - 59.2
+    - 57.4
+    - 54.8
+    - 52.6
+    - 53.9
+    - 56.8
+    - 59.7
+
+  hourly_aqi:
+    - 42
+    - 49
+    - 56
+    - 67
+    - 74
+    - 70
+    - 59
+    - 50
+
+  hourly_aqi_category:
+    - good
+    - good
+    - moderate
+    - moderate
+    - moderate
+    - moderate
+    - moderate
+    - good
+
+  current_timestamp: "2025-01-01T12:00"
+  current_pm2_5: 26.4
+  current_pm10: 39.5
+  current_no2: 28.3
+  current_o3: 52.6
+  current_aqi: 74
+  current_aqi_category: moderate
+
+communication:
+  - http_endpoint:
+      host: 0.0.0.0
+      port: 8092
+      endpoints:
+        "/v1/air-quality/{profile}":
+          method: GET
+          alias:
+            - "#attr(active_profile) = #param(profile)"
+          response:
+            station:
+              id: "#attr(station_id)"
+              name: "#attr(station_name)"
+              latitude: "#attr(latitude)"
+              longitude: "#attr(longitude)"
+              timezone: "#attr(timezone)"
+            generation_time_ms: "#attr(generation_time_ms)"
+            profile: "#attr(active_profile)"
+            monitoring_window_hours: "#attr(monitoring_window_hours)"
+            measurement_interval_minutes: "#attr(measurement_interval_minutes)"
+            hourly_units:
+              timestamp: "iso8601"
+              pm2_5: "ug/m3"
+              pm10: "ug/m3"
+              no2: "ug/m3"
+              o3: "ug/m3"
+              aqi: "index"
+              aqi_category: "category"
+            hourly_readings:
+              timestamp: "#attr(hourly_time)"
+              pm2_5: "#attr(hourly_pm2_5)"
+              pm10: "#attr(hourly_pm10)"
+              no2: "#attr(hourly_no2)"
+              o3: "#attr(hourly_o3)"
+              aqi: "#attr(hourly_aqi)"
+              aqi_category: "#attr(hourly_aqi_category)"
+            current:
+              timestamp: "#attr(current_timestamp)"
+              pm2_5: "#attr(current_pm2_5)"
+              pm10: "#attr(current_pm10)"
+              no2: "#attr(current_no2)"
+              o3: "#attr(current_o3)"
+              aqi: "#attr(current_aqi)"
+              aqi_category: "#attr(current_aqi_category)"
+
+        "/simulator/profile":
+          method: POST
+          alias:
+            - "#attr(active_profile) = #param(__body__.profile)"
+            - "#attr(monitoring_window_hours) = #param(__body__.monitoring_window_hours)"
+          response:
+            status: "ok"
+            active_profile: "#attr(active_profile)"
+            monitoring_window_hours: "#attr(monitoring_window_hours)"
+
+        "/simulator/location":
+          method: PUT
+          alias:
+            - "#attr(station_name) = #param(__body__.station_name)"
+            - "#attr(latitude) = #param(__body__.latitude)"
+            - "#attr(longitude) = #param(__body__.longitude)"
+            - "#attr(timezone) = #param(__body__.timezone)"
+          response:
+            status: "ok"
+            station_name: "#attr(station_name)"
+            latitude: "#attr(latitude)"
+            longitude: "#attr(longitude)"
+            timezone: "#attr(timezone)"
+
+        "/simulator/current":
+          method: PATCH
+          alias:
+            - "#attr(current_timestamp) = #param(__body__.timestamp)"
+            - "#attr(current_pm2_5) = #param(__body__.pm2_5)"
+            - "#attr(current_pm10) = #param(__body__.pm10)"
+            - "#attr(current_no2) = #param(__body__.no2)"
+            - "#attr(current_o3) = #param(__body__.o3)"
+            - "#attr(current_aqi) = #param(__body__.aqi)"
+            - "#attr(current_aqi_category) = #param(__body__.aqi_category)"
+          response:
+            status: "ok"
+            timestamp: "#attr(current_timestamp)"
+            pm2_5: "#attr(current_pm2_5)"
+            pm10: "#attr(current_pm10)"
+            no2: "#attr(current_no2)"
+            o3: "#attr(current_o3)"
+            aqi: "#attr(current_aqi)"
+            aqi_category: "#attr(current_aqi_category)"
+
+scenarios:
+  winter_smog_episode:
+    enabled: true
+    duration: 45.0
+    overrides:
+      $in(active_profile): "urban-smog"
+      $in(current_timestamp): "2025-01-01T07:00"
+      $in(current_pm2_5): 115.0
+      $in(current_pm10): 168.0
+      $in(current_no2): 64.0
+      $in(current_o3): 32.0
+      $in(current_aqi): 182
+      $in(current_aqi_category): unhealthy
+      $in(hourly_pm2_5): [45.0, 52.0, 78.0, 115.0, 98.0, 74.0, 66.0, 54.0]
+      $in(hourly_pm10): [60.0, 72.0, 118.0, 168.0, 159.0, 121.0, 96.0, 72.0]
+      $in(hourly_no2): [30.0, 38.0, 49.0, 64.0, 61.0, 55.0, 46.0, 36.0]
+      $in(hourly_o3): [40.0, 38.0, 36.0, 32.0, 33.0, 35.0, 38.0, 41.0]
+      $in(hourly_aqi): [76, 92, 141, 182, 170, 138, 110, 88]
+      $in(hourly_aqi_category): [moderate, moderate, unhealthy, unhealthy, unhealthy, unhealthy, unhealthy, moderate]
+
+  coastal_reset:
+    enabled: true
+    duration: 30.0
+    overrides:
+      $in(active_profile): "coastal-clean"
+      $in(current_timestamp): "2025-01-01T14:00"
+      $in(current_pm2_5): 8.0
+      $in(current_pm10): 14.0
+      $in(current_no2): 9.0
+      $in(current_o3): 78.0
+      $in(current_aqi): 32
+      $in(current_aqi_category): good
+
+  station_relocation:
+    enabled: true
+    duration: 60.0
+    overrides:
+      $in(station_id): "PL-LOD-004"
+      $in(station_name): "Lodz Fabryczna Monitor"
+      $in(latitude): 51.7592
+      $in(longitude): 19.4550
+      $in(timezone): Europe/Warsaw
+      $in(active_profile): "industrial-corridor"

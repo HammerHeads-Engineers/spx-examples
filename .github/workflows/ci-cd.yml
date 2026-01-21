@@ -11,20 +11,23 @@ on:
       - perf/**
       - performance/**
       - ci/**
+    tags:
+      - "*"
   pull_request:
     branches:
       - main
       - develop
 
 permissions:
-  contents: read
+  contents: write
+  packages: write
 
 jobs:
   tests:
     runs-on: ubuntu-latest
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-      SPX_API_URL: http://localhost:8000
+      SPX_BASE_URL: http://localhost:8000
     strategy:
       fail-fast: false
       matrix:
@@ -45,10 +48,15 @@ jobs:
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
+      - name: Validate model definitions
+        run: poetry run python tools/validate_models.py
+
       - name: Start SPX server (Docker Compose)
+        if: ${{ env.SPX_PRODUCT_KEY != '' }}
         run: docker compose up -d
 
       - name: Wait for SPX server health
+        if: ${{ env.SPX_PRODUCT_KEY != '' }}
         shell: bash
         run: |
           for i in {1..24}; do
@@ -68,9 +76,260 @@ jobs:
           fi
 
       - name: Show server logs on failure
-        if: failure()
+        if: ${{ failure() && env.SPX_PRODUCT_KEY != '' }}
         run: docker compose logs --no-color
 
       - name: Stop SPX server
         if: always()
         run: docker compose down --remove-orphans
+
+  pack-tests:
+    needs: tests
+    runs-on: ubuntu-latest
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+      MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
+      OPEN_METEO_TEST_HOST: 127.0.0.1
+      AIR_QUALITY_TEST_HOST: 127.0.0.1
+    strategy:
+      fail-fast: false
+      matrix:
+        pack:
+          - industrial_iiot_pack
+          - embedded_lab_pack
+          - energy_pack
+          - smart_building_pack
+
+    steps:
+      - name: Gate pack tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "SPX_PRODUCT_KEY is not set; skipping pack tests."
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.14
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Generate installer artifacts (non-interactive)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          mkdir -p "${OUT_DIR}"
+          poetry run python -m installer generate \
+            --packages "${{ matrix.pack }}" \
+            --output "${OUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            --print-selection json > "${OUT_DIR}/selection.json"
+
+      - name: Start stack (generated spx-start.sh)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          export PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
+          mkdir -p "${NPM_CONFIG_PREFIX}"
+          export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
+          "${OUT_DIR}/spx-start.sh"
+
+      - name: Wait for SPX server health
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/36)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; exit 1
+
+      - name: Wait for MQTT broker port
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/1883) >/dev/null 2>&1; then
+              echo "MQTT broker is reachable"; exit 0; fi
+            echo "Waiting for MQTT broker... ($i/30)"; sleep 2;
+          done
+          echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
+
+      - name: Wait for Home Assistant
+        if: ${{ steps.gate.outputs.enabled == 'true' && matrix.pack == 'smart_building_pack' }}
+        shell: bash
+        run: |
+          for i in {1..60}; do
+            status="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8123/api/ || true)"
+            if [ "$status" = "200" ] || [ "$status" = "401" ]; then
+              echo "Home Assistant API is reachable (HTTP ${status})"; exit 0; fi
+            echo "Waiting for Home Assistant... ($i/60)"; sleep 2;
+          done
+          echo "Home Assistant did not become reachable on http://localhost:8123/api/"; exit 1
+
+      - name: Run pack tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          poetry run pytest -q "tests/packs/${{ matrix.pack }}"
+
+      - name: Show stack logs on failure
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
+
+      - name: Stop stack
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/${{ matrix.pack }}
+        run: |
+          "${OUT_DIR}/spx-stop.sh"
+
+  build-installer:
+    needs: tests
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build installer package
+        run: |
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh --package-name "spx-installer"
+          scripts/build_self_extractors.sh --version "${{ github.ref_name }}"
+
+      - name: Upload installer assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.ref_name }}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" \
+              "dist/spx-installer.tgz" \
+              "dist/spx-installer-${tag}.run" \
+              "dist/spx-installer-${tag}.ps1" \
+              --clobber
+          else
+            gh release create "${tag}" \
+              "dist/spx-installer.tgz" \
+              "dist/spx-installer-${tag}.run" \
+              "dist/spx-installer-${tag}.ps1" \
+              --title "SPX Installer ${tag}" \
+              --generate-notes
+          fi
+
+  release:
+    runs-on: ubuntu-latest
+    concurrency: release
+    needs: tests
+    if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+    env:
+      SPX_PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
+    steps:
+      - name: Setup | Checkout Repository at workflow sha
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - name: Setup | Force correct release branch on workflow sha
+        run: |
+          git checkout -B ${{ github.ref_name }} ${{ github.sha }}
+
+      - name: Install Poetry
+        shell: bash
+        run: pipx install poetry
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Action | Semantic Version Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10.4.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: "github-actions"
+          git_committer_email: "actions@users.noreply.github.com"
+
+      - name: Build installer artifacts
+        if: steps.release.outputs.released == 'true'
+        run: |
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh --package-name "spx-installer"
+          scripts/build_self_extractors.sh --version "${{ steps.release.outputs.tag }}"
+
+      - name: Upload installer assets to GitHub Release
+        if: steps.release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ steps.release.outputs.tag }}"
+          gh release upload "${tag}" \
+            "dist/spx-installer.tgz" \
+            "dist/spx-installer-${tag}.run" \
+            "dist/spx-installer-${tag}.ps1" \
+            --clobber
+
+      - name: Ensure SPX_PACKAGES_TOKEN is set
+        if: steps.release.outputs.released == 'true'
+        shell: bash
+        run: |
+          if [ -z "${SPX_PACKAGES_TOKEN}" ]; then
+            echo "SPX_PACKAGES_TOKEN is required to publish GitHub Packages."
+            exit 1
+          fi
+
+      - name: Publish installer to GitHub Packages
+        if: steps.release.outputs.released == 'true'
+        env:
+          PACKAGES_TOKEN: ${{ env.SPX_PACKAGES_TOKEN }}
+        run: |
+          PKG_NAME="spx-installer"
+          VERSION="${{ steps.release.outputs.tag }}"
+          upload_pkg() {
+            local file="$1"
+            curl -L \
+              -X PUT \
+              -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"${file}" \
+              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
+          }
+          upload_pkg "dist/spx-installer.tgz"
+          upload_pkg "dist/spx-installer-${VERSION}.run"
+          upload_pkg "dist/spx-installer-${VERSION}.ps1"

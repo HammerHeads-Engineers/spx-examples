@@ -1,0 +1,70 @@
+name: generic_scpi_multimeter
+description: |
+  Virtual SCPI multimeter providing a compact set of measurement and
+  configuration commands for integration testing. The model exposes core
+  electrical quantities as attributes and maps common SCPI verbs via the
+  ASCII protocol.
+
+attributes:
+  voltage: 0.0
+  current: 0.0
+  resistance: 1000.0
+  frequency: 50.0
+  measurement_mode: voltage
+
+communication:
+  ascii:
+    # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+    terminator: "\n"
+    response_delay: 0.01
+    response_jitter: 0.0
+    mappings:
+      "MEAS:VOLT?": "#out(voltage)"
+      "MEAS:CURR?": "#out(current)"
+      "MEAS:RES?": "#out(resistance)"
+      "MEAS:FREQ?": "#out(frequency)"
+      "CONF:VOLT":
+        "#attr(measurement_mode)": voltage
+      "CONF:CURR":
+        "#attr(measurement_mode)": current
+      "CONF:RES":
+        "#attr(measurement_mode)": resistance
+      "CONF:FREQ":
+        "#attr(measurement_mode)": frequency
+      "CONF:MODE {mode}":
+        "#attr(measurement_mode)": "mode"
+        "response": "ACK"
+
+scenarios:
+  voltage_static:
+    enabled: true
+    description: |
+      Slews the measured voltage toward a target value using a bounded
+      velocity integrator, then injects a tiny dither to emulate ADC noise.
+    period: 0.1
+    actions:
+      - function: $in(voltage)
+        call: target_voltage
+        target_voltage: 230.0
+      - noise: $out(voltage)
+        std: 5.0e-3
+        mode: proportional
+
+  ascii_disconnect:
+    enabled: true
+    duration: 2.0
+    call:
+      path: communication.ascii.detach
+      stop_path: communication.ascii.attach
+
+  ascii_response_delay_spike:
+    enabled: true
+    duration: 5.0
+    overrides:
+      communication.ascii.response_delay: 10.0
+
+  discharge_spike:
+    enabled: true
+    run_limit: 1
+    overrides:
+      $out(voltage): 1000.0

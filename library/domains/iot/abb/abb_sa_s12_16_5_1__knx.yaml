@@ -1,0 +1,207 @@
+# SPDX-License-Identifier: MIT
+
+name: abb_sa_s12_16_5_1__knx
+description: |
+  ABB SA/S12.16.5.1 (Sim) – 12-fold KNX switch actuator.
+
+  Each channel exposes separate group addresses for command and status feedback (1-bit / DPT 1.001),
+  so Home Assistant KNX can maintain a stable switch state per channel.
+
+  Group address plan (3-level):
+  - Channel commands: 1/3/1 .. 1/3/12
+  - Channel states:   1/4/1 .. 1/4/12
+  - Central OFF cmd:  1/0/1 (optional)
+
+attributes:
+  cycle_time_s: 0.2
+
+  all_off_cmd: 0
+
+  ch01: 0
+  ch02: 0
+  ch03: 0
+  ch04: 0
+  ch05: 0
+  ch06: 0
+  ch07: 0
+  ch08: 0
+  ch09: 0
+  ch10: 0
+  ch11: 0
+  ch12: 0
+
+conditions:
+  - if: $attr(all_off_cmd) == 1
+    actions:
+      - function: $in(ch01)
+        call: 0
+      - function: $in(ch02)
+        call: 0
+      - function: $in(ch03)
+        call: 0
+      - function: $in(ch04)
+        call: 0
+      - function: $in(ch05)
+        call: 0
+      - function: $in(ch06)
+        call: 0
+      - function: $in(ch07)
+        call: 0
+      - function: $in(ch08)
+        call: 0
+      - function: $in(ch09)
+        call: 0
+      - function: $in(ch10)
+        call: 0
+      - function: $in(ch11)
+        call: 0
+      - function: $in(ch12)
+        call: 0
+      - function: $in(all_off_cmd)
+        call: 0
+
+communication:
+  - knx_ip:
+      router:
+        host: knx_gateway
+        port: 3671
+        route_back: true
+      poll_interval: 0.2
+      bindings:
+        - name: all_off_cmd
+          direction: inbound
+          group_address: "1/0/1"
+          value_codec: bool
+          write_attribute: "#attr(all_off_cmd)"
+
+        - name: ch01_cmd
+          direction: inbound
+          group_address: "1/3/1"
+          value_codec: bool
+          write_attribute: "#attr(ch01)"
+        - name: ch01_state
+          direction: outbound
+          group_address: "1/4/1"
+          value_codec: bool
+          read_attribute: "#attr(ch01)"
+
+        - name: ch02_cmd
+          direction: inbound
+          group_address: "1/3/2"
+          value_codec: bool
+          write_attribute: "#attr(ch02)"
+        - name: ch02_state
+          direction: outbound
+          group_address: "1/4/2"
+          value_codec: bool
+          read_attribute: "#attr(ch02)"
+
+        - name: ch03_cmd
+          direction: inbound
+          group_address: "1/3/3"
+          value_codec: bool
+          write_attribute: "#attr(ch03)"
+        - name: ch03_state
+          direction: outbound
+          group_address: "1/4/3"
+          value_codec: bool
+          read_attribute: "#attr(ch03)"
+
+        - name: ch04_cmd
+          direction: inbound
+          group_address: "1/3/4"
+          value_codec: bool
+          write_attribute: "#attr(ch04)"
+        - name: ch04_state
+          direction: outbound
+          group_address: "1/4/4"
+          value_codec: bool
+          read_attribute: "#attr(ch04)"
+
+        - name: ch05_cmd
+          direction: inbound
+          group_address: "1/3/5"
+          value_codec: bool
+          write_attribute: "#attr(ch05)"
+        - name: ch05_state
+          direction: outbound
+          group_address: "1/4/5"
+          value_codec: bool
+          read_attribute: "#attr(ch05)"
+
+        - name: ch06_cmd
+          direction: inbound
+          group_address: "1/3/6"
+          value_codec: bool
+          write_attribute: "#attr(ch06)"
+        - name: ch06_state
+          direction: outbound
+          group_address: "1/4/6"
+          value_codec: bool
+          read_attribute: "#attr(ch06)"
+
+        - name: ch07_cmd
+          direction: inbound
+          group_address: "1/3/7"
+          value_codec: bool
+          write_attribute: "#attr(ch07)"
+        - name: ch07_state
+          direction: outbound
+          group_address: "1/4/7"
+          value_codec: bool
+          read_attribute: "#attr(ch07)"
+
+        - name: ch08_cmd
+          direction: inbound
+          group_address: "1/3/8"
+          value_codec: bool
+          write_attribute: "#attr(ch08)"
+        - name: ch08_state
+          direction: outbound
+          group_address: "1/4/8"
+          value_codec: bool
+          read_attribute: "#attr(ch08)"
+
+        - name: ch09_cmd
+          direction: inbound
+          group_address: "1/3/9"
+          value_codec: bool
+          write_attribute: "#attr(ch09)"
+        - name: ch09_state
+          direction: outbound
+          group_address: "1/4/9"
+          value_codec: bool
+          read_attribute: "#attr(ch09)"
+
+        - name: ch10_cmd
+          direction: inbound
+          group_address: "1/3/10"
+          value_codec: bool
+          write_attribute: "#attr(ch10)"
+        - name: ch10_state
+          direction: outbound
+          group_address: "1/4/10"
+          value_codec: bool
+          read_attribute: "#attr(ch10)"
+
+        - name: ch11_cmd
+          direction: inbound
+          group_address: "1/3/11"
+          value_codec: bool
+          write_attribute: "#attr(ch11)"
+        - name: ch11_state
+          direction: outbound
+          group_address: "1/4/11"
+          value_codec: bool
+          read_attribute: "#attr(ch11)"
+
+        - name: ch12_cmd
+          direction: inbound
+          group_address: "1/3/12"
+          value_codec: bool
+          write_attribute: "#attr(ch12)"
+        - name: ch12_state
+          direction: outbound
+          group_address: "1/4/12"
+          value_codec: bool
+          read_attribute: "#attr(ch12)"

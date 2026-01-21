@@ -1,0 +1,231 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+# Stepper motor controller with homing, soft limits, and torque monitoring
+attributes:
+  drive_enable: 1              # 1 = drive enabled
+  homing_request: 0            # 1 = start homing routine
+  homed: 0                     # 1 = reference complete
+  position_command: 120.0      # target position [mm]
+  position_feedback: 5.0       # actual position [mm]
+  velocity_command: 0.0        # internal velocity request [mm/s]
+  velocity_feedback: 0.0       # actual velocity estimate [mm/s]
+  torque_load: 40.0            # % of rated torque
+  torque_limit: 85.0           # % threshold for alarm
+  soft_limit_pos: 500.0        # mm
+  soft_limit_neg: -10.0        # mm
+  max_speed: 10.0             # mm/s limit for motion
+  max_accel: 0.25              # mm/s^2 limit for acceleration
+  max_decel: 0.5              # mm/s^2 limit for deceleration
+  motion_error: 0.0            # helper for control loop
+  velocity_goal: 0.0           # helper for control loop
+  pos_limit_switch: 0          # digital input (0/1)
+  neg_limit_switch: 0          # digital input (0/1)
+  alarm_limit: 0               # 0/1 soft or hard limit alarm
+  alarm_torque: 0              # torque overload alarm
+  alarm_drive_fault: 0         # general drive fault
+  step_mode: 16                # microstepping ratio (for display)
+
+actions:
+  # Update tracking error.
+  - function: $in(motion_error)
+    name: update_motion_error_pre
+    description: Compute the initial position tracking error before applying velocity corrections.
+    call: $in(position_command) - $in(position_feedback)
+
+  # Compute velocity goal that respects braking distance.
+  - function: $in(velocity_goal)
+    name: compute_velocity_goal
+    description: Derive the velocity setpoint given current error and braking distance limits.
+    params:
+      zero_velocity: 0.0
+      error_deadband: 1.0e-6
+      decel_bias: 0.0
+      decel_multiplier: 2.0
+      sqrt_exponent: 0.5
+    call: zero_velocity if abs($in(motion_error)) < error_deadband else (
+          ($in(motion_error) / abs($in(motion_error)))
+          * min(
+              $in(max_speed),
+              (max(decel_bias, decel_multiplier * $in(max_decel) * abs($in(motion_error)))) ** sqrt_exponent
+            )
+        )
+
+  # Ramp actual velocity toward the goal with independent accel/decel limits.
+  - function: $in(velocity_command)
+    name: slew_velocity_command
+    description: Slew the internal velocity command toward the goal under accel/decel constraints.
+    params:
+      disabled_velocity: 0.0
+      dt: "$(~.polling.interval) or 0.1"
+    call: disabled_velocity if $in(drive_enable) == 0 else (
+          $in(velocity_command)
+          + (
+              min($in(max_accel) * dt, $in(velocity_goal) - $in(velocity_command))
+              if $in(velocity_goal) > $in(velocity_command)
+              else max(-$in(max_decel) * dt, $in(velocity_goal) - $in(velocity_command))
+            )
+        )
+
+  # Integrate position with clamping to avoid overshoot.
+  - function: $in(position_feedback)
+    name: integrate_position_feedback
+    description: Integrate velocity into position while honouring soft limits and settle ratio.
+    params:
+      settle_ratio: 0.1
+      dt: "$(~.polling.interval) or 0.1"
+    call: (
+          $in(position_command)
+          if abs($in(motion_error)) <= abs($in(velocity_command)) * settle_ratio
+          else min(
+              $in(soft_limit_pos),
+              max($in(soft_limit_neg), $in(position_feedback) + dt * $in(velocity_command))
+            )
+        )
+
+  # Zero velocity when clamped by soft limits.
+  - function: $in(velocity_command)
+    name: clamp_velocity_on_limits
+    description: Force velocity to zero once position feedback is clamped by soft limits.
+    params:
+      zero_velocity: 0.0
+    call: zero_velocity if ($in(position_feedback) <= $in(soft_limit_neg) and $in(velocity_command) < 0)
+             or ($in(position_feedback) >= $in(soft_limit_pos) and $in(velocity_command) > 0)
+          else $in(velocity_command)
+
+  # Recalculate error after motion step.
+  - function: $in(motion_error)
+    name: update_motion_error_post
+    description: Refresh the motion error after velocity and position updates.
+    call: $in(position_command) - $in(position_feedback)
+
+  # Zero velocity when settled.
+  - function: $in(velocity_command)
+    name: freeze_velocity_when_settled
+    description: Drop residual velocity once both error and commanded speed fall below thresholds.
+    params:
+      zero_velocity: 0.0
+      error_threshold: 1.0e-4
+      velocity_threshold: 1.0e-3
+    call: zero_velocity if abs($in(motion_error)) < error_threshold and abs($in(velocity_command)) < velocity_threshold else $in(velocity_command)
+
+  - function: $in(velocity_feedback)
+    name: mirror_velocity_feedback
+    description: Mirror the internal velocity command to the observable velocity feedback channel.
+    call: $in(velocity_command)
+
+  - function: $in(pos_limit_switch)
+    name: detect_positive_limit
+    description: Raise the positive limit switch once feedback approaches the soft limit margin.
+    params:
+      limit_margin: 0.1
+    call: 1 if $in(position_feedback) >= ($in(soft_limit_pos) - limit_margin) else 0
+
+  - function: $in(neg_limit_switch)
+    name: detect_negative_limit
+    description: Raise the negative limit switch once feedback nears the negative soft limit margin.
+    params:
+      limit_margin: 0.1
+    call: 1 if $in(position_feedback) <= ($in(soft_limit_neg) + limit_margin) else 0
+
+  - function: $in(torque_load)
+    name: compute_torque_load
+    description: Estimate motor torque load from commanded velocity using linear gain and offset.
+    params:
+      torque_idle_offset: 20.0
+      torque_velocity_gain: 0.2
+    call: torque_idle_offset + torque_velocity_gain * abs($in(velocity_command))
+
+  - function: $in(alarm_torque)
+    name: detect_torque_alarm
+    description: Raise a torque alarm when the estimated load exceeds the programmed limit.
+    call: 1 if $in(torque_load) >= $in(torque_limit) else 0
+
+  - function: $in(alarm_limit)
+    name: detect_limit_alarm
+    description: Assert limit alarm when either soft limit switch is active.
+    call: 1 if $in(pos_limit_switch) == 1 or $in(neg_limit_switch) == 1 else 0
+
+  - function: $in(alarm_drive_fault)
+    name: detect_drive_fault
+    description: Aggregate drive fault flag using torque and limit alarms.
+    call: 1 if ($in(drive_enable) == 1 and ($in(alarm_limit) == 1 or $in(alarm_torque) == 1)) else 0
+
+  - function: $in(homed)
+    name: update_homed_state
+    description: Treat homing as complete when request is high and position is within tolerance of zero.
+    params:
+      tolerance: 0.2
+    call: (
+          0 if $in(homing_request) == 0
+          else (1 if abs($in(position_feedback)) <= tolerance else $in(homed))
+        )
+
+distortions:
+  actions:
+    - noise: $out(position_feedback)
+      std: 5.0e-4
+      mode: proportional
+
+polling:
+  interval: 0.1
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5020
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        drive_enable:       { address: [0,0],   group: c_o, type: uint_16 }
+        homing_request:     { address: [1,1],   group: c_o, type: uint_16 }
+        homed:              { address: [2,2],   group: h_r, type: uint_16 }
+        position_command:   { address: [3,4],   group: h_r, type: float }
+        position_feedback:  { address: [5,6],   group: h_r, type: float }
+        velocity_command:   { address: [7,8],   group: h_r, type: float }
+        velocity_feedback:  { address: [9,10],  group: h_r, type: float }
+        torque_load:        { address: [11,12], group: h_r, type: float }
+        torque_limit:       { address: [13,14], group: h_r, type: float }
+        soft_limit_pos:     { address: [15,16], group: h_r, type: float }
+        soft_limit_neg:     { address: [17,18], group: h_r, type: float }
+        max_speed:          { address: [19,20], group: h_r, type: float }
+        max_accel:          { address: [21,22], group: h_r, type: float }
+        max_decel:          { address: [23,24], group: h_r, type: float }
+        pos_limit_switch:   { address: [25,25], group: h_r, type: uint_16 }
+        neg_limit_switch:   { address: [26,26], group: h_r, type: uint_16 }
+        alarm_limit:        { address: [27,27], group: h_r, type: uint_16 }
+        alarm_torque:       { address: [28,28], group: h_r, type: uint_16 }
+        alarm_drive_fault:  { address: [29,29], group: h_r, type: uint_16 }
+        step_mode:          { address: [30,31], group: h_r, type: uint_32 }
+
+scenarios:
+  homing_cycle:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(drive_enable): 1
+      $in(homing_request): 1
+      $in(position_command): 0.0
+      $in(max_speed): 6.0
+      $in(max_accel): 0.35
+      $in(max_decel): 0.45
+
+  limit_overtravel:
+    enabled: true
+    duration: 12.0
+    overrides:
+      $in(drive_enable): 1
+      $in(position_command): 520.0
+      $in(soft_limit_pos): 500.0
+      $in(max_speed): 8.0
+      $in(torque_limit): 60.0
+
+  torque_overload_test:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(drive_enable): 1
+      $in(position_command): 300.0
+      $in(max_speed): 20.0
+      $in(torque_limit): 30.0

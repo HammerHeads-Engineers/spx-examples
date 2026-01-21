@@ -1,0 +1,167 @@
+# SPDX-License-Identifier: MIT
+
+name: lighting_zone__knx
+description: |
+  KNX lighting zone with two dimming circuits, scenes, daylight sensor and emergency override.
+  Lets KNX clients drive percentage setpoints, monitor occupancy and simulate alarm states.
+
+attributes:
+  zone_state: automatic        # automatic/manual/off
+  scene_active: default
+  occupancy_detected: 1
+  daylight_lux: 280.0
+
+  circuit_a_level_percent: 65.0
+  circuit_a_target_percent: 70.0
+  circuit_b_level_percent: 25.0
+  circuit_b_target_percent: 30.0
+
+  emergency_override: 0
+  alarm_emergency: 0
+  alarm_failure: 0
+
+  energy_today_kwh: 4.2
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(circuit_a_level_percent)
+    name: track_circuit_a
+    description: Circuit A level follows the target with mode gating.
+    call: (
+          0.0 if $in(zone_state) == "off"
+          else (
+            $in(circuit_a_target_percent)
+            if abs($in(circuit_a_target_percent) - $in(circuit_a_level_percent)) <= 4.0
+            else (
+              $in(circuit_a_level_percent)
+              + (4.0 if $in(circuit_a_target_percent) > $in(circuit_a_level_percent) else -4.0)
+            )
+          )
+        )
+
+  - function: $in(circuit_b_level_percent)
+    name: track_circuit_b
+    call: (
+          0.0 if $in(zone_state) == "off"
+          else (
+            $in(circuit_b_target_percent)
+            if abs($in(circuit_b_target_percent) - $in(circuit_b_level_percent)) <= 4.0
+            else (
+              $in(circuit_b_level_percent)
+              + (4.0 if $in(circuit_b_target_percent) > $in(circuit_b_level_percent) else -4.0)
+            )
+          )
+        )
+
+  - function: $in(daylight_lux)
+    name: update_daylight
+    description: Daylight reacts to occupancy and circuit levels.
+    call: max(
+          30.0,
+          min(
+            900.0,
+            $in(daylight_lux)
+            + 0.5 * ($in(circuit_a_level_percent) + $in(circuit_b_level_percent))
+            + 10.0 * ($in(occupancy_detected) - 0.5)
+            - 15.0 * $in(emergency_override)
+          )
+        )
+
+  - function: $in(energy_today_kwh)
+    name: integrate_energy
+    description: Basic energy counter for both circuits.
+    call: $in(energy_today_kwh) + ($in(circuit_a_level_percent) + $in(circuit_b_level_percent)) * cycle_time_s / 20000.0
+
+  - function: $in(alarm_emergency)
+    name: detect_emergency_alarm
+    call: 1 if $in(emergency_override) == 1 else 0
+
+  - function: $in(alarm_failure)
+    name: detect_failure_alarm
+    call: 1 if ($in(zone_state) == "automatic" and $in(circuit_a_level_percent) < 1.0 and $in(circuit_a_target_percent) > 40.0) else 0
+
+communication:
+  - knx_ip:
+      router:
+        host: knx_gateway
+        port: 3671
+        route_back: true
+      poll_interval: 0.3
+      bindings:
+        - name: circuit_a_level
+          direction: bidirectional
+          group_address: "1/1/10"
+          value_codec: uint8
+          read_attribute: "#attr(circuit_a_level_percent)"
+          write_attribute: "#attr(circuit_a_target_percent)"
+        - name: circuit_b_level
+          direction: bidirectional
+          group_address: "1/1/11"
+          value_codec: uint8
+          read_attribute: "#attr(circuit_b_level_percent)"
+          write_attribute: "#attr(circuit_b_target_percent)"
+        - name: zone_state
+          direction: bidirectional
+          group_address: "1/1/12"
+          value_codec: string
+          read_attribute: "#attr(zone_state)"
+          write_attribute: "#attr(zone_state)"
+          payload_length: 8
+        - name: scene_select
+          direction: inbound
+          group_address: "1/1/13"
+          value_codec: string
+          payload_length: 8
+          write_attribute: "#attr(scene_active)"
+        - name: occupancy
+          direction: inbound
+          group_address: "1/1/14"
+          value_codec: bool
+          write_attribute: "#attr(occupancy_detected)"
+        - name: daylight_sensor
+          direction: outbound
+          group_address: "1/1/15"
+          dpt: 9.004
+          read_attribute: "#attr(daylight_lux)"
+        - name: emergency_override
+          direction: inbound
+          group_address: "1/1/16"
+          value_codec: bool
+          write_attribute: "#attr(emergency_override)"
+        - name: alarm_emergency
+          direction: outbound
+          group_address: "1/1/17"
+          value_codec: bool
+          read_attribute: "#attr(alarm_emergency)"
+        - name: alarm_failure
+          direction: outbound
+          group_address: "1/1/18"
+          value_codec: bool
+          read_attribute: "#attr(alarm_failure)"
+
+scenarios:
+  workday_scene:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(zone_state): automatic
+      $in(scene_active): daylight
+      $in(circuit_a_target_percent): 70.0
+      $in(circuit_b_target_percent): 40.0
+
+  cleaning_scene:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(zone_state): manual
+      $in(scene_active): cleaning
+      $in(circuit_a_target_percent): 100.0
+      $in(circuit_b_target_percent): 80.0
+
+  night_shutdown:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(zone_state): off
+      $in(scene_active): night
+      $in(occupancy_detected): 0

@@ -1,0 +1,10 @@
+name: ev_csms_demo
+description: |
+  Minimal EV/DER orchestration profile showcasing the built-in OCPP 1.6 handshake
+  between a simulated charge point and central system (BootNotification + Heartbeat +
+  StatusNotification/MeterValues).
+models:
+  - library/domains/energy/emobility/csms__ocpp.yaml
+  - library/domains/energy/emobility/evse__ocpp.yaml
+services:
+  - ocpp_central_system

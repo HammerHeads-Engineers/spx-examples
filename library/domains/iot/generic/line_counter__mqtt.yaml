@@ -1,0 +1,131 @@
+# SPDX-License-Identifier: MIT
+
+name: iiot_line_counter__mqtt
+description: |
+  Virtual production line counter publishing piece counts and line speed over MQTT.
+  The model is suitable for testing OEE-style dashboards and simple MES consumers.
+
+attributes:
+  count_total: 0            # total pieces produced
+  count_good: 0             # good pieces
+  count_bad: 0              # rejected pieces
+  line_speed_mpm: 0.0       # current line speed [m/min]
+  target_speed_mpm: 30.0    # target line speed [m/min]
+  pulse_per_meter: 10.0     # encoder pulses per meter of material
+  scrap_rate_percent: 2.0   # nominal scrap rate [%]
+  running: 1                # 1 = running, 0 = stopped
+  jam_alarm: 0              # 1 = jam detected
+  state_text: "STOPPED"     # textual state for dashboards
+
+  cycle_time_s: 1.0         # integration step [s]
+
+actions:
+  - function: $in(line_speed_mpm)
+    name: track_line_speed
+    description: Slew actual speed toward the target when running.
+    accel: 5.0
+    decel: 8.0
+    call: (
+          0.0 if $in(running) == 0
+          else (
+            $in(line_speed_mpm)
+            + (
+                min(accel, $in(target_speed_mpm) - $in(line_speed_mpm))
+                if $in(target_speed_mpm) > $in(line_speed_mpm)
+                else max(-decel, $in(target_speed_mpm) - $in(line_speed_mpm))
+              )
+          )
+        )
+
+  - function: $in(count_total)
+    name: integrate_counts
+    description: Increment counters based on line speed and scrap rate.
+    call: (
+          $in(count_total)
+          + (
+              0.0
+              if $in(running) == 0
+              else max(0.0, $in(line_speed_mpm) * cycle_time_s * $in(pulse_per_meter) / 60.0)
+            )
+        )
+
+  - function: $in(count_good)
+    name: update_good_count
+    description: Derive good piece count from total count and scrap rate.
+    call: max(0.0, $in(count_total) * (1.0 - $in(scrap_rate_percent) / 100.0))
+
+  - function: $in(count_bad)
+    name: update_bad_count
+    description: Derive scrap count as the remainder between total and good pieces.
+    call: max(0.0, $in(count_total) - $in(count_good))
+
+  - function: $in(jam_alarm)
+    name: detect_jam
+    description: Raise jam alarm when running at non-zero speed but no progress is made.
+    threshold: 0.5
+    call: (
+          1 if $in(running) == 1 and $in(line_speed_mpm) < threshold else 0
+        )
+
+  - function: $in(state_text)
+    name: update_state_text
+    description: Simple RUN/STOP/FAULT state mapping.
+    call: (
+          "FAULT" if $in(jam_alarm) == 1
+          else ("RUN" if $in(running) == 1 else "STOPPED")
+        )
+
+communication:
+  - mqtt:
+      broker: "host.docker.internal"
+      port: 1883
+      publish_interval: 1.0
+      topic_prefix: "spx/examples/line_counter"
+      default_qos: 1
+      default_retain: false
+      bindings:
+        - attribute: $ext(count_total)
+          topic: telemetry/count_total
+          direction: publish
+        - attribute: $ext(count_good)
+          topic: telemetry/count_good
+          direction: publish
+        - attribute: $ext(count_bad)
+          topic: telemetry/count_bad
+          direction: publish
+        - attribute: $ext(line_speed_mpm)
+          topic: telemetry/line_speed_mpm
+          direction: publish
+        - attribute: $ext(jam_alarm)
+          topic: telemetry/alarms/jam
+          direction: publish
+        - attribute: $ext(state_text)
+          topic: telemetry/state
+          direction: publish
+        - attribute: $attr(target_speed_mpm)
+          topic: command/target_speed_mpm
+          direction: subscribe
+        - attribute: $attr(running)
+          topic: command/running
+          direction: subscribe
+
+scenarios:
+  start_line:
+    enabled: true
+    description: |
+      Bring the line from stopped state to the nominal target speed and let the
+      counter integrate pieces for a short window.
+    duration: 30.0
+    overrides:
+      $in(running): 1
+      $in(target_speed_mpm): 30.0
+
+  line_jam:
+    enabled: true
+    description: |
+      Simulate a temporary jam: the line remains commanded to run but the
+      effective speed drops near zero, raising the jam_alarm for dashboards.
+    duration: 10.0
+    overrides:
+      $in(running): 1
+      $in(line_speed_mpm): 0.0

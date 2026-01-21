@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: MIT
+
+name: vfd_drive__modbus
+description: |
+  Virtual VFD (variable frequency drive) model exposing speed, torque and status
+  via Modbus registers. Suitable for testing drive commissioning tools and
+  simple PLC integrations.
+
+attributes:
+  enable: 1                 # 1 = enabled
+  speed_set_rpm: 1500.0     # commanded speed [rpm]
+  speed_actual_rpm: 0.0     # feedback speed [rpm]
+  torque_percent: 0.0       # load torque [%]
+  torque_limit_percent: 120.0
+
+  accel_ramp_s: 2.0         # accel time from 0..100% [s]
+  decel_ramp_s: 3.0         # decel time [s]
+
+  alarm_overload: 0         # torque overload alarm
+  alarm_drive_fault: 0      # generic drive fault
+  status_word: 0            # encoded state bits
+
+  cycle_time_s: 0.1         # integration step
+
+actions:
+  - function: $in(speed_actual_rpm)
+    name: track_speed
+    description: First-order speed tracking with independent accel/decel ramps.
+    call: (
+          0.0 if $in(enable) == 0
+          else (
+            $in(speed_actual_rpm)
+            + (
+                ( $in(speed_set_rpm) - $in(speed_actual_rpm) )
+                * (cycle_time_s / max(0.1, ($in(accel_ramp_s) if $in(speed_set_rpm) > $in(speed_actual_rpm) else $in(decel_ramp_s))))
+              )
+          )
+        )
+
+  - function: $in(torque_percent)
+    name: compute_torque
+    description: Torque rises with relative speed, saturating near limit.
+    call: min(
+          $in(torque_limit_percent),
+          max(0.0, 10.0 + 0.06 * abs($in(speed_actual_rpm)))
+        )
+
+  - function: $in(alarm_overload)
+    name: detect_overload
+    description: Raise overload alarm when torque exceeds 100%.
+    call: 1 if $in(torque_percent) >= 100.0 else 0
+
+  - function: $in(alarm_drive_fault)
+    name: detect_drive_fault
+    description: Flag drive fault when slip between command and feedback stays excessive.
+    slip_limit_rpm: 200.0
+    call: 1 if ($in(enable) == 1 and abs($in(speed_set_rpm) - $in(speed_actual_rpm)) > slip_limit_rpm) else 0
+
+  - function: $in(status_word)
+    name: build_status_word
+    description: Encode basic RUN/FAULT bits into a status word.
+    call: >-
+          (
+            0
+            + (1 if $in(enable) == 1 else 0)
+            + (2 if $in(speed_actual_rpm) > 10.0 else 0)
+            + (4 if $in(alarm_overload) == 1 else 0)
+            + (8 if $in(alarm_drive_fault) == 1 else 0)
+          )
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.1
+      mapping:
+        enable:             { address: [0,0],  group: c_o, type: uint_16 }
+        speed_set_rpm:      { address: [1,2],  group: h_r, type: float }
+        speed_actual_rpm:   { address: [3,4],  group: h_r, type: float }
+        torque_percent:     { address: [5,6],  group: h_r, type: float }
+        torque_limit_percent: { address: [7,8], group: h_r, type: float }
+        accel_ramp_s:       { address: [9,10], group: h_r, type: float }
+        decel_ramp_s:       { address: [11,12], group: h_r, type: float }
+        alarm_overload:     { address: [13,13], group: h_r, type: uint_16 }
+        alarm_drive_fault:  { address: [14,14], group: h_r, type: uint_16 }
+        status_word:        { address: [15,15], group: h_r, type: uint_16 }
+
+scenarios:
+  speed_step_profile:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 1800.0
+      $in(accel_ramp_s): 1.2
+      $in(decel_ramp_s): 1.5
+
+  torque_overload:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 2200.0
+      $in(torque_limit_percent): 90.0
+
+  emergency_stop_fault:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(enable): 1
+      $in(speed_set_rpm): 0.0
+      $in(decel_ramp_s): 0.2
+      $in(accel_ramp_s): 0.5

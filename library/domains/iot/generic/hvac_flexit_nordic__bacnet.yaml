@@ -1,0 +1,653 @@
+# SPDX-License-Identifier: MIT
+
+name: hvac_flexit_nordic__bacnet
+description: |
+  Minimal BACnet/IP simulation of Flexit Nordic (EcoNordic) for Home Assistant using flexit_bacnet object map.
+
+attributes:
+  cycle_time_s: 1.0
+
+  # Temperatures (°C)
+  outside_air_temp_c: 5.0
+  supply_air_temp_c: 18.0
+  exhaust_air_temp_c: 16.0
+  extract_air_temp_c: 21.0
+  room_temp_c: 21.0
+
+  # Air temperature setpoints (degC)
+  air_temp_setpoint_home_c: 19.0
+  air_temp_setpoint_away_c: 18.0
+  active_air_temp_setpoint_c: 19.0
+
+  # Simple thermal model
+  room_thermal_mass_kwh_per_k: 4.0
+  heat_loss_kw_per_k: 0.15
+  fan_loss_kw_per_k: 0.04
+  heating_boost_kw_per_k: 0.6
+  thermal_time_scale: 6.0
+  heat_loss_kw: 0.0
+  heating_demand_kw: 0.0
+
+  # Comfort button
+  comfort_button: 1
+  comfort_button_delay_min: 0
+
+  # Fireplace ventilation
+  fireplace_ventilation_trigger: 1
+  fireplace_active: 0
+  fireplace_remaining_min: 0.0
+
+  # Cooker hood
+  cooker_hood_active: 0
+
+  # Ventilation mode (MultiStateValue,42)
+  # Range used in this model: 1..4
+  # 1=Stop, 2=Away, 3=Home, 4=High
+  ventilation_mode: 3
+  _ventilation_mode_prev: 3
+
+  # Fans
+  supply_fan_speed_pct: 35.0
+  exhaust_fan_speed_pct: 35.0
+  supply_fan_rpm: 1200.0
+  exhaust_fan_rpm: 1200.0
+
+  # Electric heater (kW)
+  electric_heater_enabled: 0
+  heater_fault: 0
+  electric_heater_nom_power: 5.0
+  heater_load_pct: 0.0
+  heating_coil_electric_power_kw: 0.0
+
+  # Filter
+  air_filter_operating_time_h: 1000.0
+  air_filter_polluted: 0
+
+  # Rotary heat exchanger
+  rotary_hex_speed_pct: 60.0
+  rotary_hex_efficiency_pct: 75.0
+
+  # Ventilation setpoints (%) (AnalogValue 1835..1844)
+  supply_set_high: 60.0
+  supply_set_home: 35.0
+  supply_set_away: 20.0
+  supply_set_fire: 50.0
+  supply_set_cooker: 70.0
+
+  exhaust_set_high: 60.0
+  exhaust_set_home: 35.0
+  exhaust_set_away: 20.0
+  exhaust_set_fire: 50.0
+  exhaust_set_cooker: 70.0
+
+  fireplace_runtime_min: 30
+
+actions:
+  - function: $in(ventilation_mode)
+    name: clamp_ventilation_mode
+    description: Keep ventilation_mode within 1..4.
+    call: max(1, min(4, int($in(ventilation_mode))))
+
+  - function: $in(active_air_temp_setpoint_c)
+    name: derive_active_air_temp_setpoint
+    description: Select active air temperature setpoint based on ventilation mode.
+    call: (
+          $in(air_temp_setpoint_away_c) if $in(ventilation_mode) == 2
+          else $in(air_temp_setpoint_home_c)
+        )
+
+  - function: $in(heat_loss_kw)
+    name: compute_heat_loss
+    description: Estimate envelope + ventilation heat loss versus outdoor temperature.
+    call: max(
+          0.0,
+          (
+            $in(room_temp_c)
+            - $in(outside_air_temp_c)
+          )
+          * (
+            $in(heat_loss_kw_per_k)
+            + $in(fan_loss_kw_per_k) * ($in(supply_fan_speed_pct) / 100.0)
+          )
+        )
+
+  - function: $in(heating_demand_kw)
+    name: compute_heating_demand
+    description: Base load for losses plus boost to reach setpoint.
+    call: $in(heat_loss_kw) + $in(heating_boost_kw_per_k) * max(
+          0.0,
+          $in(active_air_temp_setpoint_c) - $in(room_temp_c)
+        )
+
+  - function: $in(heater_load_pct)
+    name: compute_heater_load
+    description: Normalize heating demand against installed heater power.
+    call: (
+          0.0 if ($in(electric_heater_enabled) == 0 or $in(heater_fault) == 1)
+          else max(
+            0.0,
+            min(100.0, 100.0 * $in(heating_demand_kw) / max(0.1, $in(electric_heater_nom_power)))
+          )
+        )
+
+  - function: $in(heating_coil_electric_power_kw)
+    name: compute_heating_coil_power
+    description: Scale heater power by normalized demand.
+    call: $in(electric_heater_nom_power) * ($in(heater_load_pct) / 100.0)
+
+  - function: $in(supply_fan_speed_pct)
+    name: apply_supply_mode_setpoint
+    description: Apply supply speed setpoint when ventilation mode changes.
+    call: (
+          $in(supply_fan_speed_pct) if $in(ventilation_mode) == $in(_ventilation_mode_prev)
+          else (
+            0.0 if $in(ventilation_mode) == 1
+            else (
+              $in(supply_set_away) if $in(ventilation_mode) == 2
+              else (
+                $in(supply_set_home) if $in(ventilation_mode) == 3
+                else $in(supply_set_high)
+              )
+            )
+          )
+        )
+
+  - function: $in(exhaust_fan_speed_pct)
+    name: apply_exhaust_mode_setpoint
+    description: Apply exhaust speed setpoint when ventilation mode changes.
+    call: (
+          $in(exhaust_fan_speed_pct) if $in(ventilation_mode) == $in(_ventilation_mode_prev)
+          else (
+            0.0 if $in(ventilation_mode) == 1
+            else (
+              $in(exhaust_set_away) if $in(ventilation_mode) == 2
+              else (
+                $in(exhaust_set_home) if $in(ventilation_mode) == 3
+                else $in(exhaust_set_high)
+              )
+            )
+          )
+        )
+
+  - function: $in(_ventilation_mode_prev)
+    name: track_ventilation_mode_prev
+    description: Store previous mode for change detection.
+    call: $in(ventilation_mode)
+
+  - function: $in(rotary_hex_speed_pct)
+    name: clamp_rotary_hex_speed
+    description: Keep rotary heat exchanger speed within 0..100%.
+    call: max(0.0, min(100.0, $in(rotary_hex_speed_pct)))
+
+  - function: $in(rotary_hex_efficiency_pct)
+    name: compute_rotary_efficiency
+    description: Simple efficiency proxy based on rotary speed.
+    call: max(0.0, min(90.0, 50.0 + 0.4 * $in(rotary_hex_speed_pct)))
+
+  - function: $in(supply_fan_rpm)
+    name: compute_supply_fan_rpm
+    description: Derive supply fan RPM from speed percent.
+    call: 600.0 + 20.0 * max(0.0, min(100.0, $in(supply_fan_speed_pct)))
+
+  - function: $in(exhaust_fan_rpm)
+    name: compute_exhaust_fan_rpm
+    description: Derive exhaust fan RPM from speed percent.
+    call: 600.0 + 20.0 * max(0.0, min(100.0, $in(exhaust_fan_speed_pct)))
+
+  - function: $in(supply_air_temp_c)
+    name: trend_supply_air_temp
+    description: Supply air temp trends with heat recovery and heater demand.
+    alpha: 0.05
+    call: (
+          $in(supply_air_temp_c)
+          + alpha
+            * (
+              (
+                $in(outside_air_temp_c)
+                + ($in(rotary_hex_efficiency_pct) / 100.0)
+                  * ($in(extract_air_temp_c) - $in(outside_air_temp_c))
+              )
+              + ($in(heater_load_pct) / 100.0)
+                * max(
+                  0.0,
+                  ($in(active_air_temp_setpoint_c) + 2.0)
+                  - (
+                    $in(outside_air_temp_c)
+                    + ($in(rotary_hex_efficiency_pct) / 100.0)
+                      * ($in(extract_air_temp_c) - $in(outside_air_temp_c))
+                  )
+                )
+              - $in(supply_air_temp_c)
+            )
+        )
+
+  - function: $in(room_temp_c)
+    name: trend_room_temp
+    description: Room temp follows energy balance of heater and envelope losses.
+    call: $in(room_temp_c)
+          + (
+            ($in(cycle_time_s) / 3600.0)
+            * max(0.1, $in(thermal_time_scale))
+            * (
+              ($in(heating_coil_electric_power_kw) - $in(heat_loss_kw))
+              / max(0.5, $in(room_thermal_mass_kwh_per_k))
+            )
+          )
+
+  - function: $in(extract_air_temp_c)
+    name: trend_extract_air_temp
+    description: Extract air temp trends toward room temperature.
+    alpha: 0.05
+    call: $in(extract_air_temp_c) + alpha * ($in(room_temp_c) - $in(extract_air_temp_c))
+
+  - function: $in(exhaust_air_temp_c)
+    name: trend_exhaust_air_temp
+    description: Exhaust air temp loosely trends toward outside temperature.
+    alpha: 0.03
+    call: $in(exhaust_air_temp_c) + alpha * (($in(outside_air_temp_c) + 2.0) - $in(exhaust_air_temp_c))
+
+  - function: $in(air_filter_operating_time_h)
+    name: integrate_filter_time
+    description: Accumulate air filter runtime in hours.
+    call: $in(air_filter_operating_time_h) + $in(cycle_time_s) / 3600.0
+
+  - function: $in(air_filter_polluted)
+    name: detect_filter_polluted
+    description: Mark filter as polluted after 2000h.
+    call: 1 if $in(air_filter_operating_time_h) > 2000.0 else 0
+
+  - function: $in(fireplace_active)
+    name: derive_fireplace_active
+    description: Mirror fireplace trigger into active state.
+    call: 1 if $in(fireplace_ventilation_trigger) == 2 else 0
+
+  - function: $in(fireplace_remaining_min)
+    name: derive_fireplace_remaining
+    description: Expose fireplace runtime while trigger is active.
+    call: $in(fireplace_runtime_min) if $in(fireplace_ventilation_trigger) == 2 else 0.0
+
+communication:
+  # Object map aligned with flexit_bacnet.
+  - bacnet:
+      host: 0.0.0.0
+      port: 47808
+      device:
+        instance_id: 2
+        vendor_id: 999
+        name: "Flexit Nordic (Sim)"
+        description: "800130-002967"
+        model_name: "EcoNordic"
+      timing:
+        poll_interval: 0.5
+        poll_jitter: 0.05
+      objects:
+        outside_air_temp:
+          type: analogInput
+          instance: 1
+          properties:
+            presentValue:
+              read: "#attr(outside_air_temp_c)"
+            units: "degreesCelsius"
+
+        supply_air_temp:
+          type: analogInput
+          instance: 4
+          properties:
+            presentValue:
+              read: "#attr(supply_air_temp_c)"
+            units: "degreesCelsius"
+
+        supply_fan_speed:
+          type: analogOutput
+          instance: 3
+          properties:
+            presentValue:
+              read: "#attr(supply_fan_speed_pct)"
+              write: "#attr(supply_fan_speed_pct)"
+            units: "percent"
+
+        supply_fan_rpm:
+          type: analogInput
+          instance: 5
+          properties:
+            presentValue:
+              read: "#attr(supply_fan_rpm)"
+            units: "revolutionsPerMinute"
+
+        exhaust_fan_speed:
+          type: analogOutput
+          instance: 4
+          properties:
+            presentValue:
+              read: "#attr(exhaust_fan_speed_pct)"
+              write: "#attr(exhaust_fan_speed_pct)"
+            units: "percent"
+
+        exhaust_air_temp:
+          type: analogInput
+          instance: 11
+          properties:
+            presentValue:
+              read: "#attr(exhaust_air_temp_c)"
+            units: "degreesCelsius"
+
+        exhaust_fan_rpm:
+          type: analogInput
+          instance: 12
+          properties:
+            presentValue:
+              read: "#attr(exhaust_fan_rpm)"
+            units: "revolutionsPerMinute"
+
+        extract_air_temp:
+          type: analogInput
+          instance: 59
+          properties:
+            presentValue:
+              read: "#attr(extract_air_temp_c)"
+            units: "degreesCelsius"
+
+        room_temp:
+          type: analogInput
+          instance: 75
+          properties:
+            presentValue:
+              read: "#attr(room_temp_c)"
+            units: "degreesCelsius"
+
+        air_temp_setpoint_away:
+          type: analogValue
+          instance: 1985
+          properties:
+            presentValue:
+              read: "#attr(air_temp_setpoint_away_c)"
+              write: "#attr(air_temp_setpoint_away_c)"
+            units: "degreesCelsius"
+
+        air_temp_setpoint_home:
+          type: analogValue
+          instance: 1994
+          properties:
+            presentValue:
+              read: "#attr(air_temp_setpoint_home_c)"
+              write: "#attr(air_temp_setpoint_home_c)"
+            units: "degreesCelsius"
+
+        comfort_button:
+          type: binaryValue
+          instance: 50
+          properties:
+            presentValue:
+              read: "#attr(comfort_button)"
+              write: "#attr(comfort_button)"
+              states:
+                0: "inactive"
+                1: "active"
+
+        comfort_button_delay:
+          type: positiveIntegerValue
+          instance: 318
+          properties:
+            presentValue:
+              read: "#attr(comfort_button_delay_min)"
+              write: "#attr(comfort_button_delay_min)"
+            units: "minutes"
+
+        fireplace_ventilation:
+          type: multiStateValue
+          instance: 360
+          properties:
+            presentValue:
+              read: "#attr(fireplace_ventilation_trigger)"
+              write: "#attr(fireplace_ventilation_trigger)"
+              states:
+                1: "inactive"
+                2: "trigger"
+            numberOfStates: 2
+            stateText:
+              - "inactive"
+              - "trigger"
+
+        fireplace_state:
+          type: binaryValue
+          instance: 400
+          properties:
+            presentValue:
+              read: "#attr(fireplace_active)"
+              states:
+                0: "inactive"
+                1: "active"
+
+        fireplace_remaining_duration:
+          type: analogValue
+          instance: 2038
+          properties:
+            presentValue:
+              read: "#attr(fireplace_remaining_min)"
+            units: "minutes"
+
+        cooker_hood:
+          type: binaryValue
+          instance: 402
+          properties:
+            presentValue:
+              read: "#attr(cooker_hood_active)"
+              write: "#attr(cooker_hood_active)"
+              states:
+                0: "inactive"
+                1: "active"
+
+        ventilation_mode:
+          type: multiStateValue
+          instance: 42
+          properties:
+            presentValue:
+              read: "#attr(ventilation_mode)"
+              write: "#attr(ventilation_mode)"
+              states:
+                1: "stop"
+                2: "away"
+                3: "home"
+                4: "high"
+            numberOfStates: 4
+            stateText:
+              - "stop"
+              - "away"
+              - "home"
+              - "high"
+
+        electric_heater_enabled:
+          type: binaryValue
+          instance: 445
+          properties:
+            presentValue:
+              read: "#attr(electric_heater_enabled)"
+              write: "#attr(electric_heater_enabled)"
+              states:
+                0: "off"
+                1: "on"
+
+        electric_heater_nom_power:
+          type: analogValue
+          instance: 190
+          properties:
+            presentValue:
+              read: "#attr(electric_heater_nom_power)"
+            units: "kilowatts"
+
+        heating_coil_electric_power:
+          type: analogValue
+          instance: 194
+          properties:
+            presentValue:
+              read: "#attr(heating_coil_electric_power_kw)"
+            units: "kilowatts"
+
+        air_filter_operating_time:
+          type: analogValue
+          instance: 285
+          properties:
+            presentValue:
+              read: "#attr(air_filter_operating_time_h)"
+            units: "hours"
+
+        air_filter_polluted:
+          type: binaryValue
+          instance: 522
+          properties:
+            presentValue:
+              read: "#attr(air_filter_polluted)"
+              states:
+                0: "ok"
+                1: "polluted"
+
+        rotary_hex_speed:
+          type: analogOutput
+          instance: 0
+          properties:
+            presentValue:
+              read: "#attr(rotary_hex_speed_pct)"
+              write: "#attr(rotary_hex_speed_pct)"
+            units: "percent"
+
+        rotary_hex_efficiency:
+          type: analogValue
+          instance: 2023
+          properties:
+            presentValue:
+              read: "#attr(rotary_hex_efficiency_pct)"
+            units: "percent"
+
+        supply_set_high:
+          type: analogValue
+          instance: 1835
+          properties:
+            presentValue:
+              read: "#attr(supply_set_high)"
+              write: "#attr(supply_set_high)"
+            units: "percent"
+
+        supply_set_home:
+          type: analogValue
+          instance: 1836
+          properties:
+            presentValue:
+              read: "#attr(supply_set_home)"
+              write: "#attr(supply_set_home)"
+            units: "percent"
+
+        supply_set_away:
+          type: analogValue
+          instance: 1837
+          properties:
+            presentValue:
+              read: "#attr(supply_set_away)"
+              write: "#attr(supply_set_away)"
+            units: "percent"
+
+        supply_set_fire:
+          type: analogValue
+          instance: 1838
+          properties:
+            presentValue:
+              read: "#attr(supply_set_fire)"
+              write: "#attr(supply_set_fire)"
+            units: "percent"
+
+        supply_set_cooker:
+          type: analogValue
+          instance: 1839
+          properties:
+            presentValue:
+              read: "#attr(supply_set_cooker)"
+              write: "#attr(supply_set_cooker)"
+            units: "percent"
+
+        exhaust_set_high:
+          type: analogValue
+          instance: 1840
+          properties:
+            presentValue:
+              read: "#attr(exhaust_set_high)"
+              write: "#attr(exhaust_set_high)"
+            units: "percent"
+
+        exhaust_set_home:
+          type: analogValue
+          instance: 1841
+          properties:
+            presentValue:
+              read: "#attr(exhaust_set_home)"
+              write: "#attr(exhaust_set_home)"
+            units: "percent"
+
+        exhaust_set_away:
+          type: analogValue
+          instance: 1842
+          properties:
+            presentValue:
+              read: "#attr(exhaust_set_away)"
+              write: "#attr(exhaust_set_away)"
+            units: "percent"
+
+        exhaust_set_fire:
+          type: analogValue
+          instance: 1843
+          properties:
+            presentValue:
+              read: "#attr(exhaust_set_fire)"
+              write: "#attr(exhaust_set_fire)"
+            units: "percent"
+
+        exhaust_set_cooker:
+          type: analogValue
+          instance: 1844
+          properties:
+            presentValue:
+              read: "#attr(exhaust_set_cooker)"
+              write: "#attr(exhaust_set_cooker)"
+            units: "percent"
+
+        fireplace_runtime:
+          type: positiveIntegerValue
+          instance: 270
+          properties:
+            presentValue:
+              read: "#attr(fireplace_runtime_min)"
+              write: "#attr(fireplace_runtime_min)"
+            units: "minutes"
+
+scenarios:
+  heater_failure:
+    enabled: true
+    duration: 60.0
+    overrides:
+      $in(ventilation_mode): 3
+      $in(outside_air_temp_c): 5.0
+      $in(air_temp_setpoint_home_c): 22.5
+      $in(electric_heater_enabled): 1
+      $in(heater_fault): 1
+
+  room_temp_sensor_stuck_high:
+    enabled: true
+    duration: 45.0
+    actions:
+      - function: $out(room_temp_c)
+        params:
+          stuck_start: 10.0
+          stuck_end: 35.0
+          stuck_value: 35.0
+        call: |
+          (lambda t, v:
+            stuck_value if (t >= stuck_start and t < stuck_end) else v
+          )($attr(timer.time), $out(room_temp_c))
+
+  room_temp_sensor_noise:
+    enabled: true
+    duration: 30.0
+    actions:
+      - noise: $out(room_temp_c)
+        name: Room Sensor Noise
+        description: Adds proportional noise to the room temperature reading.
+        std: 4.0e-2
+        mode: proportional

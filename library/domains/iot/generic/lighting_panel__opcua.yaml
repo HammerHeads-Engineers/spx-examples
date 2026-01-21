@@ -1,0 +1,270 @@
+# SPDX-License-Identifier: MIT
+
+name: lighting_panel__opcua
+description: |
+  OPC UA controllable lighting panel modelling three zones, daylight harvesting and scenes.
+  Useful for showcasing BMS/BAS OPC UA integrations focused on lighting and occupancy.
+
+attributes:
+  panel_state: automatic        # automatic/manual/off
+  active_scene: daylight
+  schedule_state: workday
+
+  zone1_level_percent: 65.0
+  zone1_target_percent: 70.0
+  zone2_level_percent: 40.0
+  zone2_target_percent: 45.0
+  zone3_level_percent: 15.0
+  zone3_target_percent: 20.0
+
+  daylight_lux: 320.0
+  daylight_setpoint_lux: 350.0
+
+  occupancy_zone1: 1
+  occupancy_zone2: 0
+  occupancy_zone3: 0
+
+  energy_today_kwh: 12.5
+  energy_week_kwh: 86.0
+
+  emergency_test_active: 0
+  alarm_emergency: 0
+  alarm_power: 0
+
+  cycle_time_s: 0.5
+
+actions:
+  - function: $in(zone1_level_percent)
+    name: track_zone1
+    description: Zone 1 dimming with slew and panel state override.
+    call: (
+          0.0 if $in(panel_state) == "off"
+          else (
+            $in(zone1_target_percent)
+            if abs($in(zone1_target_percent) - $in(zone1_level_percent)) <= 3.0
+            else (
+              $in(zone1_level_percent)
+              + (3.0 if $in(zone1_target_percent) > $in(zone1_level_percent) else -3.0)
+            )
+          )
+        )
+
+  - function: $in(zone2_level_percent)
+    name: track_zone2
+    call: (
+          0.0 if $in(panel_state) == "off"
+          else (
+            $in(zone2_target_percent)
+            if abs($in(zone2_target_percent) - $in(zone2_level_percent)) <= 3.0
+            else (
+              $in(zone2_level_percent)
+              + (3.0 if $in(zone2_target_percent) > $in(zone2_level_percent) else -3.0)
+            )
+          )
+        )
+
+  - function: $in(zone3_level_percent)
+    name: track_zone3
+    call: (
+          0.0 if $in(panel_state) == "off"
+          else (
+            $in(zone3_target_percent)
+            if abs($in(zone3_target_percent) - $in(zone3_level_percent)) <= 3.0
+            else (
+              $in(zone3_level_percent)
+              + (3.0 if $in(zone3_target_percent) > $in(zone3_level_percent) else -3.0)
+            )
+          )
+        )
+
+  - function: $in(daylight_lux)
+    name: update_daylight
+    description: Daylight reacts to scene selection and occupancy.
+    call: max(
+          50.0,
+          min(
+            600.0,
+            $in(daylight_lux)
+            + 5.0 * ($in(zone1_level_percent) - $in(daylight_setpoint_lux) / 10.0)
+            + 2.0 * ($in(occupancy_zone1) + $in(occupancy_zone2) + $in(occupancy_zone3))
+          )
+        )
+
+  - function: $in(energy_today_kwh)
+    name: integrate_energy
+    description: Estimate lighting energy.
+    call: $in(energy_today_kwh) + ($in(zone1_level_percent) + $in(zone2_level_percent) + $in(zone3_level_percent)) * cycle_time_s / 10000.0
+
+  - function: $in(energy_week_kwh)
+    call: max($in(energy_today_kwh), $in(energy_week_kwh) + 0.05 * cycle_time_s)
+
+  - function: $in(alarm_emergency)
+    name: detect_emergency_alarm
+    call: 1 if $in(emergency_test_active) == 1 and $in(panel_state) != "off" else 0
+
+  - function: $in(alarm_power)
+    name: detect_power_alarm
+    call: 1 if ($in(zone1_level_percent) + $in(zone2_level_percent) + $in(zone3_level_percent)) > 250.0 else 0
+
+communication:
+  - opcua_server:
+      endpoint: opc.tcp://0.0.0.0:4844/spx/lighting-panel
+      namespace_uri: urn:spx:examples:opcua:lighting-panel
+      security:
+        policy: NoSecurity
+        user_tokens:
+          - type: anonymous
+          - type: username
+            username: lighting
+            password: comfort
+      sections:
+        - name: panel
+          browse_path: ["LightingPanel"]
+          bindings:
+            - name: PanelState
+              direction: bidirectional
+              attributes: "#attr(panel_state)"
+              node:
+                browse_path: ["State"]
+                data_type: String
+            - name: ActiveScene
+              direction: bidirectional
+              attributes: "#attr(active_scene)"
+              node:
+                browse_path: ["Scene"]
+                data_type: String
+            - name: Schedule
+              direction: bidirectional
+              attributes: "#attr(schedule_state)"
+              node:
+                browse_path: ["Schedule"]
+                data_type: String
+        - name: zones
+          browse_path: ["LightingPanel","Zones"]
+          bindings:
+            - name: Zone1Level
+              direction: bidirectional
+              attributes:
+                - "#attr(zone1_level_percent)"
+                - "#attr(zone1_target_percent)"
+              read_attribute: "#attr(zone1_level_percent)"
+              write_attribute: "#attr(zone1_target_percent)"
+              node:
+                browse_path: ["Zone1","Level"]
+                data_type: Double
+            - name: Zone2Level
+              direction: bidirectional
+              attributes:
+                - "#attr(zone2_level_percent)"
+                - "#attr(zone2_target_percent)"
+              read_attribute: "#attr(zone2_level_percent)"
+              write_attribute: "#attr(zone2_target_percent)"
+              node:
+                browse_path: ["Zone2","Level"]
+                data_type: Double
+            - name: Zone3Level
+              direction: bidirectional
+              attributes:
+                - "#attr(zone3_level_percent)"
+                - "#attr(zone3_target_percent)"
+              read_attribute: "#attr(zone3_level_percent)"
+              write_attribute: "#attr(zone3_target_percent)"
+              node:
+                browse_path: ["Zone3","Level"]
+                data_type: Double
+        - name: sensors
+          browse_path: ["LightingPanel","Sensors"]
+          bindings:
+            - name: Daylight
+              direction: outbound
+              attributes: "#attr(daylight_lux)"
+              node:
+                browse_path: ["DaylightLux"]
+                data_type: Double
+            - name: DaylightSetpoint
+              direction: bidirectional
+              attributes: "#attr(daylight_setpoint_lux)"
+              node:
+                browse_path: ["DaylightSetpoint"]
+                data_type: Double
+            - name: OccupancyZone1
+              direction: outbound
+              attributes: "#attr(occupancy_zone1)"
+              node:
+                browse_path: ["Occupancy","Zone1"]
+                data_type: Boolean
+            - name: OccupancyZone2
+              direction: outbound
+              attributes: "#attr(occupancy_zone2)"
+              node:
+                browse_path: ["Occupancy","Zone2"]
+                data_type: Boolean
+            - name: OccupancyZone3
+              direction: outbound
+              attributes: "#attr(occupancy_zone3)"
+              node:
+                browse_path: ["Occupancy","Zone3"]
+                data_type: Boolean
+        - name: energy
+          browse_path: ["LightingPanel","Energy"]
+          bindings:
+            - name: EnergyToday
+              direction: outbound
+              attributes: "#attr(energy_today_kwh)"
+              node:
+                browse_path: ["Today"]
+                data_type: Double
+            - name: EnergyWeek
+              direction: outbound
+              attributes: "#attr(energy_week_kwh)"
+              node:
+                browse_path: ["WeekToDate"]
+                data_type: Double
+        - name: diagnostics
+          browse_path: ["LightingPanel","Diagnostics"]
+          bindings:
+            - name: EmergencyTest
+              direction: bidirectional
+              attributes: "#attr(emergency_test_active)"
+              node:
+                browse_path: ["EmergencyTestActive"]
+                data_type: Boolean
+            - name: AlarmEmergency
+              direction: outbound
+              attributes: "#attr(alarm_emergency)"
+              node:
+                browse_path: ["AlarmEmergency"]
+                data_type: Boolean
+            - name: AlarmPower
+              direction: outbound
+              attributes: "#attr(alarm_power)"
+              node:
+                browse_path: ["AlarmPower"]
+                data_type: Boolean
+
+scenarios:
+  evening_scene:
+    enabled: true
+    duration: 20.0
+    overrides:
+      $in(active_scene): evening
+      $in(zone1_target_percent): 45.0
+      $in(zone2_target_percent): 30.0
+      $in(zone3_target_percent): 15.0
+
+  night_shutdown:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(panel_state): off
+      $in(schedule_state): night
+      $in(zone1_target_percent): 0.0
+      $in(zone2_target_percent): 0.0
+      $in(zone3_target_percent): 0.0
+
+  emergency_test:
+    enabled: true
+    duration: 10.0
+    overrides:
+      $in(emergency_test_active): 1
+      $in(panel_state): manual

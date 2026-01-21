@@ -1,0 +1,280 @@
+# SPDX-License-Identifier: MIT
+
+name: packaging_line__opcua
+description: |
+  OPC UA model of a packaging line with infeed queue, wrapper and palletizer diagnostics.
+  Provides bidirectional commands for speed/targets and exposes typical jam / low-film alarms.
+
+attributes:
+  line_state: stopped            # stopped, running, fault
+  line_mode: automatic           # automatic/manual
+  shift_order_id: "PKG-1001"
+  pallet_destination: "Dock-A"
+
+  line_speed_mpm: 0.0
+  target_speed_mpm: 35.0
+  cases_per_min: 0.0
+  throughput_today: 0
+  reject_today: 0
+  infeed_queue_count: 12
+  pallet_count_ready: 1
+
+  wrapper_temperature_c: 135.0
+  wrapper_target_temp_c: 140.0
+  film_roll_percent: 85.0
+  diverter_mode: main             # main / rework
+
+  alarm_jam: 0
+  alarm_low_film: 0
+  alarm_overtemp: 0
+
+  cycle_time_s: 1.0
+
+actions:
+  - function: $in(line_state)
+    name: update_line_state
+    description: Determine high-level state from alarms and mode.
+    call: (
+          "fault" if ($in(alarm_jam) or $in(alarm_overtemp))
+          else (
+            "running" if ($in(line_mode) == "automatic" and $in(target_speed_mpm) > 0.1)
+            else "stopped"
+          )
+        )
+
+  - function: $in(line_speed_mpm)
+    name: slew_line_speed
+    description: Slew actual speed toward target.
+    accel: 5.0
+    call: (
+          0.0 if $in(line_state) != "running"
+          else (
+            $in(target_speed_mpm)
+            if abs($in(target_speed_mpm) - $in(line_speed_mpm)) <= accel
+            else (
+              $in(line_speed_mpm)
+              + (accel if $in(target_speed_mpm) > $in(line_speed_mpm) else -accel)
+            )
+          )
+        )
+
+  - function: $in(cases_per_min)
+    name: compute_cases_per_min
+    description: Convert conveyor speed into throughput.
+    call: max(0.0, 0.8 * $in(line_speed_mpm))
+
+  - function: $in(throughput_today)
+    name: integrate_throughput
+    description: Increment throughput and reject counters based on current rates.
+    call: (
+          $in(throughput_today)
+          + ($in(cases_per_min) * cycle_time_s / 60.0 if $in(line_state) == "running" else 0.0)
+        )
+
+  - function: $in(reject_today)
+    name: integrate_rejects
+    description: Assume 2% reject rate when running.
+    call: (
+          $in(reject_today)
+          + (0.02 * $in(cases_per_min) * cycle_time_s / 60.0 if $in(line_state) == "running" else 0.0)
+        )
+
+  - function: $in(infeed_queue_count)
+    name: update_infeed_queue
+    description: Queue drains as throughput increases.
+    call: max(
+          0.0,
+          $in(infeed_queue_count)
+          + (2.0 if $in(line_state) == "stopped" else -$in(cases_per_min) * cycle_time_s / 120.0)
+        )
+
+  - function: $in(pallet_count_ready)
+    name: build_pallets
+    description: Pallet count increments when enough product is produced.
+    call: (
+          $in(pallet_count_ready) + 1
+          if ($in(throughput_today) // 60) > ($in(pallet_count_ready))
+          else $in(pallet_count_ready)
+        )
+
+  - function: $in(wrapper_temperature_c)
+    name: regulate_wrapper_temperature
+    description: Wrapper temperature tracks target with disturbances.
+    call: (
+          $in(wrapper_target_temp_c)
+          if abs($in(wrapper_target_temp_c) - $in(wrapper_temperature_c)) <= 1.5
+          else (
+            $in(wrapper_temperature_c)
+            + (1.5 if $in(wrapper_target_temp_c) > $in(wrapper_temperature_c) else -1.5)
+          )
+        )
+
+  - function: $in(alarm_overtemp)
+    name: detect_overtemp_alarm
+    call: 1 if $in(wrapper_temperature_c) >= ($in(wrapper_target_temp_c) + 10.0) else 0
+
+  - function: $in(film_roll_percent)
+    name: drain_film_roll
+    description: Film roll decreases with throughput.
+    call: max(
+          0.0,
+          $in(film_roll_percent)
+          - (0.01 * $in(cases_per_min) * cycle_time_s / 60.0)
+        )
+
+  - function: $in(alarm_low_film)
+    name: detect_low_film
+    call: 1 if $in(film_roll_percent) <= 10.0 else 0
+
+  - function: $in(alarm_jam)
+    name: auto_clear_jam_when_stopped
+    call: 0 if $in(line_state) == "stopped" else $in(alarm_jam)
+
+communication:
+  - opcua_server:
+      endpoint: opc.tcp://0.0.0.0:4842/spx/packaging-line
+      namespace_uri: urn:spx:examples:opcua:packaging-line
+      security:
+        policy: NoSecurity
+        user_tokens:
+          - type: anonymous
+          - type: username
+            username: linelead
+            password: pack123
+      sections:
+        - name: line
+          browse_path: ["PackagingLine"]
+          bindings:
+            - name: State
+              direction: outbound
+              attributes: "#attr(line_state)"
+              node:
+                browse_path: ["State"]
+                data_type: String
+            - name: Mode
+              direction: bidirectional
+              attributes: "#attr(line_mode)"
+              node:
+                browse_path: ["Mode"]
+                data_type: String
+            - name: ShiftOrder
+              direction: bidirectional
+              attributes: "#attr(shift_order_id)"
+              node:
+                browse_path: ["ShiftOrderId"]
+                data_type: String
+            - name: PalletDestination
+              direction: bidirectional
+              attributes: "#attr(pallet_destination)"
+              node:
+                browse_path: ["PalletDestination"]
+                data_type: String
+            - name: LineSpeed
+              direction: outbound
+              attributes: "#attr(line_speed_mpm)"
+              node:
+                browse_path: ["Speed","Actual"]
+                data_type: Double
+            - name: TargetSpeed
+              direction: bidirectional
+              attributes: "#attr(target_speed_mpm)"
+              node:
+                browse_path: ["Speed","Target"]
+                data_type: Double
+            - name: Throughput
+              direction: outbound
+              attributes: "#attr(throughput_today)"
+              node:
+                browse_path: ["Throughput","Total"]
+                data_type: Double
+            - name: Rejects
+              direction: outbound
+              attributes: "#attr(reject_today)"
+              node:
+                browse_path: ["Throughput","Rejects"]
+                data_type: Double
+            - name: QueueCount
+              direction: outbound
+              attributes: "#attr(infeed_queue_count)"
+              node:
+                browse_path: ["Infeed","QueueCount"]
+                data_type: Double
+        - name: equipment
+          browse_path: ["PackagingLine","Equipment"]
+          bindings:
+            - name: WrapperTemp
+              direction: outbound
+              attributes: "#attr(wrapper_temperature_c)"
+              node:
+                browse_path: ["Wrapper","Temperature"]
+                data_type: Double
+            - name: WrapperTarget
+              direction: bidirectional
+              attributes: "#attr(wrapper_target_temp_c)"
+              node:
+                browse_path: ["Wrapper","TargetTemperature"]
+                data_type: Double
+            - name: FilmRoll
+              direction: outbound
+              attributes: "#attr(film_roll_percent)"
+              node:
+                browse_path: ["Wrapper","FilmRollPercent"]
+                data_type: Double
+            - name: DiverterMode
+              direction: bidirectional
+              attributes: "#attr(diverter_mode)"
+              node:
+                browse_path: ["Diverter","Mode"]
+                data_type: String
+            - name: PalletReady
+              direction: outbound
+              attributes: "#attr(pallet_count_ready)"
+              node:
+                browse_path: ["Palletizer","ReadyCount"]
+                data_type: Double
+        - name: alarms
+          browse_path: ["PackagingLine","Alarms"]
+          bindings:
+            - name: Jam
+              direction: bidirectional
+              attributes: "#attr(alarm_jam)"
+              node:
+                browse_path: ["Jam"]
+                data_type: Boolean
+            - name: LowFilm
+              direction: outbound
+              attributes: "#attr(alarm_low_film)"
+              node:
+                browse_path: ["LowFilm"]
+                data_type: Boolean
+            - name: Overtemp
+              direction: outbound
+              attributes: "#attr(alarm_overtemp)"
+              node:
+                browse_path: ["Overtemp"]
+                data_type: Boolean
+
+scenarios:
+  steady_run:
+    enabled: true
+    duration: 40.0
+    overrides:
+      $in(line_mode): automatic
+      $in(target_speed_mpm): 40.0
+      $in(wrapper_target_temp_c): 145.0
+
+  film_break:
+    enabled: true
+    duration: 15.0
+    overrides:
+      $in(film_roll_percent): 5.0
+      $in(alarm_jam): 1
+      $in(target_speed_mpm): 5.0
+
+  changeover_pause:
+    enabled: true
+    duration: 25.0
+    overrides:
+      $in(line_mode): manual
+      $in(target_speed_mpm): 0.0
+      $in(diverter_mode): rework

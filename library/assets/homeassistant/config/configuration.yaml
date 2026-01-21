@@ -1,0 +1,225 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# SPX demo integrations -------------------------------------------------------
+# NOTE: This file is bundled into installer builds via `library/assets/homeassistant/config`.
+modbus:
+  - name: spx_iem3000
+    type: tcp
+    host: spx-server   # <-- IP SPX
+    port: 5023
+    timeout: 5
+
+    sensors:
+      # ===== INPUT REGISTERS (i_r): 3000..3111 =====
+      # Float32 = 2 rejestry na wartość
+
+      # Currents (A)
+      - name: "SPX iEM3000 Current L1"
+        slave: 1
+        address: 3000
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+
+      - name: "SPX iEM3000 Current L2"
+        slave: 1
+        address: 3002
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+
+      - name: "SPX iEM3000 Current L3"
+        slave: 1
+        address: 3004
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+
+      - name: "SPX iEM3000 Current Avg"
+        slave: 1
+        address: 3010
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+
+      # Voltages (V) L-N
+      - name: "SPX iEM3000 Voltage L1-N"
+        slave: 1
+        address: 3028
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+
+      - name: "SPX iEM3000 Voltage L2-N"
+        slave: 1
+        address: 3030
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+
+      - name: "SPX iEM3000 Voltage L3-N"
+        slave: 1
+        address: 3032
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+
+      - name: "SPX iEM3000 Voltage LN Avg"
+        slave: 1
+        address: 3036
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+
+      # Power (kW / kVA / kVAR)
+      - name: "SPX iEM3000 Active Power Total"
+        slave: 1
+        address: 3060
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "kW"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX iEM3000 Reactive Power Total"
+        slave: 1
+        address: 3068
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "kvar"
+        state_class: measurement
+
+      - name: "SPX iEM3000 Apparent Power Total"
+        slave: 1
+        address: 3076
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "kVA"
+        state_class: measurement
+
+      # PF + Frequency
+      - name: "SPX iEM3000 Power Factor"
+        slave: 1
+        address: 3084
+        input_type: input
+        data_type: float32
+        device_class: power_factor
+        state_class: measurement
+
+      - name: "SPX iEM3000 Frequency"
+        slave: 1
+        address: 3110
+        input_type: input
+        data_type: float32
+        unit_of_measurement: "Hz"
+        device_class: frequency
+        state_class: measurement
+
+      # ===== HOLDING REGISTERS (h_r): 45100.. =====
+      - name: "SPX iEM3000 Energy Import Total"
+        slave: 1
+        address: 45100
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX iEM3000 Energy Export Total"
+        slave: 1
+        address: 45102
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+knx:
+  cover:
+    - name: "Blind 1"
+      move_long_address: "2/1/1"
+      stop_address: "2/2/1"
+      position_address: "2/3/1"
+      position_state_address: "2/4/1"
+
+    - name: "Blind 2"
+      move_long_address: "2/1/2"
+      stop_address: "2/2/2"
+      position_address: "2/3/2"
+      position_state_address: "2/4/2"
+
+    - name: "Blind 3"
+      move_long_address: "2/1/3"
+      stop_address: "2/2/3"
+      position_address: "2/3/3"
+      position_state_address: "2/4/3"
+
+    - name: "Blind 4"
+      move_long_address: "2/1/4"
+      stop_address: "2/2/4"
+      position_address: "2/3/4"
+      position_state_address: "2/4/4"
+
+  switch:
+    - name: "ABB SA/S Ch01"
+      address: "1/3/1"
+      state_address: "1/4/1"
+    - name: "ABB SA/S Ch02"
+      address: "1/3/2"
+      state_address: "1/4/2"
+    - name: "ABB SA/S Ch03"
+      address: "1/3/3"
+      state_address: "1/4/3"
+    - name: "ABB SA/S Ch04"
+      address: "1/3/4"
+      state_address: "1/4/4"
+    - name: "ABB SA/S Ch05"
+      address: "1/3/5"
+      state_address: "1/4/5"
+    - name: "ABB SA/S Ch06"
+      address: "1/3/6"
+      state_address: "1/4/6"
+    - name: "ABB SA/S Ch07"
+      address: "1/3/7"
+      state_address: "1/4/7"
+    - name: "ABB SA/S Ch08"
+      address: "1/3/8"
+      state_address: "1/4/8"
+    - name: "ABB SA/S Ch09"
+      address: "1/3/9"
+      state_address: "1/4/9"
+    - name: "ABB SA/S Ch10"
+      address: "1/3/10"
+      state_address: "1/4/10"
+    - name: "ABB SA/S Ch11"
+      address: "1/3/11"
+      state_address: "1/4/11"
+    - name: "ABB SA/S Ch12"
+      address: "1/3/12"
+      state_address: "1/4/12"

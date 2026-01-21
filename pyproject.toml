@@ -4,7 +4,7 @@
 
 [tool.poetry]
 name = "spx-examples"
-version = "0.1.0-rc.0"
+version = "1.0.0-alpha.9"
 description = "Runnable SPX examples and smoke tests using the Python client against SPX Server."
 authors = ["Aleksander Stanik <aleksander.stanik@hammerheadsengineers.com>"]
 license = "MIT"
@@ -12,7 +12,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-spx-python = "0.1.0-rc.10"           # SPX Python client for talking to the server
+spx-python = "1.0.0-rc.3"           # SPX Python client for talking to the server
 numpy = "*"      # Py3.9-compatible upper bound
 plotly = "*"
 scipy = "*"      # Py3.9-compatible upper bound
@@ -21,9 +21,12 @@ modbus_tk = "*"
 pymodbus = "*"
 paho-mqtt = "^2.1.0"
 bleak = "^1.1.1"
+colorama = "^0.4.6"
+bacpypes = "*"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+pytest-cov = "^5.0.0"
 coverage = "^7.3.1"
 black = "*"
 isort = "*"
