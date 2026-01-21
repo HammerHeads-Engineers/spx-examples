@@ -236,11 +236,13 @@ jobs:
             gh release upload "${tag}" \
               "dist/spx-installer.tgz" \
               "dist/spx-installer-${tag}.run" \
+              "dist/spx-installer-${tag}.ps1" \
               --clobber
           else
             gh release create "${tag}" \
               "dist/spx-installer.tgz" \
               "dist/spx-installer-${tag}.run" \
+              "dist/spx-installer-${tag}.ps1" \
               --title "SPX Installer ${tag}" \
               --generate-notes
           fi
@@ -281,32 +283,3 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
-
-      - name: Upload Release Asset (.ps1)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/spx-installer-${{ github.ref_name }}.ps1
-          asset_name: spx-installer-${{ github.ref_name }}.ps1
-          asset_content_type: text/plain
-
-      - name: Publish generic package to GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PKG_NAME="spx-installer"
-          VERSION="${{ github.ref_name }}"
-          upload_pkg() {
-            local file="$1"
-            curl -L \
-              -X PUT \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"${file}" \
-              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
-          }
-          upload_pkg "dist/spx-installer.tgz"
-          upload_pkg "dist/spx-installer-${VERSION}.run"
-          upload_pkg "dist/spx-installer-${VERSION}.ps1"
