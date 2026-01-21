@@ -37,6 +37,13 @@ Follow these steps after cloning the repository to start a local SPX server, see
      ```
    - Docker Compose and the test suite both read these variables, so keeping them in `.env` keeps everything in sync.
 
+**Common environment variables**
+
+| Variable | Purpose | Example |
+| --- | --- | --- |
+| `SPX_PRODUCT_KEY` | Auth key for the SPX API and integration tests. | `SPX_PRODUCT_KEY=your-product-key` |
+| `SPX_BASE_URL` | Override the SPX API base URL (defaults to `http://localhost:8000`). | `SPX_BASE_URL=http://localhost:8000` |
+
 3. **Install Python dependencies**
    - Use Poetry to install the runtime and test tooling (adds `pymodbus`, `spx-python`, pytest, etc.):
      ```bash
