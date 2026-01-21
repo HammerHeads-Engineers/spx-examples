@@ -24,6 +24,15 @@ DISCONNECT_DURATION = 1.5
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
+def _try_call(fn) -> bool:
+    """Helper to safely call a function and return True on success, False on exception."""
+    try:
+        fn()
+    except Exception:
+        return False
+    return True
+
+
 class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
     def setUp(self):
         instance = getattr(self.__class__, "_instance", None)
@@ -528,11 +537,3 @@ class TestModbusStepperSUTExampleIntegration(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
-
-
-def _try_call(fn) -> bool:
-    try:
-        fn()
-    except Exception:
-        return False
-    return True
