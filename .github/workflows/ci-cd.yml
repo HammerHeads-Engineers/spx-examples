@@ -109,8 +109,8 @@ jobs:
           if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "SPX_PRODUCT_KEY is not set; skipping pack tests."
+            echo "SPX_PRODUCT_KEY is required for pack tests."
+            exit 1
           fi
 
       - name: Checkout repository
@@ -214,7 +214,7 @@ jobs:
           "${OUT_DIR}/spx-stop.sh"
 
   build-installer:
-    needs: tests
+    needs: pack-tests
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -250,9 +250,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     concurrency: release
-    needs: tests
+    needs: pack-tests
     if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
     env:
+      SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
       SPX_PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
     steps:
       - name: Setup | Checkout Repository at workflow sha
@@ -282,7 +283,7 @@ jobs:
         id: release
         uses: python-semantic-release/python-semantic-release@v10.4.1
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.SPX_RELEASE_TOKEN }}
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
 
@@ -296,7 +297,7 @@ jobs:
       - name: Upload installer assets to GitHub Release
         if: steps.release.outputs.released == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
         run: |
           tag="${{ steps.release.outputs.tag }}"
           gh release upload "${tag}" \
