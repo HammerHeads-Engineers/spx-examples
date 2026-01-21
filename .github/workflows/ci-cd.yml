@@ -227,36 +227,60 @@ jobs:
           scripts/build_installer_package.sh --package-name "spx-installer"
           scripts/build_self_extractors.sh --version "${{ github.ref_name }}"
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Upload installer assets to GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: SPX Installer ${{ github.ref_name }}
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.ref_name }}"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release upload "${tag}" \
+              "dist/spx-installer.tgz" \
+              "dist/spx-installer-${tag}.run" \
+              --clobber
+          else
+            gh release create "${tag}" \
+              "dist/spx-installer.tgz" \
+              "dist/spx-installer-${tag}.run" \
+              --title "SPX Installer ${tag}" \
+              --generate-notes
+          fi
 
-      - name: Upload Release Asset (.tgz)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release:
+    runs-on: ubuntu-latest
+    concurrency: release
+    needs: tests
+    if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - name: Setup | Checkout Repository at workflow sha
+        uses: actions/checkout@v4
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/spx-installer.tgz
-          asset_name: spx-installer-${{ github.ref_name }}.tgz
-          asset_content_type: application/gzip
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
 
-      - name: Upload Release Asset (.run)
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup | Force correct release branch on workflow sha
+        run: |
+          git checkout -B ${{ github.ref_name }} ${{ github.sha }}
+
+      - name: Install Poetry
+        shell: bash
+        run: pipx install poetry
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/spx-installer-${{ github.ref_name }}.run
-          asset_name: spx-installer-${{ github.ref_name }}.run
-          asset_content_type: application/octet-stream
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Action | Semantic Version Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@v10.4.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          git_committer_name: "github-actions"
+          git_committer_email: "actions@users.noreply.github.com"
 
       - name: Upload Release Asset (.ps1)
         uses: actions/upload-release-asset@v1
