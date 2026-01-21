@@ -305,12 +305,17 @@ jobs:
             "dist/spx-installer-${tag}.ps1" \
             --clobber
 
-      - name: Skip GitHub Packages upload (missing SPX_PACKAGES_TOKEN)
-        if: steps.release.outputs.released == 'true' && env.SPX_PACKAGES_TOKEN == ''
-        run: echo "SPX_PACKAGES_TOKEN not set; skipping GitHub Packages upload."
+      - name: Ensure SPX_PACKAGES_TOKEN is set
+        if: steps.release.outputs.released == 'true'
+        shell: bash
+        run: |
+          if [ -z "${SPX_PACKAGES_TOKEN}" ]; then
+            echo "SPX_PACKAGES_TOKEN is required to publish GitHub Packages."
+            exit 1
+          fi
 
       - name: Publish installer to GitHub Packages
-        if: steps.release.outputs.released == 'true' && env.SPX_PACKAGES_TOKEN != ''
+        if: steps.release.outputs.released == 'true'
         env:
           PACKAGES_TOKEN: ${{ env.SPX_PACKAGES_TOKEN }}
         run: |
