@@ -17,10 +17,10 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.45"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.46"
 # SPX_SERVER_IMAGE = "spx-server:trial"
 SPX_UI_SERVICE_NAME = "spx-ui"
-SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.45"
+SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.48"
 
 
 class DeploymentGenerator:
@@ -56,7 +56,16 @@ class DeploymentGenerator:
 
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN=${PYTHON_BIN:-python3}
+if [ -z "${PYTHON_BIN:-}" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+  else
+    echo "[spx-start] Missing required command: python3 or python" >&2
+    exit 1
+  fi
+fi
 REQUIRED_MODULES=(requests:requests spx_python:spx-python)
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
