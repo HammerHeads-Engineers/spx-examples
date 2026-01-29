@@ -93,6 +93,7 @@ services:
 - Keep `actions` and `conditions` as lists when present. Prefer list-form `communication` (legacy models may use a mapping).
 - Keep `scenarios` as a mapping; use `overrides` for simple value swaps and `actions`/`conditions` for time-based logic.
 - Prefer explicit units in attribute names (e.g., `_c`, `_pct`, `_ms`, `_kw`, `_kwh`).
+- Attribute naming: stick to `lower_snake_case` (`a-z0-9_`, no spaces or special chars). Leading `_` marks helper/hidden attributes; use `k__` prefix (double underscore separator) to mark primary/simulation-critical attributes (UI may strip the prefix for display).
 - Use `$in`, `$out`, `$attr`, `$ext`, and `#attr(...)` consistently with existing models.
 - Use `hooks`, `python_file`/`import`, and `if_chain` only as documented in `docs/MODEL_LANGUAGE.md`.
 - Stick to communication protocol types listed in `docs/MODEL_LANGUAGE.md` unless the runtime adds new ones.
