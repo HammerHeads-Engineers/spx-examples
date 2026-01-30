@@ -17,10 +17,10 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.45"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.49"
 # SPX_SERVER_IMAGE = "spx-server:trial"
 SPX_UI_SERVICE_NAME = "spx-ui"
-SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.45"
+SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.49"
 
 
 class DeploymentGenerator:
@@ -56,7 +56,16 @@ class DeploymentGenerator:
 
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN=${PYTHON_BIN:-python3}
+if [ -z "${PYTHON_BIN:-}" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+  else
+    echo "[spx-start] Missing required command: python3 or python" >&2
+    exit 1
+  fi
+fi
 REQUIRED_MODULES=(requests:requests spx_python:spx-python)
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
@@ -142,7 +151,12 @@ docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
 echo "[spx-start] Active container ports:"
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps
-__BOOTSTRAP_CMD_SH__"""
+__BOOTSTRAP_CMD_SH__
+echo ""
+echo "[spx-start] SPX started successfully."
+echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
+echo "[spx-start] You can now open the available services and start playing with SPX :)"
+"""
         start_script = start_script.replace("__BOOTSTRAP_CMD_SH__", bootstrap_cmd_sh).strip("\n")
         start_script_ps1 = r"""
 $ErrorActionPreference = "Stop"
@@ -240,6 +254,10 @@ try {
     Write-Host "[spx-start] Active container ports:"
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps
 __BOOTSTRAP_CMD_PS__
+    Write-Host ""
+    Write-Host "[spx-start] SPX started successfully."
+    Write-Host "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
+    Write-Host "[spx-start] You can now open the available services and start playing with SPX :)"
 }
 catch {
     Write-Error "[spx-start] Encountered an error: $($_.Exception.Message)"
