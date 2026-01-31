@@ -95,20 +95,39 @@ Industry packs group models, services, and quickstart profiles around a specific
 - Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
 - Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_BASE_URL` if you are not using `http://localhost:8000`.
 
-## Installer workflow
+## Installer workflow (recommended)
 
-Prefer running an interactive wizard and sharing a self-contained bundle (optionally including the UI + supporting protocol services)? Use the installer scripts.
+This is the primary way to install and run an SPX environment:
+
+1. Download the installer package (`.tgz` or `.zip`).
+2. Extract it.
+3. Run the platform-specific setup launcher (`spx-setup.*`).
+
+The wizard will guide you through package selection, generate a local bundle, and optionally start the stack immediately.
 
 ### 1. Run the wizard
 
-- **macOS/Linux shells:** `./spx-install.sh`
+Use the platform launchers (recommended and primary):
+
+- **macOS:** `./spx-setup.command`
+- **Linux desktop:** `./spx-setup.desktop`
+- **Windows:** `spx-setup.bat`
+- **macOS/Linux shells:** `./spx-setup.sh`
+
+If you extracted from a `.zip` and the launchers are not executable, run `chmod +x spx-setup.command spx-setup.sh` and retry.
+
+The setup launchers call the underlying installer engine (`spx-install.sh`, `spx-install.ps1`, or a versioned `spx-installer-*.run` if present). You can run the engine directly if needed:
+
+- **Bash:** `./spx-install.sh`
 - **PowerShell (Windows or pwsh on macOS/Linux):** `pwsh ./spx-install.ps1`
 
-Both wrappers:
+The installer engine:
 
-- check that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
-- launch `python -m installer generate` with the wizard,
-- write the output to `build/spx-generated` (or another `--output` path you pass through).
+- checks that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
+- launches `python -m installer generate` with the wizard,
+- writes the output to `build/spx-generated` (or another `--output` path you pass through).
+
+After the wizard finishes, it will prompt to start the stack now. If you choose yes, it will run the generated start script for you.
 
 ### 2. Inspect the generated directory
 
@@ -122,7 +141,7 @@ Inside `build/spx-generated/` you will see:
 
 You can zip or commit this folder and hand it to teammates; they do not need the full repo.
 
-### 3. Start and stop the stack
+### 3. Start and stop the stack (manual)
 
 From inside the generated folder:
 
@@ -146,10 +165,11 @@ scripts/build_installer_package.sh
 This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 
 - `installer/`, `library/`, `profiles/`, `extensions/`
-- `spx-install.sh` / `spx-install.ps1`
+- setup launchers (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, `spx-setup.bat`)
+- installer engine (`spx-install.sh` / `spx-install.ps1`)
 - `INSTALLER_README.md` with quickstart instructions
 
-Hand the `.tgz` to teammates; they can extract it anywhere and run `./spx-install.sh` (or `pwsh ./spx-install.ps1`) to go through the wizard locally.
+Hand the `.tgz` to teammates; they can extract it anywhere and run the platform launcher (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or `spx-setup.bat`) to go through the wizard locally.
 
 ### 5. Produce single-file installers (optional)
 
