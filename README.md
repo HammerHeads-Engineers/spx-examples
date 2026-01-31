@@ -104,6 +104,7 @@ This is the primary way to install and run an SPX environment:
 3. Run the platform-specific setup launcher (`spx-setup.*`).
 
 The wizard will guide you through package selection, generate a local bundle, and optionally start the stack immediately.
+If you press ENTER through the defaults, the wizard uses a protocol-only setup (Modbus + SCPI/ASCII), skips model installation, and keeps the SPX UI enabled.
 
 ### 1. Run the wizard
 
