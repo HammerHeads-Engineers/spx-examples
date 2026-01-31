@@ -67,8 +67,8 @@ check_docker() {
 }
 
 need_cmd "$PYTHON_BIN"
-check_python_modules
 check_docker
+check_python_modules
 
 cd "$REPO_DIR"
 

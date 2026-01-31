@@ -103,8 +103,8 @@ function Check-Docker {
 }
 
 Need-Command $PythonBin
-Check-PythonModules
 $DockerCompose = Check-Docker
+Check-PythonModules
 
 Set-Location -Path $RepoDir
 
