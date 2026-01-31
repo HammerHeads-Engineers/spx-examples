@@ -66,7 +66,7 @@ if [ -z "${PYTHON_BIN:-}" ]; then
     exit 1
   fi
 fi
-REQUIRED_MODULES=(requests:requests spx_python:spx-python)
+REQUIRED_MODULES=(requests:requests spx_python:spx-python yaml:pyyaml)
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
 
@@ -196,7 +196,8 @@ function Resolve-Python {
 $PythonBin = Resolve-Python
 $RequiredModules = @(
     @{ Module = "requests"; Package = "requests" },
-    @{ Module = "spx_python"; Package = "spx-python" }
+    @{ Module = "spx_python"; Package = "spx-python" },
+    @{ Module = "yaml"; Package = "pyyaml" }
 )
 $BleAdapterPort = if ($Env:BLE_ADAPTER_PORT) { $Env:BLE_ADAPTER_PORT } else { 8085 }
 $bleProcess = $null
@@ -306,6 +307,31 @@ catch {
         start_script_ps1 = start_script_ps1.replace("__BOOTSTRAP_CMD_PS__", bootstrap_cmd_ps)
         self._write_script(output_dir / "spx-start.sh", start_script.strip() + "\n")
         self._write_ps_script(output_dir / "spx-start.ps1", start_script_ps1.strip() + "\n")
+        start_command = """#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+bash "./spx-start.sh" "$@"
+EXIT_CODE=$?
+
+echo ""
+echo "Exit code: $EXIT_CODE"
+read -r -p "Press Enter to close..." _
+exit $EXIT_CODE
+"""
+        start_bat = r"""@echo off
+setlocal
+
+cd /d "%~dp0"
+
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0spx-start.ps1" %*
+set "EXITCODE=%ERRORLEVEL%"
+echo Exit code: %EXITCODE%
+pause
+exit /b %EXITCODE%
+"""
+        self._write_text_script(output_dir / "spx-start.command", start_command.strip() + "\n", executable=True)
+        self._write_text_script(output_dir / "spx-start.bat", start_bat.strip() + "\n")
         self._write_bootstrap_runner(output_dir)
         stop_script = """
 pkill -f spx-ble-adapter >/dev/null 2>&1 || true
@@ -329,6 +355,31 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
 """
         self._write_script(output_dir / "spx-stop.sh", stop_script.strip() + "\n")
         self._write_ps_script(output_dir / "spx-stop.ps1", stop_script_ps1.strip() + "\n")
+        stop_command = """#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
+
+bash "./spx-stop.sh" "$@"
+EXIT_CODE=$?
+
+echo ""
+echo "Exit code: $EXIT_CODE"
+read -r -p "Press Enter to close..." _
+exit $EXIT_CODE
+"""
+        stop_bat = r"""@echo off
+setlocal
+
+cd /d "%~dp0"
+
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0spx-stop.ps1" %*
+set "EXITCODE=%ERRORLEVEL%"
+echo Exit code: %EXITCODE%
+pause
+exit /b %EXITCODE%
+"""
+        self._write_text_script(output_dir / "spx-stop.command", stop_command.strip() + "\n", executable=True)
+        self._write_text_script(output_dir / "spx-stop.bat", stop_bat.strip() + "\n")
 
     # Internal helpers -------------------------------------------------------
     def _build_compose(self, service_ids: List[str], assets_root: Path, include_ui: bool) -> Dict[str, Dict]:
@@ -520,6 +571,12 @@ docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-fi
 
     def _write_ps_script(self, path: Path, command: str) -> None:
         path.write_text(command, encoding="utf-8")
+
+    def _write_text_script(self, path: Path, command: str, *, executable: bool = False) -> None:
+        path.write_text(command, encoding="utf-8")
+        if executable:
+            mode = os.stat(path).st_mode
+            os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_bundle(self, output_dir: Path, selection) -> None:
         model_entries = []
