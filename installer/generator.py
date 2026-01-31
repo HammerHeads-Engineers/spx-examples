@@ -232,7 +232,7 @@ function Check-PythonModules {
     $moduleNames = $missing | ForEach-Object { $_.Module }
     $packages = $missing | ForEach-Object { $_.Package }
     Write-Host "[spx-start] Missing Python modules: $($moduleNames -join ', '). Installing via pip..."
-    & $PythonBin -m pip install --user @packages
+    & $PythonBin -m pip install --user @($packages)
     if ($LASTEXITCODE -ne 0) {
         throw "[spx-start] pip install failed"
     }
