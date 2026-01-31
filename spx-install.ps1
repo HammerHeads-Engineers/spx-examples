@@ -47,10 +47,20 @@ function Need-Command {
 }
 
 function Check-PythonModules {
+    function Test-PythonModule {
+        param([string]$Module)
+        $checkCmd = "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$Module') else 1)"
+        try {
+            & $PythonBin -c $checkCmd 2>$null | Out-Null
+        } catch {
+            return $false
+        }
+        return ($LASTEXITCODE -eq 0)
+    }
+
     $missing = @()
     foreach ($entry in $RequiredModules) {
-        & $PythonBin -c "import $($entry.Module)" 2>$null
-        if ($LASTEXITCODE -ne 0) {
+        if (-not (Test-PythonModule $entry.Module)) {
             $missing += $entry
         }
     }
@@ -67,8 +77,7 @@ function Check-PythonModules {
     }
 
     foreach ($entry in $missing) {
-        & $PythonBin -c "import $($entry.Module)" 2>$null
-        if ($LASTEXITCODE -ne 0) {
+        if (-not (Test-PythonModule $entry.Module)) {
             throw "[spx-install] Unable to import module '$($entry.Module)' even after pip install."
         }
     }
