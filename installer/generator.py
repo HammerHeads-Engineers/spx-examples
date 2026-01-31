@@ -163,7 +163,37 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PythonBin = if ($Env:PYTHON_BIN) { $Env:PYTHON_BIN } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+
+function Test-PythonCommand {
+    param([string]$Command)
+    try {
+        & $Command -c "import sys" 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+function Resolve-Python {
+    if ($Env:PYTHON_BIN) {
+        if (Test-PythonCommand $Env:PYTHON_BIN) {
+            return $Env:PYTHON_BIN
+        }
+        throw "[spx-start] PYTHON_BIN is set to '$Env:PYTHON_BIN' but is not a working Python interpreter."
+    }
+
+    foreach ($candidate in @("python3", "python")) {
+        if (Get-Command $candidate -ErrorAction SilentlyContinue) {
+            if (Test-PythonCommand $candidate) {
+                return $candidate
+            }
+        }
+    }
+
+    throw "[spx-start] Missing required command: python (3.x). Install Python 3 or set PYTHON_BIN."
+}
+
+$PythonBin = Resolve-Python
 $RequiredModules = @(
     @{ Module = "requests"; Package = "requests" },
     @{ Module = "spx_python"; Package = "spx-python" }

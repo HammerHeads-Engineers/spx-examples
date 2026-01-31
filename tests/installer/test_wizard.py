@@ -117,7 +117,7 @@ def test_wizard_protocol_selection(monkeypatch: pytest.MonkeyPatch, manifest_ind
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["0", "1", "n", "y", "y"])
+    inputs = iter(["0", "1", "y", "y", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -127,5 +127,5 @@ def test_wizard_protocol_selection(monkeypatch: pytest.MonkeyPatch, manifest_ind
     assert selection.install_spx_ui is True
     assert selection.offline_bundle is True
     assert selection.license_key == "TEST-KEY"
-    assert selection.model_ids == ["sensor"]
+    assert selection.model_ids == []
     assert selection.service_ids == ["mqtt_broker"]

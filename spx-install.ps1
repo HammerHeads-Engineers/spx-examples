@@ -5,13 +5,32 @@ Set-StrictMode -Version Latest
 $RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Resolve-Python {
+    function Test-PythonCommand {
+        param([string]$Command)
+        try {
+            & $Command -c "import sys" 2>$null | Out-Null
+            return ($LASTEXITCODE -eq 0)
+        } catch {
+            return $false
+        }
+    }
+
     if ($Env:PYTHON_BIN) {
-        return $Env:PYTHON_BIN
+        if (Test-PythonCommand $Env:PYTHON_BIN) {
+            return $Env:PYTHON_BIN
+        }
+        throw "[spx-install] PYTHON_BIN is set to '$Env:PYTHON_BIN' but is not a working Python interpreter."
     }
-    if (Get-Command python3 -ErrorAction SilentlyContinue) {
-        return "python3"
+
+    foreach ($candidate in @("python3", "python")) {
+        if (Get-Command $candidate -ErrorAction SilentlyContinue) {
+            if (Test-PythonCommand $candidate) {
+                return $candidate
+            }
+        }
     }
-    return "python"
+
+    throw "[spx-install] Missing required command: python (3.x). Install Python 3 or set PYTHON_BIN."
 }
 
 $PythonBin = Resolve-Python
