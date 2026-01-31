@@ -320,6 +320,14 @@ def run(args: argparse.Namespace) -> int:
             f"  3. Use '{output_dir}/spx-stop.sh' or 'pwsh {output_dir}/spx-stop.ps1' to shut everything down.",
             file=info_stream,
         )
+        print(
+            f"     (You can also double-click '{output_dir}/spx-start.command' or '{output_dir}/spx-start.bat',",
+            file=info_stream,
+        )
+        print(
+            f"      and '{output_dir}/spx-stop.command' or '{output_dir}/spx-stop.bat'.)",
+            file=info_stream,
+        )
 
         if getattr(args, "start", False):
             _launch_stack(output_dir, stream=info_stream)
