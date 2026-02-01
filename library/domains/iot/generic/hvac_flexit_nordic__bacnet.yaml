@@ -43,7 +43,7 @@ attributes:
   # Ventilation mode (MultiStateValue,42)
   # Range used in this model: 1..4
   # 1=Stop, 2=Away, 3=Home, 4=High
-  ventilation_mode: 3
+  k__ventilation_mode: 3
   _ventilation_mode_prev: 3
 
   # Fans
@@ -83,10 +83,10 @@ attributes:
   fireplace_runtime_min: 30
 
 actions:
-  - function: $in(ventilation_mode)
+  - function: $in(k__ventilation_mode)
     name: clamp_ventilation_mode
     description: Keep ventilation_mode within 1..4.
-    call: max(1, min(4, int($in(ventilation_mode))))
+    call: max(1, min(4, int($in(k__ventilation_mode))))
 
   - function: $in(active_air_temp_setpoint_c)
     name: derive_active_air_temp_setpoint
@@ -139,13 +139,13 @@ actions:
     name: apply_supply_mode_setpoint
     description: Apply supply speed setpoint when ventilation mode changes.
     call: (
-          $in(supply_fan_speed_pct) if $in(ventilation_mode) == $in(_ventilation_mode_prev)
+          $in(supply_fan_speed_pct) if $in(k__ventilation_mode) == $in(_ventilation_mode_prev)
           else (
-            0.0 if $in(ventilation_mode) == 1
+            0.0 if $in(k__ventilation_mode) == 1
             else (
-              $in(supply_set_away) if $in(ventilation_mode) == 2
+              $in(supply_set_away) if $in(k__ventilation_mode) == 2
               else (
-                $in(supply_set_home) if $in(ventilation_mode) == 3
+                $in(supply_set_home) if $in(k__ventilation_mode) == 3
                 else $in(supply_set_high)
               )
             )
@@ -156,13 +156,13 @@ actions:
     name: apply_exhaust_mode_setpoint
     description: Apply exhaust speed setpoint when ventilation mode changes.
     call: (
-          $in(exhaust_fan_speed_pct) if $in(ventilation_mode) == $in(_ventilation_mode_prev)
+          $in(exhaust_fan_speed_pct) if $in(k__ventilation_mode) == $in(_ventilation_mode_prev)
           else (
-            0.0 if $in(ventilation_mode) == 1
+            0.0 if $in(k__ventilation_mode) == 1
             else (
-              $in(exhaust_set_away) if $in(ventilation_mode) == 2
+              $in(exhaust_set_away) if $in(k__ventilation_mode) == 2
               else (
-                $in(exhaust_set_home) if $in(ventilation_mode) == 3
+                $in(exhaust_set_home) if $in(k__ventilation_mode) == 3
                 else $in(exhaust_set_high)
               )
             )
@@ -172,7 +172,7 @@ actions:
   - function: $in(_ventilation_mode_prev)
     name: track_ventilation_mode_prev
     description: Store previous mode for change detection.
-    call: $in(ventilation_mode)
+    call: $in(k__ventilation_mode)
 
   - function: $in(rotary_hex_speed_pct)
     name: clamp_rotary_hex_speed
@@ -442,8 +442,8 @@ communication:
           instance: 42
           properties:
             presentValue:
-              read: "#attr(ventilation_mode)"
-              write: "#attr(ventilation_mode)"
+              read: "#attr(k__ventilation_mode)"
+              write: "#attr(k__ventilation_mode)"
               states:
                 1: "stop"
                 2: "away"
@@ -619,17 +619,17 @@ communication:
 
 scenarios:
   heater_failure:
-    enabled: true
+    display_name: "Heater failure"
     duration: 60.0
     overrides:
-      $in(ventilation_mode): 3
+      $in(k__ventilation_mode): 3
       $in(outside_air_temp_c): 5.0
       $in(k__air_temp_setpoint_home_c): 22.5
       $in(k__electric_heater_enabled): 1
       $in(heater_fault): 1
 
   room_temp_sensor_stuck_high:
-    enabled: true
+    display_name: "Room temperature sensor stuck high"
     duration: 45.0
     actions:
       - function: $out(room_temp_c)
@@ -643,7 +643,7 @@ scenarios:
           )($attr(timer.time), $out(room_temp_c))
 
   room_temp_sensor_noise:
-    enabled: true
+    display_name: "Room temperature sensor noise"
     duration: 30.0
     actions:
       - noise: $out(room_temp_c)

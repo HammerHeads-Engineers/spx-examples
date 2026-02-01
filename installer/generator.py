@@ -163,6 +163,8 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $Env:COMPOSE_PROGRESS) { $Env:COMPOSE_PROGRESS = "plain" }
+if (-not $Env:BUILDKIT_PROGRESS) { $Env:BUILDKIT_PROGRESS = "plain" }
 
 function Test-PythonCommand {
     param([string]$Command)

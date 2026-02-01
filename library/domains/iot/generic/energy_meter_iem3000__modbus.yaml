@@ -10,15 +10,15 @@ description: |
 
 attributes:
   # Phase currents (A)
-  current_l1_a: 12.0
-  current_l2_a: 10.5
-  current_l3_a: 11.2
+  k__current_l1_a: 12.0
+  k__current_l2_a: 10.5
+  k__current_l3_a: 11.2
   current_avg_a: 0.0
 
   # Phase-to-neutral voltages (V)
-  voltage_l1_n_v: 230.0
-  voltage_l2_n_v: 229.5
-  voltage_l3_n_v: 231.0
+  k__voltage_l1_n_v: 230.0
+  k__voltage_l2_n_v: 229.5
+  k__voltage_l3_n_v: 231.0
   voltage_ln_avg_v: 0.0
 
   # Line-to-line voltages (V) (derived from L-N; suitable for demo dashboards)
@@ -50,27 +50,27 @@ actions:
   - function: $in(current_avg_a)
     name: compute_current_avg
     description: Average phase current.
-    call: ($in(current_l1_a) + $in(current_l2_a) + $in(current_l3_a)) / 3.0
+    call: ($in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)) / 3.0
 
   - function: $in(voltage_ln_avg_v)
     name: compute_voltage_ln_avg
     description: Average phase-to-neutral voltage.
-    call: ($in(voltage_l1_n_v) + $in(voltage_l2_n_v) + $in(voltage_l3_n_v)) / 3.0
+    call: ($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 3.0
 
   - function: $in(voltage_l1_l2_v)
     name: compute_voltage_l1_l2
     description: Approximate L1-L2 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(voltage_l1_n_v) + $in(voltage_l2_n_v)) / 2.0)
+    call: 1.7320508075688772 * (($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v)) / 2.0)
 
   - function: $in(voltage_l2_l3_v)
     name: compute_voltage_l2_l3
     description: Approximate L2-L3 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(voltage_l2_n_v) + $in(voltage_l3_n_v)) / 2.0)
+    call: 1.7320508075688772 * (($in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 2.0)
 
   - function: $in(voltage_l3_l1_v)
     name: compute_voltage_l3_l1
     description: Approximate L3-L1 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(voltage_l3_n_v) + $in(voltage_l1_n_v)) / 2.0)
+    call: 1.7320508075688772 * (($in(k__voltage_l3_n_v) + $in(k__voltage_l1_n_v)) / 2.0)
 
   - function: $in(voltage_ll_avg_v)
     name: compute_voltage_ll_avg
@@ -82,9 +82,9 @@ actions:
     description: Total apparent power (sum of per-phase V*I).
     call: 1e-3
          * (
-             $in(voltage_l1_n_v) * $in(current_l1_a)
-             + $in(voltage_l2_n_v) * $in(current_l2_a)
-             + $in(voltage_l3_n_v) * $in(current_l3_a)
+             $in(k__voltage_l1_n_v) * $in(k__current_l1_a)
+             + $in(k__voltage_l2_n_v) * $in(k__current_l2_a)
+             + $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
            )
 
   - function: $in(active_power_l1_kw)
@@ -132,9 +132,9 @@ communication:
       zero_fill: true
       mapping:
         # Currents (A) Float32
-        current_l1_a:        { address: [3000,3001], group: i_r, type: float }
-        current_l2_a:        { address: [3002,3003], group: i_r, type: float }
-        current_l3_a:        { address: [3004,3005], group: i_r, type: float }
+        k__current_l1_a:     { address: [3000,3001], group: i_r, type: float }
+        k__current_l2_a:     { address: [3002,3003], group: i_r, type: float }
+        k__current_l3_a:     { address: [3004,3005], group: i_r, type: float }
         current_avg_a:       { address: [3010,3011], group: i_r, type: float }
 
         # Voltages (V) Float32
@@ -142,9 +142,9 @@ communication:
         voltage_l2_l3_v:     { address: [3022,3023], group: i_r, type: float }
         voltage_l3_l1_v:     { address: [3024,3025], group: i_r, type: float }
         voltage_ll_avg_v:    { address: [3026,3027], group: i_r, type: float }
-        voltage_l1_n_v:      { address: [3028,3029], group: i_r, type: float }
-        voltage_l2_n_v:      { address: [3030,3031], group: i_r, type: float }
-        voltage_l3_n_v:      { address: [3032,3033], group: i_r, type: float }
+        k__voltage_l1_n_v:   { address: [3028,3029], group: i_r, type: float }
+        k__voltage_l2_n_v:   { address: [3030,3031], group: i_r, type: float }
+        k__voltage_l3_n_v:   { address: [3032,3033], group: i_r, type: float }
         voltage_ln_avg_v:    { address: [3036,3037], group: i_r, type: float }
 
         # Active power (kW) Float32

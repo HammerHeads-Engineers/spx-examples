@@ -29,8 +29,14 @@ attributes:
   k__wind_gust_ms: 6.0
   k__brightness_lux: 20000.0
   k__rain:
+  k__outdoor_temperature_c: 5.0
+  k__wind_speed_ms: 3.0
+  k__wind_gust_ms: 6.0
+  k__brightness_lux: 20000.0
+  k__rain:
     type: int
     default: 0
+  k__wind_direction_deg:
   k__wind_direction_deg:
     type: int
     default: 180
@@ -38,8 +44,8 @@ attributes:
   k__humidity_percent: 62.0
   k__pressure_hpa: 1012.0
   k__rain_rate_mm_h: 0.0
-  k__dew_point_c: -2.6
-  k__wind_chill_c: 1.8
+  dew_point_c: -2.6
+  wind_chill_c: 1.8
 
   k__availability: "online"
   _test_logs: []
@@ -242,12 +248,17 @@ attributes:
       }
     }
 
+timer:
+  time_step: 1.0
+
 actions:
   - function: $in(k__dew_point_c)
     name: Dew Point Estimate
     description: Approximate dew point from ambient temperature and relative humidity.
     call: |
       (lambda rh:
+        $in(k__outdoor_temperature_c) - (100.0 - rh) / 5.0
+      )(max(0.0, min(100.0, $in(k__humidity_percent))))
         $in(k__outdoor_temperature_c) - (100.0 - rh) / 5.0
       )(max(0.0, min(100.0, $in(k__humidity_percent))))
 
@@ -259,6 +270,7 @@ actions:
         (13.12 + 0.6215 * t - 11.37 * (v_kmh ** 0.16) + 0.3965 * t * (v_kmh ** 0.16))
         if (t <= 10.0 and v_kmh >= 4.68)
         else t
+      )($in(k__outdoor_temperature_c), $in(k__wind_speed_ms) * 3.6)
       )($in(k__outdoor_temperature_c), $in(k__wind_speed_ms) * 3.6)
 
 communication:
@@ -277,43 +289,53 @@ communication:
       will_payload: offline
       will_retain: true
       bindings:
-        - attribute: $ext(k__outdoor_temperature_c)
+        - name: k__outdoor_temperature_c
+          attribute: $ext(k__outdoor_temperature_c)
           topic: outdoor_temperature_c
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__humidity_percent)
+        - name: k__humidity_percent
+          attribute: $ext(k__humidity_percent)
           topic: humidity_percent
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__pressure_hpa)
+        - name: k__pressure_hpa
+          attribute: $ext(k__pressure_hpa)
           topic: pressure_hpa
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__wind_speed_ms)
+        - name: k__wind_speed_ms
+          attribute: $ext(k__wind_speed_ms)
           topic: wind_speed_ms
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__wind_gust_ms)
+        - name: k__wind_gust_ms
+          attribute: $ext(k__wind_gust_ms)
           topic: wind_gust_ms
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__brightness_lux)
+        - name: k__brightness_lux
+          attribute: $ext(k__brightness_lux)
           topic: brightness_lux
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__rain)
+        - name: k__rain
+          attribute: $ext(k__rain)
           topic: rain
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__rain_rate_mm_h)
+        - name: k__rain_rate_mm_h
+          attribute: $ext(k__rain_rate_mm_h)
           topic: rain_rate_mm_h
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__wind_direction_deg)
+        - name: k__wind_direction_deg
+          attribute: $ext(k__wind_direction_deg)
           topic: wind_direction_deg
           direction: publish
           publish_on_change: false
-        - attribute: $ext(k__availability)
+        - name: availability
+          attribute: $ext(availability)
           topic: availability
           direction: publish
           retain: true
@@ -328,52 +350,62 @@ communication:
       default_qos: 1
       default_retain: true
       bindings:
-        - attribute: $ext(_ha_discovery_outdoor_temperature_config)
+        - name: _ha_discovery_outdoor_temperature_config
+          attribute: $ext(_ha_discovery_outdoor_temperature_config)
           topic: sensor/spx_weather_outdoor_temperature/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_humidity_config)
+        - name: _ha_discovery_humidity_config
+          attribute: $ext(_ha_discovery_humidity_config)
           topic: sensor/spx_weather_humidity/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_pressure_config)
+        - name: _ha_discovery_pressure_config
+          attribute: $ext(_ha_discovery_pressure_config)
           topic: sensor/spx_weather_pressure/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_gateway_availability_config)
+        - name: _ha_discovery_gateway_availability_config
+          attribute: $ext(_ha_discovery_gateway_availability_config)
           topic: sensor/spx_weather_gateway_availability/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_wind_speed_config)
+        - name: _ha_discovery_wind_speed_config
+          attribute: $ext(_ha_discovery_wind_speed_config)
           topic: sensor/spx_weather_wind_speed/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_wind_gust_config)
+        - name: _ha_discovery_wind_gust_config
+          attribute: $ext(_ha_discovery_wind_gust_config)
           topic: sensor/spx_weather_wind_gust/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_brightness_config)
+        - name: _ha_discovery_brightness_config
+          attribute: $ext(_ha_discovery_brightness_config)
           topic: sensor/spx_weather_brightness/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_rain_config)
+        - name: _ha_discovery_rain_config
+          attribute: $ext(_ha_discovery_rain_config)
           topic: binary_sensor/spx_weather_rain/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_rain_rate_config)
+        - name: _ha_discovery_rain_rate_config
+          attribute: $ext(_ha_discovery_rain_rate_config)
           topic: sensor/spx_weather_rain_rate/config
           direction: publish
           retain: true
           publish_on_change: true
-        - attribute: $ext(_ha_discovery_wind_direction_config)
+        - name: _ha_discovery_wind_direction_config
+          attribute: $ext(_ha_discovery_wind_direction_config)
           topic: sensor/spx_weather_wind_direction/config
           direction: publish
           retain: true
@@ -381,6 +413,7 @@ communication:
 
 scenarios:
   Clear sunny day:
+    display_name: "Clear sunny day"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 22.0
@@ -392,8 +425,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 190
+      $in(k__outdoor_temperature_c): 22.0
+      $in(k__humidity_percent): 45.0
+      $in(k__pressure_hpa): 1018.0
+      $in(k__wind_speed_ms): 2.5
+      $in(k__wind_gust_ms): 5.0
+      $in(k__brightness_lux): 48000.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 190
 
   Overcast cool day:
+    display_name: "Overcast cool day"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 9.0
@@ -405,8 +448,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 230
+      $in(k__outdoor_temperature_c): 9.0
+      $in(k__humidity_percent): 72.0
+      $in(k__pressure_hpa): 1010.0
+      $in(k__wind_speed_ms): 4.0
+      $in(k__wind_gust_ms): 7.0
+      $in(k__brightness_lux): 12000.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 230
 
   Rainy breeze:
+    display_name: "Rainy breeze"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 11.5
@@ -418,8 +471,18 @@ scenarios:
       $in(k__rain): 1
       $in(k__rain_rate_mm_h): 2.5
       $in(k__wind_direction_deg): 210
+      $in(k__outdoor_temperature_c): 11.5
+      $in(k__humidity_percent): 88.0
+      $in(k__pressure_hpa): 1006.0
+      $in(k__wind_speed_ms): 5.0
+      $in(k__wind_gust_ms): 9.0
+      $in(k__brightness_lux): 8000.0
+      $in(k__rain): 1
+      $in(k__rain_rate_mm_h): 2.5
+      $in(k__wind_direction_deg): 210
 
   Summer storm:
+    display_name: "Summer storm"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 18.0
@@ -431,8 +494,18 @@ scenarios:
       $in(k__rain): 1
       $in(k__rain_rate_mm_h): 15.0
       $in(k__wind_direction_deg): 265
+      $in(k__outdoor_temperature_c): 18.0
+      $in(k__humidity_percent): 92.0
+      $in(k__pressure_hpa): 1002.0
+      $in(k__wind_speed_ms): 12.0
+      $in(k__wind_gust_ms): 22.0
+      $in(k__brightness_lux): 4500.0
+      $in(k__rain): 1
+      $in(k__rain_rate_mm_h): 15.0
+      $in(k__wind_direction_deg): 265
 
   Cold night:
+    display_name: "Cold night"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): -3.0
@@ -444,8 +517,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 140
+      $in(k__outdoor_temperature_c): -3.0
+      $in(k__humidity_percent): 78.0
+      $in(k__pressure_hpa): 1024.0
+      $in(k__wind_speed_ms): 1.5
+      $in(k__wind_gust_ms): 3.5
+      $in(k__brightness_lux): 0.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 140
 
   Warm summer night:
+    display_name: "Warm summer night"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 23.0
@@ -457,8 +540,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 160
+      $in(k__outdoor_temperature_c): 23.0
+      $in(k__humidity_percent): 68.0
+      $in(k__pressure_hpa): 1016.0
+      $in(k__wind_speed_ms): 1.2
+      $in(k__wind_gust_ms): 2.5
+      $in(k__brightness_lux): 0.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 160
 
   Foggy morning:
+    display_name: "Foggy morning"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 7.0
@@ -470,8 +563,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 80
+      $in(k__outdoor_temperature_c): 7.0
+      $in(k__humidity_percent): 98.0
+      $in(k__pressure_hpa): 1022.0
+      $in(k__wind_speed_ms): 0.8
+      $in(k__wind_gust_ms): 1.8
+      $in(k__brightness_lux): 600.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 80
 
   Humid hot day:
+    display_name: "Humid hot day"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 30.0
@@ -483,8 +586,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 170
+      $in(k__outdoor_temperature_c): 30.0
+      $in(k__humidity_percent): 78.0
+      $in(k__pressure_hpa): 1009.0
+      $in(k__wind_speed_ms): 3.5
+      $in(k__wind_gust_ms): 6.0
+      $in(k__brightness_lux): 65000.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 170
 
   Frosty high pressure:
+    display_name: "Frosty high pressure"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): -8.0
@@ -496,8 +609,18 @@ scenarios:
       $in(k__rain): 0
       $in(k__rain_rate_mm_h): 0.0
       $in(k__wind_direction_deg): 40
+      $in(k__outdoor_temperature_c): -8.0
+      $in(k__humidity_percent): 65.0
+      $in(k__pressure_hpa): 1032.0
+      $in(k__wind_speed_ms): 1.0
+      $in(k__wind_gust_ms): 2.5
+      $in(k__brightness_lux): 12000.0
+      $in(k__rain): 0
+      $in(k__rain_rate_mm_h): 0.0
+      $in(k__wind_direction_deg): 40
 
   Tropical downpour:
+    display_name: "Tropical downpour"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): 26.0
@@ -509,8 +632,18 @@ scenarios:
       $in(k__rain): 1
       $in(k__rain_rate_mm_h): 35.0
       $in(k__wind_direction_deg): 200
+      $in(k__outdoor_temperature_c): 26.0
+      $in(k__humidity_percent): 98.0
+      $in(k__pressure_hpa): 1003.0
+      $in(k__wind_speed_ms): 8.0
+      $in(k__wind_gust_ms): 15.0
+      $in(k__brightness_lux): 1200.0
+      $in(k__rain): 1
+      $in(k__rain_rate_mm_h): 35.0
+      $in(k__wind_direction_deg): 200
 
   Blizzard whiteout:
+    display_name: "Blizzard whiteout"
     duration: 20.0
     overrides:
       $in(k__outdoor_temperature_c): -9.0
@@ -522,41 +655,61 @@ scenarios:
       $in(k__rain): 1
       $in(k__rain_rate_mm_h): 6.0
       $in(k__wind_direction_deg): 230
+      $in(k__outdoor_temperature_c): -9.0
+      $in(k__humidity_percent): 92.0
+      $in(k__pressure_hpa): 998.0
+      $in(k__wind_speed_ms): 14.0
+      $in(k__wind_gust_ms): 26.0
+      $in(k__brightness_lux): 400.0
+      $in(k__rain): 1
+      $in(k__rain_rate_mm_h): 6.0
+      $in(k__wind_direction_deg): 230
 
   Frontal passage sequence:
+    display_name: "Frontal passage sequence"
     duration: 60.0
     conditions:
       - if: $attr(timer.time) < 20.0
         actions:
           - function: $in(k__outdoor_temperature_c)
+          - function: $in(k__outdoor_temperature_c)
             params: {temp: 24.0}
             call: temp
+          - function: $in(k__humidity_percent)
           - function: $in(k__humidity_percent)
             params: {humidity: 55.0}
             call: humidity
           - function: $in(k__pressure_hpa)
+          - function: $in(k__pressure_hpa)
             params: {pressure: 1013.0}
             call: pressure
+          - function: $in(k__wind_speed_ms)
           - function: $in(k__wind_speed_ms)
             params: {speed: 4.0}
             call: speed
           - function: $in(k__wind_gust_ms)
+          - function: $in(k__wind_gust_ms)
             params: {gust: 8.0}
             call: gust
+          - function: $in(k__brightness_lux)
           - function: $in(k__brightness_lux)
             params: {brightness: 52000.0}
             call: brightness
           - function: $in(k__rain)
+          - function: $in(k__rain)
             params: {rain_state: 0}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 0.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params: {direction: 190}
             call: direction
       - if: ($attr(timer.time) >= 20.0) and ($attr(timer.time) < 40.0)
         actions:
+          - function: $in(k__outdoor_temperature_c)
           - function: $in(k__outdoor_temperature_c)
             params:
               temp_start: 24.0
@@ -568,8 +721,10 @@ scenarios:
                 temp_start + (temp_end - temp_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
               )($attr(timer.time))
           - function: $in(k__humidity_percent)
+          - function: $in(k__humidity_percent)
             params: {humidity: 88.0}
             call: humidity
+          - function: $in(k__pressure_hpa)
           - function: $in(k__pressure_hpa)
             params:
               press_start: 1011.0
@@ -581,20 +736,26 @@ scenarios:
                 press_start + (press_end - press_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
               )($attr(timer.time))
           - function: $in(k__wind_speed_ms)
+          - function: $in(k__wind_speed_ms)
             params: {speed: 14.0}
             call: speed
+          - function: $in(k__wind_gust_ms)
           - function: $in(k__wind_gust_ms)
             params: {gust: 26.0}
             call: gust
           - function: $in(k__brightness_lux)
+          - function: $in(k__brightness_lux)
             params: {brightness: 2000.0}
             call: brightness
+          - function: $in(k__rain)
           - function: $in(k__rain)
             params: {rain_state: 1}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 18.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params:
               dir_start: 190.0
@@ -610,67 +771,87 @@ scenarios:
       - if: $attr(timer.time) >= 40.0
         actions:
           - function: $in(k__outdoor_temperature_c)
+          - function: $in(k__outdoor_temperature_c)
             params: {temp: 12.0}
             call: temp
+          - function: $in(k__humidity_percent)
           - function: $in(k__humidity_percent)
             params: {humidity: 65.0}
             call: humidity
           - function: $in(k__pressure_hpa)
+          - function: $in(k__pressure_hpa)
             params: {pressure: 1016.0}
             call: pressure
+          - function: $in(k__wind_speed_ms)
           - function: $in(k__wind_speed_ms)
             params: {speed: 6.0}
             call: speed
           - function: $in(k__wind_gust_ms)
+          - function: $in(k__wind_gust_ms)
             params: {gust: 10.0}
             call: gust
+          - function: $in(k__brightness_lux)
           - function: $in(k__brightness_lux)
             params: {brightness: 30000.0}
             call: brightness
           - function: $in(k__rain)
+          - function: $in(k__rain)
             params: {rain_state: 0}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 0.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params: {direction: 270}
             call: direction
 
   Thunderstorm cell sequence:
+    display_name: "Thunderstorm cell sequence"
     duration: 40.0
     conditions:
       - if: $attr(timer.time) < 10.0
         actions:
           - function: $in(k__outdoor_temperature_c)
+          - function: $in(k__outdoor_temperature_c)
             params: {temp: 28.0}
             call: temp
+          - function: $in(k__humidity_percent)
           - function: $in(k__humidity_percent)
             params: {humidity: 72.0}
             call: humidity
           - function: $in(k__pressure_hpa)
+          - function: $in(k__pressure_hpa)
             params: {pressure: 1008.0}
             call: pressure
+          - function: $in(k__wind_speed_ms)
           - function: $in(k__wind_speed_ms)
             params: {speed: 3.0}
             call: speed
           - function: $in(k__wind_gust_ms)
+          - function: $in(k__wind_gust_ms)
             params: {gust: 6.0}
             call: gust
+          - function: $in(k__brightness_lux)
           - function: $in(k__brightness_lux)
             params: {brightness: 62000.0}
             call: brightness
           - function: $in(k__rain)
+          - function: $in(k__rain)
             params: {rain_state: 0}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 0.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params: {direction: 170}
             call: direction
       - if: ($attr(timer.time) >= 10.0) and ($attr(timer.time) < 25.0)
         actions:
+          - function: $in(k__outdoor_temperature_c)
           - function: $in(k__outdoor_temperature_c)
             params:
               temp_start: 28.0
@@ -682,77 +863,101 @@ scenarios:
                 temp_start + (temp_end - temp_start) * min(1.0, max(0.0, (t - ramp_start)) / ramp_duration)
               )($attr(timer.time))
           - function: $in(k__humidity_percent)
+          - function: $in(k__humidity_percent)
             params: {humidity: 95.0}
             call: humidity
+          - function: $in(k__pressure_hpa)
           - function: $in(k__pressure_hpa)
             params: {pressure: 1002.0}
             call: pressure
           - function: $in(k__wind_speed_ms)
+          - function: $in(k__wind_speed_ms)
             params: {speed: 10.0}
             call: speed
+          - function: $in(k__wind_gust_ms)
           - function: $in(k__wind_gust_ms)
             params: {gust: 24.0}
             call: gust
           - function: $in(k__brightness_lux)
+          - function: $in(k__brightness_lux)
             params: {brightness: 1200.0}
             call: brightness
+          - function: $in(k__rain)
           - function: $in(k__rain)
             params: {rain_state: 1}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 28.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params: {direction: 210}
             call: direction
       - if: $attr(timer.time) >= 25.0
         actions:
           - function: $in(k__outdoor_temperature_c)
+          - function: $in(k__outdoor_temperature_c)
             params: {temp: 21.0}
             call: temp
+          - function: $in(k__humidity_percent)
           - function: $in(k__humidity_percent)
             params: {humidity: 70.0}
             call: humidity
           - function: $in(k__pressure_hpa)
+          - function: $in(k__pressure_hpa)
             params: {pressure: 1011.0}
             call: pressure
+          - function: $in(k__wind_speed_ms)
           - function: $in(k__wind_speed_ms)
             params: {speed: 4.0}
             call: speed
           - function: $in(k__wind_gust_ms)
+          - function: $in(k__wind_gust_ms)
             params: {gust: 8.0}
             call: gust
+          - function: $in(k__brightness_lux)
           - function: $in(k__brightness_lux)
             params: {brightness: 32000.0}
             call: brightness
           - function: $in(k__rain)
+          - function: $in(k__rain)
             params: {rain_state: 0}
             call: rain_state
           - function: $in(k__rain_rate_mm_h)
+          - function: $in(k__rain_rate_mm_h)
             params: {rate: 0.0}
             call: rate
+          - function: $in(k__wind_direction_deg)
           - function: $in(k__wind_direction_deg)
             params: {direction: 230}
             call: direction
 
   Squall line bursts:
+    display_name: "Squall line bursts"
     duration: 45.0
     actions:
+      - function: $in(k__outdoor_temperature_c)
       - function: $in(k__outdoor_temperature_c)
         params: {temp: 18.0}
         call: temp
       - function: $in(k__humidity_percent)
+      - function: $in(k__humidity_percent)
         params: {humidity: 76.0}
         call: humidity
+      - function: $in(k__pressure_hpa)
       - function: $in(k__pressure_hpa)
         params: {pressure: 1005.0}
         call: pressure
       - function: $in(k__wind_speed_ms)
+      - function: $in(k__wind_speed_ms)
         params: {speed: 8.0}
         call: speed
       - function: $in(k__wind_direction_deg)
+      - function: $in(k__wind_direction_deg)
         params: {direction: 250}
         call: direction
+      - function: $in(k__wind_gust_ms)
       - function: $in(k__wind_gust_ms)
         params:
           base_gust: 12.0
@@ -764,6 +969,7 @@ scenarios:
             burst_gust if (t % period) < burst_window else base_gust
           )($attr(timer.time))
       - function: $in(k__rain_rate_mm_h)
+      - function: $in(k__rain_rate_mm_h)
         params:
           base_rate: 0.0
           burst_rate: 12.0
@@ -774,10 +980,12 @@ scenarios:
             burst_rate if (t % period) < burst_window else base_rate
           )($attr(timer.time))
       - function: $in(k__rain)
+      - function: $in(k__rain)
         params:
           period: 8.0
           burst_window: 2.0
         call: 1 if (($attr(timer.time) % period) < burst_window) else 0
+      - function: $in(k__brightness_lux)
       - function: $in(k__brightness_lux)
         params:
           base_brightness: 14000.0
@@ -790,19 +998,25 @@ scenarios:
           )($attr(timer.time))
 
   Wind sensor noise:
+    display_name: "Wind sensor noise"
     actions:
+      - noise: $out(k__wind_speed_ms)
       - noise: $out(k__wind_speed_ms)
         name: Wind Speed Noise
         description: Adds small proportional jitter to wind speed.
         std: 3.0e-2
         mode: proportional
       - noise: $out(k__wind_direction_deg)
+      - noise: $out(k__wind_direction_deg)
         name: Wind Direction Noise
         description: Adds small proportional jitter to wind direction.
         std: 2.0e-2
         mode: proportional
       - noise: $out(k__brightness_lux)
+      - noise: $out(k__brightness_lux)
         name: Brightness Noise
         description: Adds small proportional jitter to brightness.
         std: 1.0e-2
         mode: proportional
+
+
