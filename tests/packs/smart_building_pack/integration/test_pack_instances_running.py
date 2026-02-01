@@ -203,14 +203,14 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
                 pass
 
         attrs = weather_instance["attributes"]
-        brightness_attr = attrs["brightness_lux"]
-        temperature_attr = attrs["outdoor_temperature_c"]
+        brightness_attr = attrs["k__brightness_lux"]
+        temperature_attr = attrs["k__outdoor_temperature_c"]
         initial_brightness = _spx_attr_float(brightness_attr)
         if initial_brightness is None:
-            self.fail("Could not read initial brightness_lux from SPX weather instance.")
+            self.fail("Could not read initial k__brightness_lux from SPX weather instance.")
         initial_temperature = _spx_attr_float(temperature_attr)
         if initial_temperature is None:
-            self.fail("Could not read initial outdoor_temperature_c from SPX weather instance.")
+            self.fail("Could not read initial k__outdoor_temperature_c from SPX weather instance.")
         self._log_step("brightness_initial", value=initial_brightness)
         self._log_step("temperature_initial", value=initial_temperature)
 
@@ -252,13 +252,13 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
             if hasattr(brightness_attr, "internal_value"):
                 brightness_attr.internal_value = value
             else:
-                weather_instance.put_attr("attributes/brightness_lux", value)
+                weather_instance.put_attr("attributes/k__brightness_lux", value)
 
         def _set_temperature(value: float) -> None:
             if hasattr(temperature_attr, "internal_value"):
                 temperature_attr.internal_value = value
             else:
-                weather_instance.put_attr("attributes/outdoor_temperature_c", value)
+                weather_instance.put_attr("attributes/k__outdoor_temperature_c", value)
 
         def _set_cover_attr(attr_name: str, value: object) -> None:
             try:
