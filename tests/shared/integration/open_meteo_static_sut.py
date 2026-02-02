@@ -89,9 +89,9 @@ class TestOpenMeteoStaticSUTIntegration(unittest.TestCase):
                 return value.internal_value
             return value
 
-        cls._default_latitude = float(_attr_value("latitude"))
-        cls._default_longitude = float(_attr_value("longitude"))
-        cls._default_timezone = str(_attr_value("timezone"))
+        cls._default_latitude = float(_attr_value("k__latitude"))
+        cls._default_longitude = float(_attr_value("k__longitude"))
+        cls._default_timezone = str(_attr_value("k__timezone"))
 
         forecast_url = f"{BASE_URL}/v1/forecast/{DEFAULT_PROFILE}/{DEFAULT_HORIZON}"
         ready = wait_for_condition(lambda: _http_ready(forecast_url), timeout=15.0, interval=0.5)

@@ -15,8 +15,8 @@ attributes:
   room_temp_c: 21.0
 
   # Air temperature setpoints (degC)
-  air_temp_setpoint_home_c: 19.0
-  air_temp_setpoint_away_c: 18.0
+  k__air_temp_setpoint_home_c: 19.0
+  k__air_temp_setpoint_away_c: 18.0
   active_air_temp_setpoint_c: 19.0
 
   # Simple thermal model
@@ -29,11 +29,11 @@ attributes:
   heating_demand_kw: 0.0
 
   # Comfort button
-  comfort_button: 1
+  cmd__comfort_button: 1
   comfort_button_delay_min: 0
 
   # Fireplace ventilation
-  fireplace_ventilation_trigger: 1
+  cmd__fireplace_ventilation_trigger: 1
   fireplace_active: 0
   fireplace_remaining_min: 0.0
 
@@ -53,7 +53,7 @@ attributes:
   exhaust_fan_rpm: 1200.0
 
   # Electric heater (kW)
-  electric_heater_enabled: 0
+  k__electric_heater_enabled: 0
   heater_fault: 0
   electric_heater_nom_power: 5.0
   heater_load_pct: 0.0
@@ -92,8 +92,8 @@ actions:
     name: derive_active_air_temp_setpoint
     description: Select active air temperature setpoint based on ventilation mode.
     call: (
-          $in(air_temp_setpoint_away_c) if $in(ventilation_mode) == 2
-          else $in(air_temp_setpoint_home_c)
+          $in(k__air_temp_setpoint_away_c) if $in(ventilation_mode) == 2
+          else $in(k__air_temp_setpoint_home_c)
         )
 
   - function: $in(heat_loss_kw)
@@ -123,7 +123,7 @@ actions:
     name: compute_heater_load
     description: Normalize heating demand against installed heater power.
     call: (
-          0.0 if ($in(electric_heater_enabled) == 0 or $in(heater_fault) == 1)
+          0.0 if ($in(k__electric_heater_enabled) == 0 or $in(heater_fault) == 1)
           else max(
             0.0,
             min(100.0, 100.0 * $in(heating_demand_kw) / max(0.1, $in(electric_heater_nom_power)))
@@ -259,12 +259,12 @@ actions:
   - function: $in(fireplace_active)
     name: derive_fireplace_active
     description: Mirror fireplace trigger into active state.
-    call: 1 if $in(fireplace_ventilation_trigger) == 2 else 0
+    call: 1 if $in(cmd__fireplace_ventilation_trigger) == 2 else 0
 
   - function: $in(fireplace_remaining_min)
     name: derive_fireplace_remaining
     description: Expose fireplace runtime while trigger is active.
-    call: $in(fireplace_runtime_min) if $in(fireplace_ventilation_trigger) == 2 else 0.0
+    call: $in(fireplace_runtime_min) if $in(cmd__fireplace_ventilation_trigger) == 2 else 0.0
 
 communication:
   # Object map aligned with flexit_bacnet.
@@ -360,8 +360,8 @@ communication:
           instance: 1985
           properties:
             presentValue:
-              read: "#attr(air_temp_setpoint_away_c)"
-              write: "#attr(air_temp_setpoint_away_c)"
+              read: "#attr(k__air_temp_setpoint_away_c)"
+              write: "#attr(k__air_temp_setpoint_away_c)"
             units: "degreesCelsius"
 
         air_temp_setpoint_home:
@@ -369,8 +369,8 @@ communication:
           instance: 1994
           properties:
             presentValue:
-              read: "#attr(air_temp_setpoint_home_c)"
-              write: "#attr(air_temp_setpoint_home_c)"
+              read: "#attr(k__air_temp_setpoint_home_c)"
+              write: "#attr(k__air_temp_setpoint_home_c)"
             units: "degreesCelsius"
 
         comfort_button:
@@ -378,8 +378,8 @@ communication:
           instance: 50
           properties:
             presentValue:
-              read: "#attr(comfort_button)"
-              write: "#attr(comfort_button)"
+              read: "#attr(cmd__comfort_button)"
+              write: "#attr(cmd__comfort_button)"
               states:
                 0: "inactive"
                 1: "active"
@@ -398,8 +398,8 @@ communication:
           instance: 360
           properties:
             presentValue:
-              read: "#attr(fireplace_ventilation_trigger)"
-              write: "#attr(fireplace_ventilation_trigger)"
+              read: "#attr(cmd__fireplace_ventilation_trigger)"
+              write: "#attr(cmd__fireplace_ventilation_trigger)"
               states:
                 1: "inactive"
                 2: "trigger"
@@ -461,8 +461,8 @@ communication:
           instance: 445
           properties:
             presentValue:
-              read: "#attr(electric_heater_enabled)"
-              write: "#attr(electric_heater_enabled)"
+              read: "#attr(k__electric_heater_enabled)"
+              write: "#attr(k__electric_heater_enabled)"
               states:
                 0: "off"
                 1: "on"
@@ -624,8 +624,8 @@ scenarios:
     overrides:
       $in(ventilation_mode): 3
       $in(outside_air_temp_c): 5.0
-      $in(air_temp_setpoint_home_c): 22.5
-      $in(electric_heater_enabled): 1
+      $in(k__air_temp_setpoint_home_c): 22.5
+      $in(k__electric_heater_enabled): 1
       $in(heater_fault): 1
 
   room_temp_sensor_stuck_high:

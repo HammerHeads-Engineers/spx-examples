@@ -23,6 +23,7 @@ Single source of truth for LLM and agent contributions.
   or confirm the stack provides a timer component.
 - Keep YAML formatting consistent (2-space indentation, no tabs).
 - Update pack README files when a pack changes.
+- Use `meta_parameters` primarily for communication/protocol parameterization (e.g., addresses, ports, topics) to support multi-instance generation; avoid placing tuning knobs there unless they must be provisioned per instance or the client explicitly requests it.
 
 ## MAY
 - Add helper tooling in `tools/` if it does not change runtime behavior.
@@ -52,6 +53,23 @@ scenarios:
     duration: 10.0
     overrides:
       $in(temperature_c): 30.0
+```
+
+Command vs state naming (k__ vs cmd__):
+```yaml
+attributes:
+  k__position_pct: 0.0      # key state: current position (readable in UI)
+  k__target_pct: 50.0       # key state: desired position (telemetry/target)
+  cmd__move_long: 2         # command input: 0=down, 1=up, 2=idle
+  cmd__stop: 0              # command input: 1=stop
+actions:
+  - function: $in(cmd__move_long)
+    name: apply_move
+    call: (
+          1 if $in(cmd__move_long) == 1
+          else -1 if $in(cmd__move_long) == 0
+          else 0
+        )
 ```
 
 Catalog entry:
@@ -93,7 +111,7 @@ services:
 - Keep `actions` and `conditions` as lists when present. Prefer list-form `communication` (legacy models may use a mapping).
 - Keep `scenarios` as a mapping; use `overrides` for simple value swaps and `actions`/`conditions` for time-based logic.
 - Prefer explicit units in attribute names (e.g., `_c`, `_pct`, `_ms`, `_kw`, `_kwh`).
-- Attribute naming: stick to `lower_snake_case` (`a-z0-9_`, no spaces or special chars). Leading `_` marks helper/hidden attributes; use `k__` prefix (double underscore separator) to mark primary/simulation-critical attributes (UI may strip the prefix for display).
+- Attribute naming: stick to `lower_snake_case` (`a-z0-9_`, no spaces or special chars). Leading `_` marks helper/hidden attributes; use `k__` prefix (double underscore separator) to mark primary/simulation-critical attributes (UI may strip the prefix for display). For command/trigger inputs, prefer the `cmd__` prefix (e.g., `cmd__move_long`, `cmd__stop`); keep legacy `*_cmd` names only when required for backward compatibility or existing integrations.
 - Use `$in`, `$out`, `$attr`, `$ext`, and `#attr(...)` consistently with existing models.
 - Use `hooks`, `python_file`/`import`, and `if_chain` only as documented in `docs/MODEL_LANGUAGE.md`.
 - Stick to communication protocol types listed in `docs/MODEL_LANGUAGE.md` unless the runtime adds new ones.

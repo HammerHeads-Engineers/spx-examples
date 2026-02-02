@@ -8,15 +8,23 @@ description: |
   Useful for validating HTTP clients against the SPX simulator without
   enabling dynamic weather actions.
 
+meta_parameters:
+  http_host:
+    type: str
+    default: 0.0.0.0
+  http_port:
+    type: int
+    default: 8091
+
 attributes:
-  latitude: 52.2297
-  longitude: 21.0122
+  k__latitude: 52.2297
+  k__longitude: 21.0122
   elevation_m: 100.0
-  timezone: Europe/Warsaw
+  k__timezone: Europe/Warsaw
   generation_time_ms: 18.5
   forecast_horizon_hours: 48
 
-  active_profile: clear
+  k__active_profile: clear
 
   hourly_time:
     - "2025-01-01T00:00"
@@ -74,28 +82,28 @@ attributes:
     - 2.6
     - 0.8
 
-  current_temperature: 4.2
-  current_wind_speed: 14.3
-  current_wind_direction: 245
-  current_weather_code: 2
+  k__current_temperature: 4.2
+  k__current_wind_speed: 14.3
+  k__current_wind_direction: 245
+  k__current_weather_code: 2
 
 communication:
   - http_endpoint:
-      host: 0.0.0.0
-      port: 8091
+      host: "$param(http_host)"
+      port: "$param(http_port)"
       endpoints:
         "/v1/forecast/{profile}/{horizon_hours}":
           method: GET
           alias:
-            - "#attr(active_profile) = #param(profile)"
+            - "#attr(k__active_profile) = #param(profile)"
             - "#attr(forecast_horizon_hours) = #param(horizon_hours)"
           response:
-            latitude: "#attr(latitude)"
-            longitude: "#attr(longitude)"
+            latitude: "#attr(k__latitude)"
+            longitude: "#attr(k__longitude)"
             elevation_m: "#attr(elevation_m)"
-            timezone: "#attr(timezone)"
+            timezone: "#attr(k__timezone)"
             generationtime_ms: "#attr(generation_time_ms)"
-            forecast_profile: "#attr(active_profile)"
+            forecast_profile: "#attr(k__active_profile)"
             forecast_horizon_hours: "#attr(forecast_horizon_hours)"
             hourly_units:
               time: "iso8601"
@@ -118,29 +126,29 @@ communication:
               temperature_2m_min: "#attr(daily_temp_min)"
               precipitation_sum: "#attr(daily_precip_sum)"
             current_weather:
-              temperature: "#attr(current_temperature)"
-              windspeed: "#attr(current_wind_speed)"
-              winddirection: "#attr(current_wind_direction)"
-              weathercode: "#attr(current_weather_code)"
+              temperature: "#attr(k__current_temperature)"
+              windspeed: "#attr(k__current_wind_speed)"
+              winddirection: "#attr(k__current_wind_direction)"
+              weathercode: "#attr(k__current_weather_code)"
 
         "/simulator/profile":
           method: POST
           alias:
-            - "#attr(active_profile) = #param(__body__.profile)"
+            - "#attr(k__active_profile) = #param(__body__.profile)"
             - "#attr(forecast_horizon_hours) = #param(__body__.horizon_hours)"
           response:
             status: "ok"
-            active_profile: "#attr(active_profile)"
+            active_profile: "#attr(k__active_profile)"
             forecast_horizon_hours: "#attr(forecast_horizon_hours)"
 
         "/simulator/location":
           method: PUT
           alias:
-            - "#attr(latitude) = #param(__body__.latitude)"
-            - "#attr(longitude) = #param(__body__.longitude)"
-            - "#attr(timezone) = #param(__body__.timezone)"
+            - "#attr(k__latitude) = #param(__body__.latitude)"
+            - "#attr(k__longitude) = #param(__body__.longitude)"
+            - "#attr(k__timezone) = #param(__body__.timezone)"
           response:
             status: "ok"
-            latitude: "#attr(latitude)"
-            longitude: "#attr(longitude)"
-            timezone: "#attr(timezone)"
+            latitude: "#attr(k__latitude)"
+            longitude: "#attr(k__longitude)"
+            timezone: "#attr(k__timezone)"

@@ -60,9 +60,9 @@ class TestOpenMeteoStaticSUTIntegration(shared_om.TestOpenMeteoStaticSUTIntegrat
                 return value.internal_value
             return value
 
-        cls._default_latitude = float(_attr_value("latitude"))
-        cls._default_longitude = float(_attr_value("longitude"))
-        cls._default_timezone = str(_attr_value("timezone"))
+        cls._default_latitude = float(_attr_value("k__latitude"))
+        cls._default_longitude = float(_attr_value("k__longitude"))
+        cls._default_timezone = str(_attr_value("k__timezone"))
 
         forecast_url = f"{shared_om.BASE_URL}/v1/forecast/{shared_om.DEFAULT_PROFILE}/{shared_om.DEFAULT_HORIZON}"
         ready = shared_om.wait_for_condition(
