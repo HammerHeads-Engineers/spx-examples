@@ -17,6 +17,8 @@ attributes:
   # Air temperature setpoints (degC)
   k__air_temp_setpoint_home_c: 19.0
   k__air_temp_setpoint_away_c: 18.0
+  k__air_temp_setpoint_home_c: 19.0
+  k__air_temp_setpoint_away_c: 18.0
   active_air_temp_setpoint_c: 19.0
 
   # Simple thermal model
@@ -362,6 +364,8 @@ communication:
             presentValue:
               read: "#attr(k__air_temp_setpoint_away_c)"
               write: "#attr(k__air_temp_setpoint_away_c)"
+              read: "#attr(k__air_temp_setpoint_away_c)"
+              write: "#attr(k__air_temp_setpoint_away_c)"
             units: "degreesCelsius"
 
         air_temp_setpoint_home:
@@ -369,6 +373,8 @@ communication:
           instance: 1994
           properties:
             presentValue:
+              read: "#attr(k__air_temp_setpoint_home_c)"
+              write: "#attr(k__air_temp_setpoint_home_c)"
               read: "#attr(k__air_temp_setpoint_home_c)"
               write: "#attr(k__air_temp_setpoint_home_c)"
             units: "degreesCelsius"
@@ -624,6 +630,8 @@ scenarios:
     overrides:
       $in(k__ventilation_mode): 3
       $in(outside_air_temp_c): 5.0
+      $in(k__air_temp_setpoint_home_c): 22.5
+      $in(k__electric_heater_enabled): 1
       $in(k__air_temp_setpoint_home_c): 22.5
       $in(k__electric_heater_enabled): 1
       $in(heater_fault): 1

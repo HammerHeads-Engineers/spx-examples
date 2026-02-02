@@ -47,7 +47,7 @@ attributes:
   dew_point_c: -2.6
   wind_chill_c: 1.8
 
-  k__availability: "online"
+  availability: "online"
   _test_logs: []
 
   _ha_discovery_outdoor_temperature_config: |-
@@ -1018,5 +1018,3 @@ scenarios:
         description: Adds small proportional jitter to brightness.
         std: 1.0e-2
         mode: proportional
-
-

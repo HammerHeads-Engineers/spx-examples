@@ -27,7 +27,7 @@ meta_parameters:
     default: "1"
 
 attributes:
-  cycle_time_s: 0.2
+  _cycle_time_s: 0.2
 
   all_off_cmd: 0
 
