@@ -95,7 +95,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         self.attributes = self.instance["attributes"]
 
         # Ensure the SPX model has attached to the broker before publishing commands.
-        mqtt_connected_attr = self.attributes["mqtt_connected"]
+        mqtt_connected_attr = self.attributes["k__mqtt_connected"]
         if mqtt_connected_attr is not None:
             connected = wait_for_condition(
                 lambda: bool(float(getattr(mqtt_connected_attr, "internal_value", 0))),
@@ -152,7 +152,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     def _wait_for_temperature(self, target: float, *, timeout: float) -> bool:
         deadline = time.time() + timeout
         while time.time() < deadline:
-            value = float(self.attributes["temperature_c"].internal_value)
+            value = float(self.attributes["k__temperature_c"].internal_value)
             delta = abs(value - target)
             if delta <= 0.5:
                 return True
@@ -199,8 +199,8 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     def test_setpoint_command_updates_temperature(self):
         start_temp = 20.0
         target_value = 25.0
-        self.attributes["temperature_c"].internal_value = start_temp
-        self.attributes["target_c"].internal_value = start_temp
+        self.attributes["k__temperature_c"].internal_value = start_temp
+        self.attributes["k__target_c"].internal_value = start_temp
         if "temperature_integral" in self.attributes:
             self.attributes["temperature_integral"].internal_value = 0.0
         time.sleep(0.2)
@@ -210,17 +210,20 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         for attempt in range(attempts):
             self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
             target_updated = wait_for_condition(
-                lambda: abs(self.attributes["target_c"].internal_value - target_value) <= 0.05,
+                lambda: abs(self.attributes["k__target_c"].internal_value - target_value) <= 0.05,
                 timeout=5.0,
             )
             if target_updated:
                 break
             time.sleep(0.5)
 
-        self.assertTrue(target_updated, f"target_c={self.attributes['target_c'].internal_value} == {target_value} attribute did not update from command topic")
+        self.assertTrue(
+            target_updated,
+            f"k__target_c={self.attributes['k__target_c'].internal_value} == {target_value} attribute did not update from command topic",
+        )
 
         temp_reached = self._wait_for_temperature(target_value, timeout=10.0)
-        self.assertTrue(temp_reached, "temperature_c did not converge to the setpoint")
+        self.assertTrue(temp_reached, "k__temperature_c did not converge to the setpoint")
 
         telemetry_temperature = self._await_value(
             self.sut.latest_temperature,

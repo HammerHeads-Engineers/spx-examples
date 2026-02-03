@@ -12,6 +12,10 @@ from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
 from . import ui
 
+DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
+PROTOCOL_ALIASES = {"ascii": "scpi"}
+PROTOCOL_LABELS = {"scpi": "scpi (ASCII)"}
+
 
 @dataclass(frozen=True)
 class WizardSelection:
@@ -41,11 +45,17 @@ class InstallerWizard:
         self.index = index
         self._print_banner()
         packages, protocol_filters = self._prompt_packages(index.industries, index)
-        profiles = self._prompt_profiles(packages, index)
-        install_examples = self._prompt_yes_no("\nInstall bundled example models/tests? [Y/n]: ", default=True)
+        protocol_only = bool(protocol_filters) and not packages
+        profiles = [] if protocol_only else self._prompt_profiles(packages, index)
+        install_examples = False
         start_instances: List[str] = []
-        if install_examples:
-            start_instances = self._prompt_start_instances(packages, index)
+        if not protocol_only:
+            install_examples = self._prompt_yes_no(
+                "\nInstall bundled example models/tests? [Y/n]: ",
+                default=True,
+            )
+            if install_examples:
+                start_instances = self._prompt_start_instances(packages, index)
         install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
         offline_bundle = self._prompt_yes_no(
             "Prepare offline installation bundle instead of immediate launch? [y/N]: ",
@@ -53,8 +63,12 @@ class InstallerWizard:
         )
         license_key = self._prompt_license_key()
 
-        model_ids = resolve_model_ids(packages, profiles, protocol_filters, index)
-        service_ids = resolve_service_ids(model_ids, packages, profiles, index)
+        if protocol_only:
+            model_ids = []
+            service_ids = self._prompt_protocol_services(protocol_filters, index)
+        else:
+            model_ids = resolve_model_ids(packages, profiles, protocol_filters, index)
+            service_ids = resolve_service_ids(model_ids, packages, profiles, index)
         instances = resolve_default_instances(packages, index) if install_examples else []
         if install_examples:
             allowed = {entry.get("instance_key") for entry in instances if entry.get("instance_key")}
@@ -102,6 +116,31 @@ class InstallerWizard:
             )
         )
 
+    def _available_protocols(self, index: ManifestIndex) -> List[str]:
+        protocol_set = {
+            proto
+            for model in index.models.values()
+            for proto in model.protocols
+        }
+        protocol_set |= {
+            svc.protocol
+            for svc in index.services.values()
+            if svc.protocol
+        }
+        return sorted(protocol_set)
+
+    def _resolve_default_protocols(self, index: ManifestIndex) -> List[str]:
+        available = set(self._available_protocols(index))
+        resolved: List[str] = []
+        for proto in DEFAULT_PROTOCOLS:
+            canonical = PROTOCOL_ALIASES.get(proto, proto)
+            if canonical in available and canonical not in resolved:
+                resolved.append(canonical)
+        return resolved
+
+    def _format_protocol_label(self, protocol: str) -> str:
+        return PROTOCOL_LABELS.get(protocol, protocol)
+
     def _prompt_packages(
         self,
         industries: Dict[str, IndustryManifest],
@@ -109,6 +148,8 @@ class InstallerWizard:
     ) -> tuple[List[str], List[str]]:
         entries = list(industries.values())
         entries.sort(key=lambda ind: ind.name.lower())
+        default_protocols = self._resolve_default_protocols(index)
+        default_protocol_label = ", ".join(self._format_protocol_label(p) for p in default_protocols)
 
         print(ui.heading("Available packages:\n"))
         for idx, ind in enumerate(entries, start=1):
@@ -120,11 +161,24 @@ class InstallerWizard:
                 print(f"      Services: {', '.join(ind.services)}")
             print()
 
-        print(f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')}\n")
+        if default_protocol_label:
+            print(
+                f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')} "
+                f"{ui.accent(f'(default: {default_protocol_label})')}\n"
+            )
+        else:
+            print(f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')}\n")
 
         while True:
-            raw = input("Enter package numbers (comma-separated, e.g. 1,3 or 0 for protocols, q to quit): ").strip()
+            raw = input(
+                "Enter package numbers (comma-separated, ENTER for default protocols, 0 for protocols, q to quit): "
+            ).strip()
             self._check_quit(raw)
+            if not raw:
+                if default_protocols:
+                    return [], default_protocols
+                print(ui.warn("  Default protocols are unavailable; please select an entry."))
+                continue
             if raw in {"0", "p", "P"}:
                 protocols = self._prompt_protocols(index)
                 if protocols:
@@ -228,30 +282,75 @@ class InstallerWizard:
             print(ui.warn("  Please enter 'y' or 'n'."))
 
     def _prompt_protocols(self, index: ManifestIndex) -> List[str]:
-        protocol_set = {
-            proto
-            for model in index.models.values()
-            for proto in model.protocols
-        }
-        protocol_set |= {
-            svc.protocol
-            for svc in index.services.values()
-            if svc.protocol
-        }
-        if not protocol_set:
+        sorted_protocols = self._available_protocols(index)
+        if not sorted_protocols:
             print(ui.warn("No protocols available."))
             return []
 
-        sorted_protocols = sorted(protocol_set)
+        default_protocols = self._resolve_default_protocols(index)
+        default_protocol_label = ", ".join(self._format_protocol_label(p) for p in default_protocols)
+
         print(ui.heading("\nAvailable protocols:\n"))
         for idx, proto in enumerate(sorted_protocols, start=1):
-            print(f"  [{ui.accent(str(idx))}] {proto}")
+            print(f"  [{ui.accent(str(idx))}] {self._format_protocol_label(proto)}")
+        while True:
+            prompt = "Select protocols (comma-separated, ENTER for default"
+            if default_protocol_label:
+                prompt += f" {default_protocol_label}"
+            prompt += ", q to quit): "
+            choices = self._prompt_indices(
+                prompt,
+                len(sorted_protocols),
+                allow_empty=True,
+            )
+            if not choices:
+                if default_protocols:
+                    return default_protocols
+                print(ui.warn("  Please select at least one protocol."))
+                continue
+            return [sorted_protocols[i - 1] for i in choices]
+
+    def _prompt_protocol_services(
+        self,
+        protocols: Sequence[str],
+        index: ManifestIndex,
+    ) -> List[str]:
+        if not protocols:
+            return []
+
+        candidates = [
+            service
+            for service in index.services.values()
+            if service.protocol in protocols
+        ]
+        if not candidates:
+            return []
+
+        candidates.sort(key=lambda svc: (svc.protocol or "", svc.name.lower()))
+        print(ui.heading("\nServices matching selected protocols:\n"))
+        for idx, service in enumerate(candidates, start=1):
+            runtime = service.deployment.runtime if service.deployment else "docker"
+            ports = ", ".join(
+                f"{port.host}/{port.transport}" for port in service.ports
+            )
+            print(
+                f"  [{ui.accent(str(idx))}] {ui.heading(service.name)} "
+                f"({service.protocol}, {runtime})"
+            )
+            if service.description:
+                print(f"      {service.description}")
+            if ports:
+                print(f"      Ports: {ports}")
+            print()
+
         choices = self._prompt_indices(
-            "Select protocols (comma-separated, q to quit): ",
-            len(sorted_protocols),
-            allow_empty=False,
+            "Select services to enable (comma-separated, ENTER for all, q to quit): ",
+            len(candidates),
+            allow_empty=True,
         )
-        return [sorted_protocols[i - 1] for i in choices]
+        if not choices:
+            return [service.id for service in candidates]
+        return [candidates[i - 1].id for i in choices]
 
     def _prompt_license_key(self) -> str:
         env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
@@ -333,7 +432,7 @@ class InstallerWizard:
         if protocols:
             print("\nProtocols:")
             for proto in protocols:
-                print(f"  • {proto}")
+                print(f"  • {self._format_protocol_label(proto)}")
         print(f"\nInstall examples: {ui.success('yes') if install_examples else ui.warn('no')}")
         print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
         print(f"Offline bundle: {ui.success('yes') if offline_bundle else ui.warn('no')}")
@@ -360,7 +459,10 @@ class InstallerWizard:
         else:
             print("  • (none selected)")
         print("\nServices:")
-        for service_id in service_ids:
-            manifest = index.services[service_id]
-            deployment = manifest.deployment.runtime if manifest.deployment else "docker"
-            print(f"  • {manifest.name} ({deployment})")
+        if service_ids:
+            for service_id in service_ids:
+                manifest = index.services[service_id]
+                deployment = manifest.deployment.runtime if manifest.deployment else "docker"
+                print(f"  • {manifest.name} ({deployment})")
+        else:
+            print("  • (none selected)")

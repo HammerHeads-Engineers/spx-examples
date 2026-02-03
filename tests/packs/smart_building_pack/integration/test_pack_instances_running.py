@@ -39,16 +39,16 @@ INSTANCE_KEYS = [
 ]
 
 ABB_SWITCH_ATTRS = [
-    "ch01",
-    "ch02",
-    "ch03",
-    "ch04",
+    "k__ch01",
+    "k__ch02",
+    "k__ch03",
+    "k__ch04",
 ]
 ABB_COVER_POS_ATTRS = [
-    "c1_position_pct",
-    "c2_position_pct",
-    "c3_position_pct",
-    "c4_position_pct",
+    "k__c1_position_pct",
+    "k__c2_position_pct",
+    "k__c3_position_pct",
+    "k__c4_position_pct",
 ]
 ABB_COVER_TRAVEL_ATTRS = [
     "c1_travel_time_s",
@@ -133,7 +133,7 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
             for key in INSTANCE_KEYS
         }
         cls._logging_enabled = spx_ensure_attribute is not None and spx_append_attribute_value is not None
-        cls.spx_log_attr = "test_logs"
+        cls.spx_log_attr = "_test_logs"
         cls.spx_log_instance = None
         if cls._logging_enabled:
             cls._log_instance = cls._instances["spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt"]
@@ -159,7 +159,7 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
         try:
             entries = list(instance["attributes"][self.spx_log_attr].internal_value or [])
         except Exception as exc:
-            self.fail(f"Unable to read test_logs from SPX instance: {exc}")
+            self.fail(f"Unable to read _test_logs from SPX instance: {exc}")
         start_ts = getattr(self, "_log_start_ts", 0.0)
         return [entry for entry in entries if isinstance(entry, dict) and entry.get("ts", 0.0) >= start_ts]
 
@@ -203,14 +203,14 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
                 pass
 
         attrs = weather_instance["attributes"]
-        brightness_attr = attrs["brightness_lux"]
-        temperature_attr = attrs["outdoor_temperature_c"]
+        brightness_attr = attrs["k__brightness_lux"]
+        temperature_attr = attrs["k__outdoor_temperature_c"]
         initial_brightness = _spx_attr_float(brightness_attr)
         if initial_brightness is None:
-            self.fail("Could not read initial brightness_lux from SPX weather instance.")
+            self.fail("Could not read initial k__brightness_lux from SPX weather instance.")
         initial_temperature = _spx_attr_float(temperature_attr)
         if initial_temperature is None:
-            self.fail("Could not read initial outdoor_temperature_c from SPX weather instance.")
+            self.fail("Could not read initial k__outdoor_temperature_c from SPX weather instance.")
         self._log_step("brightness_initial", value=initial_brightness)
         self._log_step("temperature_initial", value=initial_temperature)
 
@@ -252,13 +252,13 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
             if hasattr(brightness_attr, "internal_value"):
                 brightness_attr.internal_value = value
             else:
-                weather_instance.put_attr("attributes/brightness_lux", value)
+                weather_instance.put_attr("attributes/k__brightness_lux", value)
 
         def _set_temperature(value: float) -> None:
             if hasattr(temperature_attr, "internal_value"):
                 temperature_attr.internal_value = value
             else:
-                weather_instance.put_attr("attributes/outdoor_temperature_c", value)
+                weather_instance.put_attr("attributes/k__outdoor_temperature_c", value)
 
         def _set_cover_attr(attr_name: str, value: object) -> None:
             try:
@@ -275,8 +275,8 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
 
         def _force_cover_position(target: float) -> None:
             for channel in ("c1", "c2", "c3", "c4"):
-                _set_cover_attr(f"{channel}_position_pct", float(target))
-                _set_cover_attr(f"{channel}_target_pct", float(target))
+                _set_cover_attr(f"k__{channel}_position_pct", float(target))
+                _set_cover_attr(f"k__{channel}_target_pct", float(target))
                 _set_cover_attr(f"{channel}_target_active", 0)
                 _set_cover_attr(f"{channel}_moving", 0)
 
@@ -414,7 +414,7 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
     def test_z_test_logs_recorded(self):
         entries = self._recent_logs()
         self.assertIsInstance(entries, list)
-        self.assertTrue(entries, "Expected test_logs entries to be recorded.")
+        self.assertTrue(entries, "Expected _test_logs entries to be recorded.")
 
         step_events = {entry.get("event") for entry in entries if entry.get("kind") == "step"}
         testcase_end = [

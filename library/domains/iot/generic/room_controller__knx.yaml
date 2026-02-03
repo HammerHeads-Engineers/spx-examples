@@ -6,24 +6,38 @@ description: |
   The model mirrors a typical wall thermostat / fan-coil module so KNX clients can exercise group writes
   and inbound telemetry updates without connecting to a physical installation.
 
+meta_parameters:
+  knx_router_host:
+    type: str
+    default: knx_gateway
+  knx_router_port:
+    type: int
+    default: 3671
+  knx_poll_interval:
+    type: float
+    default: 0.3
+  ga_main:
+    type: str
+    default: "2"
+
 attributes:
-  room_temperature_c: 22.5
-  room_setpoint_c: 22.0
-  room_command_c: 22.0
+  k__room_temperature_c: 22.5
+  k__room_setpoint_c: 22.0
+  k__room_command_c: 22.0
   min_setpoint_c: 7.0
   max_setpoint_c: 28.0
   setpoint_step_k: 0.1
-  hvac_mode_code: 1         # DPT 20.102: 0 auto, 1 comfort, 2 standby, 3 economy, 4 building protection
-  hvac_mode: comfort        # derived from hvac_mode_code and hvac_on
+  k__hvac_mode_code: 1         # DPT 20.102: 0 auto, 1 comfort, 2 standby, 3 economy, 4 building protection
+  hvac_mode: comfort        # derived from k__hvac_mode_code and hvac_on
   hvac_on: 1
   hvac_active: 1
   fan_speed_percent: 35.0
-  fan_command_percent: 35.0
-  valve_position_percent: 40.0
+  k__fan_command_percent: 35.0
+  k__valve_position_percent: 40.0
   cooling_mode: 0
   relative_humidity_percent: 45.0
-  occupancy_present: 1
-  window_open: 0
+  k__occupancy_present: 1
+  k__window_open: 0
   alarm_window: 0
   comfort_mode_request: 0
   economy_mode_request: 0
@@ -33,7 +47,7 @@ attributes:
   cycle_time_s: 0.5
 
 actions:
-  - function: $in(room_setpoint_c)
+  - function: $in(k__room_setpoint_c)
     name: track_setpoint
     description: Slew controller setpoint toward the KNX command.
     call: max(
@@ -41,17 +55,17 @@ actions:
           min(
             $in(max_setpoint_c),
             (
-              $in(room_command_c)
-              if abs($in(room_command_c) - $in(room_setpoint_c)) <= $in(setpoint_step_k)
+              $in(k__room_command_c)
+              if abs($in(k__room_command_c) - $in(k__room_setpoint_c)) <= $in(setpoint_step_k)
               else (
-                $in(room_setpoint_c)
-                + ($in(setpoint_step_k) if $in(room_command_c) > $in(room_setpoint_c) else -$in(setpoint_step_k))
+                $in(k__room_setpoint_c)
+                + ($in(setpoint_step_k) if $in(k__room_command_c) > $in(k__room_setpoint_c) else -$in(setpoint_step_k))
               )
             )
           )
         )
 
-  - function: $in(hvac_mode_code)
+  - function: $in(k__hvac_mode_code)
     name: honor_individual_modes
     description: Override mode when individual mode addresses fire.
     call: (
@@ -59,7 +73,7 @@ actions:
           else 3 if $in(economy_mode_request) == 1
           else 2 if $in(standby_mode_request) == 1
           else 1 if $in(comfort_mode_request) == 1
-          else $in(hvac_mode_code)
+          else $in(k__hvac_mode_code)
         )
 
   - function: $in(hvac_mode)
@@ -68,21 +82,21 @@ actions:
     call: (
           "off" if $in(hvac_on) == 0
           else (
-            "comfort" if $in(hvac_mode_code) == 1
-            else "standby" if $in(hvac_mode_code) == 2
-            else "economy" if $in(hvac_mode_code) == 3
-            else "building_protection" if $in(hvac_mode_code) == 4
+            "comfort" if $in(k__hvac_mode_code) == 1
+            else "standby" if $in(k__hvac_mode_code) == 2
+            else "economy" if $in(k__hvac_mode_code) == 3
+            else "building_protection" if $in(k__hvac_mode_code) == 4
             else "auto"
           )
         )
 
-  - function: $in(room_temperature_c)
+  - function: $in(k__room_temperature_c)
     name: update_room_temperature
     description: Simple first-order room dynamic influenced by setpoint, window and occupancy.
-    call: $in(room_temperature_c)
-          + 0.35 * ($in(room_setpoint_c) - $in(room_temperature_c))
-          + 0.03 * ($in(occupancy_present) - 0.5)
-          - 0.4 * $in(window_open)
+    call: $in(k__room_temperature_c)
+          + 0.35 * ($in(k__room_setpoint_c) - $in(k__room_temperature_c))
+          + 0.03 * ($in(k__occupancy_present) - 0.5)
+          - 0.4 * $in(k__window_open)
 
   - function: $in(fan_speed_percent)
     name: track_fan_speed
@@ -90,16 +104,16 @@ actions:
     call: (
           0.0 if $in(hvac_mode) == "off"
           else (
-            $in(fan_command_percent)
-            if abs($in(fan_command_percent) - $in(fan_speed_percent)) <= 2.0
+            $in(k__fan_command_percent)
+            if abs($in(k__fan_command_percent) - $in(fan_speed_percent)) <= 2.0
             else (
               $in(fan_speed_percent)
-              + (2.0 if $in(fan_command_percent) > $in(fan_speed_percent) else -2.0)
+              + (2.0 if $in(k__fan_command_percent) > $in(fan_speed_percent) else -2.0)
             )
           )
         )
 
-  - function: $in(valve_position_percent)
+  - function: $in(k__valve_position_percent)
     name: compute_valve_position
     description: Valve tracks temperature error unless the window is open.
     call: max(
@@ -107,11 +121,11 @@ actions:
           min(
             100.0,
             (
-              0.0 if $in(window_open) == 1 or $in(hvac_mode) == "off"
+              0.0 if $in(k__window_open) == 1 or $in(hvac_mode) == "off"
               else 45.0
                    + 3.0
                    * (
-                     ($in(room_setpoint_c) - $in(room_temperature_c))
+                     ($in(k__room_setpoint_c) - $in(k__room_temperature_c))
                      * (1 if $in(cooling_mode) == 0 else -1)
                    )
              )
@@ -121,7 +135,7 @@ actions:
   - function: $in(hvac_active)
     name: detect_activity
     description: Active when valve is open and controller is on.
-    call: 1 if $in(hvac_on) == 1 and $in(hvac_mode) != "off" and $in(valve_position_percent) > 2.0 else 0
+    call: 1 if $in(hvac_on) == 1 and $in(hvac_mode) != "off" and $in(k__valve_position_percent) > 2.0 else 0
 
   - function: $in(relative_humidity_percent)
     name: update_relative_humidity
@@ -135,10 +149,10 @@ actions:
             * (
               (
                 46.0
-                + 8.0 * ($in(occupancy_present) - 0.5)
+                + 8.0 * ($in(k__occupancy_present) - 0.5)
                 - 10.0 * ($in(fan_speed_percent) / 100.0)
-                - 5.0 * ($in(room_temperature_c) - $in(room_setpoint_c))
-                - 12.0 * $in(window_open)
+                - 5.0 * ($in(k__room_temperature_c) - $in(k__room_setpoint_c))
+                - 12.0 * $in(k__window_open)
               )
               - $in(relative_humidity_percent)
             )
@@ -147,119 +161,117 @@ actions:
 
   - function: $in(alarm_window)
     name: detect_window_alarm
-    call: 1 if $in(window_open) == 1 and $in(hvac_mode) == "comfort" else 0
+    call: 1 if $in(k__window_open) == 1 and $in(hvac_mode) == "comfort" else 0
 
 communication:
   - knx_ip:
       router:
-        host: knx_gateway
-        port: 3671
+        host: "$param(knx_router_host)"
+        port: "$param(knx_router_port)"
         route_back: true
-      poll_interval: 0.3
+      poll_interval: "$param(knx_poll_interval)"
       bindings:
         - name: room_temperature
           direction: outbound
-          group_address: "2/0/1"
+          group_address: "$param(ga_main)/0/1"
           dpt: 9.001
-          read_attribute: "#attr(room_temperature_c)"
+          read_attribute: "#attr(k__room_temperature_c)"
         - name: setpoint_command
           direction: bidirectional
-          group_address: "2/0/2"
+          group_address: "$param(ga_main)/0/2"
           dpt: 9.001
-          read_attribute: "#attr(room_command_c)"
-          write_attribute: "#attr(room_command_c)"
+          read_attribute: "#attr(k__room_command_c)"
+          write_attribute: "#attr(k__room_command_c)"
         - name: fan_speed
           direction: bidirectional
-          group_address: "2/0/3"
+          group_address: "$param(ga_main)/0/3"
           value_codec: uint8
           read_attribute: "#attr(fan_speed_percent)"
-          write_attribute: "#attr(fan_command_percent)"
+          write_attribute: "#attr(k__fan_command_percent)"
         - name: occupancy
           direction: inbound
-          group_address: "2/0/4"
+          group_address: "$param(ga_main)/0/4"
           value_codec: bool
-          write_attribute: "#attr(occupancy_present)"
+          write_attribute: "#attr(k__occupancy_present)"
         - name: window_contact
           direction: inbound
-          group_address: "2/0/5"
+          group_address: "$param(ga_main)/0/5"
           value_codec: bool
-          write_attribute: "#attr(window_open)"
+          write_attribute: "#attr(k__window_open)"
         - name: valve_feedback
           direction: outbound
-          group_address: "2/0/6"
+          group_address: "$param(ga_main)/0/6"
           value_codec: uint8
-          read_attribute: "#attr(valve_position_percent)"
+          read_attribute: "#attr(k__valve_position_percent)"
         - name: alarm_window
           direction: outbound
-          group_address: "2/0/7"
+          group_address: "$param(ga_main)/0/7"
           value_codec: bool
           read_attribute: "#attr(alarm_window)"
         - name: relative_humidity
           direction: outbound
-          group_address: "2/0/8"
+          group_address: "$param(ga_main)/0/8"
           dpt: 9.007
           read_attribute: "#attr(relative_humidity_percent)"
         - name: hvac_active
           direction: outbound
-          group_address: "2/0/9"
+          group_address: "$param(ga_main)/0/9"
           value_codec: bool
           read_attribute: "#attr(hvac_active)"
         - name: hvac_on_off
           direction: bidirectional
-          group_address: "2/0/10"
+          group_address: "$param(ga_main)/0/10"
           value_codec: bool
           read_attribute: "#attr(hvac_on)"
           write_attribute: "#attr(hvac_on)"
         - name: heating_cooling
           direction: bidirectional
-          group_address: "2/0/11"
+          group_address: "$param(ga_main)/0/11"
           dpt: 1.100
           read_attribute: "#attr(cooling_mode)"
           write_attribute: "#attr(cooling_mode)"
         - name: operation_mode
           direction: bidirectional
-          group_address: "2/0/12"
+          group_address: "$param(ga_main)/0/12"
           dpt: 20.102
-          read_attribute: "#attr(hvac_mode_code)"
-          write_attribute: "#attr(hvac_mode_code)"
+          read_attribute: "#attr(k__hvac_mode_code)"
+          write_attribute: "#attr(k__hvac_mode_code)"
         - name: comfort_mode
           direction: inbound
-          group_address: "2/0/13"
+          group_address: "$param(ga_main)/0/13"
           value_codec: bool
           write_attribute: "#attr(comfort_mode_request)"
         - name: economy_mode
           direction: inbound
-          group_address: "2/0/14"
+          group_address: "$param(ga_main)/0/14"
           value_codec: bool
           write_attribute: "#attr(economy_mode_request)"
         - name: standby_mode
           direction: inbound
-          group_address: "2/0/15"
+          group_address: "$param(ga_main)/0/15"
           value_codec: bool
           write_attribute: "#attr(standby_mode_request)"
         - name: building_protection_mode
           direction: inbound
-          group_address: "2/0/16"
+          group_address: "$param(ga_main)/0/16"
           value_codec: bool
           write_attribute: "#attr(building_protection_request)"
 
 scenarios:
   comfort_mode:
-    enabled: true
     duration: 20.0
     overrides:
-      $in(hvac_mode_code): 1
+      $in(k__hvac_mode_code): 1
       $in(hvac_on): 1
-      $in(room_command_c): 23.0
-      $in(occupancy_present): 1
-      $in(window_open): 0
+      $in(k__room_command_c): 23.0
+      $in(k__occupancy_present): 1
+      $in(k__window_open): 0
 
   energy_saver:
-    enabled: true
     duration: 15.0
     overrides:
-      $in(hvac_mode_code): 2
+      $in(k__hvac_mode_code): 2
       $in(hvac_on): 1
-      $in(room_command_c): 20.0
-      $in(fan_command_percent): 20.0
-      $in(occupancy_present): 0
+      $in(k__room_command_c): 20.0
+      $in(k__fan_command_percent): 20.0
+      $in(k__occupancy_present): 0
