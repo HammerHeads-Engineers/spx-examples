@@ -31,7 +31,6 @@ meta_parameters:
     default: "2"
 
 attributes:
-  cycle_time_s: 0.2
   invert_move_long: 1
   invert_position: 1
   position_tolerance_pct: 0.5
@@ -75,7 +74,8 @@ attributes:
   c4_stop_cmd: 0
   c4_position_set_raw_cmd: -1.0
   c4_position_state_raw: 0
-
+  _cycle_time_s: 0.2
+  
 actions:
   # ------------------------------------------------------------------
   # Channel 1
@@ -131,7 +131,7 @@ actions:
   - function: $in(k__c1_position_pct)
     name: integrate_position_c1
     params:
-      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c1_travel_time_s))) * 100.0"
+      delta_pct: "($in(_cycle_time_s) / max(1.0, $in(c1_travel_time_s))) * 100.0"
     call: (
           (
             min(
@@ -242,7 +242,7 @@ actions:
   - function: $in(k__c2_position_pct)
     name: integrate_position_c2
     params:
-      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c2_travel_time_s))) * 100.0"
+      delta_pct: "($in(_cycle_time_s) / max(1.0, $in(c2_travel_time_s))) * 100.0"
     call: (
           (
             min(
@@ -353,7 +353,7 @@ actions:
   - function: $in(k__c3_position_pct)
     name: integrate_position_c3
     params:
-      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c3_travel_time_s))) * 100.0"
+      delta_pct: "($in(_cycle_time_s) / max(1.0, $in(c3_travel_time_s))) * 100.0"
     call: (
           (
             min(
@@ -464,7 +464,7 @@ actions:
   - function: $in(k__c4_position_pct)
     name: integrate_position_c4
     params:
-      delta_pct: "($in(cycle_time_s) / max(1.0, $in(c4_travel_time_s))) * 100.0"
+      delta_pct: "($in(_cycle_time_s) / max(1.0, $in(c4_travel_time_s))) * 100.0"
     call: (
           (
             min(
