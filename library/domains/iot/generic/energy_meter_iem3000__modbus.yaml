@@ -8,6 +8,14 @@ description: |
     - 3000..3110: instantaneous measurements (Float32, input registers)
     - 45100..45102: total active energy import/export (Float32, holding registers)
 
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5023
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
   # Phase currents (A)
   k__current_l1_a: 12.0
@@ -44,7 +52,7 @@ attributes:
   k__energy_import_total_kwh: 0.0
   k__energy_export_total_kwh: 0.0
 
-  cycle_time_s: 1.0
+  _cycle_time_s: 1.0
 
 actions:
   - function: $in(current_avg_a)
@@ -117,18 +125,18 @@ actions:
   - function: $in(k__energy_import_total_kwh)
     name: integrate_energy_import
     description: Integrate imported energy (kWh) from total active power (kW).
-    call: $in(k__energy_import_total_kwh) + max(0.0, $in(k__active_power_total_kw)) * $in(cycle_time_s) / 3600.0
+    call: $in(k__energy_import_total_kwh) + max(0.0, $in(k__active_power_total_kw)) * $in(_cycle_time_s) / 3600.0
 
   - function: $in(k__energy_export_total_kwh)
     name: integrate_energy_export
     description: Integrate exported energy (kWh) from total active power (kW).
-    call: $in(k__energy_export_total_kwh) + max(0.0, -$in(k__active_power_total_kw)) * $in(cycle_time_s) / 3600.0
+    call: $in(k__energy_export_total_kwh) + max(0.0, -$in(k__active_power_total_kw)) * $in(_cycle_time_s) / 3600.0
 
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5023
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         # Currents (A) Float32
