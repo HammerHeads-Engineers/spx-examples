@@ -100,21 +100,21 @@ class TestAirQualityStaticSUTIntegration(unittest.TestCase):
         if not isinstance(defaults, dict):
             raise unittest.SkipTest("Air quality model YAML attributes must be a mapping.")
 
-        cls._default_station_id = str(defaults.get("station_id", ""))
-        cls._default_station_name = str(defaults.get("station_name", ""))
-        cls._default_latitude = float(defaults.get("latitude", 0.0))
-        cls._default_longitude = float(defaults.get("longitude", 0.0))
-        cls._default_timezone = str(defaults.get("timezone", ""))
+        cls._default_station_id = str(defaults.get("k__station_id", ""))
+        cls._default_station_name = str(defaults.get("k__station_name", ""))
+        cls._default_latitude = float(defaults.get("k__latitude", 0.0))
+        cls._default_longitude = float(defaults.get("k__longitude", 0.0))
+        cls._default_timezone = str(defaults.get("k__timezone", ""))
         cls._default_monitoring_window = int(defaults.get("monitoring_window_hours", 0))
         cls._default_measurement_interval = int(defaults.get("measurement_interval_minutes", 0))
 
-        cls._default_current_timestamp = str(defaults.get("current_timestamp", ""))
-        cls._default_current_pm2_5 = float(defaults.get("current_pm2_5", 0.0))
-        cls._default_current_pm10 = float(defaults.get("current_pm10", 0.0))
-        cls._default_current_no2 = float(defaults.get("current_no2", 0.0))
-        cls._default_current_o3 = float(defaults.get("current_o3", 0.0))
-        cls._default_current_aqi = float(defaults.get("current_aqi", 0.0))
-        cls._default_current_aqi_category = str(defaults.get("current_aqi_category", ""))
+        cls._default_current_timestamp = str(defaults.get("k__current_timestamp", ""))
+        cls._default_current_pm2_5 = float(defaults.get("k__current_pm2_5", 0.0))
+        cls._default_current_pm10 = float(defaults.get("k__current_pm10", 0.0))
+        cls._default_current_no2 = float(defaults.get("k__current_no2", 0.0))
+        cls._default_current_o3 = float(defaults.get("k__current_o3", 0.0))
+        cls._default_current_aqi = float(defaults.get("k__current_aqi", 0.0))
+        cls._default_current_aqi_category = str(defaults.get("k__current_aqi_category", ""))
 
         report_url = f"{BASE_URL}/v1/air-quality/{DEFAULT_PROFILE}"
         ready = wait_for_condition(lambda: _http_ready(report_url), timeout=15.0, interval=0.5)
@@ -147,7 +147,7 @@ class TestAirQualityStaticSUTIntegration(unittest.TestCase):
             # station_id is not currently updateable via the HTTP simulator endpoints, so reset it explicitly.
             try:
                 attrs = instance["attributes"]
-                attrs["station_id"].internal_value = self._default_station_id
+                attrs["k__station_id"].internal_value = self._default_station_id
             except Exception:
                 pass
 

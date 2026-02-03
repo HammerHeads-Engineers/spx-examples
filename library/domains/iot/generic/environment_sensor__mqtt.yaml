@@ -9,25 +9,42 @@
 #   to remote control commands. The model captures typical smart-building data such as
 #   temperature, humidity, and indoor air quality while surfacing health alarms.
 
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: host.docker.internal
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/env"
+  mqtt_publish_interval:
+    type: float
+    default: 0.5
+  mqtt_default_qos:
+    type: int
+    default: 1
+
 attributes:
-  temperature_c: 22.5          # °C, current measured temperature
+  k__temperature_c: 22.5          # °C, current measured temperature
   ambient_c: 20.5              # °C, surrounding ambient temperature
-  target_c: 22.0               # °C, commanded comfort setpoint from MQTT
-  humidity_percent: 45.0       # %RH, instantaneous humidity
+  k__target_c: 22.0               # °C, commanded comfort setpoint from MQTT
+  k__humidity_percent: 45.0       # %RH, instantaneous humidity
   humidity_target: 47.0        # %RH, preferred humidity band target
   humidity_ambient: 42.0       # %RH, ambient humidity influencing drift
-  co2_ppm: 560.0               # ppm, indoor CO₂ level estimate
+  k__co2_ppm: 560.0               # ppm, indoor CO₂ level estimate
   co2_target: 650.0            # ppm, acceptable CO₂ band upper bound
-  hvac_mode: auto              # HVAC operating mode (auto/heat/cool/off)
-  fan_speed_percent: 32.0      # %, current fan command applied by local controller
-  fan_speed_target: 35.0       # %, desired fan speed from remote command
+  k__hvac_mode: auto              # HVAC operating mode (auto/heat/cool/off)
+  k__fan_speed_percent: 32.0      # %, current fan command applied by local controller
+  k__fan_speed_target: 35.0       # %, desired fan speed from remote command
   fan_speed_adjusted_target: 35.0  # %, target after automatic biasing
   fan_slew_rate: 4.0           # % per cycle, slew rate limiter for fan updates
   fan_temp_gain: 2.5           # gain converting temperature error into additional fan demand
-  occupancy_count: 3.0         # people, inferred occupancy
-  occupancy_target: 3.0        # people, scenario override target
+  k__occupancy_count: 3.0         # people, inferred occupancy
+  k__occupancy_target: 3.0        # people, scenario override target
 
-  comfort_index: 92.0          # 0-100 composite comfort score
+  k__comfort_index: 92.0          # 0-100 composite comfort score
   comfort_weight_temp: 0.55    # weighting factor for temperature error
   comfort_weight_humidity: 0.25  # weighting factor for humidity error
   comfort_weight_co2: 0.20     # weighting factor for CO₂ excess
@@ -40,9 +57,9 @@ attributes:
   humidity_temp_gain: 0.015    # rate at which higher temps dry the air
   co2_temp_gain: 1.5           # ppm contribution per degree of positive temp error
 
-  alarm_high_temp: 0           # 0/1, over-temperature alarm flag
-  alarm_co2: 0                 # 0/1, elevated CO₂ alarm flag
-  alarm_stale_data: 0          # 0/1, MQTT stale-data alarm flag
+  k__alarm_high_temp: 0           # 0/1, over-temperature alarm flag
+  k__alarm_co2: 0                 # 0/1, elevated CO₂ alarm flag
+  k__alarm_stale_data: 0          # 0/1, MQTT stale-data alarm flag
   high_temp_threshold: 28.0    # °C, alarm threshold
   co2_threshold: 1200.0        # ppm, alarm threshold
   stale_counter: 0.0           # s, accumulator tracking offline duration
@@ -52,21 +69,20 @@ attributes:
   occupancy_emission: 25.0     # ppm contribution per occupant per cycle
   occupancy_decay: 0.45        # fractional decay toward occupancy target
 
-  mqtt_connected: 1            # 0/1, communication health flag
-  publish_interval: 0.5        # s, target cadence for telemetry pushes
-  status_text: "IDLE"          # textual summary of current mode
+  k__mqtt_connected: 1            # 0/1, communication health flag
+  k__status_text: "IDLE"          # textual summary of current mode
   command_source: ""           # helper storing last command origin label
 
 actions:
   # Slew the inferred occupancy toward the target (used by scenarios).
-  - function: $in(occupancy_count)
+  - function: $in(k__occupancy_count)
     description: Smoothly blend occupancy toward scenario target to avoid impulsive spikes.
     slew_rate: 0.6
     call: (
-          $in(occupancy_target)
-          if abs($in(occupancy_target) - $in(occupancy_count)) <= slew_rate
-          else $in(occupancy_count)
-               + (slew_rate if $in(occupancy_target) > $in(occupancy_count) else -slew_rate)
+          $in(k__occupancy_target)
+          if abs($in(k__occupancy_target) - $in(k__occupancy_count)) <= slew_rate
+          else $in(k__occupancy_count)
+               + (slew_rate if $in(k__occupancy_target) > $in(k__occupancy_count) else -slew_rate)
         )
 
   # Update process temperature using a simple ambient/load/PI blend.
@@ -77,27 +93,27 @@ actions:
           min(
             $in(temperature_integral_clamp),
             $in(temperature_integral) * (1 - $in(temperature_integral_leak))
-            + $in(temperature_integral_gain) * ($in(target_c) - $in(temperature_c))
+            + $in(temperature_integral_gain) * ($in(k__target_c) - $in(k__temperature_c))
           )
         )
 
-  - function: $in(temperature_c)
+  - function: $in(k__temperature_c)
     description: Combine ambient drift, occupant heat load, and setpoint tracking consistent with HVAC models.
     heating_gain: 0.12
     cooling_gain: 0.09
     ambient_gain: 0.04
     occupancy_gain: 0.018
     call: (
-          $in(temperature_c)
-          + ambient_gain * ($in(ambient_c) - $in(temperature_c))
-          + occupancy_gain * max(0.0, $in(occupancy_count) - 1.0)
-          + heating_gain * max(0.0, $in(target_c) - $in(temperature_c))
-          - cooling_gain * max(0.0, $in(temperature_c) - $in(target_c))
+          $in(k__temperature_c)
+          + ambient_gain * ($in(ambient_c) - $in(k__temperature_c))
+          + occupancy_gain * max(0.0, $in(k__occupancy_count) - 1.0)
+          + heating_gain * max(0.0, $in(k__target_c) - $in(k__temperature_c))
+          - cooling_gain * max(0.0, $in(k__temperature_c) - $in(k__target_c))
           + $in(temperature_integral)
         )
 
   # Blend humidity toward the target while respecting physical limits.
-  - function: $in(humidity_percent)
+  - function: $in(k__humidity_percent)
     description: Approach humidity target with ambient influence and occupant moisture load.
     recovery_gain: 0.06
     occupant_gain: 0.025
@@ -105,25 +121,25 @@ actions:
           15.0,
           min(
             95.0,
-            $in(humidity_percent)
-            + recovery_gain * ($in(humidity_target) - $in(humidity_percent))
-            + occupant_gain * max(0.0, $in(occupancy_count) - 1.0)
-            + 0.02 * ($in(humidity_ambient) - $in(humidity_percent))
-            - $in(humidity_temp_gain) * max(0.0, $in(temperature_c) - $in(target_c))
+            $in(k__humidity_percent)
+            + recovery_gain * ($in(humidity_target) - $in(k__humidity_percent))
+            + occupant_gain * max(0.0, $in(k__occupancy_count) - 1.0)
+            + 0.02 * ($in(humidity_ambient) - $in(k__humidity_percent))
+            - $in(humidity_temp_gain) * max(0.0, $in(k__temperature_c) - $in(k__target_c))
           )
         )
 
   # Evolve CO₂ concentration based on ventilation and occupancy respiration.
-  - function: $in(co2_ppm)
+  - function: $in(k__co2_ppm)
     description: Estimate indoor CO₂ with a low-order balance between emissions and ventilation.
     outdoor_ppm: 420.0
     call: max(
           outdoor_ppm,
           (
-            $in(co2_ppm)
-            - $in(ventilation_rate) * max(0.0, $in(co2_ppm) - outdoor_ppm)
-            + $in(occupancy_emission) * max(0.0, $in(occupancy_count))
-            + $in(co2_temp_gain) * max(0.0, $in(temperature_c) - $in(target_c))
+            $in(k__co2_ppm)
+            - $in(ventilation_rate) * max(0.0, $in(k__co2_ppm) - outdoor_ppm)
+            + $in(occupancy_emission) * max(0.0, $in(k__occupancy_count))
+            + $in(co2_temp_gain) * max(0.0, $in(k__temperature_c) - $in(k__target_c))
           )
         )
 
@@ -134,13 +150,13 @@ actions:
           0.0,
           min(
             100.0,
-            $in(fan_speed_target)
-            + max(-25.0, min(25.0, $in(fan_temp_gain) * ($in(temperature_c) - $in(target_c))))
+            $in(k__fan_speed_target)
+            + max(-25.0, min(25.0, $in(fan_temp_gain) * ($in(k__temperature_c) - $in(k__target_c))))
           )
         )
 
   # Slew the applied fan speed toward the target command with rate limiting.
-  - function: $in(fan_speed_percent)
+  - function: $in(k__fan_speed_percent)
     description: Rate-limit fan speed adjustments derived from MQTT commands or automation.
     call: max(
           0.0,
@@ -148,12 +164,12 @@ actions:
             100.0,
             (
               $in(fan_speed_adjusted_target)
-              if abs($in(fan_speed_adjusted_target) - $in(fan_speed_percent)) <= $in(fan_slew_rate)
+              if abs($in(fan_speed_adjusted_target) - $in(k__fan_speed_percent)) <= $in(fan_slew_rate)
               else (
-                $in(fan_speed_percent)
+                $in(k__fan_speed_percent)
                 + (
                     $in(fan_slew_rate)
-                    if $in(fan_speed_adjusted_target) > $in(fan_speed_percent)
+                    if $in(fan_speed_adjusted_target) > $in(k__fan_speed_percent)
                     else -$in(fan_slew_rate)
                   )
               )
@@ -162,27 +178,27 @@ actions:
         )
 
   # Compute a composite comfort index based on temperature, humidity, and CO₂ deviation.
-  - function: $in(comfort_index)
+  - function: $in(k__comfort_index)
     description: Collapse deviations into a 0-100 score (100 = best comfort).
     call: max(
           0.0,
           min(
             100.0,
             100.0
-            - 10.0 * $in(comfort_weight_temp) * abs($in(target_c) - $in(temperature_c))
-            - 2.5 * $in(comfort_weight_humidity) * abs($in(humidity_target) - $in(humidity_percent))
-            - 0.08 * $in(comfort_weight_co2) * max(0.0, $in(co2_ppm) - $in(co2_target))
+            - 10.0 * $in(comfort_weight_temp) * abs($in(k__target_c) - $in(k__temperature_c))
+            - 2.5 * $in(comfort_weight_humidity) * abs($in(humidity_target) - $in(k__humidity_percent))
+            - 0.08 * $in(comfort_weight_co2) * max(0.0, $in(k__co2_ppm) - $in(co2_target))
           )
         )
 
   # Derive a readable status string for telemetry dashboards.
-  - function: $in(status_text)
+  - function: $in(k__status_text)
     description: Provide a textual status reflecting target tracking and connectivity.
     call: (
-          "DISCONNECTED" if $in(mqtt_connected) == 0
+          "DISCONNECTED" if $in(k__mqtt_connected) == 0
           else (
-            "HEATING" if $in(target_c) - $in(temperature_c) > 0.6
-            else ("COOLING" if $in(temperature_c) - $in(target_c) > 0.6 else "IDLE")
+            "HEATING" if $in(k__target_c) - $in(k__temperature_c) > 0.6
+            else ("COOLING" if $in(k__temperature_c) - $in(k__target_c) > 0.6 else "IDLE")
           )
         )
 
@@ -193,78 +209,78 @@ actions:
     decay: 1.2
     call: (
           max(0.0, min($in(stale_timeout), $in(stale_counter) + increment))
-          if $in(mqtt_connected) == 0
+          if $in(k__mqtt_connected) == 0
           else max(0.0, $in(stale_counter) - decay)
         )
 
   # Raise alarms based on environmental thresholds or stale communications.
-  - function: $in(alarm_high_temp)
-    call: 1 if $in(temperature_c) >= $in(high_temp_threshold) else 0
+  - function: $in(k__alarm_high_temp)
+    call: 1 if $in(k__temperature_c) >= $in(high_temp_threshold) else 0
 
-  - function: $in(alarm_co2)
-    call: 1 if $in(co2_ppm) >= $in(co2_threshold) else 0
+  - function: $in(k__alarm_co2)
+    call: 1 if $in(k__co2_ppm) >= $in(co2_threshold) else 0
 
-  - function: $in(alarm_stale_data)
+  - function: $in(k__alarm_stale_data)
     call: 1 if $in(stale_counter) >= $in(stale_timeout) else 0
 
 communication:
   - mqtt:
-      broker: "host.docker.internal"
-      port: 1883
-      publish_interval: 0.5
-      topic_prefix: "spx/examples/env"
-      default_qos: 1
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
-        - attribute: $ext(temperature_c)
+        - attribute: $ext(k__temperature_c)
           topic: telemetry/temperature_c
           direction: publish
-        - attribute: $ext(target_c)
+        - attribute: $ext(k__target_c)
           topic: telemetry/target_c
           direction: publish
-        - attribute: $ext(humidity_percent)
+        - attribute: $ext(k__humidity_percent)
           topic: telemetry/humidity_percent
           direction: publish
-        - attribute: $ext(co2_ppm)
+        - attribute: $ext(k__co2_ppm)
           topic: telemetry/co2_ppm
           direction: publish
-        - attribute: $ext(comfort_index)
+        - attribute: $ext(k__comfort_index)
           topic: telemetry/comfort_index
           direction: publish
-        - attribute: $ext(hvac_mode)
+        - attribute: $ext(k__hvac_mode)
           topic: telemetry/hvac_mode
           direction: publish
-        - attribute: $ext(fan_speed_percent)
+        - attribute: $ext(k__fan_speed_percent)
           topic: telemetry/fan_speed_percent
           direction: publish
-        - attribute: $ext(occupancy_count)
+        - attribute: $ext(k__occupancy_count)
           topic: telemetry/occupancy_count
           direction: publish
-        - attribute: $ext(status_text)
+        - attribute: $ext(k__status_text)
           topic: telemetry/status
           direction: publish
-        - attribute: $ext(alarm_high_temp)
+        - attribute: $ext(k__alarm_high_temp)
           topic: telemetry/alarms/high_temp
           direction: publish
-        - attribute: $ext(alarm_co2)
+        - attribute: $ext(k__alarm_co2)
           topic: telemetry/alarms/co2
           direction: publish
-        - attribute: $ext(alarm_stale_data)
+        - attribute: $ext(k__alarm_stale_data)
           topic: telemetry/alarms/stale
           direction: publish
-        - attribute: $ext(mqtt_connected)
+        - attribute: $ext(k__mqtt_connected)
           topic: telemetry/health/mqtt_connected
           direction: publish
-        - attribute: $attr(target_c)
+        - attribute: $attr(k__target_c)
           topic: command/setpoint_c
           direction: subscribe
-        - attribute: $attr(hvac_mode)
+        - attribute: $attr(k__hvac_mode)
           topic: command/hvac_mode
           direction: subscribe
-        - attribute: $attr(fan_speed_target)
+        - attribute: $attr(k__fan_speed_target)
           topic: command/fan_speed
           direction: subscribe
-        - attribute: $attr(occupancy_target)
+        - attribute: $attr(k__occupancy_target)
           topic: command/occupancy
           direction: subscribe
         - attribute: $attr(command_source)
@@ -273,20 +289,17 @@ communication:
 
 scenarios:
   occupancy_spike:
-    enabled: true
     duration: 15.0
     overrides:
-      $in(occupancy_target): 18.0
+      $in(k__occupancy_target): 18.0
 
   night_setback:
-    enabled: true
     duration: 30.0
     overrides:
-      $in(target_c): 18.5
-      $in(fan_speed_target): 20.0
+      $in(k__target_c): 18.5
+      $in(k__fan_speed_target): 20.0
 
   mqtt_disconnect:
-    enabled: true
     duration: 4.0
     call:
       path: communication.mqtt.detach

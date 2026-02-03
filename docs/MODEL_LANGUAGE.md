@@ -38,6 +38,9 @@ Conventions:
 - Use suffixes for units: `_c`, `_pct`, `_ms`, `_s`, `_kw`, `_kwh`, `_h`.
 - Use `cycle_time_s` when the model integrates over time.
 - Internal helpers can be prefixed with `_`.
+- Use `k__` prefix for primary control inputs: setpoints, modes, enable/disable flags,
+  or attributes that are written from external protocols and drive behavior.
+  Avoid `k__` on derived or telemetry-only attributes.
 
 ## Expressions
 - `$in(attr)` reads a value from the model state.
@@ -286,6 +289,19 @@ Known protocol types in spx-core include:
   `profinet_server`, `profinet_snap7_adapter`, `redfish`, `redfish_server`,
   `snmp`, `snmp_server`.
 
+### Binding naming conventions
+When a protocol uses `bindings` (or another list of mapping entries that supports a `name` field):
+- Include an explicit `name` on every binding entry.
+- Keep `name` stable and unique within the container.
+- Prefer `name` equal to the attribute name (e.g., `temperature` for `$ext(temperature)`).
+- If a binding spans multiple attributes or the protocol address is the primary identity,
+  use a protocol-point name (e.g., `knx_ga_1_1_10`, `modbus_hr_40001`).
+- Add direction suffix only when needed to disambiguate: `_in`, `_out`, `_rw`.
+
+For mappings expressed as dicts:
+- The mapping key is the primary name.
+- If the entry supports a `name` field, set it explicitly (defaulting to the mapping key).
+
 ## Scenarios
 `scenarios` is a mapping from scenario name to configuration.
 Common fields:
@@ -296,6 +312,10 @@ Common fields:
 - `overrides`: mapping of `$in(...)` or dot-paths (e.g., `communication.mqtt.publish_interval`)
 - `actions`: list of action definitions
 - `conditions`: list of conditional rules
+
+Guidance:
+- Avoid `enabled: true` in standard scenario definitions because it auto-starts the scenario with instance start.
+  Use `enabled: true` only when auto-start is explicitly required by the model specification.
 
 Example:
 ```yaml
@@ -327,6 +347,20 @@ timer:
   auto_reset: false
   time_step: 0.25
 ```
+
+### Private timer attribute (__timer)
+Models that need elapsed time may use the reserved private attribute `__timer`:
+- `__timer` mirrors the model's Timer component `time` value (elapsed seconds, monotonic).
+- `__timer` exists only on model instances (not on the System root).
+- Do not define your own attribute named `__timer` (reserved).
+- Writing to `__timer` sets the timer time and stops it if running.
+
+Reference it as `#attr(__timer)` / `$out(__timer)` in bindings or actions.
+
+When to prefer `__timer` vs `$attr(timer.time)`:
+- Use `__timer` for model-local elapsed time (instance uptime), especially in bindings or simple expressions where a single attribute reference is clearer.
+- Use `$attr(timer.time)` (or `$(.timer.time)`) inside scenarios; it is the scenario-local timer that resets on each `start()`.
+- Use `$attr(..timer.time)` (parent) or `$attr(~.timer.time)` (root) when you explicitly need non-scenario timers.
 
 ## Polling
 `polling` runs the parent component's `run()` loop on a background thread.

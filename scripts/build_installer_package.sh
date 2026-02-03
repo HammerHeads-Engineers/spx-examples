@@ -7,7 +7,7 @@ usage() {
 Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME]
 
 Creates a portable installer archive (tgz) with the wizard CLI, manifests,
-and helper scripts so end users can run `spx-install` without cloning the repo.
+and helper scripts so end users can run `spx-setup` without cloning the repo.
 
 Options:
   --output-dir DIR     Directory to place the assembled folder and tarball (default: dist)
@@ -54,6 +54,10 @@ copy_entries=(
   "library"
   "profiles"
   "extensions"
+  "spx-setup.command"
+  "spx-setup.desktop"
+  "spx-setup.sh"
+  "spx-setup.bat"
   "spx-install.sh"
   "spx-install.ps1"
   "README.md"
@@ -83,7 +87,7 @@ done
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
 
-This archive contains the interactive installer (`spx-install.sh` / `spx-install.ps1`),
+This archive contains the interactive installer (launch via `spx-setup.*`),
 the manifest library, and all helper scripts required to generate a deployment bundle
 without cloning the full spx-examples repository.
 
@@ -96,8 +100,10 @@ without cloning the full spx-examples repository.
 
 1. Extract this archive (e.g. `tar -xzf spx-installer.tgz`).
 2. Run the installer:
-   - macOS/Linux: `./spx-install.sh`
-   - Windows / PowerShell: `pwsh ./spx-install.ps1`
+   - macOS: `./spx-setup.command`
+   - Linux desktop: `./spx-setup.desktop`
+   - Windows: `spx-setup.bat`
+   - macOS/Linux shells: `./spx-setup.sh`
 3. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
 4. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
 

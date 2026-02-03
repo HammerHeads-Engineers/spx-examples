@@ -2,7 +2,16 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN=${PYTHON_BIN:-python3}
+if [ -z "${PYTHON_BIN:-}" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN=python3
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+  else
+    echo "[spx-install] Missing required command: python3 or python" >&2
+    exit 1
+  fi
+fi
 REQUIRED_MODULES=(
   "yaml:pyyaml"
   "colorama:colorama"
@@ -58,8 +67,8 @@ check_docker() {
 }
 
 need_cmd "$PYTHON_BIN"
-check_python_modules
 check_docker
+check_python_modules
 
 cd "$REPO_DIR"
 

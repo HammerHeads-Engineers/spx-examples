@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SPX Setup
+Comment=Launch the SPX setup wizard
+Terminal=true
+Exec=sh -c 'cd "$(dirname "$1")" && bash ./spx-setup.sh' sh %k
+Icon=utilities-terminal
+Categories=Development;Utility;

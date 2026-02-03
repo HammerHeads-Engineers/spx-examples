@@ -16,14 +16,28 @@ description: |
   - position_set:   2/3/1 .. 2/3/4
   - position_state: 2/4/1 .. 2/4/4
 
+meta_parameters:
+  knx_router_host:
+    type: str
+    default: knx_gateway
+  knx_router_port:
+    type: int
+    default: 3671
+  knx_poll_interval:
+    type: float
+    default: 0.2
+  ga_main:
+    type: str
+    default: "2"
+
 attributes:
   cycle_time_s: 0.2
   invert_move_long: 1
   invert_position: 1
   position_tolerance_pct: 0.5
 
-  c1_position_pct: 10.0
-  c1_target_pct: 10.0
+  k__c1_position_pct: 10.0
+  k__c1_target_pct: 10.0
   c1_target_active: 0
   c1_moving: 0            # -1=down, 0=stop, +1=up
   c1_travel_time_s: 42.0
@@ -32,8 +46,8 @@ attributes:
   c1_position_set_raw_cmd: -1.0
   c1_position_state_raw: 26
 
-  c2_position_pct: 40.0
-  c2_target_pct: 40.0
+  k__c2_position_pct: 40.0
+  k__c2_target_pct: 40.0
   c2_target_active: 0
   c2_moving: 0
   c2_travel_time_s: 42.0
@@ -42,8 +56,8 @@ attributes:
   c2_position_set_raw_cmd: -1.0
   c2_position_state_raw: 102
 
-  c3_position_pct: 70.0
-  c3_target_pct: 70.0
+  k__c3_position_pct: 70.0
+  k__c3_target_pct: 70.0
   c3_target_active: 0
   c3_moving: 0
   c3_travel_time_s: 42.0
@@ -52,8 +66,8 @@ attributes:
   c3_position_set_raw_cmd: -1.0
   c3_position_state_raw: 178
 
-  c4_position_pct: 0.0
-  c4_target_pct: 0.0
+  k__c4_position_pct: 0.0
+  k__c4_target_pct: 0.0
   c4_target_active: 0
   c4_moving: 0
   c4_travel_time_s: 42.0
@@ -66,7 +80,7 @@ actions:
   # ------------------------------------------------------------------
   # Channel 1
   # ------------------------------------------------------------------
-  - function: $in(c1_target_pct)
+  - function: $in(k__c1_target_pct)
     name: latch_target_c1
     params:
       raw_pct: "(max(0.0, min(255.0, $in(c1_position_set_raw_cmd))) / 255.0) * 100.0"
@@ -79,7 +93,7 @@ actions:
             ),
           )
           if $in(c1_position_set_raw_cmd) >= 0.0
-          else $in(c1_target_pct)
+          else $in(k__c1_target_pct)
         )
 
   - function: $in(c1_target_active)
@@ -98,8 +112,8 @@ actions:
           else (
             (
               0
-              if abs($in(c1_target_pct) - $in(c1_position_pct)) <= $in(position_tolerance_pct)
-              else (1 if $in(c1_target_pct) > $in(c1_position_pct) else -1)
+              if abs($in(k__c1_target_pct) - $in(k__c1_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(k__c1_target_pct) > $in(k__c1_position_pct) else -1)
             )
             if $in(c1_position_set_raw_cmd) >= 0.0
             else (
@@ -114,7 +128,7 @@ actions:
           )
         )
 
-  - function: $in(c1_position_pct)
+  - function: $in(k__c1_position_pct)
     name: integrate_position_c1
     params:
       delta_pct: "($in(cycle_time_s) / max(1.0, $in(c1_travel_time_s))) * 100.0"
@@ -123,9 +137,9 @@ actions:
             min(
               100.0,
               (
-                min($in(c1_target_pct), $in(c1_position_pct) + delta_pct)
+                min($in(k__c1_target_pct), $in(k__c1_position_pct) + delta_pct)
                 if $in(c1_target_active) == 1
-                else ($in(c1_position_pct) + delta_pct)
+                else ($in(k__c1_position_pct) + delta_pct)
               ),
             )
             if $in(c1_moving) == 1
@@ -133,13 +147,13 @@ actions:
               max(
                 0.0,
                 (
-                  max($in(c1_target_pct), $in(c1_position_pct) - delta_pct)
+                  max($in(k__c1_target_pct), $in(k__c1_position_pct) - delta_pct)
                   if $in(c1_target_active) == 1
-                  else ($in(c1_position_pct) - delta_pct)
+                  else ($in(k__c1_position_pct) - delta_pct)
                 ),
               )
               if $in(c1_moving) == -1
-              else $in(c1_position_pct)
+              else $in(k__c1_position_pct)
             )
           )
         )
@@ -149,9 +163,9 @@ actions:
     call: (
           0
           if (
-            ($in(c1_moving) == 1 and $in(c1_position_pct) >= 99.9)
-            or ($in(c1_moving) == -1 and $in(c1_position_pct) <= 0.1)
-            or ($in(c1_target_active) == 1 and abs($in(c1_target_pct) - $in(c1_position_pct)) <= $in(position_tolerance_pct))
+            ($in(c1_moving) == 1 and $in(k__c1_position_pct) >= 99.9)
+            or ($in(c1_moving) == -1 and $in(k__c1_position_pct) <= 0.1)
+            or ($in(c1_target_active) == 1 and abs($in(k__c1_target_pct) - $in(k__c1_position_pct)) <= $in(position_tolerance_pct))
           )
           else $in(c1_moving)
         )
@@ -167,7 +181,7 @@ actions:
   - function: $in(c1_position_state_raw)
     name: encode_position_state_raw_c1
     params:
-      pos_pct: "(100.0 - $in(c1_position_pct)) if $in(invert_position) == 1 else $in(c1_position_pct)"
+      pos_pct: "(100.0 - $in(k__c1_position_pct)) if $in(invert_position) == 1 else $in(k__c1_position_pct)"
     call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
 
   - function: $in(c1_position_set_raw_cmd)
@@ -177,7 +191,7 @@ actions:
   # ------------------------------------------------------------------
   # Channel 2
   # ------------------------------------------------------------------
-  - function: $in(c2_target_pct)
+  - function: $in(k__c2_target_pct)
     name: latch_target_c2
     params:
       raw_pct: "(max(0.0, min(255.0, $in(c2_position_set_raw_cmd))) / 255.0) * 100.0"
@@ -190,7 +204,7 @@ actions:
             ),
           )
           if $in(c2_position_set_raw_cmd) >= 0.0
-          else $in(c2_target_pct)
+          else $in(k__c2_target_pct)
         )
 
   - function: $in(c2_target_active)
@@ -209,8 +223,8 @@ actions:
           else (
             (
               0
-              if abs($in(c2_target_pct) - $in(c2_position_pct)) <= $in(position_tolerance_pct)
-              else (1 if $in(c2_target_pct) > $in(c2_position_pct) else -1)
+              if abs($in(k__c2_target_pct) - $in(k__c2_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(k__c2_target_pct) > $in(k__c2_position_pct) else -1)
             )
             if $in(c2_position_set_raw_cmd) >= 0.0
             else (
@@ -225,7 +239,7 @@ actions:
           )
         )
 
-  - function: $in(c2_position_pct)
+  - function: $in(k__c2_position_pct)
     name: integrate_position_c2
     params:
       delta_pct: "($in(cycle_time_s) / max(1.0, $in(c2_travel_time_s))) * 100.0"
@@ -234,9 +248,9 @@ actions:
             min(
               100.0,
               (
-                min($in(c2_target_pct), $in(c2_position_pct) + delta_pct)
+                min($in(k__c2_target_pct), $in(k__c2_position_pct) + delta_pct)
                 if $in(c2_target_active) == 1
-                else ($in(c2_position_pct) + delta_pct)
+                else ($in(k__c2_position_pct) + delta_pct)
               ),
             )
             if $in(c2_moving) == 1
@@ -244,13 +258,13 @@ actions:
               max(
                 0.0,
                 (
-                  max($in(c2_target_pct), $in(c2_position_pct) - delta_pct)
+                  max($in(k__c2_target_pct), $in(k__c2_position_pct) - delta_pct)
                   if $in(c2_target_active) == 1
-                  else ($in(c2_position_pct) - delta_pct)
+                  else ($in(k__c2_position_pct) - delta_pct)
                 ),
               )
               if $in(c2_moving) == -1
-              else $in(c2_position_pct)
+              else $in(k__c2_position_pct)
             )
           )
         )
@@ -260,9 +274,9 @@ actions:
     call: (
           0
           if (
-            ($in(c2_moving) == 1 and $in(c2_position_pct) >= 99.9)
-            or ($in(c2_moving) == -1 and $in(c2_position_pct) <= 0.1)
-            or ($in(c2_target_active) == 1 and abs($in(c2_target_pct) - $in(c2_position_pct)) <= $in(position_tolerance_pct))
+            ($in(c2_moving) == 1 and $in(k__c2_position_pct) >= 99.9)
+            or ($in(c2_moving) == -1 and $in(k__c2_position_pct) <= 0.1)
+            or ($in(c2_target_active) == 1 and abs($in(k__c2_target_pct) - $in(k__c2_position_pct)) <= $in(position_tolerance_pct))
           )
           else $in(c2_moving)
         )
@@ -278,7 +292,7 @@ actions:
   - function: $in(c2_position_state_raw)
     name: encode_position_state_raw_c2
     params:
-      pos_pct: "(100.0 - $in(c2_position_pct)) if $in(invert_position) == 1 else $in(c2_position_pct)"
+      pos_pct: "(100.0 - $in(k__c2_position_pct)) if $in(invert_position) == 1 else $in(k__c2_position_pct)"
     call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
 
   - function: $in(c2_position_set_raw_cmd)
@@ -288,7 +302,7 @@ actions:
   # ------------------------------------------------------------------
   # Channel 3
   # ------------------------------------------------------------------
-  - function: $in(c3_target_pct)
+  - function: $in(k__c3_target_pct)
     name: latch_target_c3
     params:
       raw_pct: "(max(0.0, min(255.0, $in(c3_position_set_raw_cmd))) / 255.0) * 100.0"
@@ -301,7 +315,7 @@ actions:
             ),
           )
           if $in(c3_position_set_raw_cmd) >= 0.0
-          else $in(c3_target_pct)
+          else $in(k__c3_target_pct)
         )
 
   - function: $in(c3_target_active)
@@ -320,8 +334,8 @@ actions:
           else (
             (
               0
-              if abs($in(c3_target_pct) - $in(c3_position_pct)) <= $in(position_tolerance_pct)
-              else (1 if $in(c3_target_pct) > $in(c3_position_pct) else -1)
+              if abs($in(k__c3_target_pct) - $in(k__c3_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(k__c3_target_pct) > $in(k__c3_position_pct) else -1)
             )
             if $in(c3_position_set_raw_cmd) >= 0.0
             else (
@@ -336,7 +350,7 @@ actions:
           )
         )
 
-  - function: $in(c3_position_pct)
+  - function: $in(k__c3_position_pct)
     name: integrate_position_c3
     params:
       delta_pct: "($in(cycle_time_s) / max(1.0, $in(c3_travel_time_s))) * 100.0"
@@ -345,9 +359,9 @@ actions:
             min(
               100.0,
               (
-                min($in(c3_target_pct), $in(c3_position_pct) + delta_pct)
+                min($in(k__c3_target_pct), $in(k__c3_position_pct) + delta_pct)
                 if $in(c3_target_active) == 1
-                else ($in(c3_position_pct) + delta_pct)
+                else ($in(k__c3_position_pct) + delta_pct)
               ),
             )
             if $in(c3_moving) == 1
@@ -355,13 +369,13 @@ actions:
               max(
                 0.0,
                 (
-                  max($in(c3_target_pct), $in(c3_position_pct) - delta_pct)
+                  max($in(k__c3_target_pct), $in(k__c3_position_pct) - delta_pct)
                   if $in(c3_target_active) == 1
-                  else ($in(c3_position_pct) - delta_pct)
+                  else ($in(k__c3_position_pct) - delta_pct)
                 ),
               )
               if $in(c3_moving) == -1
-              else $in(c3_position_pct)
+              else $in(k__c3_position_pct)
             )
           )
         )
@@ -371,9 +385,9 @@ actions:
     call: (
           0
           if (
-            ($in(c3_moving) == 1 and $in(c3_position_pct) >= 99.9)
-            or ($in(c3_moving) == -1 and $in(c3_position_pct) <= 0.1)
-            or ($in(c3_target_active) == 1 and abs($in(c3_target_pct) - $in(c3_position_pct)) <= $in(position_tolerance_pct))
+            ($in(c3_moving) == 1 and $in(k__c3_position_pct) >= 99.9)
+            or ($in(c3_moving) == -1 and $in(k__c3_position_pct) <= 0.1)
+            or ($in(c3_target_active) == 1 and abs($in(k__c3_target_pct) - $in(k__c3_position_pct)) <= $in(position_tolerance_pct))
           )
           else $in(c3_moving)
         )
@@ -389,7 +403,7 @@ actions:
   - function: $in(c3_position_state_raw)
     name: encode_position_state_raw_c3
     params:
-      pos_pct: "(100.0 - $in(c3_position_pct)) if $in(invert_position) == 1 else $in(c3_position_pct)"
+      pos_pct: "(100.0 - $in(k__c3_position_pct)) if $in(invert_position) == 1 else $in(k__c3_position_pct)"
     call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
 
   - function: $in(c3_position_set_raw_cmd)
@@ -399,7 +413,7 @@ actions:
   # ------------------------------------------------------------------
   # Channel 4
   # ------------------------------------------------------------------
-  - function: $in(c4_target_pct)
+  - function: $in(k__c4_target_pct)
     name: latch_target_c4
     params:
       raw_pct: "(max(0.0, min(255.0, $in(c4_position_set_raw_cmd))) / 255.0) * 100.0"
@@ -412,7 +426,7 @@ actions:
             ),
           )
           if $in(c4_position_set_raw_cmd) >= 0.0
-          else $in(c4_target_pct)
+          else $in(k__c4_target_pct)
         )
 
   - function: $in(c4_target_active)
@@ -431,8 +445,8 @@ actions:
           else (
             (
               0
-              if abs($in(c4_target_pct) - $in(c4_position_pct)) <= $in(position_tolerance_pct)
-              else (1 if $in(c4_target_pct) > $in(c4_position_pct) else -1)
+              if abs($in(k__c4_target_pct) - $in(k__c4_position_pct)) <= $in(position_tolerance_pct)
+              else (1 if $in(k__c4_target_pct) > $in(k__c4_position_pct) else -1)
             )
             if $in(c4_position_set_raw_cmd) >= 0.0
             else (
@@ -447,7 +461,7 @@ actions:
           )
         )
 
-  - function: $in(c4_position_pct)
+  - function: $in(k__c4_position_pct)
     name: integrate_position_c4
     params:
       delta_pct: "($in(cycle_time_s) / max(1.0, $in(c4_travel_time_s))) * 100.0"
@@ -456,9 +470,9 @@ actions:
             min(
               100.0,
               (
-                min($in(c4_target_pct), $in(c4_position_pct) + delta_pct)
+                min($in(k__c4_target_pct), $in(k__c4_position_pct) + delta_pct)
                 if $in(c4_target_active) == 1
-                else ($in(c4_position_pct) + delta_pct)
+                else ($in(k__c4_position_pct) + delta_pct)
               ),
             )
             if $in(c4_moving) == 1
@@ -466,13 +480,13 @@ actions:
               max(
                 0.0,
                 (
-                  max($in(c4_target_pct), $in(c4_position_pct) - delta_pct)
+                  max($in(k__c4_target_pct), $in(k__c4_position_pct) - delta_pct)
                   if $in(c4_target_active) == 1
-                  else ($in(c4_position_pct) - delta_pct)
+                  else ($in(k__c4_position_pct) - delta_pct)
                 ),
               )
               if $in(c4_moving) == -1
-              else $in(c4_position_pct)
+              else $in(k__c4_position_pct)
             )
           )
         )
@@ -482,9 +496,9 @@ actions:
     call: (
           0
           if (
-            ($in(c4_moving) == 1 and $in(c4_position_pct) >= 99.9)
-            or ($in(c4_moving) == -1 and $in(c4_position_pct) <= 0.1)
-            or ($in(c4_target_active) == 1 and abs($in(c4_target_pct) - $in(c4_position_pct)) <= $in(position_tolerance_pct))
+            ($in(c4_moving) == 1 and $in(k__c4_position_pct) >= 99.9)
+            or ($in(c4_moving) == -1 and $in(k__c4_position_pct) <= 0.1)
+            or ($in(c4_target_active) == 1 and abs($in(k__c4_target_pct) - $in(k__c4_position_pct)) <= $in(position_tolerance_pct))
           )
           else $in(c4_moving)
         )
@@ -500,7 +514,7 @@ actions:
   - function: $in(c4_position_state_raw)
     name: encode_position_state_raw_c4
     params:
-      pos_pct: "(100.0 - $in(c4_position_pct)) if $in(invert_position) == 1 else $in(c4_position_pct)"
+      pos_pct: "(100.0 - $in(k__c4_position_pct)) if $in(invert_position) == 1 else $in(k__c4_position_pct)"
     call: round(max(0.0, min(100.0, pos_pct)) * 255.0 / 100.0)
 
   - function: $in(c4_position_set_raw_cmd)
@@ -510,91 +524,91 @@ actions:
 communication:
   - knx_ip:
       router:
-        host: knx_gateway
-        port: 3671
+        host: "$param(knx_router_host)"
+        port: "$param(knx_router_port)"
         route_back: true
-      poll_interval: 0.2
+      poll_interval: "$param(knx_poll_interval)"
       bindings:
         - name: c1_move_long
           direction: inbound
-          group_address: "2/1/1"
+          group_address: "$param(ga_main)/1/1"
           value_codec: bool
           write_attribute: "#attr(c1_move_long_cmd)"
         - name: c1_stop
           direction: inbound
-          group_address: "2/2/1"
+          group_address: "$param(ga_main)/2/1"
           value_codec: bool
           write_attribute: "#attr(c1_stop_cmd)"
         - name: c1_position_set
           direction: inbound
-          group_address: "2/3/1"
+          group_address: "$param(ga_main)/3/1"
           value_codec: uint8
           write_attribute: "#attr(c1_position_set_raw_cmd)"
         - name: c1_position_state
           direction: outbound
-          group_address: "2/4/1"
+          group_address: "$param(ga_main)/4/1"
           value_codec: uint8
           read_attribute: "#attr(c1_position_state_raw)"
 
         - name: c2_move_long
           direction: inbound
-          group_address: "2/1/2"
+          group_address: "$param(ga_main)/1/2"
           value_codec: bool
           write_attribute: "#attr(c2_move_long_cmd)"
         - name: c2_stop
           direction: inbound
-          group_address: "2/2/2"
+          group_address: "$param(ga_main)/2/2"
           value_codec: bool
           write_attribute: "#attr(c2_stop_cmd)"
         - name: c2_position_set
           direction: inbound
-          group_address: "2/3/2"
+          group_address: "$param(ga_main)/3/2"
           value_codec: uint8
           write_attribute: "#attr(c2_position_set_raw_cmd)"
         - name: c2_position_state
           direction: outbound
-          group_address: "2/4/2"
+          group_address: "$param(ga_main)/4/2"
           value_codec: uint8
           read_attribute: "#attr(c2_position_state_raw)"
 
         - name: c3_move_long
           direction: inbound
-          group_address: "2/1/3"
+          group_address: "$param(ga_main)/1/3"
           value_codec: bool
           write_attribute: "#attr(c3_move_long_cmd)"
         - name: c3_stop
           direction: inbound
-          group_address: "2/2/3"
+          group_address: "$param(ga_main)/2/3"
           value_codec: bool
           write_attribute: "#attr(c3_stop_cmd)"
         - name: c3_position_set
           direction: inbound
-          group_address: "2/3/3"
+          group_address: "$param(ga_main)/3/3"
           value_codec: uint8
           write_attribute: "#attr(c3_position_set_raw_cmd)"
         - name: c3_position_state
           direction: outbound
-          group_address: "2/4/3"
+          group_address: "$param(ga_main)/4/3"
           value_codec: uint8
           read_attribute: "#attr(c3_position_state_raw)"
 
         - name: c4_move_long
           direction: inbound
-          group_address: "2/1/4"
+          group_address: "$param(ga_main)/1/4"
           value_codec: bool
           write_attribute: "#attr(c4_move_long_cmd)"
         - name: c4_stop
           direction: inbound
-          group_address: "2/2/4"
+          group_address: "$param(ga_main)/2/4"
           value_codec: bool
           write_attribute: "#attr(c4_stop_cmd)"
         - name: c4_position_set
           direction: inbound
-          group_address: "2/3/4"
+          group_address: "$param(ga_main)/3/4"
           value_codec: uint8
           write_attribute: "#attr(c4_position_set_raw_cmd)"
         - name: c4_position_state
           direction: outbound
-          group_address: "2/4/4"
+          group_address: "$param(ga_main)/4/4"
           value_codec: uint8
           read_attribute: "#attr(c4_position_state_raw)"

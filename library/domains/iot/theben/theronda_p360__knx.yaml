@@ -10,26 +10,40 @@ description: |
   - Presence channels C4/C5: switch-on delay + presence time delay, basic ON/OFF output (switch-command style).
   - Parallel switching: trigger pulse output (no remote-trigger aggregation yet).
 
+meta_parameters:
+  knx_router_host:
+    type: str
+    default: knx_gateway
+  knx_router_port:
+    type: int
+    default: 3671
+  knx_poll_interval:
+    type: float
+    default: 0.3
+  ga_main:
+    type: str
+    default: "3"
+
 attributes:
   # --- Environment inputs ---
-  motion_detected: 0               # 0/1 - simulate PIR detection
-  brightness_ceiling_lux: 280.0    # lux - "internal" sensor measurement (pre room-correction)
+  k__motion_detected: 0               # 0/1 - simulate PIR detection
+  k__brightness_ceiling_lux: 280.0    # lux - "internal" sensor measurement (pre room-correction)
   brightness_external_lux: 280.0   # lux - provided via KNX object 10 when external measurement is used
 
   # --- General parameters (ETS-like) ---
-  operating_mode: master           # master|slave
-  master_operating_mode: individual_switching  # individual_switching|parallel_switching
+  k__operating_mode: master           # master|slave
+  k__master_operating_mode: individual_switching  # individual_switching|parallel_switching
   parallel_switching_cycle_s: 60.0 # 30,60,120,180,240 (manual)
 
-  brightness_measurement_source: internal  # internal|external
+  k__brightness_measurement_source: internal  # internal|external
   room_correction_factor: 0.3      # 0.05..2.0 (manual)
 
   lighting_channel_c1_function: switching  # switching|constant_light|constant_light_no_presence|inactive
   lighting_channel_c2_function: switching  # switching|constant_light|constant_light_no_presence|inactive
   lighting_configuration_type: fully_automatic  # fully_automatic|semi_automatic
 
-  brightness_setpoint_lux: 500.0
-  brightness_alt_setpoint_lux: 400.0
+  k__brightness_setpoint_lux: 500.0
+  k__brightness_alt_setpoint_lux: 400.0
   lighting_time_delay_s: 600.0     # 30..3600 (manual)
   lighting_standby_enabled_param: 1          # 0/1 - standby time feature enabled in parameters
   lighting_standby_duration_s: 1800.0        # 30..3600 (manual)
@@ -110,13 +124,13 @@ actions:
     call: max(30.0, min(3600.0, $in(obj27_lighting_time_delay_in_s)))
 
   - function: $in(active_setpoint_lux)
-    call: ($in(brightness_alt_setpoint_lux) if $in(obj22_select_alt_setpoint_in) == 1 else $in(brightness_setpoint_lux))
+    call: ($in(k__brightness_alt_setpoint_lux) if $in(obj22_select_alt_setpoint_in) == 1 else $in(k__brightness_setpoint_lux))
 
   - function: $in(brightness_lux)
     call: (
           max(0.0, $in(brightness_external_lux))
-          if $in(brightness_measurement_source) == "external"
-          else max(0.0, $in(brightness_ceiling_lux) / $in(room_correction_factor))
+          if $in(k__brightness_measurement_source) == "external"
+          else max(0.0, $in(k__brightness_ceiling_lux) / $in(room_correction_factor))
         )
 
   - function: $in(obj9_brightness_out_lux)
@@ -184,10 +198,10 @@ actions:
       any_lighting: "($in(lighting_channel_c1_function) != \"inactive\") or ($in(lighting_channel_c2_function) != \"inactive\")"
     call: (
           0.0
-          if ($in(operating_mode) == "slave") or (not any_lighting)
+          if ($in(k__operating_mode) == "slave") or (not any_lighting)
           else (
             $in(lighting_time_delay_s)
-            if $in(motion_detected) == 1
+            if $in(k__motion_detected) == 1
             else max(0.0, $in(lighting_timer_s) - dt)
           )
         )
@@ -210,7 +224,7 @@ actions:
       should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c1_manual_on_timer_s) > 0)"
     call: (
           0
-          if ($in(operating_mode) == "slave")
+          if ($in(k__operating_mode) == "slave")
              or ($in(lighting_channel_c1_function) == "inactive")
              or blocked
           else (
@@ -234,7 +248,7 @@ actions:
       should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c2_manual_on_timer_s) > 0)"
     call: (
           0
-          if ($in(operating_mode) == "slave")
+          if ($in(k__operating_mode) == "slave")
              or ($in(lighting_channel_c2_function) == "inactive")
              or blocked
           else (
@@ -255,10 +269,10 @@ actions:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
     call: (
           0.0
-          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or ($in(motion_detected) == 0 and $in(presence_c4_timer_s) == 0)
+          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c4_timer_s) == 0)
           else (
             min($in(presence_c4_switch_on_delay_s), $in(presence_c4_on_delay_timer_s) + dt)
-            if $in(motion_detected) == 1
+            if $in(k__motion_detected) == 1
             else $in(presence_c4_on_delay_timer_s)
           )
         )
@@ -271,7 +285,7 @@ actions:
           0.0
           if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or (not delay_ok)
           else (
-            $in(presence_c4_time_delay_s) if $in(motion_detected) == 1 else max(0.0, $in(presence_c4_timer_s) - dt)
+            $in(presence_c4_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c4_timer_s) - dt)
           )
         )
 
@@ -290,10 +304,10 @@ actions:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
     call: (
           0.0
-          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or ($in(motion_detected) == 0 and $in(presence_c5_timer_s) == 0)
+          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c5_timer_s) == 0)
           else (
             min($in(presence_c5_switch_on_delay_s), $in(presence_c5_on_delay_timer_s) + dt)
-            if $in(motion_detected) == 1
+            if $in(k__motion_detected) == 1
             else $in(presence_c5_on_delay_timer_s)
           )
         )
@@ -306,7 +320,7 @@ actions:
           0.0
           if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or (not delay_ok)
           else (
-            $in(presence_c5_time_delay_s) if $in(motion_detected) == 1 else max(0.0, $in(presence_c5_timer_s) - dt)
+            $in(presence_c5_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c5_timer_s) - dt)
           )
         )
 
@@ -323,16 +337,16 @@ actions:
   # --- Parallel switching trigger (pulse/toggle) ---
   - function: $in(obj41_parallel_trigger_out)
     params:
-      enabled: "($in(operating_mode) == \"slave\") or ($in(master_operating_mode) == \"parallel_switching\")"
-    call: 1 if (enabled and $in(motion_detected) == 1 and (($in(motion_prev) == 0) or ($in(trigger_timer_s) >= $in(parallel_switching_cycle_s)))) else 0
+      enabled: "($in(k__operating_mode) == \"slave\") or ($in(k__master_operating_mode) == \"parallel_switching\")"
+    call: 1 if (enabled and $in(k__motion_detected) == 1 and (($in(motion_prev) == 0) or ($in(trigger_timer_s) >= $in(parallel_switching_cycle_s)))) else 0
 
   - function: $in(trigger_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
-      enabled: "($in(operating_mode) == \"slave\") or ($in(master_operating_mode) == \"parallel_switching\")"
+      enabled: "($in(k__operating_mode) == \"slave\") or ($in(k__master_operating_mode) == \"parallel_switching\")"
     call: (
           0.0
-          if (not enabled) or ($in(motion_detected) == 0)
+          if (not enabled) or ($in(k__motion_detected) == 0)
           else (
             0.0 if $in(trigger_timer_s) >= $in(parallel_switching_cycle_s)
             else min($in(parallel_switching_cycle_s), $in(trigger_timer_s) + dt)
@@ -340,55 +354,55 @@ actions:
         )
 
   - function: $in(motion_prev)
-    call: $in(motion_detected)
+    call: $in(k__motion_detected)
 
 communication:
   - knx_ip:
       router:
-        host: knx_gateway
-        port: 3671
+        host: "$param(knx_router_host)"
+        port: "$param(knx_router_port)"
         route_back: true
-      poll_interval: 0.3
+      poll_interval: "$param(knx_poll_interval)"
       bindings:
         # Lighting channel C1
         - name: obj0_c1_switch
           direction: bidirectional
-          group_address: "3/0/1"
+          group_address: "$param(ga_main)/0/1"
           value_codec: bool
           read_attribute: "#attr(obj0_c1_switch_out)"
           write_attribute: "#attr(obj0_c1_switch_cmd_in)"
         - name: obj4_c1_setpoint
           direction: bidirectional
-          group_address: "3/0/5"
+          group_address: "$param(ga_main)/0/5"
           dpt: 9.004
-          read_attribute: "#attr(brightness_setpoint_lux)"
-          write_attribute: "#attr(brightness_setpoint_lux)"
+          read_attribute: "#attr(k__brightness_setpoint_lux)"
+          write_attribute: "#attr(k__brightness_setpoint_lux)"
         - name: obj6_c1_alt_setpoint
           direction: bidirectional
-          group_address: "3/0/7"
+          group_address: "$param(ga_main)/0/7"
           dpt: 9.004
-          read_attribute: "#attr(brightness_alt_setpoint_lux)"
-          write_attribute: "#attr(brightness_alt_setpoint_lux)"
+          read_attribute: "#attr(k__brightness_alt_setpoint_lux)"
+          write_attribute: "#attr(k__brightness_alt_setpoint_lux)"
         - name: obj8_room_correction_factor
           direction: outbound
-          group_address: "3/0/9"
+          group_address: "$param(ga_main)/0/9"
           dpt: 9.001
           read_attribute: "#attr(obj8_room_correction_factor_out_scaled)"
         - name: obj9_brightness_value
           direction: outbound
-          group_address: "3/0/10"
+          group_address: "$param(ga_main)/0/10"
           dpt: 9.004
           read_attribute: "#attr(obj9_brightness_out_lux)"
         - name: obj10_external_brightness
           direction: inbound
-          group_address: "3/0/11"
+          group_address: "$param(ga_main)/0/11"
           dpt: 9.004
           write_attribute: "#attr(obj10_external_brightness_lux_in)"
 
         # Lighting channel C2
         - name: obj11_c2_switch
           direction: bidirectional
-          group_address: "3/1/1"
+          group_address: "$param(ga_main)/1/1"
           value_codec: bool
           read_attribute: "#attr(obj11_c2_switch_out)"
           write_attribute: "#attr(obj11_c2_switch_cmd_in)"
@@ -396,65 +410,88 @@ communication:
         # Shared lighting control objects
         - name: obj22_select_alt_setpoint
           direction: inbound
-          group_address: "3/2/1"
+          group_address: "$param(ga_main)/2/1"
           value_codec: bool
           write_attribute: "#attr(obj22_select_alt_setpoint_in)"
         - name: obj25_standby_function
           direction: inbound
-          group_address: "3/2/3"
+          group_address: "$param(ga_main)/2/3"
           value_codec: bool
           write_attribute: "#attr(obj25_standby_enable_in)"
         - name: obj27_lighting_time_delay
           direction: inbound
-          group_address: "3/2/4"
+          group_address: "$param(ga_main)/2/4"
           dpt: 7.005
           write_attribute: "#attr(obj27_lighting_time_delay_in_s)"
         - name: obj28_lighting_block
           direction: inbound
-          group_address: "3/2/5"
+          group_address: "$param(ga_main)/2/5"
           value_codec: bool
           write_attribute: "#attr(obj28_lighting_block_in)"
         - name: obj29_central_command
           direction: inbound
-          group_address: "3/2/6"
+          group_address: "$param(ga_main)/2/6"
           value_codec: bool
           write_attribute: "#attr(obj29_central_command_in)"
 
         # Presence channels
         - name: obj31_presence_c4_1
           direction: outbound
-          group_address: "3/3/1"
+          group_address: "$param(ga_main)/3/1"
           value_codec: bool
           read_attribute: "#attr(obj31_presence_c4_1_out)"
         - name: obj32_presence_c4_2
           direction: outbound
-          group_address: "3/3/2"
+          group_address: "$param(ga_main)/3/2"
           value_codec: bool
           read_attribute: "#attr(obj32_presence_c4_2_out)"
         - name: obj33_presence_c4_block
           direction: inbound
-          group_address: "3/3/3"
+          group_address: "$param(ga_main)/3/3"
           value_codec: bool
           write_attribute: "#attr(obj33_presence_c4_block_in)"
         - name: obj34_presence_c5_1
           direction: outbound
-          group_address: "3/3/4"
+          group_address: "$param(ga_main)/3/4"
           value_codec: bool
           read_attribute: "#attr(obj34_presence_c5_1_out)"
         - name: obj35_presence_c5_2
           direction: outbound
-          group_address: "3/3/5"
+          group_address: "$param(ga_main)/3/5"
           value_codec: bool
           read_attribute: "#attr(obj35_presence_c5_2_out)"
         - name: obj36_presence_c5_block
           direction: inbound
-          group_address: "3/3/6"
+          group_address: "$param(ga_main)/3/6"
           value_codec: bool
           write_attribute: "#attr(obj36_presence_c5_block_in)"
 
         # Parallel switching trigger
         - name: obj41_parallel_trigger
           direction: outbound
-          group_address: "3/4/1"
+          group_address: "$param(ga_main)/4/1"
           value_codec: bool
           read_attribute: "#attr(obj41_parallel_trigger_out)"
+
+scenarios:
+  motion_detected:
+    duration: 20.0
+    description: "Presence detected with low ambient light."
+    overrides:
+      $in(k__motion_detected): 1
+      $in(k__brightness_ceiling_lux): 120.0
+      $in(obj28_lighting_block_in): 0
+
+  manual_switch_c1:
+    duration: 10.0
+    description: "Manual toggle of channel C1 via KNX."
+    overrides:
+      $in(obj0_c1_switch_cmd_in): 1
+      $in(k__motion_detected): 0
+
+  parallel_switching_pulse:
+    duration: 12.0
+    description: "Parallel switching trigger based on motion."
+    overrides:
+      $in(k__master_operating_mode): parallel_switching
+      $in(k__motion_detected): 1
