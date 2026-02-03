@@ -17,8 +17,6 @@ attributes:
   # Air temperature setpoints (degC)
   k__air_temp_setpoint_home_c: 19.0
   k__air_temp_setpoint_away_c: 18.0
-  k__air_temp_setpoint_home_c: 19.0
-  k__air_temp_setpoint_away_c: 18.0
   active_air_temp_setpoint_c: 19.0
 
   # Simple thermal model
@@ -94,7 +92,7 @@ actions:
     name: derive_active_air_temp_setpoint
     description: Select active air temperature setpoint based on ventilation mode.
     call: (
-          $in(k__air_temp_setpoint_away_c) if $in(ventilation_mode) == 2
+          $in(k__air_temp_setpoint_away_c) if $in(k__ventilation_mode) == 2
           else $in(k__air_temp_setpoint_home_c)
         )
 
@@ -630,8 +628,6 @@ scenarios:
     overrides:
       $in(k__ventilation_mode): 3
       $in(outside_air_temp_c): 5.0
-      $in(k__air_temp_setpoint_home_c): 22.5
-      $in(k__electric_heater_enabled): 1
       $in(k__air_temp_setpoint_home_c): 22.5
       $in(k__electric_heater_enabled): 1
       $in(heater_fault): 1

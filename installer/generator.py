@@ -633,7 +633,6 @@ import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
-from typing import Any, Dict, Optional
 
 import requests
 import yaml
@@ -688,20 +687,13 @@ def bootstrap(bundle_path: Path, api_url: str) -> None:
     if spx_python is not None:
         client = spx_python.init(address=api_url, product_key=bundle.get("license_key", ""))
         model_payloads: Dict[str, Dict[str, Any]] = {}
-        model_payloads: Dict[str, Dict[str, Any]] = {}
         for entry in models:
             payload = register_via_sdk(client, entry)
             if payload and isinstance(payload, dict):
                 model_id = entry.get("id")
                 if isinstance(model_id, str) and model_id:
                     model_payloads[model_id] = payload
-            payload = register_via_sdk(client, entry)
-            if payload and isinstance(payload, dict):
-                model_id = entry.get("id")
-                if isinstance(model_id, str) and model_id:
-                    model_payloads[model_id] = payload
         for entry in instances:
-            create_instance_via_sdk(client, entry, model_payloads)
             create_instance_via_sdk(client, entry, model_payloads)
         for instance_key in start_instances:
             start_instance_via_sdk(client, instance_key)
@@ -724,43 +716,19 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def register_via_sdk(client, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-def register_via_sdk(client, entry: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     model_id = entry.get("id")
     raw_path = entry.get("path", "")
     model_path = resolve_model_path(raw_path)
     if not model_id or not model_path.exists():
         print(f"  - Skipping invalid entry: {entry}")
         return None
-        return None
     with model_path.open("r", encoding="utf-8") as handle:
         payload = yaml.safe_load(handle)
     client["models"][model_id] = payload
     print(f"  - Registered model {model_id} via SDK")
     return payload
-    return payload
 
 
-def _meta_defaults(payload: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
-    meta = payload.get("meta_parameters", {})
-    if not isinstance(meta, dict):
-        return {}, []
-    params: Dict[str, Any] = {}
-    missing: list[str] = []
-    for name, spec in meta.items():
-        if not isinstance(spec, dict):
-            continue
-        if "default" in spec:
-            params[name] = {"cycle": [spec.get("default")]}
-        elif spec.get("required") is True:
-            missing.append(name)
-    return params, missing
-
-
-def create_instance_via_sdk(
-    client,
-    entry: Dict[str, Any],
-    model_payloads: Dict[str, Dict[str, Any]],
-) -> None:
 def _meta_defaults(payload: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
     meta = payload.get("meta_parameters", {})
     if not isinstance(meta, dict):
@@ -785,24 +753,6 @@ def create_instance_via_sdk(
     model_id = entry.get("model_id")
     instance_key = entry.get("instance_key")
     if not model_id or not instance_key:
-        return
-    payload = model_payloads.get(model_id, {})
-    has_meta = isinstance(payload, dict) and bool(payload.get("meta_parameters"))
-    if has_meta:
-        params, missing = _meta_defaults(payload)
-        if missing:
-            raise RuntimeError(
-                f"Missing defaults for required meta_parameters in {model_id}: {', '.join(missing)}"
-            )
-        if params:
-            client["instances"].generate(
-                template=model_id,
-                count=1,
-                name=instance_key,
-                parameters=params,
-            )
-            print(f"  - Generated instance {instance_key} from {model_id}")
-            return
         return
     payload = model_payloads.get(model_id, {})
     has_meta = isinstance(payload, dict) and bool(payload.get("meta_parameters"))
