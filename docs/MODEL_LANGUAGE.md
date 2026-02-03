@@ -36,7 +36,7 @@ attributes:
 
 Conventions:
 - Use suffixes for units: `_c`, `_pct`, `_ms`, `_s`, `_kw`, `_kwh`, `_h`.
-- Use `cycle_time_s` when the model integrates over time.
+- Use `_cycle_time_s` when the model integrates over time; expose `cycle_time_s` only when the integration step must be user-visible.
 - Internal helpers can be prefixed with `_`.
 - Use `k__` prefix for primary control inputs: setpoints, modes, enable/disable flags,
   or attributes that are written from external protocols and drive behavior.
