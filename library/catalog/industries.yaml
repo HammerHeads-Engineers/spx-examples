@@ -93,6 +93,12 @@ industries:
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
         instance: spx_vacuum_gauge_multichannel
+    start_instances:
+      - spx_health_monitor_ble
+      - spx_temp_sensor_ble
+      - spx_env_sensor_mqtt
+      - spx_lab_multimeter
+      - spx_vacuum_gauge
     path: library/industries/embedded_lab_pack
   - id: industrial_iiot_pack
     name: Industrial Pack (Industry 4.0)

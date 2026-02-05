@@ -46,16 +46,22 @@ class InstallerWizard:
         self._print_banner()
         packages, protocol_filters = self._prompt_packages(index.industries, index)
         protocol_only = bool(protocol_filters) and not packages
-        profiles = [] if protocol_only else self._prompt_profiles(packages, index)
-        install_examples = False
+        profiles: List[str] = []
+        install_models = False
+        install_instances = False
         start_instances: List[str] = []
         if not protocol_only:
-            install_examples = self._prompt_yes_no(
-                "\nInstall bundled example models/tests? [Y/n]: ",
+            install_models = self._prompt_yes_no(
+                "\nAdd models from selected packages? [Y/n]: ",
                 default=True,
             )
-            if install_examples:
-                start_instances = self._prompt_start_instances(packages, index)
+            if install_models:
+                install_instances = self._prompt_yes_no(
+                    "Add default instances? [Y/n]: ",
+                    default=True,
+                )
+                if install_instances:
+                    start_instances = self._prompt_start_instances(packages, index)
         install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
         offline_bundle = self._prompt_yes_no(
             "Prepare offline installation bundle instead of immediate launch? [y/N]: ",
@@ -67,18 +73,26 @@ class InstallerWizard:
             model_ids = []
             service_ids = self._prompt_protocol_services(protocol_filters, index)
         else:
-            model_ids = resolve_model_ids(packages, profiles, protocol_filters, index)
+            model_ids = resolve_model_ids(packages, profiles, protocol_filters, index) if install_models else []
             service_ids = resolve_service_ids(model_ids, packages, profiles, index)
-        instances = resolve_default_instances(packages, index) if install_examples else []
-        if install_examples:
+        instances = resolve_default_instances(packages, index) if install_instances else []
+        if install_instances:
             allowed = {entry.get("instance_key") for entry in instances if entry.get("instance_key")}
             start_instances = [key for key in start_instances if key in allowed]
+        if install_instances and (
+            "smart_building_pack" in packages
+            or "industrial_iiot_pack" in packages
+            or "embedded_lab_pack" in packages
+        ):
+            allowed = set(start_instances)
+            instances = [entry for entry in instances if entry.get("instance_key") in allowed]
 
         self._print_summary(
             packages,
             profiles,
             protocol_filters,
-            install_examples,
+            install_models,
+            install_instances,
             install_spx_ui,
             offline_bundle,
             license_key,
@@ -93,7 +107,7 @@ class InstallerWizard:
             packages=packages,
             profiles=profiles,
             protocols=protocol_filters,
-            install_examples=install_examples,
+            install_examples=install_models,
             install_spx_ui=install_spx_ui,
             offline_bundle=offline_bundle,
             license_key=license_key,
@@ -405,7 +419,8 @@ class InstallerWizard:
         packages: Sequence[str],
         profiles: Sequence[str],
         protocols: Sequence[str],
-        install_examples: bool,
+        install_models: bool,
+        install_instances: bool,
         install_spx_ui: bool,
         offline_bundle: bool,
         license_key: str,
@@ -433,7 +448,8 @@ class InstallerWizard:
             print("\nProtocols:")
             for proto in protocols:
                 print(f"  • {self._format_protocol_label(proto)}")
-        print(f"\nInstall examples: {ui.success('yes') if install_examples else ui.warn('no')}")
+        print(f"\nInstall models: {ui.success('yes') if install_models else ui.warn('no')}")
+        print(f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}")
         print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
         print(f"Offline bundle: {ui.success('yes') if offline_bundle else ui.warn('no')}")
         print(f"SPX product key: {ui.heading(license_key or 'N/A')}")

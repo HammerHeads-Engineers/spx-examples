@@ -238,6 +238,13 @@ def _build_noninteractive_selection(
 
     instances = resolve_default_instances(packages, index) if install_examples else []
     start_instances = resolve_start_instances(packages, index) if install_examples else []
+    if install_examples and (
+        "smart_building_pack" in packages
+        or "industrial_iiot_pack" in packages
+        or "embedded_lab_pack" in packages
+    ):
+        allowed = set(start_instances)
+        instances = [entry for entry in instances if entry.get("instance_key") in allowed]
 
     return WizardSelection(
         packages=packages,

@@ -95,13 +95,13 @@ def test_wizard_with_inputs(monkeypatch: pytest.MonkeyPatch, manifest_index: Man
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "1", "", "n", "n"])
+    inputs = iter(["1", "", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
 
     assert selection.packages == ["pack_a"]
-    assert selection.profiles == ["profile_a"]
+    assert selection.profiles == []
     assert selection.protocols == []
     assert selection.install_examples is True
     assert selection.install_spx_ui is False
