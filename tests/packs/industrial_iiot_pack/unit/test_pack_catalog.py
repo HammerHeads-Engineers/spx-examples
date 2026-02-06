@@ -68,3 +68,9 @@ def test_pack_profiles_reference_catalog_models() -> None:
             model_entry = models_by_path[model_path]
             packages = model_entry.get("packages", []) or []
             assert PACK_ID in packages, f"Catalog model {model_entry.get('id')} is missing '{PACK_ID}' in packages"
+
+
+def test_pack_includes_abb_m1m_power_meter() -> None:
+    models = models_for_pack(PACK_ID)
+    model_ids = {entry.get("id") for entry in models}
+    assert "Energy.PowerMeter.AbbM1M.Modbus" in model_ids
