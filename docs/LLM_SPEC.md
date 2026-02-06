@@ -29,6 +29,60 @@ Single source of truth for LLM and agent contributions.
 - Add helper tooling in `tools/` if it does not change runtime behavior.
 - Add new packs or profiles with matching catalog updates.
 
+## Operational flow for new-device-model generation automations
+Use this flow only for automations whose primary objective is creating a new
+device model YAML (plus required integration updates such as catalog/profile/tests).
+Do not treat this as a mandatory flow for unrelated repository tasks.
+
+1) Input contract
+- Start from a clear objective and acceptance criteria.
+- Confirm target domain/pack and protocol.
+- For vendor/protocol-specific models, require first-party documentation links.
+
+2) Implementation scope
+- Add/update model YAML in `library/domains/...`.
+- Keep naming rules (`lower_snake_case`, `name` aligned with file stem).
+- Update catalogs/profiles/pack docs as required by AGENTS.md.
+- Keep changes additive and backward-compatible.
+
+3) Runtime smoke gate (required)
+- Add a minimal integration smoke test for each new model.
+- Smoke test must load/register the model via `spx_python`, create/reset/start an instance, and assert it reaches `running`.
+- For protocol models, verify at least one protocol-level read/write probe on the exposed endpoint (for Modbus: resolve endpoint and read key registers).
+- On failure, capture diagnostic context from instance state and CI logs.
+
+4) Validation before push
+- Run:
+  - `poetry run python tools/validate_models.py`
+  - `poetry run pytest`
+
+5) CI remediation loop
+- After push, monitor CI for the branch.
+- If CI fails: fetch failing job logs, apply targeted fixes, commit, and push on the same branch.
+- Retry CI remediation up to 3 consecutive attempts.
+
+6) Success path
+- Open or update a PR with base branch `develop` only.
+- Never target `main` from automation.
+- Include source links, rationale, and test/validation evidence in the PR body.
+
+7) Failure fallback (after 3 failed CI remediation attempts)
+- Stop automated fix attempts.
+- Open an issue in the repository summarizing:
+  - branch and commit,
+  - failing workflow/job URLs,
+  - last observed error signature,
+  - attempted fixes,
+  - explicit blocker and next recommended manual action.
+- Leave merge from `develop` to `main` to a human maintainer.
+
+## Prompt minimization guidance
+- Keep automation prompts short.
+- Put stable process rules in this file and reference them from prompts.
+- Prompt content should focus on task-specific objective, constraints, and deliverables.
+- Avoid repeating generic flow, branch policy, and retry policy in every automation prompt.
+- For new-device-model generation prompts, reference this section instead of duplicating it.
+
 ## Golden examples
 
 Minimal model YAML:
