@@ -272,7 +272,7 @@ communication:
         reactive_power_total_raw: { address: [23330,23331], group: i_r, type: uint_32 }
         apparent_power_total_raw: { address: [23338,23339], group: i_r, type: uint_32 }
         frequency_raw:         { address: [23346,23347], group: i_r, type: uint_32 }
-        power_factor_total_raw:{ address: [23360,23361], group: i_r, type: uint_32 }
+        power_factor_total_raw: { address: [23360,23361], group: i_r, type: uint_32 }
 
 scenarios:
   nominal_load:
