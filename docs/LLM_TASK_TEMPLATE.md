@@ -23,8 +23,15 @@ Use this template for new-device-model generation tasks.
 ## Files touched
 - 
 
+## Pack registration checklist (required)
+- Catalog entry includes target pack in `packages`:
+- Target pack profile includes the model path:
+- `library/catalog/industries.yaml` update needed?
+- If one-click sample provisioning is expected: `default_instances` / `start_instances` updated:
+
 ## Runtime smoke test plan (required for new model YAML)
 - Model path:
+- Target pack:
 - Smoke test path:
 - Bootstrap method (`spx_python` + instance start):
 - Protocol probe(s):
@@ -41,6 +48,11 @@ poetry run pytest
 - Attempt 2/3:
 - Attempt 3/3:
 - Stop after 3 failed CI attempts and create issue.
+
+## Process upgrade gate (required for new model workflow)
+- CI-visible rule ensuring new model YAML changes include smoke coverage:
+- Guard implementation path (pytest/validation script):
+- Guard result:
 
 ## PR summary (target `develop`)
 - Source links (first-party):
