@@ -331,6 +331,16 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterAbbD13_15.Modbus
+    name: ABB D13 15 Energy Meter (Modbus)
+    path: library/domains/iot/abb/abb_d13_15__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+
   - id: Energy.EVSE.Ocpp
     name: EVSE / Charge Point (OCPP 1.6)
     path: library/domains/energy/emobility/evse__ocpp.yaml

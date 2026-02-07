@@ -17,6 +17,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - Flexit Nordic HVAC (BACnet): `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`
   - Thermal controller (Modbus): `library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml`
   - Energy meter iEM3000 (Modbus): `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`
+  - ABB D13 15 energy meter (Modbus): `library/domains/iot/abb/abb_d13_15__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`
@@ -56,7 +57,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 | mqtt_broker | 1883/tcp | MQTT env sensors and weather gateway |
 | lwm2m_server | 5683/udp, 5684/udp, 8080/tcp | LwM2M env sensor + management UI |
 | http_gateway | 8091/tcp, 8092/tcp | Weather forecast + air quality feeds |
-| modbus_tcp_gateway | 502/tcp | Thermal controller via gateway; per-model Modbus ports live in YAML (e.g. iEM3000 uses 5023) |
+| modbus_tcp_gateway | 502/tcp | Thermal controller via gateway; per-model Modbus ports live in YAML (e.g. iEM3000 uses 5023, D13 15 uses 5032) |
 | bacnet_gateway | 47808/udp, 47818/udp, 47828/udp | Flexit HVAC, security, fire panel |
 | opcua_server | 4843/tcp, 4844/tcp | BMS controller + lighting panel endpoints |
 | knx_gateway | 3671/udp, 6720/tcp | KNX/IP tunneling + TCP interface |
