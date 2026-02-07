@@ -4,9 +4,8 @@ name: siemens_pac3200__modbus
 description: |
   Minimal Modbus TCP (slave) simulation of the Siemens SENTRON PAC3200 power meter.
   Register mapping follows the PAC3200 measured-variable table (Float32) for voltages,
-  currents, frequency, total power and power factor. Energy counters are simulated
-  internally but not exposed via Modbus because the PAC3200 uses 64-bit registers for
-  energy totals.
+  currents, frequency, and power values. Energy counters are simulated internally but
+  not exposed via Modbus in this minimal model.
 
 meta_parameters:
   modbus_port:
