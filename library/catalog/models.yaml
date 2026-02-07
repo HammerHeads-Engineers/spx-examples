@@ -340,6 +340,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
     profiles: [process_cell_quickstart]
+  - id: Energy.EnergyMeterDirisA40.Modbus
+    name: Socomec DIRIS A-40 Energy Meter (Modbus TCP)
+    path: library/domains/iot/socomec/diris_a40__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EVSE.Ocpp
     name: EVSE / Charge Point (OCPP 1.6)
     path: library/domains/energy/emobility/evse__ocpp.yaml
