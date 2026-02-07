@@ -8,8 +8,7 @@ import unittest
 from typing import Optional, Sequence
 
 from tests.common.modbus_utils import wait_for_modbus_endpoint
-from tests.common.repo import repo_root
-from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition
+from tests.common.spx_utils import require_existing_instance, wait_for_condition
 
 try:  # pymodbus >= 3.x
     from pymodbus.client import ModbusTcpClient  # type: ignore
@@ -20,10 +19,8 @@ except Exception:  # pragma: no cover - fallback for pymodbus < 3.x
         ModbusTcpClient = None  # type: ignore
 
 
-ROOT = repo_root()
-MODEL_PATH = ROOT / "library" / "domains" / "iot" / "abb" / "abb_m1m_power_meter__modbus.yaml"
-MODEL_KEY = "tests__abb_m1m_power_meter_modbus"
-INSTANCE_KEY = "tests__abb_m1m_power_meter_modbus"
+MODEL_ID = "Energy.PowerMeter.AbbM1M.Modbus"
+INSTANCE_KEY = "spx_abb_m1m_power_meter_modbus"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 READ_RETRY_TIMEOUT = float(os.environ.get("ABB_M1M_SMOKE_READ_TIMEOUT", "6.0"))
 
@@ -127,18 +124,27 @@ class TestModbusAbbM1MSmokeIntegration(unittest.TestCase):
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
-        (
+        cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
+        cls._instance = require_existing_instance(
             cls._client,
-            cls._instance,
-            cls._model_changed,
-        ) = bootstrap_model_instance(
-            spx_python,
-            product_key=product_key,
-            base_url=SPX_BASE_URL,
-            model_path=MODEL_PATH,
-            model_key=MODEL_KEY,
-            instance_key=INSTANCE_KEY,
+            INSTANCE_KEY,
+            expected_model_id=MODEL_ID,
+            ensure_running=False,
         )
+        cls._model_changed = False
+
+        try:
+            cls._instance.stop()
+        except Exception:
+            pass
+        try:
+            cls._instance.reset()
+        except Exception:
+            pass
+        try:
+            cls._instance.start()
+        except Exception:
+            pass
 
     @classmethod
     def _debug_snapshot(cls) -> str:
