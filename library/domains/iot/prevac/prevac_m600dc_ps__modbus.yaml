@@ -1,0 +1,189 @@
+# SPDX-License-Identifier: MIT
+
+name: prevac_m600dc_ps__modbus
+description: |
+  Prevac M600DC-PS magnetron power supply with Modbus TCP register map.
+  The mapping follows the user manual register table (rev. 03 / 1.4.4),
+  exposing key measurements, setpoints, and control commands.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 502
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  device_state: 0
+  status_word_1: 0
+  status_word_2: 0
+  switch_to_operate_allowed: 17
+
+  magnetron_power_w: 0.0
+  magnetron_voltage_v: 0.0
+  magnetron_current_ma: 0.0
+  arc_value: 0
+  thickness_nm: 0.0
+  rate_nm_s: 0.0
+  flow_sccm: 0.0
+
+  cmd__go_to_operate: 0
+  cmd__go_to_standby: 0
+
+  k__power_set_w: 100.0
+  k__voltage_set_v: 500.0
+  k__current_set_ma: 100.0
+  k__flow_set_sccm: 10.0
+
+  cmd__shutter_1_open: 0
+  cmd__shutter_1_close: 0
+  cmd__shutter_2_open: 0
+  cmd__shutter_2_close: 0
+  cmd__shutter_3_open: 0
+  cmd__shutter_3_close: 0
+
+  cmd__valve_open: 0
+  cmd__valve_close: 0
+  cmd__clear_thickness: 0
+
+  k__power_limit_output_1_w: 600
+  k__power_limit_output_2_w: 600
+  k__power_limit_output_3_w: 600
+  k__voltage_limit_output_1_v: 1200
+  k__voltage_limit_output_2_v: 1200
+  k__voltage_limit_output_3_v: 1200
+  k__current_limit_output_1_ma: 1200
+  k__current_limit_output_2_ma: 1200
+  k__current_limit_output_3_ma: 1200
+
+  k__power_ramp_w_s: 200
+  k__voltage_ramp_v_s: 200
+  k__current_ramp_ma_s: 200
+
+  k__vacuum_interlock_mode: 0
+  k__arc_detect_enabled: 1
+  k__arc_detect_time_us: 50
+  k__arc_off_time_ms: 100
+  k__arc_limit_enabled: 0
+  k__arc_limit_value: 1000
+
+  k__shutter_control_internal: 1
+  k__shutter_1_mode: 1
+  k__shutter_1_thickness_setpoint_nm: 0.0
+  k__shutter_1_time_setpoint_s: 0
+  shutter_1_remaining_time_s: 0
+  k__shutter_2_mode: 1
+  k__shutter_2_thickness_setpoint_nm: 0.0
+  k__shutter_2_time_setpoint_s: 0
+  shutter_2_remaining_time_s: 0
+  k__shutter_3_mode: 1
+  k__shutter_3_thickness_setpoint_nm: 0.0
+  k__shutter_3_time_setpoint_s: 0
+  shutter_3_remaining_time_s: 0
+
+  k__flow_sensor_enabled: 1
+  k__flow_sensor_range: 3
+  flow_controller_temp_raw: 0
+  flow_controller_drive_level_raw: 0
+  k__parallel_mode_enabled: 0
+  extension_module_count: 0
+
+  output_1_work_time_s: 0
+  output_2_work_time_s: 0
+  output_3_work_time_s: 0
+  k__active_output: 1
+  active_output: 1
+  k__timer_direction: 1
+  operate_time_s: 0
+  k__operate_time_setpoint_s: 0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        device_state: { address: [0,0], group: h_r, type: uint_16 }
+        status_word_1: { address: [1,1], group: h_r, type: uint_16 }
+        status_word_2: { address: [2,2], group: h_r, type: uint_16 }
+        switch_to_operate_allowed: { address: [3,3], group: h_r, type: uint_16 }
+
+        magnetron_power_w: { address: [4,5], group: h_r, type: float }
+        magnetron_voltage_v: { address: [6,7], group: h_r, type: float }
+        magnetron_current_ma: { address: [8,9], group: h_r, type: float }
+        arc_value: { address: [10,10], group: h_r, type: uint_16 }
+        thickness_nm: { address: [11,12], group: h_r, type: float }
+        rate_nm_s: { address: [13,14], group: h_r, type: float }
+        flow_sccm: { address: [15,16], group: h_r, type: float }
+
+        cmd__go_to_operate: { address: [17,17], group: h_r, type: uint_16 }
+        cmd__go_to_standby: { address: [18,18], group: h_r, type: uint_16 }
+
+        k__power_set_w: { address: [19,20], group: h_r, type: float }
+        k__voltage_set_v: { address: [21,22], group: h_r, type: float }
+        k__current_set_ma: { address: [23,24], group: h_r, type: float }
+        k__flow_set_sccm: { address: [25,26], group: h_r, type: float }
+
+        cmd__shutter_1_open: { address: [27,27], group: h_r, type: uint_16 }
+        cmd__shutter_1_close: { address: [28,28], group: h_r, type: uint_16 }
+        cmd__shutter_2_open: { address: [29,29], group: h_r, type: uint_16 }
+        cmd__shutter_2_close: { address: [30,30], group: h_r, type: uint_16 }
+        cmd__shutter_3_open: { address: [31,31], group: h_r, type: uint_16 }
+        cmd__shutter_3_close: { address: [32,32], group: h_r, type: uint_16 }
+
+        cmd__valve_open: { address: [33,33], group: h_r, type: uint_16 }
+        cmd__valve_close: { address: [34,34], group: h_r, type: uint_16 }
+        cmd__clear_thickness: { address: [35,35], group: h_r, type: uint_16 }
+
+        k__power_limit_output_1_w: { address: [36,36], group: h_r, type: uint_16 }
+        k__power_limit_output_2_w: { address: [37,37], group: h_r, type: uint_16 }
+        k__power_limit_output_3_w: { address: [38,38], group: h_r, type: uint_16 }
+        k__voltage_limit_output_1_v: { address: [39,39], group: h_r, type: uint_16 }
+        k__voltage_limit_output_2_v: { address: [40,40], group: h_r, type: uint_16 }
+        k__voltage_limit_output_3_v: { address: [41,41], group: h_r, type: uint_16 }
+        k__current_limit_output_1_ma: { address: [42,42], group: h_r, type: uint_16 }
+        k__current_limit_output_2_ma: { address: [43,43], group: h_r, type: uint_16 }
+        k__current_limit_output_3_ma: { address: [44,44], group: h_r, type: uint_16 }
+
+        k__power_ramp_w_s: { address: [45,45], group: h_r, type: uint_16 }
+        k__voltage_ramp_v_s: { address: [46,46], group: h_r, type: uint_16 }
+        k__current_ramp_ma_s: { address: [47,47], group: h_r, type: uint_16 }
+
+        k__vacuum_interlock_mode: { address: [48,48], group: h_r, type: uint_16 }
+        k__arc_detect_enabled: { address: [49,49], group: h_r, type: uint_16 }
+        k__arc_detect_time_us: { address: [50,50], group: h_r, type: uint_16 }
+        k__arc_off_time_ms: { address: [51,51], group: h_r, type: uint_16 }
+        k__arc_limit_enabled: { address: [52,52], group: h_r, type: uint_16 }
+        k__arc_limit_value: { address: [53,54], group: h_r, type: uint_32 }
+
+        k__shutter_control_internal: { address: [55,55], group: h_r, type: uint_16 }
+        k__shutter_1_mode: { address: [56,56], group: h_r, type: uint_16 }
+        k__shutter_1_thickness_setpoint_nm: { address: [57,58], group: h_r, type: float }
+        k__shutter_1_time_setpoint_s: { address: [59,60], group: h_r, type: uint_32 }
+        shutter_1_remaining_time_s: { address: [61,62], group: h_r, type: uint_32 }
+        k__shutter_2_mode: { address: [63,63], group: h_r, type: uint_16 }
+        k__shutter_2_thickness_setpoint_nm: { address: [64,65], group: h_r, type: float }
+        k__shutter_2_time_setpoint_s: { address: [66,67], group: h_r, type: uint_32 }
+        shutter_2_remaining_time_s: { address: [68,69], group: h_r, type: uint_32 }
+        k__shutter_3_mode: { address: [70,70], group: h_r, type: uint_16 }
+        k__shutter_3_thickness_setpoint_nm: { address: [71,72], group: h_r, type: float }
+        k__shutter_3_time_setpoint_s: { address: [73,74], group: h_r, type: uint_32 }
+        shutter_3_remaining_time_s: { address: [75,76], group: h_r, type: uint_32 }
+
+        k__flow_sensor_enabled: { address: [77,77], group: h_r, type: uint_16 }
+        k__flow_sensor_range: { address: [78,78], group: h_r, type: uint_16 }
+        flow_controller_temp_raw: { address: [79,79], group: h_r, type: uint_16 }
+        flow_controller_drive_level_raw: { address: [80,80], group: h_r, type: uint_16 }
+        k__parallel_mode_enabled: { address: [81,81], group: h_r, type: uint_16 }
+        extension_module_count: { address: [82,82], group: h_r, type: uint_16 }
+
+        output_1_work_time_s: { address: [83,84], group: h_r, type: uint_32 }
+        output_2_work_time_s: { address: [85,86], group: h_r, type: uint_32 }
+        output_3_work_time_s: { address: [87,88], group: h_r, type: uint_32 }
+        k__active_output: { address: [89,89], group: h_r, type: uint_16 }
+        active_output: { address: [90,90], group: h_r, type: uint_16 }
+        k__timer_direction: { address: [91,91], group: h_r, type: uint_16 }
+        operate_time_s: { address: [92,93], group: h_r, type: uint_32 }
+        k__operate_time_setpoint_s: { address: [94,95], group: h_r, type: uint_32 }

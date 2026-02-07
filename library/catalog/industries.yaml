@@ -89,6 +89,8 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Lab.Multimeter.Scpi
         instance: spx_lab_multimeter
+      - model: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
+        instance: spx_prevac_m600dc_ps
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
