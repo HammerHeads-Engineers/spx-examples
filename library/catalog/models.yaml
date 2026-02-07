@@ -331,6 +331,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPac3200.Modbus
+    name: Siemens SENTRON PAC3200 Power Meter (Modbus)
+    path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.PowerMeter.AbbM1M.Modbus
     name: ABB M1M Power Meter (Modbus TCP)
     path: library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
