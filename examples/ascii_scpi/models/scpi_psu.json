@@ -1,0 +1,55 @@
+{
+  "name": "scpi_psu",
+  "description": "Example SCPI bench power supply model for ASCII/TCP demos.\n",
+  "attributes": {
+    "idn": "SPX,SCPI_PSU,PSU0001,1.0",
+    "k__voltage_set_v": 5.0,
+    "k__current_set_a": 1.0,
+    "k__output_state": "OFF",
+    "voltage_readback_v": 0.0,
+    "current_readback_a": 0.0,
+    "error_status": "0,No error"
+  },
+  "actions": [
+    {
+      "function": "$in(voltage_readback_v)",
+      "name": "update_voltage_readback",
+      "call": "($in(k__voltage_set_v) if $in(k__output_state) == \"ON\" else 0.0)"
+    },
+    {
+      "function": "$in(current_readback_a)",
+      "name": "update_current_readback",
+      "call": "($in(k__current_set_a) if $in(k__output_state) == \"ON\" else 0.0)"
+    }
+  ],
+  "communication": [
+    {
+      "ascii": {
+        "terminator": "\n",
+        "response_delay": 0.01,
+        "response_jitter": 0.0,
+        "mappings": {
+          "*IDN?": "#out(idn)",
+          "SOUR:VOLT {voltage}": {
+            "#attr(k__voltage_set_v)": "voltage"
+          },
+          "SOUR:CURR {current}": {
+            "#attr(k__current_set_a)": "current"
+          },
+          "SOUR:VOLT?": "#out(k__voltage_set_v)",
+          "SOUR:CURR?": "#out(k__current_set_a)",
+          "MEAS:VOLT?": "#out(voltage_readback_v)",
+          "MEAS:CURR?": "#out(current_readback_a)",
+          "OUTP ON": {
+            "#attr(k__output_state)": "ON"
+          },
+          "OUTP OFF": {
+            "#attr(k__output_state)": "OFF"
+          },
+          "OUTP?": "#out(k__output_state)",
+          "SYST:ERR?": "#out(error_status)"
+        }
+      }
+    }
+  ]
+}

@@ -241,6 +241,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, iiot_monitoring]
+  - id: Lab.Multimeter.GenericDmm.Scpi
+    name: Generic Digital Multimeter (SCPI)
+    path: library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.Keysight1000X.Scpi
     name: Keysight InfiniiVision 1000 X-Series Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
@@ -262,6 +271,15 @@ models:
   - id: Lab.PowerSupply.RigolDp800.Scpi
     name: Rigol DP800 Series Power Supply (SCPI)
     path: library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.PowerSupply.Bench.Scpi
+    name: Bench Power Supply (SCPI)
+    path: library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:

@@ -4,6 +4,8 @@ description: |
   DP800 power supply so VISA/TCP test benches can run deterministically.
 models:
   - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+  - library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
+  - library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
