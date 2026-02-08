@@ -1,0 +1,129 @@
+name: rigol_dp800__scpi
+description: |
+  Virtual Rigol DP800-series programmable linear power supply exposing a
+  subset of SCPI commands for channel voltage/current setpoints, output
+  enable, and measurement readback over TCP.
+
+attributes:
+  idn: "RIGOL,DP800,DP8D000000000,00.01.17"
+
+  k__ch1_voltage_set_v: 5.0
+  k__ch1_current_set_a: 1.0
+  k__ch1_output_state: "OFF"
+  ch1_output_mode: "CV"
+  ch1_voltage_v: 0.0
+  ch1_current_a: 0.0
+  ch1_power_w: 0.0
+
+  k__ch2_voltage_set_v: 5.0
+  k__ch2_current_set_a: 1.0
+  k__ch2_output_state: "OFF"
+  ch2_output_mode: "CV"
+  ch2_voltage_v: 0.0
+  ch2_current_a: 0.0
+  ch2_power_w: 0.0
+
+  k__ch3_voltage_set_v: 5.0
+  k__ch3_current_set_a: 1.0
+  k__ch3_output_state: "OFF"
+  ch3_output_mode: "CV"
+  ch3_voltage_v: 0.0
+  ch3_current_a: 0.0
+  ch3_power_w: 0.0
+
+actions:
+  - function: $in(ch1_voltage_v)
+    name: update_ch1_voltage
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == "ON" else 0.0)
+  - function: $in(ch1_current_a)
+    name: update_ch1_current
+    call: ($in(k__ch1_current_set_a) if $in(k__ch1_output_state) == "ON" else 0.0)
+  - function: $in(ch1_power_w)
+    name: update_ch1_power
+    call: ($in(k__ch1_voltage_set_v) * $in(k__ch1_current_set_a) if $in(k__ch1_output_state) == "ON" else 0.0)
+
+  - function: $in(ch2_voltage_v)
+    name: update_ch2_voltage
+    call: ($in(k__ch2_voltage_set_v) if $in(k__ch2_output_state) == "ON" else 0.0)
+  - function: $in(ch2_current_a)
+    name: update_ch2_current
+    call: ($in(k__ch2_current_set_a) if $in(k__ch2_output_state) == "ON" else 0.0)
+  - function: $in(ch2_power_w)
+    name: update_ch2_power
+    call: ($in(k__ch2_voltage_set_v) * $in(k__ch2_current_set_a) if $in(k__ch2_output_state) == "ON" else 0.0)
+
+  - function: $in(ch3_voltage_v)
+    name: update_ch3_voltage
+    call: ($in(k__ch3_voltage_set_v) if $in(k__ch3_output_state) == "ON" else 0.0)
+  - function: $in(ch3_current_a)
+    name: update_ch3_current
+    call: ($in(k__ch3_current_set_a) if $in(k__ch3_output_state) == "ON" else 0.0)
+  - function: $in(ch3_power_w)
+    name: update_ch3_power
+    call: ($in(k__ch3_voltage_set_v) * $in(k__ch3_current_set_a) if $in(k__ch3_output_state) == "ON" else 0.0)
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        ":MEAS? CH1": "#out(ch1_voltage_v)"
+        ":MEAS? CH2": "#out(ch2_voltage_v)"
+        ":MEAS? CH3": "#out(ch3_voltage_v)"
+        ":MEAS:VOLT? CH1": "#out(ch1_voltage_v)"
+        ":MEAS:VOLT? CH2": "#out(ch2_voltage_v)"
+        ":MEAS:VOLT? CH3": "#out(ch3_voltage_v)"
+        ":MEAS:CURR? CH1": "#out(ch1_current_a)"
+        ":MEAS:CURR? CH2": "#out(ch2_current_a)"
+        ":MEAS:CURR? CH3": "#out(ch3_current_a)"
+        ":MEAS:POWE? CH1": "#out(ch1_power_w)"
+        ":MEAS:POWE? CH2": "#out(ch2_power_w)"
+        ":MEAS:POWE? CH3": "#out(ch3_power_w)"
+
+        ":SOURce1:VOLTage {voltage}":
+          "#attr(k__ch1_voltage_set_v)": "voltage"
+        ":SOURce1:VOLTage?": "#out(k__ch1_voltage_set_v)"
+        ":SOURce1:CURRent {current}":
+          "#attr(k__ch1_current_set_a)": "current"
+        ":SOURce1:CURRent?": "#out(k__ch1_current_set_a)"
+
+        ":SOURce2:VOLTage {voltage}":
+          "#attr(k__ch2_voltage_set_v)": "voltage"
+        ":SOURce2:VOLTage?": "#out(k__ch2_voltage_set_v)"
+        ":SOURce2:CURRent {current}":
+          "#attr(k__ch2_current_set_a)": "current"
+        ":SOURce2:CURRent?": "#out(k__ch2_current_set_a)"
+
+        ":SOURce3:VOLTage {voltage}":
+          "#attr(k__ch3_voltage_set_v)": "voltage"
+        ":SOURce3:VOLTage?": "#out(k__ch3_voltage_set_v)"
+        ":SOURce3:CURRent {current}":
+          "#attr(k__ch3_current_set_a)": "current"
+        ":SOURce3:CURRent?": "#out(k__ch3_current_set_a)"
+
+        ":OUTP? CH1": "#out(k__ch1_output_state)"
+        ":OUTP? CH2": "#out(k__ch2_output_state)"
+        ":OUTP? CH3": "#out(k__ch3_output_state)"
+        ":OUTP CH1,ON":
+          "#attr(k__ch1_output_state)": "ON"
+        ":OUTP CH1,OFF":
+          "#attr(k__ch1_output_state)": "OFF"
+        ":OUTP CH2,ON":
+          "#attr(k__ch2_output_state)": "ON"
+        ":OUTP CH2,OFF":
+          "#attr(k__ch2_output_state)": "OFF"
+        ":OUTP CH3,ON":
+          "#attr(k__ch3_output_state)": "ON"
+        ":OUTP CH3,OFF":
+          "#attr(k__ch3_output_state)": "OFF"
+
+        ":OUTP:MODE? CH1": "#out(ch1_output_mode)"
+        ":OUTP:MODE? CH2": "#out(ch2_output_mode)"
+        ":OUTP:MODE? CH3": "#out(ch3_output_mode)"
+        ":OUTP:CVCC? CH1": "#out(ch1_output_mode)"
+        ":OUTP:CVCC? CH2": "#out(ch2_output_mode)"
+        ":OUTP:CVCC? CH3": "#out(ch3_output_mode)"

@@ -114,6 +114,8 @@ industries:
         instance: spx_prevac_m600dc_ps
       - model: Lab.Oscilloscope.RigolDs1000z.Scpi
         instance: spx_rigol_ds1000z_oscilloscope
+      - model: Lab.PowerSupply.RigolDp800.Scpi
+        instance: spx_rigol_dp800_power_supply
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
