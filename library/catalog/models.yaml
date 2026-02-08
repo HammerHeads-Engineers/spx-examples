@@ -349,6 +349,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.RackPdu.ApcRpdu2g.Modbus
+    name: APC NetShelter Rack PDU 2g (RPDU2g) (Modbus)
+    path: library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterEm4200.Modbus
     name: Schneider Electric EM4200 Energy Meter (Modbus)
     path: library/domains/iot/schneider/schneider_em4200__modbus.yaml
@@ -361,6 +370,12 @@ models:
   - id: Energy.EnergyMeterPac3200.Modbus
     name: Siemens SENTRON PAC3200 Power Meter (Modbus)
     path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
     name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
     path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml

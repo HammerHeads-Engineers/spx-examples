@@ -25,6 +25,8 @@ industries:
         instance: spx_energy_meter_em4200_modbus
       - model: Energy.EnergyMeterPac3200.Modbus
         instance: spx_energy_meter_pac3200_modbus
+      - model: Energy.RackPdu.ApcRpdu2g.Modbus
+        instance: spx_rack_pdu_rpdu2g_modbus
       - model: Energy.EnergyMeterDirisA40.Modbus
         instance: spx_energy_meter_diris_a40_modbus
       - model: Energy.EnergyMeterCarloGavazziEm24.Modbus
