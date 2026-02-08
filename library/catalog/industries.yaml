@@ -101,6 +101,8 @@ industries:
         instance: spx_lab_multimeter
       - model: Lab.Oscilloscope.Keysight1000X.Scpi
         instance: spx_lab_oscilloscope
+      - model: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
+        instance: spx_prevac_m600dc_ps
       - model: Lab.Oscilloscope.RigolDs1000z.Scpi
         instance: spx_rigol_ds1000z_oscilloscope
       - model: Process.VacuumGauge.Modbus
