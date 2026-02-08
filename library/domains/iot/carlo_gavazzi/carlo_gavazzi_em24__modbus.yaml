@@ -1,0 +1,393 @@
+# SPDX-License-Identifier: MIT
+
+name: carlo_gavazzi_em24__modbus
+description: |
+  Carlo Gavazzi EM24 Ethernet energy meter (E1) modeled as a Modbus TCP slave.
+  The register layout follows the EM24 Ethernet communication protocol manual
+  with scaled integer registers for voltages, currents, power, power factor, and
+  total energy counters.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5031
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Phase-to-neutral voltages (V)
+  k__voltage_l1_n_v: 230.0
+  k__voltage_l2_n_v: 231.0
+  k__voltage_l3_n_v: 229.5
+
+  # Phase currents (A)
+  k__current_l1_a: 8.5
+  k__current_l2_a: 8.1
+  k__current_l3_a: 8.3
+
+  # Per-phase power factor inputs
+  k__power_factor_l1: 0.96
+  k__power_factor_l2: 0.95
+  k__power_factor_l3: 0.97
+
+  # Frequency (Hz)
+  k__frequency_hz: 50.0
+
+  # Derived line-to-line voltages (V)
+  voltage_l1_l2_v: 0.0
+  voltage_l2_l3_v: 0.0
+  voltage_l3_l1_v: 0.0
+  voltage_ln_sum_v: 0.0
+  voltage_ll_sum_v: 0.0
+
+  # Power (W/VA/VAR)
+  active_power_l1_w: 0.0
+  active_power_l2_w: 0.0
+  active_power_l3_w: 0.0
+  active_power_total_w: 0.0
+
+  apparent_power_l1_va: 0.0
+  apparent_power_l2_va: 0.0
+  apparent_power_l3_va: 0.0
+  apparent_power_total_va: 0.0
+
+  reactive_power_l1_var: 0.0
+  reactive_power_l2_var: 0.0
+  reactive_power_l3_var: 0.0
+  reactive_power_total_var: 0.0
+
+  power_factor_total: 0.0
+
+  # Energy totals (kWh)
+  energy_import_total_kwh: 0.0
+  energy_export_total_kwh: 0.0
+
+  # Phase sequence (123 for L1-L2-L3, 132 for L1-L3-L2)
+  phase_sequence: 123
+
+  _cycle_time_s: 1.0
+
+  # Raw Modbus register payloads (scaled integer values)
+  _v_l1_n_raw: 0
+  _v_l2_n_raw: 0
+  _v_l3_n_raw: 0
+  _v_l1_l2_raw: 0
+  _v_l2_l3_raw: 0
+  _v_l3_l1_raw: 0
+  _a_l1_raw: 0
+  _a_l2_raw: 0
+  _a_l3_raw: 0
+  _w_l1_raw: 0
+  _w_l2_raw: 0
+  _w_l3_raw: 0
+  _va_l1_raw: 0
+  _va_l2_raw: 0
+  _va_l3_raw: 0
+  _var_l1_raw: 0
+  _var_l2_raw: 0
+  _var_l3_raw: 0
+  _v_ln_sum_raw: 0
+  _v_ll_sum_raw: 0
+  _w_sum_raw: 0
+  _va_sum_raw: 0
+  _var_sum_raw: 0
+  _pf_l1_raw: 0
+  _pf_l2_raw: 0
+  _pf_l3_raw: 0
+  _pf_sum_raw: 0
+  _phase_sequence_raw: 123
+  _hz_raw: 0
+  _kwh_import_raw: 0
+  _kwh_export_raw: 0
+
+actions:
+  - function: $in(voltage_l1_l2_v)
+    name: compute_voltage_l1_l2
+    call: 1.7320508075688772 * (($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v)) / 2.0)
+
+  - function: $in(voltage_l2_l3_v)
+    name: compute_voltage_l2_l3
+    call: 1.7320508075688772 * (($in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 2.0)
+
+  - function: $in(voltage_l3_l1_v)
+    name: compute_voltage_l3_l1
+    call: 1.7320508075688772 * (($in(k__voltage_l3_n_v) + $in(k__voltage_l1_n_v)) / 2.0)
+
+  - function: $in(voltage_ln_sum_v)
+    name: compute_voltage_ln_sum
+    call: $in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)
+
+  - function: $in(voltage_ll_sum_v)
+    name: compute_voltage_ll_sum
+    call: $in(voltage_l1_l2_v) + $in(voltage_l2_l3_v) + $in(voltage_l3_l1_v)
+
+  - function: $in(apparent_power_l1_va)
+    name: compute_apparent_power_l1
+    call: abs($in(k__voltage_l1_n_v) * $in(k__current_l1_a))
+
+  - function: $in(apparent_power_l2_va)
+    name: compute_apparent_power_l2
+    call: abs($in(k__voltage_l2_n_v) * $in(k__current_l2_a))
+
+  - function: $in(apparent_power_l3_va)
+    name: compute_apparent_power_l3
+    call: abs($in(k__voltage_l3_n_v) * $in(k__current_l3_a))
+
+  - function: $in(active_power_l1_w)
+    name: compute_active_power_l1
+    call: $in(k__voltage_l1_n_v) * $in(k__current_l1_a) * $in(k__power_factor_l1)
+
+  - function: $in(active_power_l2_w)
+    name: compute_active_power_l2
+    call: $in(k__voltage_l2_n_v) * $in(k__current_l2_a) * $in(k__power_factor_l2)
+
+  - function: $in(active_power_l3_w)
+    name: compute_active_power_l3
+    call: $in(k__voltage_l3_n_v) * $in(k__current_l3_a) * $in(k__power_factor_l3)
+
+  - function: $in(active_power_total_w)
+    name: compute_active_power_total
+    call: $in(active_power_l1_w) + $in(active_power_l2_w) + $in(active_power_l3_w)
+
+  - function: $in(apparent_power_total_va)
+    name: compute_apparent_power_total
+    call: $in(apparent_power_l1_va) + $in(apparent_power_l2_va) + $in(apparent_power_l3_va)
+
+  - function: $in(reactive_power_l1_var)
+    name: compute_reactive_power_l1
+    call: (max(0.0, ($in(apparent_power_l1_va) ** 2) - ($in(active_power_l1_w) ** 2)) ** 0.5)
+
+  - function: $in(reactive_power_l2_var)
+    name: compute_reactive_power_l2
+    call: (max(0.0, ($in(apparent_power_l2_va) ** 2) - ($in(active_power_l2_w) ** 2)) ** 0.5)
+
+  - function: $in(reactive_power_l3_var)
+    name: compute_reactive_power_l3
+    call: (max(0.0, ($in(apparent_power_l3_va) ** 2) - ($in(active_power_l3_w) ** 2)) ** 0.5)
+
+  - function: $in(reactive_power_total_var)
+    name: compute_reactive_power_total
+    call: $in(reactive_power_l1_var) + $in(reactive_power_l2_var) + $in(reactive_power_l3_var)
+
+  - function: $in(power_factor_total)
+    name: compute_power_factor_total
+    call: |
+      (0.0 if $in(apparent_power_total_va) <= 0.0
+       else $in(active_power_total_w) / $in(apparent_power_total_va))
+
+  - function: $in(energy_import_total_kwh)
+    name: integrate_energy_import
+    call: $in(energy_import_total_kwh) + max(0.0, $in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+
+  - function: $in(energy_export_total_kwh)
+    name: integrate_energy_export
+    call: $in(energy_export_total_kwh) + max(0.0, -$in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+
+  - function: $in(_v_l1_n_raw)
+    name: encode_v_l1_n_raw
+    call: int(round($in(k__voltage_l1_n_v) * 10.0))
+
+  - function: $in(_v_l2_n_raw)
+    name: encode_v_l2_n_raw
+    call: int(round($in(k__voltage_l2_n_v) * 10.0))
+
+  - function: $in(_v_l3_n_raw)
+    name: encode_v_l3_n_raw
+    call: int(round($in(k__voltage_l3_n_v) * 10.0))
+
+  - function: $in(_v_l1_l2_raw)
+    name: encode_v_l1_l2_raw
+    call: int(round($in(voltage_l1_l2_v) * 10.0))
+
+  - function: $in(_v_l2_l3_raw)
+    name: encode_v_l2_l3_raw
+    call: int(round($in(voltage_l2_l3_v) * 10.0))
+
+  - function: $in(_v_l3_l1_raw)
+    name: encode_v_l3_l1_raw
+    call: int(round($in(voltage_l3_l1_v) * 10.0))
+
+  - function: $in(_a_l1_raw)
+    name: encode_a_l1_raw
+    call: int(round($in(k__current_l1_a) * 1000.0))
+
+  - function: $in(_a_l2_raw)
+    name: encode_a_l2_raw
+    call: int(round($in(k__current_l2_a) * 1000.0))
+
+  - function: $in(_a_l3_raw)
+    name: encode_a_l3_raw
+    call: int(round($in(k__current_l3_a) * 1000.0))
+
+  - function: $in(_w_l1_raw)
+    name: encode_w_l1_raw
+    call: int(round($in(active_power_l1_w) * 10.0))
+
+  - function: $in(_w_l2_raw)
+    name: encode_w_l2_raw
+    call: int(round($in(active_power_l2_w) * 10.0))
+
+  - function: $in(_w_l3_raw)
+    name: encode_w_l3_raw
+    call: int(round($in(active_power_l3_w) * 10.0))
+
+  - function: $in(_va_l1_raw)
+    name: encode_va_l1_raw
+    call: int(round($in(apparent_power_l1_va) * 10.0))
+
+  - function: $in(_va_l2_raw)
+    name: encode_va_l2_raw
+    call: int(round($in(apparent_power_l2_va) * 10.0))
+
+  - function: $in(_va_l3_raw)
+    name: encode_va_l3_raw
+    call: int(round($in(apparent_power_l3_va) * 10.0))
+
+  - function: $in(_var_l1_raw)
+    name: encode_var_l1_raw
+    call: int(round($in(reactive_power_l1_var) * 10.0))
+
+  - function: $in(_var_l2_raw)
+    name: encode_var_l2_raw
+    call: int(round($in(reactive_power_l2_var) * 10.0))
+
+  - function: $in(_var_l3_raw)
+    name: encode_var_l3_raw
+    call: int(round($in(reactive_power_l3_var) * 10.0))
+
+  - function: $in(_v_ln_sum_raw)
+    name: encode_v_ln_sum_raw
+    call: int(round($in(voltage_ln_sum_v) * 10.0))
+
+  - function: $in(_v_ll_sum_raw)
+    name: encode_v_ll_sum_raw
+    call: int(round($in(voltage_ll_sum_v) * 10.0))
+
+  - function: $in(_w_sum_raw)
+    name: encode_w_sum_raw
+    call: int(round($in(active_power_total_w) * 10.0))
+
+  - function: $in(_va_sum_raw)
+    name: encode_va_sum_raw
+    call: int(round($in(apparent_power_total_va) * 10.0))
+
+  - function: $in(_var_sum_raw)
+    name: encode_var_sum_raw
+    call: int(round($in(reactive_power_total_var) * 10.0))
+
+  - function: $in(_pf_l1_raw)
+    name: encode_pf_l1_raw
+    call: int(round($in(k__power_factor_l1) * 1000.0))
+
+  - function: $in(_pf_l2_raw)
+    name: encode_pf_l2_raw
+    call: int(round($in(k__power_factor_l2) * 1000.0))
+
+  - function: $in(_pf_l3_raw)
+    name: encode_pf_l3_raw
+    call: int(round($in(k__power_factor_l3) * 1000.0))
+
+  - function: $in(_pf_sum_raw)
+    name: encode_pf_sum_raw
+    call: int(round($in(power_factor_total) * 1000.0))
+
+  - function: $in(_phase_sequence_raw)
+    name: encode_phase_sequence_raw
+    call: int($in(phase_sequence))
+
+  - function: $in(_hz_raw)
+    name: encode_hz_raw
+    call: int(round($in(k__frequency_hz) * 10.0))
+
+  - function: $in(_kwh_import_raw)
+    name: encode_kwh_import_raw
+    call: int(round($in(energy_import_total_kwh) * 10.0))
+
+  - function: $in(_kwh_export_raw)
+    name: encode_kwh_export_raw
+    call: int(round($in(energy_export_total_kwh) * 10.0))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        # Voltages (V) -> scaled by 10
+        _v_l1_n_raw:   { address: [0,1],   group: i_r, type: uint_32 }
+        _v_l2_n_raw:   { address: [2,3],   group: i_r, type: uint_32 }
+        _v_l3_n_raw:   { address: [4,5],   group: i_r, type: uint_32 }
+        _v_l1_l2_raw:  { address: [6,7],   group: i_r, type: uint_32 }
+        _v_l2_l3_raw:  { address: [8,9],   group: i_r, type: uint_32 }
+        _v_l3_l1_raw:  { address: [10,11], group: i_r, type: uint_32 }
+
+        # Currents (A) -> scaled by 1000
+        _a_l1_raw:     { address: [12,13], group: i_r, type: uint_32 }
+        _a_l2_raw:     { address: [14,15], group: i_r, type: uint_32 }
+        _a_l3_raw:     { address: [16,17], group: i_r, type: uint_32 }
+
+        # Power (W/VA/VAR) -> scaled by 10
+        _w_l1_raw:     { address: [18,19], group: i_r, type: uint_32 }
+        _w_l2_raw:     { address: [20,21], group: i_r, type: uint_32 }
+        _w_l3_raw:     { address: [22,23], group: i_r, type: uint_32 }
+        _va_l1_raw:    { address: [24,25], group: i_r, type: uint_32 }
+        _va_l2_raw:    { address: [26,27], group: i_r, type: uint_32 }
+        _va_l3_raw:    { address: [28,29], group: i_r, type: uint_32 }
+        _var_l1_raw:   { address: [30,31], group: i_r, type: uint_32 }
+        _var_l2_raw:   { address: [32,33], group: i_r, type: uint_32 }
+        _var_l3_raw:   { address: [34,35], group: i_r, type: uint_32 }
+
+        # Sums
+        _v_ln_sum_raw: { address: [36,37], group: i_r, type: uint_32 }
+        _v_ll_sum_raw: { address: [38,39], group: i_r, type: uint_32 }
+        _w_sum_raw:    { address: [40,41], group: i_r, type: uint_32 }
+        _va_sum_raw:   { address: [42,43], group: i_r, type: uint_32 }
+        _var_sum_raw:  { address: [44,45], group: i_r, type: uint_32 }
+
+        # Power factor + phase sequence + frequency
+        _pf_l1_raw:         { address: [46,46], group: i_r, type: uint_16 }
+        _pf_l2_raw:         { address: [47,47], group: i_r, type: uint_16 }
+        _pf_l3_raw:         { address: [48,48], group: i_r, type: uint_16 }
+        _pf_sum_raw:        { address: [49,49], group: i_r, type: uint_16 }
+        _phase_sequence_raw: { address: [50,50], group: i_r, type: uint_16 }
+        _hz_raw:            { address: [51,51], group: i_r, type: uint_16 }
+
+        # Energy totals (kWh) -> scaled by 10
+        _kwh_import_raw: { address: [52,53], group: i_r, type: uint_32 }
+        _kwh_export_raw: { address: [78,79], group: i_r, type: uint_32 }
+
+scenarios:
+  balanced_load:
+    description: Balanced three-phase load near nominal voltage.
+    duration: 30.0
+    overrides:
+      $in(k__voltage_l1_n_v): 230.0
+      $in(k__voltage_l2_n_v): 230.0
+      $in(k__voltage_l3_n_v): 230.0
+      $in(k__current_l1_a): 12.0
+      $in(k__current_l2_a): 12.0
+      $in(k__current_l3_a): 12.0
+      $in(k__power_factor_l1): 0.98
+      $in(k__power_factor_l2): 0.98
+      $in(k__power_factor_l3): 0.98
+
+  inductive_load:
+    description: Lower power factor across all phases to mimic inductive loads.
+    duration: 30.0
+    overrides:
+      $in(k__power_factor_l1): 0.7
+      $in(k__power_factor_l2): 0.68
+      $in(k__power_factor_l3): 0.72
+
+  pv_export:
+    description: Negative phase currents to simulate PV export.
+    duration: 30.0
+    overrides:
+      $in(k__current_l1_a): -6.0
+      $in(k__current_l2_a): -5.5
+      $in(k__current_l3_a): -5.8
+      $in(k__power_factor_l1): 0.99
+      $in(k__power_factor_l2): 0.99
+      $in(k__power_factor_l3): 0.99

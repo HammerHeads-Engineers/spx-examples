@@ -340,6 +340,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
+    name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
+    path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.PowerMeter.AbbM1M.Modbus
     name: ABB M1M Power Meter (Modbus TCP)
     path: library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
