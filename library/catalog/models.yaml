@@ -223,6 +223,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, iiot_monitoring]
+  - id: Lab.Oscilloscope.RigolDs1000z.Scpi
+    name: Rigol DS1000Z Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
     name: BLE Vital Signs Monitor
     path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
@@ -334,6 +343,24 @@ models:
   - id: Energy.EnergyMeterPm8000.Modbus
     name: Schneider Electric PowerLogic PM8000 Meter (Modbus)
     path: library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.PowerMeter.AbbM1M.Modbus
+    name: ABB M1M Power Meter (Modbus TCP)
+    path: library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
+  - id: Energy.EnergyMeterDirisA40.Modbus
+    name: Socomec DIRIS A-40 Energy Meter (Modbus TCP)
+    path: library/domains/iot/socomec/diris_a40__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:
