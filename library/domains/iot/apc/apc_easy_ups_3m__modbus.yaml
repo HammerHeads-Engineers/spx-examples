@@ -1,0 +1,350 @@
+# SPDX-License-Identifier: MIT
+
+name: apc_easy_ups_3m__modbus
+description: |
+  Modbus TCP (slave) simulation of APC Easy UPS 3M (E3M) telemetry registers.
+  Uses the E3M Modbus Register Map input register block (function 0x04) with
+  scaled unsigned integer values and per-point gains (0.1, 0.01, 0.001).
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5024
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Input currents (A)
+  input_current_phase_a_a: 12.0
+  input_current_phase_b_a: 11.6
+  input_current_phase_c_a: 12.2
+  input_current_avg_a: 0.0
+
+  # Output currents (A)
+  output_current_phase_a_a: 10.8
+  output_current_phase_b_a: 10.4
+  output_current_phase_c_a: 11.1
+  output_current_avg_a: 0.0
+
+  # Frequencies (Hz)
+  input_frequency_hz: 50.0
+  output_frequency_hz: 50.0
+  bypass_frequency_hz: 50.0
+
+  # Power factor (ratio)
+  input_power_factor_phase_a: 0.98
+  input_power_factor_phase_b: 0.97
+  input_power_factor_phase_c: 0.99
+
+  # Output power
+  output_active_power_phase_a_kw: 8.2
+  output_active_power_phase_b_kw: 7.9
+  output_active_power_phase_c_kw: 8.4
+  output_active_power_total_kw: 0.0
+
+  output_apparent_power_phase_a_kva: 8.7
+  output_apparent_power_phase_b_kva: 8.3
+  output_apparent_power_phase_c_kva: 8.9
+  output_apparent_power_total_kva: 0.0
+
+  # Output load
+  output_load_pct_phase_a: 32.0
+  output_load_pct_phase_b: 30.0
+  output_load_pct_phase_c: 33.0
+
+  # Line voltages (V)
+  input_line_voltage_ab_v: 400.0
+  input_line_voltage_bc_v: 398.5
+  input_line_voltage_ca_v: 401.0
+  input_line_voltage_avg_v: 0.0
+
+  output_line_voltage_ab_v: 400.0
+  output_line_voltage_bc_v: 399.0
+  output_line_voltage_ca_v: 401.5
+  output_line_voltage_avg_v: 0.0
+
+  # Internal registers (scaled integer values for Modbus mapping)
+  _reg_input_current_phase_a: 0
+  _reg_input_current_phase_b: 0
+  _reg_input_current_phase_c: 0
+  _reg_output_current_phase_a: 0
+  _reg_output_current_phase_b: 0
+  _reg_output_current_phase_c: 0
+  _reg_input_frequency: 0
+  _reg_output_frequency: 0
+  _reg_bypass_frequency: 0
+  _reg_input_power_factor_phase_a: 0
+  _reg_input_power_factor_phase_b: 0
+  _reg_input_power_factor_phase_c: 0
+  _reg_output_active_power_phase_a: 0
+  _reg_output_active_power_phase_b: 0
+  _reg_output_active_power_phase_c: 0
+  _reg_output_apparent_power_phase_a: 0
+  _reg_output_apparent_power_phase_b: 0
+  _reg_output_apparent_power_phase_c: 0
+  _reg_output_load_pct_phase_a: 0
+  _reg_output_load_pct_phase_b: 0
+  _reg_output_load_pct_phase_c: 0
+  _reg_input_line_voltage_ab: 0
+  _reg_input_line_voltage_bc: 0
+  _reg_input_line_voltage_ca: 0
+  _reg_output_line_voltage_ab: 0
+  _reg_output_line_voltage_bc: 0
+  _reg_output_line_voltage_ca: 0
+
+actions:
+  - function: $in(input_current_avg_a)
+    name: compute_input_current_avg
+    description: Average input current.
+    call: ($in(input_current_phase_a_a) + $in(input_current_phase_b_a) + $in(input_current_phase_c_a)) / 3.0
+
+  - function: $in(output_current_avg_a)
+    name: compute_output_current_avg
+    description: Average output current.
+    call: ($in(output_current_phase_a_a) + $in(output_current_phase_b_a) + $in(output_current_phase_c_a)) / 3.0
+
+  - function: $in(output_active_power_total_kw)
+    name: compute_output_active_power_total
+    description: Total output active power.
+    call: $in(output_active_power_phase_a_kw) + $in(output_active_power_phase_b_kw) + $in(output_active_power_phase_c_kw)
+
+  - function: $in(output_apparent_power_total_kva)
+    name: compute_output_apparent_power_total
+    description: Total output apparent power.
+    call: $in(output_apparent_power_phase_a_kva) + $in(output_apparent_power_phase_b_kva) + $in(output_apparent_power_phase_c_kva)
+
+  - function: $in(input_line_voltage_avg_v)
+    name: compute_input_line_voltage_avg
+    description: Average input line voltage.
+    call: ($in(input_line_voltage_ab_v) + $in(input_line_voltage_bc_v) + $in(input_line_voltage_ca_v)) / 3.0
+
+  - function: $in(output_line_voltage_avg_v)
+    name: compute_output_line_voltage_avg
+    description: Average output line voltage.
+    call: ($in(output_line_voltage_ab_v) + $in(output_line_voltage_bc_v) + $in(output_line_voltage_ca_v)) / 3.0
+
+  - function: $in(_reg_input_current_phase_a)
+    name: pack_input_current_phase_a
+    description: Scale input current phase A (0.1 A).
+    call: max(0, min(65535, int(round($in(input_current_phase_a_a) / 0.1))))
+
+  - function: $in(_reg_input_current_phase_b)
+    name: pack_input_current_phase_b
+    description: Scale input current phase B (0.1 A).
+    call: max(0, min(65535, int(round($in(input_current_phase_b_a) / 0.1))))
+
+  - function: $in(_reg_input_current_phase_c)
+    name: pack_input_current_phase_c
+    description: Scale input current phase C (0.1 A).
+    call: max(0, min(65535, int(round($in(input_current_phase_c_a) / 0.1))))
+
+  - function: $in(_reg_output_current_phase_a)
+    name: pack_output_current_phase_a
+    description: Scale output current phase A (0.1 A).
+    call: max(0, min(65535, int(round($in(output_current_phase_a_a) / 0.1))))
+
+  - function: $in(_reg_output_current_phase_b)
+    name: pack_output_current_phase_b
+    description: Scale output current phase B (0.1 A).
+    call: max(0, min(65535, int(round($in(output_current_phase_b_a) / 0.1))))
+
+  - function: $in(_reg_output_current_phase_c)
+    name: pack_output_current_phase_c
+    description: Scale output current phase C (0.1 A).
+    call: max(0, min(65535, int(round($in(output_current_phase_c_a) / 0.1))))
+
+  - function: $in(_reg_input_frequency)
+    name: pack_input_frequency
+    description: Scale input frequency (0.1 Hz).
+    call: max(0, min(65535, int(round($in(input_frequency_hz) / 0.1))))
+
+  - function: $in(_reg_output_frequency)
+    name: pack_output_frequency
+    description: Scale output frequency (0.1 Hz).
+    call: max(0, min(65535, int(round($in(output_frequency_hz) / 0.1))))
+
+  - function: $in(_reg_bypass_frequency)
+    name: pack_bypass_frequency
+    description: Scale bypass frequency (0.1 Hz).
+    call: max(0, min(65535, int(round($in(bypass_frequency_hz) / 0.1))))
+
+  - function: $in(_reg_input_power_factor_phase_a)
+    name: pack_input_power_factor_phase_a
+    description: Scale input power factor phase A (0.001).
+    call: max(0, min(65535, int(round($in(input_power_factor_phase_a) / 0.001))))
+
+  - function: $in(_reg_input_power_factor_phase_b)
+    name: pack_input_power_factor_phase_b
+    description: Scale input power factor phase B (0.001).
+    call: max(0, min(65535, int(round($in(input_power_factor_phase_b) / 0.001))))
+
+  - function: $in(_reg_input_power_factor_phase_c)
+    name: pack_input_power_factor_phase_c
+    description: Scale input power factor phase C (0.001).
+    call: max(0, min(65535, int(round($in(input_power_factor_phase_c) / 0.001))))
+
+  - function: $in(_reg_output_active_power_phase_a)
+    name: pack_output_active_power_phase_a
+    description: Scale output active power phase A (0.1 kW).
+    call: max(0, min(65535, int(round($in(output_active_power_phase_a_kw) / 0.1))))
+
+  - function: $in(_reg_output_active_power_phase_b)
+    name: pack_output_active_power_phase_b
+    description: Scale output active power phase B (0.1 kW).
+    call: max(0, min(65535, int(round($in(output_active_power_phase_b_kw) / 0.1))))
+
+  - function: $in(_reg_output_active_power_phase_c)
+    name: pack_output_active_power_phase_c
+    description: Scale output active power phase C (0.1 kW).
+    call: max(0, min(65535, int(round($in(output_active_power_phase_c_kw) / 0.1))))
+
+  - function: $in(_reg_output_apparent_power_phase_a)
+    name: pack_output_apparent_power_phase_a
+    description: Scale output apparent power phase A (0.1 kVA).
+    call: max(0, min(65535, int(round($in(output_apparent_power_phase_a_kva) / 0.1))))
+
+  - function: $in(_reg_output_apparent_power_phase_b)
+    name: pack_output_apparent_power_phase_b
+    description: Scale output apparent power phase B (0.1 kVA).
+    call: max(0, min(65535, int(round($in(output_apparent_power_phase_b_kva) / 0.1))))
+
+  - function: $in(_reg_output_apparent_power_phase_c)
+    name: pack_output_apparent_power_phase_c
+    description: Scale output apparent power phase C (0.1 kVA).
+    call: max(0, min(65535, int(round($in(output_apparent_power_phase_c_kva) / 0.1))))
+
+  - function: $in(_reg_output_load_pct_phase_a)
+    name: pack_output_load_pct_phase_a
+    description: Scale output load percent phase A (1%).
+    call: max(0, min(65535, int(round($in(output_load_pct_phase_a)))))
+
+  - function: $in(_reg_output_load_pct_phase_b)
+    name: pack_output_load_pct_phase_b
+    description: Scale output load percent phase B (1%).
+    call: max(0, min(65535, int(round($in(output_load_pct_phase_b)))))
+
+  - function: $in(_reg_output_load_pct_phase_c)
+    name: pack_output_load_pct_phase_c
+    description: Scale output load percent phase C (1%).
+    call: max(0, min(65535, int(round($in(output_load_pct_phase_c)))))
+
+  - function: $in(_reg_input_line_voltage_ab)
+    name: pack_input_line_voltage_ab
+    description: Scale input line voltage AB (0.1 V).
+    call: max(0, min(65535, int(round($in(input_line_voltage_ab_v) / 0.1))))
+
+  - function: $in(_reg_input_line_voltage_bc)
+    name: pack_input_line_voltage_bc
+    description: Scale input line voltage BC (0.1 V).
+    call: max(0, min(65535, int(round($in(input_line_voltage_bc_v) / 0.1))))
+
+  - function: $in(_reg_input_line_voltage_ca)
+    name: pack_input_line_voltage_ca
+    description: Scale input line voltage CA (0.1 V).
+    call: max(0, min(65535, int(round($in(input_line_voltage_ca_v) / 0.1))))
+
+  - function: $in(_reg_output_line_voltage_ab)
+    name: pack_output_line_voltage_ab
+    description: Scale output line voltage AB (0.1 V).
+    call: max(0, min(65535, int(round($in(output_line_voltage_ab_v) / 0.1))))
+
+  - function: $in(_reg_output_line_voltage_bc)
+    name: pack_output_line_voltage_bc
+    description: Scale output line voltage BC (0.1 V).
+    call: max(0, min(65535, int(round($in(output_line_voltage_bc_v) / 0.1))))
+
+  - function: $in(_reg_output_line_voltage_ca)
+    name: pack_output_line_voltage_ca
+    description: Scale output line voltage CA (0.1 V).
+    call: max(0, min(65535, int(round($in(output_line_voltage_ca_v) / 0.1))))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        # Input current (A) 0.1 A
+        _reg_input_current_phase_a: { address: [30005,30005], group: i_r, type: uint_16 }
+        _reg_input_current_phase_b: { address: [30006,30006], group: i_r, type: uint_16 }
+        _reg_input_current_phase_c: { address: [30007,30007], group: i_r, type: uint_16 }
+
+        # Output current (A) 0.1 A
+        _reg_output_current_phase_a: { address: [30015,30015], group: i_r, type: uint_16 }
+        _reg_output_current_phase_b: { address: [30016,30016], group: i_r, type: uint_16 }
+        _reg_output_current_phase_c: { address: [30017,30017], group: i_r, type: uint_16 }
+
+        # Frequencies (Hz) 0.1 Hz
+        _reg_input_frequency: { address: [30004,30004], group: i_r, type: uint_16 }
+        _reg_output_frequency: { address: [30014,30014], group: i_r, type: uint_16 }
+        _reg_bypass_frequency: { address: [30030,30030], group: i_r, type: uint_16 }
+
+        # Input power factor 0.001
+        _reg_input_power_factor_phase_a: { address: [30008,30008], group: i_r, type: uint_16 }
+        _reg_input_power_factor_phase_b: { address: [30009,30009], group: i_r, type: uint_16 }
+        _reg_input_power_factor_phase_c: { address: [30010,30010], group: i_r, type: uint_16 }
+
+        # Output active power (kW) 0.1 kW
+        _reg_output_active_power_phase_a: { address: [30018,30018], group: i_r, type: uint_16 }
+        _reg_output_active_power_phase_b: { address: [30019,30019], group: i_r, type: uint_16 }
+        _reg_output_active_power_phase_c: { address: [30020,30020], group: i_r, type: uint_16 }
+
+        # Output load (%) 1%
+        _reg_output_load_pct_phase_a: { address: [30021,30021], group: i_r, type: uint_16 }
+        _reg_output_load_pct_phase_b: { address: [30022,30022], group: i_r, type: uint_16 }
+        _reg_output_load_pct_phase_c: { address: [30023,30023], group: i_r, type: uint_16 }
+
+        # Output apparent power (kVA) 0.1 kVA
+        _reg_output_apparent_power_phase_a: { address: [30047,30047], group: i_r, type: uint_16 }
+        _reg_output_apparent_power_phase_b: { address: [30048,30048], group: i_r, type: uint_16 }
+        _reg_output_apparent_power_phase_c: { address: [30049,30049], group: i_r, type: uint_16 }
+
+        # Input line voltage (V) 0.1 V
+        _reg_input_line_voltage_ab: { address: [30050,30050], group: i_r, type: uint_16 }
+        _reg_input_line_voltage_bc: { address: [30051,30051], group: i_r, type: uint_16 }
+        _reg_input_line_voltage_ca: { address: [30052,30052], group: i_r, type: uint_16 }
+
+        # Output line voltage (V) 0.1 V
+        _reg_output_line_voltage_ab: { address: [30056,30056], group: i_r, type: uint_16 }
+        _reg_output_line_voltage_bc: { address: [30057,30057], group: i_r, type: uint_16 }
+        _reg_output_line_voltage_ca: { address: [30058,30058], group: i_r, type: uint_16 }
+
+scenarios:
+  normal_operation:
+    description: Balanced load with nominal frequencies and voltages.
+    duration: 30.0
+    overrides:
+      $in(input_current_phase_a_a): 12.0
+      $in(input_current_phase_b_a): 11.6
+      $in(input_current_phase_c_a): 12.2
+      $in(output_current_phase_a_a): 10.8
+      $in(output_current_phase_b_a): 10.4
+      $in(output_current_phase_c_a): 11.1
+      $in(output_active_power_phase_a_kw): 8.2
+      $in(output_active_power_phase_b_kw): 7.9
+      $in(output_active_power_phase_c_kw): 8.4
+      $in(output_apparent_power_phase_a_kva): 8.7
+      $in(output_apparent_power_phase_b_kva): 8.3
+      $in(output_apparent_power_phase_c_kva): 8.9
+      $in(output_load_pct_phase_a): 32.0
+      $in(output_load_pct_phase_b): 30.0
+      $in(output_load_pct_phase_c): 33.0
+
+  high_load:
+    description: Elevated output load and current draw.
+    duration: 30.0
+    overrides:
+      $in(output_current_phase_a_a): 19.5
+      $in(output_current_phase_b_a): 18.8
+      $in(output_current_phase_c_a): 20.1
+      $in(output_active_power_phase_a_kw): 14.2
+      $in(output_active_power_phase_b_kw): 13.7
+      $in(output_active_power_phase_c_kw): 14.8
+      $in(output_apparent_power_phase_a_kva): 15.1
+      $in(output_apparent_power_phase_b_kva): 14.6
+      $in(output_apparent_power_phase_c_kva): 15.5
+      $in(output_load_pct_phase_a): 58.0
+      $in(output_load_pct_phase_b): 55.0
+      $in(output_load_pct_phase_c): 60.0

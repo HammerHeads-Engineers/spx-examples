@@ -9,6 +9,7 @@ models:
   - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
   - library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
   - library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
+  - library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
   - library/domains/iot/schneider/schneider_pm5330__modbus.yaml
   - library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
   - library/domains/iot/abb/abb_d13_15__modbus.yaml

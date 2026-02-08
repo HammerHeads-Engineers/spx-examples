@@ -367,6 +367,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.UpsEasy3M.Modbus
+    name: APC Easy UPS 3M (Modbus)
+    path: library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterPm5330.Modbus
     name: Schneider Electric PowerLogic PM5330 Energy Meter (Modbus)
     path: library/domains/iot/schneider/schneider_pm5330__modbus.yaml
