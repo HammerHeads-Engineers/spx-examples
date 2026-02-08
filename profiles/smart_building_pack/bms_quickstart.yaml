@@ -10,6 +10,7 @@ models:
   - library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
   - library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
   - library/domains/iot/schneider/schneider_pm5330__modbus.yaml
+  - library/domains/iot/socomec/diris_a40__modbus.yaml
   - library/domains/weather/weather_forecast__http.yaml
   - library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
   - library/domains/iot/generic/bms_controller__opcua.yaml
