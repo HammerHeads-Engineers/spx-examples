@@ -1,0 +1,255 @@
+# SPDX-License-Identifier: MIT
+
+name: rack_pdu_rpdu2g__modbus
+description: |
+  APC NetShelter Rack PDU 2g (RPDU2g) Modbus register map simulation for
+  load, energy, and per-phase measurements. Addresses follow the RPDU2g
+  Modbus Register Map (TME45037, May 2024).
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5030
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Phase measurements
+  k__phase_l1_current_a: 7.8
+  k__phase_l1_voltage_v: 230.0
+  k__phase_l1_power_kw: 1.8
+  k__phase_l1_apparent_power_kva: 1.95
+
+  k__phase_l2_current_a: 7.5
+  k__phase_l2_voltage_v: 229.0
+  k__phase_l2_power_kw: 1.7
+  k__phase_l2_apparent_power_kva: 1.9
+
+  k__phase_l3_current_a: 7.7
+  k__phase_l3_voltage_v: 231.0
+  k__phase_l3_power_kw: 1.75
+  k__phase_l3_apparent_power_kva: 1.93
+
+  # Derived device totals
+  device_real_load_power_kw: 0.0
+  device_apparent_load_power_kva: 0.0
+  device_power_factor: 0.0
+  device_energy_kwh: 0.0
+  device_state: 2
+  device_peak_power_kw: 0.0
+
+  # Register-scaled raw values
+  device_real_load_power_raw: 0
+  device_apparent_load_power_raw: 0
+  device_power_factor_raw: 0
+  device_energy_raw: 0
+  device_state_raw: 2
+  device_peak_power_raw: 0
+
+  phase_l1_current_raw: 0
+  phase_l1_voltage_raw: 0
+  phase_l1_power_raw: 0
+  phase_l1_apparent_power_raw: 0
+
+  phase_l2_current_raw: 0
+  phase_l2_voltage_raw: 0
+  phase_l2_power_raw: 0
+  phase_l2_apparent_power_raw: 0
+
+  phase_l3_current_raw: 0
+  phase_l3_voltage_raw: 0
+  phase_l3_power_raw: 0
+  phase_l3_apparent_power_raw: 0
+
+  low_load_threshold_kw: 2.0
+  near_overload_threshold_kw: 7.0
+  overload_threshold_kw: 8.5
+  _cycle_time_s: 1.0
+
+actions:
+  - function: $in(device_real_load_power_kw)
+    name: compute_device_real_load_power
+    description: Sum per-phase real power into the device total.
+    call: $in(k__phase_l1_power_kw) + $in(k__phase_l2_power_kw) + $in(k__phase_l3_power_kw)
+
+  - function: $in(device_apparent_load_power_kva)
+    name: compute_device_apparent_load_power
+    description: Sum per-phase apparent power into the device total.
+    call: (
+          $in(k__phase_l1_apparent_power_kva)
+          + $in(k__phase_l2_apparent_power_kva)
+          + $in(k__phase_l3_apparent_power_kva)
+        )
+
+  - function: $in(device_power_factor)
+    name: compute_device_power_factor
+    description: Compute device power factor from real/apparent power.
+    call: (
+          0.0 if $in(device_apparent_load_power_kva) <= 0.0
+          else $in(device_real_load_power_kw) / $in(device_apparent_load_power_kva)
+        )
+
+  - function: $in(device_energy_kwh)
+    name: integrate_device_energy
+    description: Integrate cumulative energy from real power.
+    call: $in(device_energy_kwh) + max(0.0, $in(device_real_load_power_kw)) * $in(_cycle_time_s) / 3600.0
+
+  - function: $in(device_state)
+    name: compute_device_state
+    description: Map load to low/normal/near overload/overload state.
+    call: (
+          1 if $in(device_real_load_power_kw) < $in(low_load_threshold_kw)
+          else 2 if $in(device_real_load_power_kw) < $in(near_overload_threshold_kw)
+          else 3 if $in(device_real_load_power_kw) < $in(overload_threshold_kw)
+          else 4
+        )
+
+  - function: $in(device_peak_power_kw)
+    name: track_peak_power
+    description: Track the peak real power since start.
+    call: max($in(device_peak_power_kw), $in(device_real_load_power_kw))
+
+  - function: $in(device_real_load_power_raw)
+    name: encode_device_real_load_power
+    call: int(round($in(device_real_load_power_kw) * 100.0))
+
+  - function: $in(device_apparent_load_power_raw)
+    name: encode_device_apparent_load_power
+    call: int(round($in(device_apparent_load_power_kva) * 100.0))
+
+  - function: $in(device_power_factor_raw)
+    name: encode_device_power_factor
+    call: int(round($in(device_power_factor) * 100.0))
+
+  - function: $in(device_energy_raw)
+    name: encode_device_energy
+    call: int(round($in(device_energy_kwh) * 10.0))
+
+  - function: $in(device_state_raw)
+    name: encode_device_state
+    call: int($in(device_state))
+
+  - function: $in(device_peak_power_raw)
+    name: encode_device_peak_power
+    call: int(round($in(device_peak_power_kw) * 100.0))
+
+  - function: $in(phase_l1_current_raw)
+    name: encode_phase_l1_current
+    call: int(round($in(k__phase_l1_current_a) * 10.0))
+
+  - function: $in(phase_l1_voltage_raw)
+    name: encode_phase_l1_voltage
+    call: int(round($in(k__phase_l1_voltage_v)))
+
+  - function: $in(phase_l1_power_raw)
+    name: encode_phase_l1_power
+    call: int(round($in(k__phase_l1_power_kw) * 100.0))
+
+  - function: $in(phase_l1_apparent_power_raw)
+    name: encode_phase_l1_apparent_power
+    call: int(round($in(k__phase_l1_apparent_power_kva) * 100.0))
+
+  - function: $in(phase_l2_current_raw)
+    name: encode_phase_l2_current
+    call: int(round($in(k__phase_l2_current_a) * 10.0))
+
+  - function: $in(phase_l2_voltage_raw)
+    name: encode_phase_l2_voltage
+    call: int(round($in(k__phase_l2_voltage_v)))
+
+  - function: $in(phase_l2_power_raw)
+    name: encode_phase_l2_power
+    call: int(round($in(k__phase_l2_power_kw) * 100.0))
+
+  - function: $in(phase_l2_apparent_power_raw)
+    name: encode_phase_l2_apparent_power
+    call: int(round($in(k__phase_l2_apparent_power_kva) * 100.0))
+
+  - function: $in(phase_l3_current_raw)
+    name: encode_phase_l3_current
+    call: int(round($in(k__phase_l3_current_a) * 10.0))
+
+  - function: $in(phase_l3_voltage_raw)
+    name: encode_phase_l3_voltage
+    call: int(round($in(k__phase_l3_voltage_v)))
+
+  - function: $in(phase_l3_power_raw)
+    name: encode_phase_l3_power
+    call: int(round($in(k__phase_l3_power_kw) * 100.0))
+
+  - function: $in(phase_l3_apparent_power_raw)
+    name: encode_phase_l3_apparent_power
+    call: int(round($in(k__phase_l3_apparent_power_kva) * 100.0))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        device_real_load_power_raw:     { address: [40208,40208], group: h_r, type: uint_16 }
+        device_apparent_load_power_raw: { address: [40209,40209], group: h_r, type: uint_16 }
+        device_power_factor_raw:        { address: [40210,40210], group: h_r, type: uint_16 }
+        device_energy_raw:              { address: [40211,40212], group: h_r, type: uint_32 }
+        device_state_raw:               { address: [40213,40213], group: h_r, type: uint_16 }
+        device_peak_power_raw:          { address: [40214,40214], group: h_r, type: uint_16 }
+
+        phase_l1_current_raw:           { address: [40668,40668], group: h_r, type: uint_16 }
+        phase_l1_voltage_raw:           { address: [40669,40669], group: h_r, type: uint_16 }
+        phase_l1_power_raw:             { address: [40670,40670], group: h_r, type: uint_16 }
+        phase_l1_apparent_power_raw:    { address: [40671,40671], group: h_r, type: uint_16 }
+
+        phase_l2_current_raw:           { address: [40690,40690], group: h_r, type: uint_16 }
+        phase_l2_voltage_raw:           { address: [40691,40691], group: h_r, type: uint_16 }
+        phase_l2_power_raw:             { address: [40692,40692], group: h_r, type: uint_16 }
+        phase_l2_apparent_power_raw:    { address: [40693,40693], group: h_r, type: uint_16 }
+
+        phase_l3_current_raw:           { address: [40712,40712], group: h_r, type: uint_16 }
+        phase_l3_voltage_raw:           { address: [40713,40713], group: h_r, type: uint_16 }
+        phase_l3_power_raw:             { address: [40714,40714], group: h_r, type: uint_16 }
+        phase_l3_apparent_power_raw:    { address: [40715,40715], group: h_r, type: uint_16 }
+
+scenarios:
+  balanced_load:
+    description: Balanced three-phase load at nominal voltage.
+    duration: 30.0
+    overrides:
+      $in(k__phase_l1_current_a): 7.6
+      $in(k__phase_l2_current_a): 7.6
+      $in(k__phase_l3_current_a): 7.6
+      $in(k__phase_l1_power_kw): 1.7
+      $in(k__phase_l2_power_kw): 1.7
+      $in(k__phase_l3_power_kw): 1.7
+      $in(k__phase_l1_apparent_power_kva): 1.85
+      $in(k__phase_l2_apparent_power_kva): 1.85
+      $in(k__phase_l3_apparent_power_kva): 1.85
+
+  overload_event:
+    description: High power draw that crosses overload threshold.
+    duration: 20.0
+    overrides:
+      $in(k__phase_l1_current_a): 12.5
+      $in(k__phase_l2_current_a): 12.2
+      $in(k__phase_l3_current_a): 12.4
+      $in(k__phase_l1_power_kw): 2.9
+      $in(k__phase_l2_power_kw): 2.8
+      $in(k__phase_l3_power_kw): 2.9
+      $in(k__phase_l1_apparent_power_kva): 3.1
+      $in(k__phase_l2_apparent_power_kva): 3.0
+      $in(k__phase_l3_apparent_power_kva): 3.1
+
+  low_load:
+    description: Light load with power reduction on all phases.
+    duration: 20.0
+    overrides:
+      $in(k__phase_l1_current_a): 2.4
+      $in(k__phase_l2_current_a): 2.3
+      $in(k__phase_l3_current_a): 2.4
+      $in(k__phase_l1_power_kw): 0.55
+      $in(k__phase_l2_power_kw): 0.53
+      $in(k__phase_l3_power_kw): 0.54
+      $in(k__phase_l1_apparent_power_kva): 0.6
+      $in(k__phase_l2_apparent_power_kva): 0.58
+      $in(k__phase_l3_apparent_power_kva): 0.59
