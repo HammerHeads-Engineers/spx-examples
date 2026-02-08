@@ -1,0 +1,178 @@
+# SPDX-License-Identifier: MIT
+
+name: schneider_em4200__modbus
+description: |
+  Minimal Modbus TCP (slave) simulation of Schneider Electric PowerLogic EM4200
+  energy meters. The exposed registers follow the EM4200 Modbus Register Map
+  float block (addresses 257+), covering totals, per-phase voltages/currents,
+  power factor, and frequency.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5030
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Phase currents (A)
+  k__current_l1_a: 12.0
+  k__current_l2_a: 10.5
+  k__current_l3_a: 11.2
+  current_avg_a: 0.0
+
+  # Phase-to-neutral voltages (V)
+  k__voltage_l1_n_v: 230.0
+  k__voltage_l2_n_v: 229.5
+  k__voltage_l3_n_v: 231.0
+  voltage_ln_avg_v: 0.0
+
+  # Line-to-line voltages (V) (derived from L-N; suitable for demo dashboards)
+  voltage_l1_l2_v: 0.0
+  voltage_l2_l3_v: 0.0
+  voltage_l3_l1_v: 0.0
+  voltage_ll_avg_v: 0.0
+
+  # Power (kW/kVAR/kVA)
+  k__power_factor: 0.96
+  power_factor_leading: 0
+  k__active_power_total_kw: 0.0
+  k__reactive_power_total_kvar: 0.0
+  k__apparent_power_total_kva: 0.0
+
+  # Frequency (Hz)
+  k__frequency_hz: 50.0
+
+  # Cumulative energy (kWh)
+  k__energy_total_kwh: 0.0
+
+  _cycle_time_s: 1.0
+
+actions:
+  - function: $in(current_avg_a)
+    name: compute_current_avg
+    description: Average phase current.
+    call: ($in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)) / 3.0
+
+  - function: $in(voltage_ln_avg_v)
+    name: compute_voltage_ln_avg
+    description: Average phase-to-neutral voltage.
+    call: ($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 3.0
+
+  - function: $in(voltage_l1_l2_v)
+    name: compute_voltage_l1_l2
+    description: Approximate L1-L2 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v)) / 2.0)
+
+  - function: $in(voltage_l2_l3_v)
+    name: compute_voltage_l2_l3
+    description: Approximate L2-L3 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 2.0)
+
+  - function: $in(voltage_l3_l1_v)
+    name: compute_voltage_l3_l1
+    description: Approximate L3-L1 voltage from phase-to-neutral values (balanced phasor assumption).
+    call: 1.7320508075688772 * (($in(k__voltage_l3_n_v) + $in(k__voltage_l1_n_v)) / 2.0)
+
+  - function: $in(voltage_ll_avg_v)
+    name: compute_voltage_ll_avg
+    description: Average line-to-line voltage.
+    call: ($in(voltage_l1_l2_v) + $in(voltage_l2_l3_v) + $in(voltage_l3_l1_v)) / 3.0
+
+  - function: $in(k__apparent_power_total_kva)
+    name: compute_apparent_power
+    description: Total apparent power (sum of per-phase V*I).
+    call: 1e-3
+         * (
+             $in(k__voltage_l1_n_v) * $in(k__current_l1_a)
+             + $in(k__voltage_l2_n_v) * $in(k__current_l2_a)
+             + $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
+           )
+
+  - function: $in(k__active_power_total_kw)
+    name: compute_active_power_total
+    description: Total active power (power factor applied to apparent power).
+    call: $in(k__power_factor) * $in(k__apparent_power_total_kva)
+
+  - function: $in(k__reactive_power_total_kvar)
+    name: compute_reactive_power_total
+    description: Approximate total reactive power magnitude from active/apparent power.
+    call: (
+          max(0.0, ($in(k__apparent_power_total_kva) ** 2) - ($in(k__active_power_total_kw) ** 2)) ** 0.5
+        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(k__energy_total_kwh)
+    name: integrate_energy_total
+    description: Integrate consumed energy (kWh) from total active power (kW).
+    call: $in(k__energy_total_kwh) + max(0.0, $in(k__active_power_total_kw)) * $in(_cycle_time_s) / 3600.0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        # Energy totals (kWh) Float32
+        k__energy_total_kwh:     { address: [257,258], group: h_r, type: float }
+
+        # Power totals (kW/kVAR/kVA) Float32
+        k__active_power_total_kw:    { address: [261,262], group: i_r, type: float }
+        k__reactive_power_total_kvar: { address: [263,264], group: i_r, type: float }
+        k__apparent_power_total_kva:  { address: [265,266], group: i_r, type: float }
+        k__power_factor:             { address: [267,268], group: i_r, type: float }
+
+        # Voltage + current averages Float32
+        voltage_ll_avg_v:        { address: [269,270], group: i_r, type: float }
+        voltage_ln_avg_v:        { address: [271,272], group: i_r, type: float }
+        current_avg_a:           { address: [273,274], group: i_r, type: float }
+
+        # Line-line voltages (V) Float32
+        voltage_l1_l2_v:         { address: [287,288], group: i_r, type: float }
+        voltage_l2_l3_v:         { address: [289,290], group: i_r, type: float }
+        voltage_l3_l1_v:         { address: [291,292], group: i_r, type: float }
+
+        # Phase-to-neutral voltages (V) Float32
+        k__voltage_l1_n_v:       { address: [293,294], group: i_r, type: float }
+        k__voltage_l2_n_v:       { address: [295,296], group: i_r, type: float }
+        k__voltage_l3_n_v:       { address: [297,298], group: i_r, type: float }
+
+        # Frequency (Hz) Float32
+        k__frequency_hz:         { address: [1557,1558], group: i_r, type: float }
+
+        # Phase currents (A) Float32
+        k__current_l1_a:         { address: [2705,2706], group: i_r, type: float }
+        k__current_l2_a:         { address: [2707,2708], group: i_r, type: float }
+        k__current_l3_a:         { address: [2709,2710], group: i_r, type: float }
+
+scenarios:
+  peak_demand:
+    description: High load with balanced phases and near-unity power factor.
+    duration: 30.0
+    overrides:
+      $in(k__current_l1_a): 48.0
+      $in(k__current_l2_a): 46.5
+      $in(k__current_l3_a): 49.0
+      $in(k__power_factor): 0.99
+      $in(power_factor_leading): 0
+
+  pv_export:
+    description: Simulated PV export using negative phase currents.
+    duration: 30.0
+    overrides:
+      $in(k__current_l1_a): -7.5
+      $in(k__current_l2_a): -6.8
+      $in(k__current_l3_a): -7.1
+      $in(k__power_factor): 0.98
+      $in(power_factor_leading): 1
+
+  low_power_factor_lagging:
+    description: Inductive load with low power factor.
+    duration: 45.0
+    overrides:
+      $in(k__current_l1_a): 24.0
+      $in(k__current_l2_a): 23.5
+      $in(k__current_l3_a): 24.2
+      $in(k__power_factor): 0.72
+      $in(power_factor_leading): 0

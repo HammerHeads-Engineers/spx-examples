@@ -223,6 +223,24 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, iiot_monitoring]
+  - id: Lab.Oscilloscope.Keysight1000X.Scpi
+    name: Keysight InfiniiVision 1000 X-Series Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.RigolDs1000z.Scpi
+    name: Rigol DS1000Z Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
     name: BLE Vital Signs Monitor
     path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
@@ -331,8 +349,44 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterAbbD13_15.Modbus
+    name: ABB D13 15 Energy Meter (Modbus)
+    path: library/domains/iot/abb/abb_d13_15__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterEm4200.Modbus
+    name: Schneider Electric EM4200 Energy Meter (Modbus)
+    path: library/domains/iot/schneider/schneider_em4200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPac3200.Modbus
+    name: Siemens SENTRON PAC3200 Power Meter (Modbus)
+    path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.PowerMeter.AbbM1M.Modbus
+    name: ABB M1M Power Meter (Modbus TCP)
+    path: library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: [process_cell_quickstart]
   - id: Energy.EnergyMeterDirisA40.Modbus
-    name: Socomec DIRIS A-40 Power Meter (Modbus)
+    name: Socomec DIRIS A-40 Energy Meter (Modbus TCP)
     path: library/domains/iot/socomec/diris_a40__modbus.yaml
     domain: iot
     protocols: [modbus]

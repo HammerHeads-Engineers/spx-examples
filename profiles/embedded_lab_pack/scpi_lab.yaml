@@ -4,6 +4,8 @@ description: |
   VISA/TCP test benches can run deterministically.
 models:
   - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+  - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+  - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
   - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
 services:
   - scpi_tcp_stack
