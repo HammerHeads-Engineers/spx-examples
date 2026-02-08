@@ -3,18 +3,20 @@
 import os
 import unittest
 
-import tests.shared.integration.scpi_oscilloscope_sut_example as shared_scpi
+import tests.shared.integration.scpi_keysight_1000x_sut_example as shared_scpi
 
 from tests.common.spx_utils import require_existing_instance
 
 
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
-INSTANCE_KEY = "spx_rigol_ds1000z_oscilloscope"
-MODEL_ID = "Lab.Oscilloscope.RigolDs1000z.Scpi"
+INSTANCE_KEY = "spx_lab_oscilloscope"
+MODEL_ID = "Lab.Oscilloscope.Keysight1000X.Scpi"
 
 
-class TestScpiOscilloscopeSUTExample(shared_scpi.TestScpiOscilloscopeSUTExample):
-    """Run the shared SCPI oscilloscope suite against the installer-created instance."""
+class TestScpiKeysight1000XOscilloscopeSUTExample(
+    shared_scpi.TestScpiKeysight1000XOscilloscopeSUTExample
+):
+    """Run the shared Keysight SCPI oscilloscope suite against installer instance."""
 
     @classmethod
     def setUpClass(cls):

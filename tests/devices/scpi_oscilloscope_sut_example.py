@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
 """Example SCPI oscilloscope SUT client used by integration tests."""
@@ -15,7 +15,7 @@ TERMINATOR = "\n"
 
 
 class ScpiOscilloscopeSUTExample:
-    """Very small helper bridging TCP sockets with SCPI commands."""
+    """Minimal helper for SCPI-over-TCP oscilloscope queries."""
 
     def __init__(
         self,
@@ -122,32 +122,20 @@ class ScpiOscilloscopeSUTExample:
     def identify(self) -> str:
         return self.query("*IDN?")
 
-    def measure_vpp(self) -> float:
-        return float(self.query(":MEASure:VPP?"))
+    def measure_vpp(self, channel: int = 1) -> float:
+        return float(self.query(f":MEASure:ITEM? VPP,CHANnel{channel}"))
 
-    def measure_vrms(self) -> float:
-        return float(self.query(":MEASure:VRMS?"))
+    def measure_vrms(self, channel: int = 1) -> float:
+        return float(self.query(f":MEASure:ITEM? VRMS,CHANnel{channel}"))
 
-    def measure_frequency(self) -> float:
-        return float(self.query(":MEASure:FREQuency?"))
+    def measure_vavg(self, channel: int = 1) -> float:
+        return float(self.query(f":MEASure:ITEM? VAVG,CHANnel{channel}"))
 
-    def channel_scale(self, value: float) -> None:
-        self.write(f":CHANnel1:SCALe {value}")
+    def measure_frequency(self, channel: int = 1) -> float:
+        return float(self.query(f":MEASure:ITEM? FREQuency,CHANnel{channel}"))
 
-    def channel_scale_query(self) -> float:
-        return float(self.query(":CHANnel1:SCALe?"))
-
-    def timebase_scale(self, value: float) -> None:
-        self.write(f":TIMebase:SCALe {value}")
-
-    def timebase_scale_query(self) -> float:
-        return float(self.query(":TIMebase:SCALe?"))
-
-    def trigger_level(self, value: float) -> None:
-        self.write(f":TRIGger:LEVel {value}")
-
-    def trigger_level_query(self) -> float:
-        return float(self.query(":TRIGger:LEVel?"))
+    def measure_period(self, channel: int = 1) -> float:
+        return float(self.query(f":MEASure:ITEM? PERiod,CHANnel{channel}"))
 
     def _require_socket(self) -> socket.socket:
         if self._socket is None:

@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
 """Shared integration coverage for the example SCPI oscilloscope SUT implementation."""
 
 import os
+import time
 import unittest
+from typing import Optional
 
 from tests.common.ascii_utils import wait_for_ascii_port
 from tests.common.spx_utils import bootstrap_model_instance, wait_seconds, wait_for_condition
@@ -14,16 +16,9 @@ from tests.devices.scpi_oscilloscope_sut_example import ScpiOscilloscopeSUTExamp
 
 
 ROOT = repo_root()
-MODEL_PATH = (
-    ROOT
-    / "library"
-    / "domains"
-    / "measurement_instruments"
-    / "keysight"
-    / "keysight_infiniivision_1000x__scpi.yaml"
-)
+MODEL_PATH = ROOT / "library" / "domains" / "measurement_instruments" / "rigol" / "rigol_ds1000z__scpi.yaml"
 MODEL_KEY = "tests__scpi_oscilloscope"
-INSTANCE_KEY = "keysight_infiniivision_1000x"
+INSTANCE_KEY = "rigol_ds1000z_oscilloscope"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
@@ -60,11 +55,9 @@ class TestScpiOscilloscopeSUTExample(unittest.TestCase):
         if self.instance is None:  # pragma: no cover - defensive
             self.skipTest("SCPI oscilloscope instance not initialised")
 
-        self._ensure_scenario_stopped("calibration_tone")
-        self._ensure_scenario_stopped("transient_spike")
+        self._ensure_scenario_stopped("amplitude_sweep")
         wait_seconds(0.1)
 
-        # Ensure the ASCII adapter is attached and resolve the effective port before connecting.
         try:
             comm = self.instance["communication"]["ascii"]
             attach = getattr(comm, "attach", None)
@@ -93,7 +86,7 @@ class TestScpiOscilloscopeSUTExample(unittest.TestCase):
             self.sut.close()
 
     # ------------------------------------------------------------------
-    # Helper
+    # Helpers
     # ------------------------------------------------------------------
     def _set_attribute(self, name: str, value) -> None:
         attrs = self.instance["attributes"]
@@ -127,67 +120,41 @@ class TestScpiOscilloscopeSUTExample(unittest.TestCase):
     # ------------------------------------------------------------------
     # Tests
     # ------------------------------------------------------------------
-    def test_idn_returns_keysight_signature(self):
+    def test_idn_matches_attribute(self):
+        target = "RIGOL,DS1000Z,DS1ZA000000000,00.04.03.SP2"
+        self._set_attribute("idn", target)
         reply = self._query_or_skip("*IDN?")
-        self.assertIn("KEYSIGHT", reply.upper())
+        self.assertEqual(reply, target)
 
-    def test_measurements_match_attributes(self):
-        self._set_attribute("vpp_v", 1.23)
-        self._set_attribute("vrms_v", 0.41)
-        self._set_attribute("frequency_hz", 2500.0)
+    def test_measure_vpp_matches_attribute(self):
+        target_vpp = 2.5
+        self._set_attribute("channel1_vpp_v", target_vpp)
+        raw = self._query_or_skip(":MEASure:ITEM? VPP,CHANnel1")
+        self.assertAlmostEqual(float(raw), target_vpp, places=2)
 
-        vpp = float(self._query_or_skip(":MEASure:VPP?"))
-        vrms = float(self._query_or_skip(":MEASure:VRMS?"))
-        freq = float(self._query_or_skip(":MEASure:FREQuency?"))
+    def test_measure_vrms_matches_attribute(self):
+        target_vrms = 0.88
+        self._set_attribute("channel1_vrms_v", target_vrms)
+        raw = self._query_or_skip(":MEASure:ITEM? VRMS,CHANnel1")
+        self.assertAlmostEqual(float(raw), target_vrms, places=2)
 
-        self.assertAlmostEqual(vpp, 1.23, places=2)
-        self.assertAlmostEqual(vrms, 0.41, places=2)
-        self.assertAlmostEqual(freq, 2500.0, places=1)
+    def test_measure_vavg_matches_attribute(self):
+        target_vavg = 0.12
+        self._set_attribute("channel1_vavg_v", target_vavg)
+        raw = self._query_or_skip(":MEASure:ITEM? VAVG,CHANnel1")
+        self.assertAlmostEqual(float(raw), target_vavg, places=2)
 
-    def test_channel_scale_round_trip(self):
-        self.sut.channel_scale(0.2)
-        wait_seconds(0.1)
-        scale = self.sut.channel_scale_query()
-        self.assertAlmostEqual(scale, 0.2, places=3)
-        self.assertAlmostEqual(self._get_attribute("k__channel_1_scale_v"), 0.2, places=3)
+    def test_measure_frequency_matches_attribute(self):
+        target_freq = 1234.0
+        self._set_attribute("channel1_freq_hz", target_freq)
+        raw = self._query_or_skip(":MEASure:ITEM? FREQuency,CHANnel1")
+        self.assertAlmostEqual(float(raw), target_freq, places=1)
 
-    def test_timebase_scale_round_trip(self):
-        self.sut.timebase_scale(0.0005)
-        wait_seconds(0.1)
-        scale = self.sut.timebase_scale_query()
-        self.assertAlmostEqual(scale, 0.0005, places=6)
-        self.assertAlmostEqual(self._get_attribute("k__timebase_scale_s"), 0.0005, places=6)
+    def test_measure_period_matches_attribute(self):
+        target_period = 0.00075
+        self._set_attribute("channel1_period_s", target_period)
+        raw = self._query_or_skip(":MEASure:ITEM? PERiod,CHANnel1")
+        self.assertAlmostEqual(float(raw), target_period, places=5)
 
-    def test_trigger_level_round_trip(self):
-        self.sut.trigger_level(0.05)
-        wait_seconds(0.1)
-        level = self.sut.trigger_level_query()
-        self.assertAlmostEqual(level, 0.05, places=3)
-        self.assertAlmostEqual(self._get_attribute("k__trigger_level_v"), 0.05, places=3)
 
-    def test_measurement_source_round_trip(self):
-        reply = self._query_or_skip(":MEASure:SOURce CHAN1")
-        self.assertEqual(reply, "OK")
-        wait_seconds(0.1)
-        self.assertEqual(self._get_attribute("k__measurement_source"), "CHAN1")
-        source = self._query_or_skip(":MEASure:SOURce?")
-        self.assertEqual(source, "CHAN1")
-
-    def test_system_error_reports_no_error(self):
-        reply = self._query_or_skip(":SYSTem:ERRor?")
-        self.assertIn("No error", reply)
-
-    def test_calibration_tone_scenario_sets_targets(self):
-        scenarios = self.instance["scenarios"]
-        scenario = scenarios["calibration_tone"]
-        self._set_attribute("vpp_v", 0.0)
-        self._set_attribute("frequency_hz", 0.0)
-        start = getattr(scenario, "start", None)
-        if callable(start):
-            start()
-        wait_seconds(0.3)
-
-        vpp = float(self._query_or_skip(":MEASure:VPP?"))
-        freq = float(self._query_or_skip(":MEASure:FREQuency?"))
-        self.assertAlmostEqual(vpp, 2.0, places=2)
-        self.assertAlmostEqual(freq, 1000.0, places=1)
+__all__ = ["TestScpiOscilloscopeSUTExample"]
