@@ -17,6 +17,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - Flexit Nordic HVAC (BACnet): `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`
   - Thermal controller (Modbus): `library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml`
   - Energy meter iEM3000 (Modbus): `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`
+  - PowerLogic PM8000 meter (Modbus): `library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`
