@@ -24,6 +24,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - Energy meter EM4200 (Modbus): `library/domains/iot/schneider/schneider_em4200__modbus.yaml`
   - Siemens PAC3200 power meter (Modbus): `library/domains/iot/siemens/siemens_pac3200__modbus.yaml`
   - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
+  - Energy meter EM24 (Modbus): `library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`
