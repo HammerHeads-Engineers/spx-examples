@@ -18,6 +18,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - Thermal controller (Modbus): `library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml`
   - Energy meter iEM3000 (Modbus): `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`
   - Easy UPS 3M (Modbus): `library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml`
+  - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`

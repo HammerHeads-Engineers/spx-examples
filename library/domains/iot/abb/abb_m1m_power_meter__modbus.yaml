@@ -1,0 +1,307 @@
+# SPDX-License-Identifier: MIT
+
+name: abb_m1m_power_meter__modbus
+description: |
+  Minimal Modbus TCP (slave) simulation of ABB M1M power meters with key
+  real-time measurements mapped from the M1M Modbus register list. The model
+  exposes scaled 32-bit register values for voltages, currents, power, frequency,
+  and power factor.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5027
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  k__load_kw: 12.0
+  k__power_factor: 0.96
+  k__voltage_nominal_v: 230.0
+  k__frequency_nominal_hz: 50.0
+  power_factor_leading: 0
+
+  voltage_drop_per_kw: 0.35
+  voltage_floor_v: 200.0
+  voltage_ceiling_v: 245.0
+
+  frequency_droop_per_kw: 0.02
+  frequency_floor_hz: 47.5
+  frequency_ceiling_hz: 52.0
+
+  voltage_system_v: 0.0
+  voltage_l1_v: 0.0
+  voltage_l2_v: 0.0
+  voltage_l3_v: 0.0
+  voltage_l1_l2_v: 0.0
+  voltage_l2_l3_v: 0.0
+  voltage_l3_l1_v: 0.0
+
+  current_l1_a: 0.0
+  current_l2_a: 0.0
+  current_l3_a: 0.0
+  current_avg_a: 0.0
+
+  active_power_total_kw: 0.0
+  reactive_power_total_kvar: 0.0
+  apparent_power_total_kva: 0.0
+  frequency_hz: 0.0
+  power_factor_total: 0.0
+
+  voltage_system_raw: 0
+  voltage_l1_raw: 0
+  voltage_l2_raw: 0
+  voltage_l3_raw: 0
+  voltage_l1_l2_raw: 0
+  voltage_l2_l3_raw: 0
+  voltage_l3_l1_raw: 0
+
+  current_total_raw: 0
+  current_l1_raw: 0
+  current_l2_raw: 0
+  current_l3_raw: 0
+
+  active_power_total_raw: 0
+  reactive_power_total_raw: 0
+  apparent_power_total_raw: 0
+  frequency_raw: 0
+  power_factor_total_raw: 0
+
+actions:
+  - function: $in(voltage_system_v)
+    name: compute_voltage_system
+    description: Compute base line-to-neutral voltage with load-dependent sag.
+    call: max(
+          $in(voltage_floor_v),
+          min(
+            $in(voltage_ceiling_v),
+            $in(k__voltage_nominal_v) - $in(voltage_drop_per_kw) * max(0.0, $in(k__load_kw))
+          )
+        )
+
+  - function: $in(voltage_l1_v)
+    name: compute_voltage_l1
+    description: Apply small deterministic unbalance on phase L1.
+    call: $in(voltage_system_v) + 0.3
+
+  - function: $in(voltage_l2_v)
+    name: compute_voltage_l2
+    description: Apply small deterministic unbalance on phase L2.
+    call: $in(voltage_system_v) - 0.2
+
+  - function: $in(voltage_l3_v)
+    name: compute_voltage_l3
+    description: Apply small deterministic unbalance on phase L3.
+    call: $in(voltage_system_v) - 0.1
+
+  - function: $in(voltage_l1_l2_v)
+    name: compute_voltage_l1_l2
+    description: Line voltage L1-L2 from phase voltages.
+    call: 1.7320508075688772 * (($in(voltage_l1_v) + $in(voltage_l2_v)) / 2.0)
+
+  - function: $in(voltage_l2_l3_v)
+    name: compute_voltage_l2_l3
+    description: Line voltage L2-L3 from phase voltages.
+    call: 1.7320508075688772 * (($in(voltage_l2_v) + $in(voltage_l3_v)) / 2.0)
+
+  - function: $in(voltage_l3_l1_v)
+    name: compute_voltage_l3_l1
+    description: Line voltage L3-L1 from phase voltages.
+    call: 1.7320508075688772 * (($in(voltage_l3_v) + $in(voltage_l1_v)) / 2.0)
+
+  - function: $in(current_avg_a)
+    name: compute_current_avg
+    description: Compute average line current from total load.
+    call: |
+      (lambda load_kw, v_ll, pf:
+        0.0 if load_kw <= 0.0 else (load_kw * 1000.0) / max(1.0, (1.7320508075688772 * v_ll * pf))
+      )(
+        max(0.0, $in(k__load_kw)),
+        ($in(voltage_l1_l2_v) + $in(voltage_l2_l3_v) + $in(voltage_l3_l1_v)) / 3.0,
+        max(0.1, min(1.0, abs($in(k__power_factor))))
+      )
+
+  - function: $in(current_l1_a)
+    name: compute_current_l1
+    description: Assign per-phase current with minor deterministic spread.
+    call: $in(current_avg_a) * 1.02
+
+  - function: $in(current_l2_a)
+    name: compute_current_l2
+    description: Assign per-phase current with minor deterministic spread.
+    call: $in(current_avg_a) * 0.99
+
+  - function: $in(current_l3_a)
+    name: compute_current_l3
+    description: Assign per-phase current with minor deterministic spread.
+    call: $in(current_avg_a) * 0.99
+
+  - function: $in(active_power_total_kw)
+    name: compute_active_power_total
+    description: Active power follows load demand.
+    call: max(0.0, $in(k__load_kw))
+
+  - function: $in(apparent_power_total_kva)
+    name: compute_apparent_power_total
+    description: Apparent power derived from active power and power factor.
+    call: $in(active_power_total_kw) / max(0.1, min(1.0, abs($in(k__power_factor))))
+
+  - function: $in(reactive_power_total_kvar)
+    name: compute_reactive_power_total
+    description: Reactive power magnitude derived from apparent and active power.
+    call: (
+          max(0.0, ($in(apparent_power_total_kva) ** 2) - ($in(active_power_total_kw) ** 2))
+        ) ** 0.5 * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(power_factor_total)
+    name: compute_power_factor_total
+    description: Report absolute power factor (sign handled via reactive power).
+    call: max(0.0, min(1.0, abs($in(k__power_factor))))
+
+  - function: $in(frequency_hz)
+    name: compute_frequency
+    description: Frequency droops with higher load.
+    call: max(
+          $in(frequency_floor_hz),
+          min(
+            $in(frequency_ceiling_hz),
+            $in(k__frequency_nominal_hz) - $in(frequency_droop_per_kw) * max(0.0, $in(active_power_total_kw))
+          )
+        )
+
+  - function: $in(voltage_system_raw)
+    name: encode_voltage_system
+    description: Encode system voltage (0.1 V units).
+    call: int(round($in(voltage_system_v) * 10.0))
+
+  - function: $in(voltage_l1_raw)
+    name: encode_voltage_l1
+    description: Encode phase L1 voltage (0.1 V units).
+    call: int(round($in(voltage_l1_v) * 10.0))
+
+  - function: $in(voltage_l2_raw)
+    name: encode_voltage_l2
+    description: Encode phase L2 voltage (0.1 V units).
+    call: int(round($in(voltage_l2_v) * 10.0))
+
+  - function: $in(voltage_l3_raw)
+    name: encode_voltage_l3
+    description: Encode phase L3 voltage (0.1 V units).
+    call: int(round($in(voltage_l3_v) * 10.0))
+
+  - function: $in(voltage_l1_l2_raw)
+    name: encode_voltage_l1_l2
+    description: Encode line voltage L1-L2 (0.1 V units).
+    call: int(round($in(voltage_l1_l2_v) * 10.0))
+
+  - function: $in(voltage_l2_l3_raw)
+    name: encode_voltage_l2_l3
+    description: Encode line voltage L2-L3 (0.1 V units).
+    call: int(round($in(voltage_l2_l3_v) * 10.0))
+
+  - function: $in(voltage_l3_l1_raw)
+    name: encode_voltage_l3_l1
+    description: Encode line voltage L3-L1 (0.1 V units).
+    call: int(round($in(voltage_l3_l1_v) * 10.0))
+
+  - function: $in(current_total_raw)
+    name: encode_current_total
+    description: Encode total line current (0.01 A units).
+    call: int(round($in(current_avg_a) * 100.0))
+
+  - function: $in(current_l1_raw)
+    name: encode_current_l1
+    description: Encode phase L1 current (0.01 A units).
+    call: int(round($in(current_l1_a) * 100.0))
+
+  - function: $in(current_l2_raw)
+    name: encode_current_l2
+    description: Encode phase L2 current (0.01 A units).
+    call: int(round($in(current_l2_a) * 100.0))
+
+  - function: $in(current_l3_raw)
+    name: encode_current_l3
+    description: Encode phase L3 current (0.01 A units).
+    call: int(round($in(current_l3_a) * 100.0))
+
+  - function: $in(active_power_total_raw)
+    name: encode_active_power_total
+    description: Encode total active power (0.01 W units).
+    call: int(round($in(active_power_total_kw) * 100000.0))
+
+  - function: $in(reactive_power_total_raw)
+    name: encode_reactive_power_total
+    description: Encode total reactive power (0.01 var units).
+    call: int(round(abs($in(reactive_power_total_kvar)) * 100000.0))
+
+  - function: $in(apparent_power_total_raw)
+    name: encode_apparent_power_total
+    description: Encode total apparent power (0.01 VA units).
+    call: int(round($in(apparent_power_total_kva) * 100000.0))
+
+  - function: $in(frequency_raw)
+    name: encode_frequency
+    description: Encode frequency (0.01 Hz units).
+    call: int(round($in(frequency_hz) * 100.0))
+
+  - function: $in(power_factor_total_raw)
+    name: encode_power_factor_total
+    description: Encode power factor (0.001 units).
+    call: int(round($in(power_factor_total) * 1000.0))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        voltage_system_raw:    { address: [23296,23297], group: i_r, type: uint_32 }
+        voltage_l1_raw:        { address: [23298,23299], group: i_r, type: uint_32 }
+        voltage_l2_raw:        { address: [23300,23301], group: i_r, type: uint_32 }
+        voltage_l3_raw:        { address: [23302,23303], group: i_r, type: uint_32 }
+        voltage_l1_l2_raw:     { address: [23304,23305], group: i_r, type: uint_32 }
+        voltage_l2_l3_raw:     { address: [23306,23307], group: i_r, type: uint_32 }
+        voltage_l3_l1_raw:     { address: [23308,23309], group: i_r, type: uint_32 }
+        current_total_raw:     { address: [23310,23311], group: i_r, type: uint_32 }
+        current_l1_raw:        { address: [23312,23313], group: i_r, type: uint_32 }
+        current_l2_raw:        { address: [23314,23315], group: i_r, type: uint_32 }
+        current_l3_raw:        { address: [23316,23317], group: i_r, type: uint_32 }
+        active_power_total_raw:   { address: [23322,23323], group: i_r, type: uint_32 }
+        reactive_power_total_raw: { address: [23330,23331], group: i_r, type: uint_32 }
+        apparent_power_total_raw: { address: [23338,23339], group: i_r, type: uint_32 }
+        frequency_raw:         { address: [23346,23347], group: i_r, type: uint_32 }
+        power_factor_total_raw: { address: [23360,23361], group: i_r, type: uint_32 }
+
+scenarios:
+  nominal_load:
+    description: Balanced nominal load at high power factor.
+    duration: 30.0
+    overrides:
+      $in(k__load_kw): 10.0
+      $in(k__power_factor): 0.98
+
+  overload:
+    description: Elevated load with voltage sag.
+    duration: 25.0
+    overrides:
+      $in(k__load_kw): 25.0
+      $in(k__power_factor): 0.92
+      $in(voltage_drop_per_kw): 0.6
+
+  low_power_factor:
+    description: Inductive load with low power factor.
+    duration: 30.0
+    overrides:
+      $in(k__load_kw): 18.0
+      $in(k__power_factor): 0.72
+      $in(power_factor_leading): 0
+
+  recovery:
+    description: Return to lighter load and nominal voltage.
+    duration: 20.0
+    overrides:
+      $in(k__load_kw): 8.0
+      $in(k__power_factor): 0.99
+      $in(voltage_drop_per_kw): 0.25
