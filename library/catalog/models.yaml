@@ -343,6 +343,18 @@ models:
   - id: Energy.EnergyMeterAbbD13_15.Modbus
     name: ABB D13 15 Energy Meter (Modbus)
     path: library/domains/iot/abb/abb_d13_15__modbus.yaml
+  - id: Energy.EnergyMeterEm4200.Modbus
+    name: Schneider Electric EM4200 Energy Meter (Modbus)
+    path: library/domains/iot/schneider/schneider_em4200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPac3200.Modbus
+    name: Siemens SENTRON PAC3200 Power Meter (Modbus)
+    path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:
