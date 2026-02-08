@@ -19,6 +19,8 @@ industries:
         instance: spx_hvac_flexit_nordic_bacnet
       - model: Energy.EnergyMeterIem3000.Modbus
         instance: spx_energy_meter_iem3000_modbus
+      - model: Energy.UpsEasy3M.Modbus
+        instance: spx_easy_ups_3m_modbus
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
       - model: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
@@ -44,6 +46,7 @@ industries:
     start_instances:
       - spx_hvac_flexit_nordic_bacnet
       - spx_energy_meter_iem3000_modbus
+      - spx_easy_ups_3m_modbus
       - spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
       - spx_abb_sa_s12_16_5_1_knx
       - spx_abb_jra_s4_230_5_1_knx
