@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: MIT
+
+name: schneider_powerlogic_pm8000__modbus
+description: |
+  Modbus TCP (slave) simulation of a Schneider Electric PowerLogic PM8000
+  power/energy meter. The register mapping follows the PM8000 Modbus Map
+  (float32 quantities for average currents/voltages, total powers, frequency,
+  and energy totals).
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5025
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Averaged electrical measurements
+  k__current_avg_a: 12.0
+  k__voltage_ll_avg_v: 400.0
+  k__voltage_ln_avg_v: 230.0
+  k__power_factor: 0.97
+  power_factor_leading: 0
+  k__frequency_hz: 50.0
+
+  # Derived totals (W/VAR/VA)
+  active_power_total_w: 0.0
+  reactive_power_total_var: 0.0
+  apparent_power_total_va: 0.0
+
+  # Cumulative energy (kWh)
+  energy_import_total_kwh: 0.0
+  energy_export_total_kwh: 0.0
+
+  _cycle_time_s: 1.0
+
+actions:
+  - function: $in(apparent_power_total_va)
+    name: compute_apparent_power
+    description: Total apparent power from average VLL and current.
+    call: |
+      (lambda s: abs(s))(
+        1.7320508075688772 * $in(k__voltage_ll_avg_v) * $in(k__current_avg_a)
+      )
+
+  - function: $in(active_power_total_w)
+    name: compute_active_power
+    description: Total active power from apparent power and power factor.
+    call: |
+      1.7320508075688772
+      * $in(k__voltage_ll_avg_v)
+      * $in(k__current_avg_a)
+      * $in(k__power_factor)
+
+  - function: $in(reactive_power_total_var)
+    name: compute_reactive_power
+    description: Reactive power magnitude with leading/lagging sign.
+    call: |
+      (max(0.0, ($in(apparent_power_total_va) ** 2) - ($in(active_power_total_w) ** 2)) ** 0.5)
+      * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(energy_import_total_kwh)
+    name: integrate_energy_import
+    description: Integrate imported energy (kWh) from active power (W).
+    call: |
+      $in(energy_import_total_kwh)
+      + max(0.0, $in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+
+  - function: $in(energy_export_total_kwh)
+    name: integrate_energy_export
+    description: Integrate exported energy (kWh) from active power (W).
+    call: |
+      $in(energy_export_total_kwh)
+      + max(0.0, -$in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        # Averages (Float32 input registers)
+        k__current_avg_a:     { address: [3010, 3011], group: i_r, type: float }
+        k__voltage_ll_avg_v:  { address: [3026, 3027], group: i_r, type: float }
+        k__voltage_ln_avg_v:  { address: [3036, 3037], group: i_r, type: float }
+
+        # Power totals (Float32 input registers)
+        active_power_total_w:    { address: [3060, 3061], group: i_r, type: float }
+        reactive_power_total_var: { address: [3068, 3069], group: i_r, type: float }
+        apparent_power_total_va: { address: [3076, 3077], group: i_r, type: float }
+
+        # Power factor + frequency (Float32 input registers)
+        k__power_factor:      { address: [3150, 3151], group: i_r, type: float }
+        k__frequency_hz:      { address: [3110, 3111], group: i_r, type: float }
+
+        # Energy totals (Float32 input registers)
+        energy_import_total_kwh: { address: [2700, 2701], group: i_r, type: float }
+        energy_export_total_kwh: { address: [2702, 2703], group: i_r, type: float }
+
+scenarios:
+  peak_demand:
+    description: High load, lagging power factor.
+    duration: 30.0
+    overrides:
+      $in(k__current_avg_a): 80.0
+      $in(k__power_factor): 0.92
+      $in(power_factor_leading): 0
+
+  pv_export:
+    description: Simulated PV export with leading power factor.
+    duration: 30.0
+    overrides:
+      $in(k__current_avg_a): -20.0
+      $in(k__power_factor): 0.98
+      $in(power_factor_leading): 1

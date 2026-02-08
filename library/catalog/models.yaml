@@ -358,6 +358,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPm8000.Modbus
+    name: Schneider Electric PowerLogic PM8000 Meter (Modbus)
+    path: library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterAbbD13_15.Modbus
     name: ABB D13 15 Energy Meter (Modbus)
     path: library/domains/iot/abb/abb_d13_15__modbus.yaml
