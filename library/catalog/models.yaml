@@ -451,6 +451,9 @@ models:
   - id: Energy.EnergyMeterPac3200.Modbus
     name: Siemens SENTRON PAC3200 Power Meter (Modbus)
     path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
+  - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
+    name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
+    path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:
