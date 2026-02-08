@@ -1,0 +1,63 @@
+name: keysight_infiniivision_1000x__scpi
+description: |
+  Keysight InfiniiVision 1000 X-Series oscilloscope model driven by SCPI
+  (ASCII/TCP). Provides channel scale/offset control and basic measurement
+  queries for lab automation and CI harnesses.
+
+attributes:
+  k__channel_1_scale_v: 0.5
+  k__channel_1_offset_v: 0.0
+  k__timebase_scale_s: 0.001
+  k__trigger_level_v: 0.0
+  k__measurement_source: CHAN1
+  vpp_v: 1.0
+  vrms_v: 0.707
+  vavg_v: 0.0
+  frequency_hz: 1000.0
+  last_error: '0,"No error"'
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "KEYSIGHT TECHNOLOGIES,DSOX1000X,MY00000000,01.20.0000"
+        ":SYSTem:ERRor?": "#out(last_error)"
+        ":MEASure:VPP?": "#out(vpp_v)"
+        ":MEASure:VRMS?": "#out(vrms_v)"
+        ":MEASure:VAVerage?": "#out(vavg_v)"
+        ":MEASure:FREQuency?": "#out(frequency_hz)"
+        ":MEASure:SOURce?": "#out(k__measurement_source)"
+        ":MEASure:SOURce {source}":
+          "#attr(k__measurement_source)": "source"
+          response: "OK"
+        ":CHANnel1:SCALe?": "#out(k__channel_1_scale_v)"
+        ":CHANnel1:SCALe {scale}":
+          "#attr(k__channel_1_scale_v)": "scale"
+        ":CHANnel1:OFFSet?": "#out(k__channel_1_offset_v)"
+        ":CHANnel1:OFFSet {offset}":
+          "#attr(k__channel_1_offset_v)": "offset"
+        ":TIMebase:SCALe?": "#out(k__timebase_scale_s)"
+        ":TIMebase:SCALe {scale}":
+          "#attr(k__timebase_scale_s)": "scale"
+        ":TRIGger:LEVel?": "#out(k__trigger_level_v)"
+        ":TRIGger:LEVel {level}":
+          "#attr(k__trigger_level_v)": "level"
+
+scenarios:
+  calibration_tone:
+    display_name: "Calibration Tone"
+    description: "Stable 1 kHz, 2 Vpp signal for lab calibration."
+    overrides:
+      $out(vpp_v): 2.0
+      $out(vrms_v): 0.707
+      $out(vavg_v): 0.0
+      $out(frequency_hz): 1000.0
+  transient_spike:
+    display_name: "Transient Spike"
+    description: "Short 5 Vpp excursion to validate limit triggers."
+    duration: 1.0
+    overrides:
+      $out(vpp_v): 5.0

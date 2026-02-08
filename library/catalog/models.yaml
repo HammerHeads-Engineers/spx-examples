@@ -223,6 +223,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, iiot_monitoring]
+  - id: Lab.Oscilloscope.Keysight1000X.Scpi
+    name: Keysight InfiniiVision 1000 X-Series Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
     name: BLE Vital Signs Monitor
     path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml

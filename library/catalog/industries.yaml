@@ -89,6 +89,8 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Lab.Multimeter.Scpi
         instance: spx_lab_multimeter
+      - model: Lab.Oscilloscope.Keysight1000X.Scpi
+        instance: spx_lab_oscilloscope
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
