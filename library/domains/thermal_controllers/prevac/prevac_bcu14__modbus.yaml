@@ -1,0 +1,169 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: prevac_bcu14__modbus
+description: |
+  Prevac BCU14 bakeout controller with two independent heating zones.
+  Modbus register map based on BCU14 User Manual rev. 1 (Nov 2025), firmware 3.7.3.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5031
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Zone 1 controls/status.
+  cmd__zone1_go_operate: 0
+  cmd__zone1_go_standby: 0
+  zone1_status_bits: 0
+  k__zone1_timer_direction: 0
+  zone1_remaining_reg_time_s: 0
+  k__zone1_reg_bakeout_time_s: 3600
+  zone1_remaining_cont_time_s: 0
+  k__zone1_cont_bakeout_time_s: 0
+  zone1_actual_temp_c: 25
+  k__zone1_temp_unit: 0
+  k__zone1_target_temp_c: 120
+  zone1_actual_target_temp_c: 120
+  k__zone1_fan_start_temp_c: 80
+  k__zone1_ramp_rate_c_per_unit: 5
+  k__zone1_ramp_rate_unit: 1
+  k__zone1_controlled_cooling: 1
+  k__zone1_autostart_interlock: 0
+  k__zone1_power_fail_signal: 0
+
+  # Zone 2 controls/status.
+  cmd__zone2_go_operate: 0
+  cmd__zone2_go_standby: 0
+  zone2_status_bits: 0
+  k__zone2_timer_direction: 0
+  zone2_remaining_reg_time_s: 0
+  k__zone2_reg_bakeout_time_s: 3600
+  zone2_remaining_cont_time_s: 0
+  k__zone2_cont_bakeout_time_s: 0
+  zone2_actual_temp_c: 25
+  k__zone2_temp_unit: 0
+  k__zone2_target_temp_c: 120
+  zone2_actual_target_temp_c: 120
+  k__zone2_fan_start_temp_c: 80
+  k__zone2_ramp_rate_c_per_unit: 5
+  k__zone2_ramp_rate_unit: 1
+  k__zone2_controlled_cooling: 1
+  k__zone2_autostart_interlock: 0
+  k__zone2_power_fail_signal: 0
+
+  # Global device settings.
+  cmd__release_remote_control: 0
+  remote_control_enabled: 0
+
+  # Internal helpers.
+  _zone1_temp_min_c: 0
+  _zone1_temp_max_c: 1200
+  _zone1_temp_response_gain: 0.08
+  _zone2_temp_min_c: 0
+  _zone2_temp_max_c: 1200
+  _zone2_temp_response_gain: 0.08
+
+actions:
+  - function: $in(zone1_actual_target_temp_c)
+    name: sync_zone1_target
+    description: Keep actual target temperature aligned with the zone 1 target.
+    call: $in(k__zone1_target_temp_c)
+
+  - function: $in(zone2_actual_target_temp_c)
+    name: sync_zone2_target
+    description: Keep actual target temperature aligned with the zone 2 target.
+    call: $in(k__zone2_target_temp_c)
+
+  - function: $in(zone1_actual_temp_c)
+    name: zone1_temperature_follow
+    description: Simple first-order response for zone 1 bakeout temperature.
+    call: max(
+          $in(_zone1_temp_min_c),
+          min(
+            $in(_zone1_temp_max_c),
+            $in(zone1_actual_temp_c)
+            + $in(_zone1_temp_response_gain)
+              * ($in(zone1_actual_target_temp_c) - $in(zone1_actual_temp_c))
+          )
+        )
+
+  - function: $in(zone2_actual_temp_c)
+    name: zone2_temperature_follow
+    description: Simple first-order response for zone 2 bakeout temperature.
+    call: max(
+          $in(_zone2_temp_min_c),
+          min(
+            $in(_zone2_temp_max_c),
+            $in(zone2_actual_temp_c)
+            + $in(_zone2_temp_response_gain)
+              * ($in(zone2_actual_target_temp_c) - $in(zone2_actual_temp_c))
+          )
+        )
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        cmd__zone1_go_operate: { address: [0,0], group: h_r, type: uint_16 }
+        cmd__zone1_go_standby: { address: [1,1], group: h_r, type: uint_16 }
+        zone1_status_bits: { address: [2,2], group: h_r, type: uint_16 }
+        k__zone1_timer_direction: { address: [3,3], group: h_r, type: uint_16 }
+        zone1_remaining_reg_time_s: { address: [4,5], group: h_r, type: uint_32 }
+        k__zone1_reg_bakeout_time_s: { address: [6,7], group: h_r, type: uint_32 }
+        zone1_remaining_cont_time_s: { address: [8,9], group: h_r, type: uint_32 }
+        k__zone1_cont_bakeout_time_s: { address: [10,11], group: h_r, type: uint_32 }
+        zone1_actual_temp_c: { address: [12,12], group: h_r, type: uint_16 }
+        k__zone1_temp_unit: { address: [13,13], group: h_r, type: uint_16 }
+        k__zone1_target_temp_c: { address: [14,14], group: h_r, type: uint_16 }
+        zone1_actual_target_temp_c: { address: [15,15], group: h_r, type: uint_16 }
+        k__zone1_fan_start_temp_c: { address: [16,16], group: h_r, type: uint_16 }
+        k__zone1_ramp_rate_c_per_unit: { address: [17,17], group: h_r, type: uint_16 }
+        k__zone1_ramp_rate_unit: { address: [18,18], group: h_r, type: uint_16 }
+        k__zone1_controlled_cooling: { address: [19,19], group: h_r, type: uint_16 }
+        k__zone1_autostart_interlock: { address: [20,20], group: h_r, type: uint_16 }
+        k__zone1_power_fail_signal: { address: [21,21], group: h_r, type: uint_16 }
+
+        cmd__zone2_go_operate: { address: [27,27], group: h_r, type: uint_16 }
+        cmd__zone2_go_standby: { address: [28,28], group: h_r, type: uint_16 }
+        zone2_status_bits: { address: [29,29], group: h_r, type: uint_16 }
+        k__zone2_timer_direction: { address: [30,30], group: h_r, type: uint_16 }
+        zone2_remaining_reg_time_s: { address: [31,32], group: h_r, type: uint_32 }
+        k__zone2_reg_bakeout_time_s: { address: [33,34], group: h_r, type: uint_32 }
+        zone2_remaining_cont_time_s: { address: [35,36], group: h_r, type: uint_32 }
+        k__zone2_cont_bakeout_time_s: { address: [37,38], group: h_r, type: uint_32 }
+        zone2_actual_temp_c: { address: [39,39], group: h_r, type: uint_16 }
+        k__zone2_temp_unit: { address: [40,40], group: h_r, type: uint_16 }
+        k__zone2_target_temp_c: { address: [41,41], group: h_r, type: uint_16 }
+        zone2_actual_target_temp_c: { address: [42,42], group: h_r, type: uint_16 }
+        k__zone2_fan_start_temp_c: { address: [43,43], group: h_r, type: uint_16 }
+        k__zone2_ramp_rate_c_per_unit: { address: [44,44], group: h_r, type: uint_16 }
+        k__zone2_ramp_rate_unit: { address: [45,45], group: h_r, type: uint_16 }
+        k__zone2_controlled_cooling: { address: [46,46], group: h_r, type: uint_16 }
+        k__zone2_autostart_interlock: { address: [47,47], group: h_r, type: uint_16 }
+        k__zone2_power_fail_signal: { address: [48,48], group: h_r, type: uint_16 }
+
+        cmd__release_remote_control: { address: [1000,1000], group: h_r, type: uint_16 }
+        remote_control_enabled: { address: [1151,1151], group: h_r, type: uint_16 }
+
+scenarios:
+  zone1_bakeout:
+    description: Drive zone 1 to a higher bakeout target.
+    duration: 20.0
+    overrides:
+      $in(k__zone1_target_temp_c): 200
+      $in(k__zone1_fan_start_temp_c): 120
+
+  zone2_bakeout:
+    description: Drive zone 2 to a higher bakeout target.
+    duration: 20.0
+    overrides:
+      $in(k__zone2_target_temp_c): 220
+      $in(k__zone2_fan_start_temp_c): 130
