@@ -93,6 +93,8 @@ industries:
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
         instance: spx_vacuum_gauge_multichannel
+      - model: Process.ThermalController.PrevacBcu14.Modbus
+        instance: spx_prevac_bcu14
     start_instances:
       - spx_health_monitor_ble
       - spx_temp_sensor_ble

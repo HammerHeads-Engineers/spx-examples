@@ -179,6 +179,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
     profiles: []
+  - id: Process.ThermalController.PrevacBcu14.Modbus
+    name: Prevac BCU14 Bakeout Controller (Modbus TCP)
+    path: library/domains/thermal_controllers/prevac/prevac_bcu14__modbus.yaml
+    domain: thermal_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Process.ThermalController.Advanced
     name: Thermal Controller (Advanced)
     path: library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml
