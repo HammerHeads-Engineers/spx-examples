@@ -1,0 +1,150 @@
+# SPDX-License-Identifier: MIT
+
+name: prevac_tsp04_ps__modbus
+description: |
+  Prevac TSP04-PS titanium sublimation pump power supply with Modbus RTU/TCP register map.
+  Mapping follows the user manual register table (rev. 1.0.3).
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 502
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  cmd__pump1_operate_on: 0
+  cmd__pump1_operate_off: 0
+  k__pump1_work_mode: 0
+  k__pump1_output_current_set_a: 0
+  pump1_output_current_a: 0
+  pump1_output_voltage_v: 0.0
+  pump1_actual_cycle_number: 0
+  pump1_actual_work_time_s: 0
+  pump1_status_word: 0
+  pump1_filament_1_status: 0
+  pump1_filament_2_status: 0
+  pump1_filament_3_status: 0
+  k__pump1_filament_runtime_s: 0
+  k__pump1_filament_off_time_s: 0
+  cmd__pump1_filament_1_on: 0
+  cmd__pump1_filament_2_on: 0
+  cmd__pump1_filament_3_on: 0
+  k__pump1_filament_runtime_degas_s: 0
+  k__pump1_filament_off_time_degas_s: 0
+  cmd__pump1_filament_1_on_degas: 0
+  cmd__pump1_filament_2_on_degas: 0
+  cmd__pump1_filament_3_on_degas: 0
+  pump1_filament_1_total_work_time_s: 0
+  pump1_filament_2_total_work_time_s: 0
+  pump1_filament_3_total_work_time_s: 0
+  k__pump1_timer_direction: 0
+  pump1_actual_operate_time_s: 0
+  k__pump1_operate_time_setpoint_s: 0
+  k__device_setup: 0
+  k__pump1_connector_cable_length: 0
+
+  cmd__pump2_operate_on: 0
+  cmd__pump2_operate_off: 0
+  k__pump2_work_mode: 0
+  k__pump2_output_current_set_a: 0
+  pump2_output_current_a: 0
+  pump2_output_voltage_v: 0.0
+  pump2_actual_cycle_number: 0
+  pump2_actual_work_time_s: 0
+  pump2_filament_1_status: 0
+  pump2_filament_2_status: 0
+  pump2_filament_3_status: 0
+  k__pump2_filament_runtime_s: 0
+  k__pump2_filament_off_time_s: 0
+  cmd__pump2_filament_1_on: 0
+  cmd__pump2_filament_2_on: 0
+  cmd__pump2_filament_3_on: 0
+  k__pump2_filament_runtime_degas_s: 0
+  k__pump2_filament_off_time_degas_s: 0
+  cmd__pump2_filament_1_on_degas: 0
+  cmd__pump2_filament_2_on_degas: 0
+  cmd__pump2_filament_3_on_degas: 0
+  pump2_filament_1_total_work_time_s: 0
+  pump2_filament_2_total_work_time_s: 0
+  pump2_filament_3_total_work_time_s: 0
+  k__pump2_timer_direction: 0
+  pump2_actual_operate_time_s: 0
+  k__pump2_operate_time_setpoint_s: 0
+  k__pump2_connector_cable_length: 0
+
+  cmd__release_remote_control: 0
+  k__touchscreen_auto_lock: 0
+  remote_control_enabled: 0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        cmd__pump1_operate_on: { address: [0,0], group: h_r, type: uint_16 }
+        cmd__pump1_operate_off: { address: [1,1], group: h_r, type: uint_16 }
+        k__pump1_work_mode: { address: [2,2], group: h_r, type: uint_16 }
+        k__pump1_output_current_set_a: { address: [3,3], group: h_r, type: uint_16 }
+        pump1_output_current_a: { address: [4,4], group: h_r, type: uint_16 }
+        pump1_output_voltage_v: { address: [5,6], group: h_r, type: float }
+        pump1_actual_cycle_number: { address: [7,7], group: h_r, type: uint_16 }
+        pump1_actual_work_time_s: { address: [8,9], group: h_r, type: int_32 }
+        pump1_status_word: { address: [10,10], group: h_r, type: uint_16 }
+        pump1_filament_1_status: { address: [11,11], group: h_r, type: uint_16 }
+        pump1_filament_2_status: { address: [12,12], group: h_r, type: uint_16 }
+        pump1_filament_3_status: { address: [13,13], group: h_r, type: uint_16 }
+        k__pump1_filament_runtime_s: { address: [15,15], group: h_r, type: int_16 }
+        k__pump1_filament_off_time_s: { address: [16,17], group: h_r, type: int_32 }
+        cmd__pump1_filament_1_on: { address: [18,18], group: h_r, type: uint_16 }
+        cmd__pump1_filament_2_on: { address: [19,19], group: h_r, type: uint_16 }
+        cmd__pump1_filament_3_on: { address: [20,20], group: h_r, type: uint_16 }
+        k__pump1_filament_runtime_degas_s: { address: [22,22], group: h_r, type: int_16 }
+        k__pump1_filament_off_time_degas_s: { address: [23,24], group: h_r, type: int_32 }
+        cmd__pump1_filament_1_on_degas: { address: [25,25], group: h_r, type: uint_16 }
+        cmd__pump1_filament_2_on_degas: { address: [26,26], group: h_r, type: uint_16 }
+        cmd__pump1_filament_3_on_degas: { address: [27,27], group: h_r, type: uint_16 }
+        pump1_filament_1_total_work_time_s: { address: [29,30], group: h_r, type: int_32 }
+        pump1_filament_2_total_work_time_s: { address: [31,32], group: h_r, type: int_32 }
+        pump1_filament_3_total_work_time_s: { address: [33,34], group: h_r, type: int_32 }
+        k__pump1_timer_direction: { address: [37,37], group: h_r, type: uint_16 }
+        pump1_actual_operate_time_s: { address: [38,39], group: h_r, type: int_32 }
+        k__pump1_operate_time_setpoint_s: { address: [40,41], group: h_r, type: int_32 }
+        k__device_setup: { address: [42,42], group: h_r, type: uint_16 }
+        k__pump1_connector_cable_length: { address: [43,43], group: h_r, type: uint_16 }
+
+        cmd__pump2_operate_on: { address: [100,100], group: h_r, type: uint_16 }
+        cmd__pump2_operate_off: { address: [101,101], group: h_r, type: uint_16 }
+        k__pump2_work_mode: { address: [102,102], group: h_r, type: uint_16 }
+        k__pump2_output_current_set_a: { address: [103,103], group: h_r, type: uint_16 }
+        pump2_output_current_a: { address: [104,104], group: h_r, type: uint_16 }
+        pump2_output_voltage_v: { address: [105,106], group: h_r, type: float }
+        pump2_actual_cycle_number: { address: [107,107], group: h_r, type: uint_16 }
+        pump2_actual_work_time_s: { address: [108,109], group: h_r, type: int_32 }
+        pump2_filament_1_status: { address: [110,110], group: h_r, type: uint_16 }
+        pump2_filament_2_status: { address: [111,111], group: h_r, type: uint_16 }
+        pump2_filament_3_status: { address: [112,112], group: h_r, type: uint_16 }
+        k__pump2_filament_runtime_s: { address: [113,113], group: h_r, type: int_16 }
+        k__pump2_filament_off_time_s: { address: [114,115], group: h_r, type: int_32 }
+        cmd__pump2_filament_1_on: { address: [116,116], group: h_r, type: uint_16 }
+        cmd__pump2_filament_2_on: { address: [117,117], group: h_r, type: uint_16 }
+        cmd__pump2_filament_3_on: { address: [118,118], group: h_r, type: uint_16 }
+        k__pump2_filament_runtime_degas_s: { address: [119,119], group: h_r, type: int_16 }
+        k__pump2_filament_off_time_degas_s: { address: [120,121], group: h_r, type: int_32 }
+        cmd__pump2_filament_1_on_degas: { address: [122,122], group: h_r, type: uint_16 }
+        cmd__pump2_filament_2_on_degas: { address: [123,123], group: h_r, type: uint_16 }
+        cmd__pump2_filament_3_on_degas: { address: [124,124], group: h_r, type: uint_16 }
+        pump2_filament_1_total_work_time_s: { address: [125,126], group: h_r, type: int_32 }
+        pump2_filament_2_total_work_time_s: { address: [127,128], group: h_r, type: int_32 }
+        pump2_filament_3_total_work_time_s: { address: [129,130], group: h_r, type: int_32 }
+        k__pump2_timer_direction: { address: [131,131], group: h_r, type: uint_16 }
+        pump2_actual_operate_time_s: { address: [132,133], group: h_r, type: int_32 }
+        k__pump2_operate_time_setpoint_s: { address: [134,135], group: h_r, type: int_32 }
+        k__pump2_connector_cable_length: { address: [136,136], group: h_r, type: uint_16 }
+
+        cmd__release_remote_control: { address: [1000,1000], group: h_r, type: uint_16 }
+        k__touchscreen_auto_lock: { address: [1113,1113], group: h_r, type: uint_16 }
+        remote_control_enabled: { address: [1151,1151], group: h_r, type: uint_16 }
