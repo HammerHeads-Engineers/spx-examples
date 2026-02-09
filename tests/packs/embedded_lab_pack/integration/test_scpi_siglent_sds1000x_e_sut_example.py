@@ -134,10 +134,12 @@ class TestScpiSiglentSds1000xESutExample(unittest.TestCase):
         self.assertAlmostEqual(float(raw), target_vpp, places=2)
 
     def test_measure_vrms_matches_attribute(self):
-        target_vrms = 1.12
-        self._set_attribute("channel1_vrms_v", target_vrms)
+        target_vpp = 3.168
+        expected_vrms = target_vpp * 0.353553
+        self._set_attribute("channel1_vpp_v", target_vpp)
+        wait_seconds(0.2)
         raw = self._query_or_skip("C1:PAVA? RMS")
-        self.assertAlmostEqual(float(raw), target_vrms, places=2)
+        self.assertAlmostEqual(float(raw), expected_vrms, places=2)
 
     def test_measure_vavg_matches_attribute(self):
         target_vavg = 0.15
@@ -152,10 +154,12 @@ class TestScpiSiglentSds1000xESutExample(unittest.TestCase):
         self.assertAlmostEqual(float(raw), target_freq, places=1)
 
     def test_measure_period_matches_attribute(self):
-        target_period = 0.00075
-        self._set_attribute("channel1_period_s", target_period)
+        target_freq = 1333.333333
+        expected_period = 1.0 / target_freq
+        self._set_attribute("channel1_freq_hz", target_freq)
+        wait_seconds(0.2)
         raw = self._query_or_skip("C1:PAVA? PER")
-        self.assertAlmostEqual(float(raw), target_period, places=5)
+        self.assertAlmostEqual(float(raw), expected_period, places=5)
 
     def test_channel_scale_updates_attribute(self):
         reply = self._query_or_skip("C1:VDIV 0.5")
