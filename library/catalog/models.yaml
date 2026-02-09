@@ -313,6 +313,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.MagnetronPowerSupply.PrevacM1600PDCPS.Modbus
+    name: Prevac M1600PDC-PS Magnetron Power Supply (Modbus)
+    path: library/domains/iot/prevac/prevac_m1600pdc_ps__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
     name: BLE Vital Signs Monitor
     path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
