@@ -277,6 +277,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.SiglentSds1000xE.Scpi
+    name: Siglent SDS1000X-E Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.RigolDs1000z.Scpi
     name: Rigol DS1000Z Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml

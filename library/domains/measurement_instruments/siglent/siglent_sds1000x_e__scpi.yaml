@@ -1,0 +1,76 @@
+name: siglent_sds1000x_e__scpi
+description: |
+  Virtual Siglent SDS1000X-E series oscilloscope exposing a subset of the
+  SCPI (ASCII/TCP) command set for channel setup and measurement queries.
+attributes:
+  k__channel_1_scale_v: 1.0
+  k__channel_1_offset_v: 0.0
+  k__timebase_scale_s: 0.001
+  k__trigger_level_v: 0.0
+  channel1_vpp_v: 2.0
+  channel1_vrms_v: 0.7071
+  channel1_vavg_v: 0.0
+  channel1_freq_hz: 1000.0
+  channel1_period_s: 0.001
+  idn: "SIGLENT,SDS1000X-E,SDS1XE0000000,1.0"
+
+actions:
+  - function: $in(channel1_period_s)
+    name: update_period
+    params:
+      min_freq_hz: 0.1
+    call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
+  - function: $in(channel1_vrms_v)
+    name: update_vrms
+    params:
+      scale: 0.353553
+    call: $in(channel1_vpp_v) * scale
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+        "C1:VDIV?": "#out(k__channel_1_scale_v)"
+        "C1:VDIV {scale}":
+          "#attr(k__channel_1_scale_v)": "scale"
+          response: "OK"
+        "C1:OFST?": "#out(k__channel_1_offset_v)"
+        "C1:OFST {offset}":
+          "#attr(k__channel_1_offset_v)": "offset"
+          response: "OK"
+        "TDIV?": "#out(k__timebase_scale_s)"
+        "TDIV {scale}":
+          "#attr(k__timebase_scale_s)": "scale"
+          response: "OK"
+        "TRLV?": "#out(k__trigger_level_v)"
+        "TRLV {level}":
+          "#attr(k__trigger_level_v)": "level"
+          response: "OK"
+        "C1:PAVA? PKPK": "#out(channel1_vpp_v)"
+        "C1:PAVA? RMS": "#out(channel1_vrms_v)"
+        "C1:PAVA? MEAN": "#out(channel1_vavg_v)"
+        "C1:PAVA? FREQ": "#out(channel1_freq_hz)"
+        "C1:PAVA? PER": "#out(channel1_period_s)"
+
+scenarios:
+  amplitude_sweep:
+    description: "Slowly ramp channel 1 amplitude for lab demos."
+    period: 0.2
+    actions:
+      - function: $in(channel1_vpp_v)
+        params:
+          min_vpp: 0.5
+          max_vpp: 5.0
+          step_vpp: 0.1
+        call: |
+          (lambda v, min_vpp, max_vpp, step_vpp:
+            min_vpp if v >= max_vpp else v + step_vpp
+          )($in(channel1_vpp_v), min_vpp, max_vpp, step_vpp)
+      - function: $in(channel1_vrms_v)
+        params:
+          scale: 0.353553
+        call: $in(channel1_vpp_v) * scale
