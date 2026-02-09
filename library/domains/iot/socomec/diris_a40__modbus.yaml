@@ -3,58 +3,44 @@
 name: diris_a40__modbus
 description: |
   Minimal Modbus TCP (slave) simulation of the Socomec DIRIS A-40 energy meter.
-  Register mapping follows the DIRIS A-40 Modbus table (v1.7.4):
-    - 264..349: instantaneous metrology (Float32 input registers)
-    - 19843..19847: total active energy import/export (UInt32 input registers)
+  Exposes key instantaneous measurements and total active energy using the
+  DIRIS A-40 Modbus communication table (Level 1).
 
 meta_parameters:
   modbus_port:
     type: int
-    default: 5026
+    default: 5030
   modbus_unit_id:
     type: int
     default: 1
 
 attributes:
-  # Phase currents (A)
   k__current_l1_a: 12.0
   k__current_l2_a: 10.5
   k__current_l3_a: 11.2
   current_avg_a: 0.0
 
-  # Phase-to-neutral voltages (V)
   k__voltage_l1_n_v: 230.0
   k__voltage_l2_n_v: 229.5
   k__voltage_l3_n_v: 231.0
-  voltage_ln_avg_v: 0.0
 
-  # Line-to-line voltages (V) (derived from L-N; suitable for demo dashboards)
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
+  voltage_l1_l2_v: 400.0
+  voltage_l2_l3_v: 401.0
+  voltage_l3_l1_v: 399.5
+  voltage_ll_avg_v: 0.0
 
-  # Power (kW/kVAR/kVA)
+  k__frequency_hz: 50.0
+
   k__power_factor: 0.95
   power_factor_leading: 0
+
   active_power_l1_kw: 0.0
   active_power_l2_kw: 0.0
   active_power_l3_kw: 0.0
   k__active_power_total_kw: 0.0
-  k__reactive_power_total_kvar: 0.0
-  k__apparent_power_total_kva: 0.0
 
-  # Frequency (Hz)
-  k__frequency_hz: 50.0
-
-  # Cumulative energy (kWh)
   k__energy_import_total_kwh: 0.0
   k__energy_export_total_kwh: 0.0
-
-  _modbus_active_power_l1_w: 0.0
-  _modbus_active_power_l2_w: 0.0
-  _modbus_active_power_l3_w: 0.0
-  _modbus_energy_import_total_kwh: 0
-  _modbus_energy_export_total_kwh: 0
 
   _cycle_time_s: 1.0
 
@@ -64,35 +50,10 @@ actions:
     description: Average phase current.
     call: ($in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)) / 3.0
 
-  - function: $in(voltage_ln_avg_v)
-    name: compute_voltage_ln_avg
-    description: Average phase-to-neutral voltage.
-    call: ($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 3.0
-
-  - function: $in(voltage_l1_l2_v)
-    name: compute_voltage_l1_l2
-    description: Approximate L1-L2 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v)) / 2.0)
-
-  - function: $in(voltage_l2_l3_v)
-    name: compute_voltage_l2_l3
-    description: Approximate L2-L3 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)) / 2.0)
-
-  - function: $in(voltage_l3_l1_v)
-    name: compute_voltage_l3_l1
-    description: Approximate L3-L1 voltage from phase-to-neutral values (balanced phasor assumption).
-    call: 1.7320508075688772 * (($in(k__voltage_l3_n_v) + $in(k__voltage_l1_n_v)) / 2.0)
-
-  - function: $in(k__apparent_power_total_kva)
-    name: compute_apparent_power
-    description: Total apparent power (sum of per-phase V*I).
-    call: 1e-3
-         * (
-             $in(k__voltage_l1_n_v) * $in(k__current_l1_a)
-             + $in(k__voltage_l2_n_v) * $in(k__current_l2_a)
-             + $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
-           )
+  - function: $in(voltage_ll_avg_v)
+    name: compute_voltage_ll_avg
+    description: Average line-to-line voltage.
+    call: ($in(voltage_l1_l2_v) + $in(voltage_l2_l3_v) + $in(voltage_l3_l1_v)) / 3.0
 
   - function: $in(active_power_l1_kw)
     name: compute_active_power_l1
@@ -114,47 +75,15 @@ actions:
     description: Total active power (sum of per-phase values).
     call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw)
 
-  - function: $in(k__reactive_power_total_kvar)
-    name: compute_reactive_power_total
-    description: Approximate total reactive power magnitude from active/apparent power.
-    call: (
-          max(0.0, ($in(k__apparent_power_total_kva) ** 2) - ($in(k__active_power_total_kw) ** 2)) ** 0.5
-        ) * (-1.0 if $in(power_factor_leading) else 1.0)
-
   - function: $in(k__energy_import_total_kwh)
     name: integrate_energy_import
-    description: Integrate imported energy (kWh) from total active power (kW).
+    description: Integrate imported energy from total active power.
     call: $in(k__energy_import_total_kwh) + max(0.0, $in(k__active_power_total_kw)) * $in(_cycle_time_s) / 3600.0
 
   - function: $in(k__energy_export_total_kwh)
     name: integrate_energy_export
-    description: Integrate exported energy (kWh) from total active power (kW).
+    description: Integrate exported energy from total active power.
     call: $in(k__energy_export_total_kwh) + max(0.0, -$in(k__active_power_total_kw)) * $in(_cycle_time_s) / 3600.0
-
-  - function: $in(_modbus_active_power_l1_w)
-    name: compute_modbus_active_power_l1
-    description: Convert L1 active power to watts for Modbus registers.
-    call: $in(active_power_l1_kw) * 1000.0
-
-  - function: $in(_modbus_active_power_l2_w)
-    name: compute_modbus_active_power_l2
-    description: Convert L2 active power to watts for Modbus registers.
-    call: $in(active_power_l2_kw) * 1000.0
-
-  - function: $in(_modbus_active_power_l3_w)
-    name: compute_modbus_active_power_l3
-    description: Convert L3 active power to watts for Modbus registers.
-    call: $in(active_power_l3_kw) * 1000.0
-
-  - function: $in(_modbus_energy_import_total_kwh)
-    name: compute_modbus_energy_import
-    description: Round imported energy to integer kWh for Modbus registers.
-    call: int(round(max(0.0, $in(k__energy_import_total_kwh))))
-
-  - function: $in(_modbus_energy_export_total_kwh)
-    name: compute_modbus_energy_export
-    description: Round exported energy to integer kWh for Modbus registers.
-    call: int(round(max(0.0, $in(k__energy_export_total_kwh))))
 
 communication:
   - modbus_slave:
@@ -163,71 +92,42 @@ communication:
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
-        # Frequency (Hz) Float32
-        k__frequency_hz:    { address: [264,265], group: i_r, type: float }
-
-        # Line-to-line voltages (V) Float32
-        voltage_l1_l2_v:    { address: [266,267], group: i_r, type: float }
-        voltage_l2_l3_v:    { address: [268,269], group: i_r, type: float }
-        voltage_l3_l1_v:    { address: [270,271], group: i_r, type: float }
-
-        # Phase-to-neutral voltages (V) Float32
-        k__voltage_l1_n_v:  { address: [284,285], group: i_r, type: float }
-        k__voltage_l2_n_v:  { address: [286,287], group: i_r, type: float }
-        k__voltage_l3_n_v:  { address: [288,289], group: i_r, type: float }
-
-        # Currents (A) Float32
-        k__current_l1_a:    { address: [308,309], group: i_r, type: float }
-        k__current_l2_a:    { address: [310,311], group: i_r, type: float }
-        k__current_l3_a:    { address: [312,313], group: i_r, type: float }
-
-        # Active power (W) Float32
-        _modbus_active_power_l1_w: { address: [344,345], group: i_r, type: float }
-        _modbus_active_power_l2_w: { address: [346,347], group: i_r, type: float }
-        _modbus_active_power_l3_w: { address: [348,349], group: i_r, type: float }
-
-        # Energy totals (kWh) UInt32
-        _modbus_energy_import_total_kwh: { address: [19843,19844], group: i_r, type: uint_32 }
-        _modbus_energy_export_total_kwh: { address: [19846,19847], group: i_r, type: uint_32 }
+        k__frequency_hz:         { address: [264,265],  group: i_r, type: float }
+        k__voltage_l1_n_v:       { address: [284,285],  group: i_r, type: float }
+        k__voltage_l2_n_v:       { address: [286,287],  group: i_r, type: float }
+        k__voltage_l3_n_v:       { address: [288,289],  group: i_r, type: float }
+        voltage_l1_l2_v:         { address: [300,301],  group: i_r, type: float }
+        voltage_l2_l3_v:         { address: [302,303],  group: i_r, type: float }
+        voltage_l3_l1_v:         { address: [304,305],  group: i_r, type: float }
+        k__current_l1_a:         { address: [308,309],  group: i_r, type: float }
+        k__current_l2_a:         { address: [310,311],  group: i_r, type: float }
+        k__current_l3_a:         { address: [312,313],  group: i_r, type: float }
+        active_power_l1_kw:      { address: [344,345],  group: i_r, type: float }
+        active_power_l2_kw:      { address: [346,347],  group: i_r, type: float }
+        active_power_l3_kw:      { address: [348,349],  group: i_r, type: float }
+        k__energy_import_total_kwh: { address: [19843,19844], group: i_r, type: uint_32 }
+        k__energy_export_total_kwh: { address: [19846,19847], group: i_r, type: uint_32 }
 
 scenarios:
   peak_demand:
-    description: High load with balanced phases and near-unity power factor.
-    duration: 30.0
+    description: Elevated load with near-unity power factor.
+    duration: 25.0
     overrides:
-      $in(k__current_l1_a): 45.0
-      $in(k__current_l2_a): 44.0
-      $in(k__current_l3_a): 46.0
+      $in(k__current_l1_a): 52.0
+      $in(k__current_l2_a): 49.0
+      $in(k__current_l3_a): 51.0
       $in(k__power_factor): 0.98
-      $in(power_factor_leading): 0
-
-  pv_export:
-    description: Simulated PV export using negative phase currents.
-    duration: 30.0
-    overrides:
-      $in(k__current_l1_a): -8.0
-      $in(k__current_l2_a): -7.5
-      $in(k__current_l3_a): -7.8
-      $in(k__power_factor): 0.99
-      $in(power_factor_leading): 1
-
-  low_power_factor_lagging:
-    description: Inductive load with low power factor.
-    duration: 45.0
-    overrides:
-      $in(k__power_factor): 0.65
-      $in(power_factor_leading): 0
 
   voltage_sag:
-    description: Phase-to-neutral voltage sag across all phases.
-    duration: 30.0
-    overrides:
-      $in(k__voltage_l1_n_v): 205.0
-      $in(k__voltage_l2_n_v): 208.0
-      $in(k__voltage_l3_n_v): 210.0
-
-  frequency_drift:
-    description: Off-nominal grid frequency condition.
+    description: Reduced line-to-line voltage event.
     duration: 20.0
     overrides:
-      $in(k__frequency_hz): 49.2
+      $in(voltage_l1_l2_v): 372.0
+      $in(voltage_l2_l3_v): 374.0
+      $in(voltage_l3_l1_v): 370.0
+
+  low_power_factor:
+    description: Inductive load with low power factor.
+    duration: 30.0
+    overrides:
+      $in(k__power_factor): 0.72

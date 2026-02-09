@@ -509,7 +509,7 @@ models:
     protocols: [modbus]
     services:
       - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
     profiles: [bms_quickstart]
   - id: Energy.UpsEasy3M.Modbus
     name: APC Easy UPS 3M (Modbus)
@@ -554,7 +554,7 @@ models:
     protocols: [modbus]
     services:
       - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
+    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
     profiles: [bms_quickstart]
   - id: Energy.EVSE.Ocpp
     name: EVSE / Charge Point (OCPP 1.6)
