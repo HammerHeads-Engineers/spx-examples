@@ -52,6 +52,11 @@ def _run_git(root: Path, args: list[str], check: bool = True) -> str:
     return proc.stdout
 
 
+def _is_shallow_repository(root: Path) -> bool:
+    out = _run_git(root, ["rev-parse", "--is-shallow-repository"], check=False).strip().lower()
+    return out == "true"
+
+
 def _ensure_base_ref(root: Path, base_ref: str) -> None:
     verify = subprocess.run(
         ["git", "rev-parse", "--verify", base_ref],
@@ -85,6 +90,37 @@ def _ensure_base_ref(root: Path, base_ref: str) -> None:
         raise RuntimeError(
             f"Base ref {base_ref!r} is not available locally. Run: git fetch origin develop"
         )
+
+
+def _changed_name_status(root: Path, base_ref: str) -> str:
+    range_expr = f"{base_ref}...HEAD"
+    try:
+        return _run_git(root, ["diff", "--name-status", range_expr])
+    except RuntimeError as exc:
+        message = str(exc).lower()
+        if "no merge base" not in message:
+            raise
+
+        # CI runners may have shallow history and miss the merge base even for valid refs.
+        if _is_shallow_repository(root):
+            subprocess.run(
+                ["git", "fetch", "--unshallow", "origin"],
+                cwd=root,
+                text=True,
+                capture_output=True,
+            )
+            try:
+                return _run_git(root, ["diff", "--name-status", range_expr])
+            except RuntimeError as retry_exc:
+                if "no merge base" not in str(retry_exc).lower():
+                    raise
+
+        print(
+            "Model branch guard warning: no merge base for "
+            f"{range_expr}; falling back to two-dot diff ({base_ref}..HEAD).",
+            file=sys.stderr,
+        )
+        return _run_git(root, ["diff", "--name-status", f"{base_ref}..HEAD"])
 
 
 def _load_catalog_from_worktree(root: Path) -> object:
@@ -277,7 +313,7 @@ def main() -> int:
         current_entries = _parse_catalog_entries(current_catalog)
         base_entries = _parse_catalog_entries(base_catalog)
 
-        changed_raw = _run_git(root, ["diff", "--name-status", f"{args.base_ref}...HEAD"])
+        changed_raw = _changed_name_status(root, args.base_ref)
         changed_files = parse_name_status_lines(changed_raw)
 
         branch_name = detect_branch_name(root)

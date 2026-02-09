@@ -80,3 +80,26 @@ def test_existing_model_edit_violations_blocks_modification_in_strict_mode() -> 
 
     assert errors
     assert "modifies an existing model file" in errors[0]
+
+
+def test_changed_name_status_falls_back_when_no_merge_base(monkeypatch, capsys) -> None:
+    guard = _load_guard_module()
+    calls: list[list[str]] = []
+
+    def fake_run_git(root, args, check=True):
+        calls.append(args)
+        if args == ["diff", "--name-status", "origin/develop...HEAD"]:
+            raise RuntimeError("git diff --name-status origin/develop...HEAD failed: no merge base")
+        if args == ["diff", "--name-status", "origin/develop..HEAD"]:
+            return "A\tlibrary/domains/iot/vendor/new_meter__modbus.yaml\n"
+        return ""
+
+    monkeypatch.setattr(guard, "_run_git", fake_run_git)
+    monkeypatch.setattr(guard, "_is_shallow_repository", lambda root: False)
+
+    output = guard._changed_name_status(Path("."), "origin/develop")
+
+    assert output.startswith("A\tlibrary/domains/")
+    assert ["diff", "--name-status", "origin/develop...HEAD"] in calls
+    assert ["diff", "--name-status", "origin/develop..HEAD"] in calls
+    assert "falling back to two-dot diff" in capsys.readouterr().err
