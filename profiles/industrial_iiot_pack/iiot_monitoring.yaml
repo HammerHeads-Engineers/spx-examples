@@ -6,7 +6,9 @@ models:
   - library/domains/iot/generic/environment_sensor__mqtt.yaml
   - library/domains/iot/generic/air_quality_station__http.yaml
   - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+  - library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
 services:
   - mqtt_broker
   - http_gateway
   - scpi_tcp_stack
+  - modbus_tcp_gateway
