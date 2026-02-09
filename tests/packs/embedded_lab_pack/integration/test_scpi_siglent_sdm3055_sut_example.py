@@ -144,16 +144,19 @@ class TestScpiSiglentSdm3055SUTExample(unittest.TestCase):
 
     def test_conf_voltage_dc_updates_mode(self):
         self.sut.write("CONF:VOLT:DC")
+        self.sut.drain()
         time.sleep(0.1)
         self.assertEqual(self._get_attribute("k__mode"), "VOLT:DC")
 
     def test_conf_current_dc_updates_mode(self):
         self.sut.write("CONF:CURR:DC")
+        self.sut.drain()
         time.sleep(0.1)
         self.assertEqual(self._get_attribute("k__mode"), "CURR:DC")
 
     def test_read_returns_mode_value(self):
         self.sut.write("CONF:RES")
+        self.sut.drain()
         time.sleep(0.1)
         target_res = 550.0
         self._set_attribute("resistance_ohm", target_res)
