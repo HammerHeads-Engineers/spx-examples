@@ -18,12 +18,15 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - Thermal controller (Modbus): `library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml`
   - Energy meter iEM3000 (Modbus): `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`
   - Easy UPS 3M (Modbus): `library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml`
+  - Energy meter PM3200 (Modbus): `library/domains/iot/schneider/schneider_pm3200__modbus.yaml`
   - Energy meter PM5330 (Modbus): `library/domains/iot/schneider/schneider_pm5330__modbus.yaml`
   - PowerLogic PM8000 meter (Modbus): `library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml`
   - ABB D13 15 energy meter (Modbus): `library/domains/iot/abb/abb_d13_15__modbus.yaml`
   - Energy meter EM4200 (Modbus): `library/domains/iot/schneider/schneider_em4200__modbus.yaml`
   - Siemens PAC3200 power meter (Modbus): `library/domains/iot/siemens/siemens_pac3200__modbus.yaml`
+  - APC NetShelter Rack PDU 2g (Modbus): `library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml`
   - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
+  - Energy meter EM24 (Modbus): `library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`

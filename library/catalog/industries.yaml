@@ -21,6 +21,8 @@ industries:
         instance: spx_energy_meter_iem3000_modbus
       - model: Energy.UpsEasy3M.Modbus
         instance: spx_easy_ups_3m_modbus
+      - model: Energy.EnergyMeterPm3200.Modbus
+        instance: spx_energy_meter_pm3200_modbus
       - model: Energy.EnergyMeterPm5330.Modbus
         instance: spx_energy_meter_pm5330_modbus
       - model: Energy.EnergyMeterPm8000.Modbus
@@ -31,8 +33,13 @@ industries:
         instance: spx_energy_meter_em4200_modbus
       - model: Energy.EnergyMeterPac3200.Modbus
         instance: spx_energy_meter_pac3200_modbus
+      - model: Energy.RackPdu.ApcNetShelter2g.Modbus
+        instance: spx_apc_rack_pdu_2g_modbus
       - model: Energy.EnergyMeterDirisA40.Modbus
         instance: spx_energy_meter_diris_a40_modbus
+      - model: Energy.EnergyMeterCarloGavazziEm24.Modbus
+        instance: spx_energy_meter_em24_modbus
+
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
       - model: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
@@ -58,7 +65,6 @@ industries:
     start_instances:
       - spx_hvac_flexit_nordic_bacnet
       - spx_energy_meter_iem3000_modbus
-      - spx_easy_ups_3m_modbus
       - spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
       - spx_abb_sa_s12_16_5_1_knx
       - spx_abb_jra_s4_230_5_1_knx
@@ -83,6 +89,8 @@ industries:
         instance: spx_weather_feed
       - model: Process.ThermalController.Modbus
         instance: spx_process_heater
+      - model: Energy.EnergyMeterDirisA10.Modbus
+        instance: spx_energy_meter_diris_a10_modbus
     path: library/industries/energy_pack
   - id: embedded_lab_pack
     name: Embedded & Lab Pack
@@ -104,18 +112,10 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Lab.Multimeter.Scpi
         instance: spx_lab_multimeter
-      - model: Lab.Oscilloscope.Keysight1000X.Scpi
-        instance: spx_lab_oscilloscope
-      - model: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
-        instance: spx_prevac_m600dc_ps
-      - model: Lab.Oscilloscope.RigolDs1000z.Scpi
-        instance: spx_rigol_ds1000z_oscilloscope
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
         instance: spx_vacuum_gauge_multichannel
-      - model: Process.ThermalController.PrevacBcu14.Modbus
-        instance: spx_prevac_bcu14
     start_instances:
       - spx_health_monitor_ble
       - spx_temp_sensor_ble
@@ -175,7 +175,9 @@ industries:
       - model: Energy.EnergyMeter3Ph.Modbus
         instance: spx_energy_meter_3ph_modbus
       - model: Energy.PowerMeter.AbbM1M.Modbus
-        instance: spx_abb_m1m_power_meter_modbus
+        instance: spx_abb_m1m_power_meter
+      - model: Energy.RackPdu.ApcNetShelter2g.Modbus
+        instance: spx_apc_rack_pdu_2g_modbus
       - model: Process.PressureTransmitter.Modbus
         instance: spx_pressure_transmitter
       - model: Process.ProcessCell.OpcUa

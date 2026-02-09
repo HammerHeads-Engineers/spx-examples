@@ -180,7 +180,7 @@ models:
     packages: [industrial_iiot_pack]
     profiles: []
   - id: Process.ThermalController.PrevacBcu14.Modbus
-    name: Prevac BCU14 Bakeout Controller (Modbus TCP)
+    name: Prevac BCU14 Bakeout Controller (Modbus)
     path: library/domains/thermal_controllers/prevac/prevac_bcu14__modbus.yaml
     domain: thermal_controllers
     protocols: [modbus]
@@ -223,15 +223,6 @@ models:
       - id: modbus_tcp_gateway
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: []
-  - id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
-    name: Prevac M600DC-PS Magnetron Power Supply (Modbus TCP)
-    path: library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml
-    domain: iot
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
   - id: Lab.Multimeter.Scpi
     name: SCPI Multimeter
     path: library/domains/measurement_instruments/generic/multimeter__scpi.yaml
@@ -241,8 +232,26 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack, industrial_iiot_pack]
     profiles: [scpi_lab, iiot_monitoring]
+  - id: Lab.DigitalMultimeter.Scpi
+    name: SCPI Digital Multimeter
+    path: library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.BenchPowerSupply.Scpi
+    name: SCPI Bench Power Supply
+    path: library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.Keysight1000X.Scpi
-    name: Keysight InfiniiVision 1000 X-Series Oscilloscope (SCPI)
+    name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
@@ -257,6 +266,24 @@ models:
     protocols: [scpi]
     services:
       - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.PowerSupply.RigolDp800.Scpi
+    name: Rigol DP800 Power Supply (SCPI)
+    path: library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
+    name: Prevac M600DC-PS Magnetron Power Supply (Modbus)
+    path: library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
@@ -367,9 +394,18 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
-  - id: Energy.UpsEasy3M.Modbus
-    name: APC Easy UPS 3M (Modbus)
-    path: library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
+  - id: Energy.EnergyMeterPm3200.Modbus
+    name: Schneider Electric PowerLogic PM3200 (Modbus)
+    path: library/domains/iot/schneider/schneider_pm3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPm3200.Modbus
+    name: Schneider Electric PowerLogic PM3200 Energy Meter (Modbus)
+    path: library/domains/iot/schneider/schneider_pm3200__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:
@@ -377,7 +413,7 @@ models:
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
   - id: Energy.EnergyMeterPm5330.Modbus
-    name: Schneider Electric PowerLogic PM5330 Energy Meter (Modbus)
+    name: Schneider Electric PowerLogic PM5330 (Modbus)
     path: library/domains/iot/schneider/schneider_pm5330__modbus.yaml
     domain: iot
     protocols: [modbus]
@@ -386,7 +422,7 @@ models:
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
   - id: Energy.EnergyMeterPm8000.Modbus
-    name: Schneider Electric PowerLogic PM8000 Meter (Modbus)
+    name: Schneider Electric PowerLogic PM8000 (Modbus)
     path: library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
     domain: iot
     protocols: [modbus]
@@ -403,6 +439,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
+    name: Carlo Gavazzi EM24 Energy Meter (Modbus)
+    path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterEm4200.Modbus
     name: Schneider Electric EM4200 Energy Meter (Modbus)
     path: library/domains/iot/schneider/schneider_em4200__modbus.yaml
@@ -413,8 +458,53 @@ models:
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
   - id: Energy.EnergyMeterPac3200.Modbus
-    name: Siemens SENTRON PAC3200 Power Meter (Modbus)
+    name: Siemens SENTRON PAC3200 Energy Meter (Modbus)
     path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterDirisA10.Modbus
+    name: Socomec DIRIS A-10 Energy Meter (Modbus)
+    path: library/domains/iot/socomec/diris_a10__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [energy_pack]
+    profiles: []
+  - id: Energy.EnergyMeterDirisA40.Modbus
+    name: Socomec DIRIS A40 Energy Meter (Modbus)
+    path: library/domains/iot/socomec/diris_a40__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.UpsEasy3M.Modbus
+    name: APC Easy UPS 3M (Modbus)
+    path: library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.RackPdu.ApcNetShelter2g.Modbus
+    name: APC NetShelter Rack PDU RPDU2g (Modbus)
+    path: library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack, smart_building_pack]
+    profiles: [iiot_monitoring, bms_quickstart]
+  - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
+    name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
+    path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:

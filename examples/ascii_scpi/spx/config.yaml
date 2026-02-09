@@ -1,0 +1,11 @@
+mode: tcp
+host: 127.0.0.1
+port: 5025
+terminator: "\n"
+timeout_ms: 500
+serial:
+  port: /dev/ttyUSB0
+  baud: 9600
+  bytesize: 8
+  parity: N
+  stopbits: 1

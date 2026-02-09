@@ -7,6 +7,7 @@
 __all__ = [
     "bacnet_client",
     "modbus_stepper_sut_example",
+    "modbus_rack_pdu_sut_example",
     "modbus_vacuum_gauge_sut_example",
     "modbus_vacuum_gauge_multichannel_sut_example",
     "thermal_controller_sut_example",

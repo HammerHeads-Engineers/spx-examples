@@ -1,0 +1,45 @@
+name: digital_multimeter__scpi
+description: |
+  Generic SCPI digital multimeter with DC voltage and resistance measurements,
+  plus simple configuration commands for ASCII-over-TCP demos.
+
+attributes:
+  idn: "SPX,DMM,DMM0001,1.0"
+
+  k__mode: "VOLT:DC"
+  k__range_v: 10.0
+
+  voltage_readback_v: 1.234
+  resistance_readback_ohm: 1000.0
+  readback_value: 1.234
+
+  error_status: "0,No error"
+
+actions:
+  - function: $in(readback_value)
+    name: update_readback
+    call: |
+      ($in(voltage_readback_v)
+       if $in(k__mode) == "VOLT:DC"
+       else $in(resistance_readback_ohm))
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        "CONF:VOLT:DC":
+          "#attr(k__mode)": "VOLT:DC"
+        "CONF:VOLT:DC {range}":
+          "#attr(k__mode)": "VOLT:DC"
+          "#attr(k__range_v)": "range"
+
+        "MEAS:VOLT:DC?": "#out(voltage_readback_v)"
+        "MEAS:RES?": "#out(resistance_readback_ohm)"
+        "READ?": "#out(readback_value)"
+
+        "SYST:ERR?": "#out(error_status)"

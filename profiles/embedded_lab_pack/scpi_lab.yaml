@@ -1,11 +1,14 @@
 name: scpi_lab
 description: |
-  SCPI-focused lab harness bundling the virtual multimeter and vacuum gauge so
-  VISA/TCP test benches can run deterministically.
+  SCPI-focused lab harness bundling the virtual multimeter, oscilloscope, and
+  DP800 power supply so VISA/TCP test benches can run deterministically.
 models:
   - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
+  - library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
+  - library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
+  - library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
   - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
   - library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml
   - library/domains/thermal_controllers/prevac/prevac_bcu14__modbus.yaml
