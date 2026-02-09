@@ -39,6 +39,8 @@ industries:
         instance: spx_energy_meter_diris_a40_modbus
       - model: Energy.EnergyMeterCarloGavazziEm24.Modbus
         instance: spx_energy_meter_em24_modbus
+      - model: Energy.EnergyMeterEastronSdm630.Modbus
+        instance: spx_energy_meter_sdm630_modbus
       - model: Energy.EnergyMeterEatonPxm2000.Modbus
         instance: spx_energy_meter_pxm2000_modbus
 
