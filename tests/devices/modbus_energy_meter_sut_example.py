@@ -8,6 +8,8 @@ from __future__ import annotations
 from typing import Dict, Optional, Sequence
 
 from .modbus_sut_base import (
+    ConnectionException,
+    ModbusIOException,
     ModbusMap,
     ModbusSUTBase,
     ModbusTcpClient,
@@ -15,21 +17,17 @@ from .modbus_sut_base import (
 )
 
 DEFAULT_MODBUS_MAP: ModbusMap = {
-    "frequency": {"address": 264, "decoder": "float_be", "scale": 1.0},
-    "voltage_l1_n": {"address": 284, "decoder": "float_be", "scale": 1.0},
-    "voltage_l2_n": {"address": 286, "decoder": "float_be", "scale": 1.0},
-    "voltage_l3_n": {"address": 288, "decoder": "float_be", "scale": 1.0},
-    "voltage_l1_l2": {"address": 300, "decoder": "float_be", "scale": 1.0},
-    "voltage_l2_l3": {"address": 302, "decoder": "float_be", "scale": 1.0},
-    "voltage_l3_l1": {"address": 304, "decoder": "float_be", "scale": 1.0},
-    "current_l1": {"address": 308, "decoder": "float_be", "scale": 1.0},
-    "current_l2": {"address": 310, "decoder": "float_be", "scale": 1.0},
-    "current_l3": {"address": 312, "decoder": "float_be", "scale": 1.0},
-    "active_power_l1": {"address": 344, "decoder": "float_be", "scale": 1.0},
-    "active_power_l2": {"address": 346, "decoder": "float_be", "scale": 1.0},
-    "active_power_l3": {"address": 348, "decoder": "float_be", "scale": 1.0},
-    "energy_import_total": {"address": 19843, "decoder": "u32", "scale": 1.0},
-    "energy_export_total": {"address": 19846, "decoder": "u32", "scale": 1.0},
+    "voltage_l1_n_v": {"address": 50520, "decoder": "u32", "scale": 100.0},
+    "voltage_l2_n_v": {"address": 50522, "decoder": "u32", "scale": 100.0},
+    "voltage_l3_n_v": {"address": 50524, "decoder": "u32", "scale": 100.0},
+    "current_l1_a": {"address": 50528, "decoder": "u32", "scale": 1000.0},
+    "current_l2_a": {"address": 50530, "decoder": "u32", "scale": 1000.0},
+    "current_l3_a": {"address": 50532, "decoder": "u32", "scale": 1000.0},
+    "frequency_hz": {"address": 50526, "decoder": "u32", "scale": 100.0},
+    "active_power_total_kw": {"address": 50536, "decoder": "u32", "scale": 10000.0},
+    "power_factor": {"address": 50542, "decoder": "u32", "scale": 1000.0},
+    "energy_import_kwh": {"address": 50780, "decoder": "u32", "scale": 1.0},
+    "energy_export_kwh": {"address": 50786, "decoder": "u32", "scale": 1.0},
 }
 
 
@@ -39,13 +37,10 @@ def _decode_u32(registers: Sequence[int]) -> int:
 
 
 class ModbusEnergyMeterSUTExample(ModbusSUTBase):
-    """Thin wrapper around pymodbus representing the Socomec DIRIS A-40 Modbus model."""
+    """Thin wrapper around pymodbus representing the Socomec DIRIS A-10 Modbus model."""
 
     _DECODER_REGISTRY: Dict[str, RegisterDecoder] = {
         "u32": RegisterDecoder(count=2, fn=_decode_u32),
-        "float_be": RegisterDecoder(
-            count=2, fn=lambda regs: ModbusSUTBase.modbus_to_float(regs, "ABCD")
-        ),
     }
 
     def __init__(
@@ -66,76 +61,87 @@ class ModbusEnergyMeterSUTExample(ModbusSUTBase):
         )
 
     def read_voltage_l1_n(self) -> float:
-        return self._read_input_decoded("voltage_l1_n")
-
-    def read_voltage_l1_l2(self) -> float:
-        return self._read_input_decoded("voltage_l1_l2")
-
-    def read_voltage_l2_n(self) -> float:
-        return self._read_input_decoded("voltage_l2_n")
-
-    def read_voltage_l3_n(self) -> float:
-        return self._read_input_decoded("voltage_l3_n")
-
-    def read_voltage_l2_l3(self) -> float:
-        return self._read_input_decoded("voltage_l2_l3")
-
-    def read_voltage_l3_l1(self) -> float:
-        return self._read_input_decoded("voltage_l3_l1")
-
-    def read_frequency(self) -> float:
-        return self._read_input_decoded("frequency")
+        return self._read_scaled("voltage_l1_n_v")
 
     def read_current_l1(self) -> float:
-        return self._read_input_decoded("current_l1")
+        return self._read_scaled("current_l1_a")
 
-    def read_current_l2(self) -> float:
-        return self._read_input_decoded("current_l2")
+    def read_frequency(self) -> float:
+        return self._read_scaled("frequency_hz")
 
-    def read_current_l3(self) -> float:
-        return self._read_input_decoded("current_l3")
+    def read_active_power_total_kw(self) -> float:
+        return self._read_scaled("active_power_total_kw")
 
-    def read_active_power_l1(self) -> float:
-        return self._read_input_decoded("active_power_l1")
+    def read_power_factor(self) -> float:
+        return self._read_scaled("power_factor")
 
-    def read_active_power_l2(self) -> float:
-        return self._read_input_decoded("active_power_l2")
+    def read_energy_import_kwh(self) -> float:
+        return self._read_scaled("energy_import_kwh")
 
-    def read_active_power_l3(self) -> float:
-        return self._read_input_decoded("active_power_l3")
+    def read_energy_export_kwh(self) -> float:
+        return self._read_scaled("energy_export_kwh")
 
-    def read_energy_import_total(self) -> float:
-        return self._read_input_decoded("energy_import_total")
-
-    def read_energy_export_total(self) -> float:
-        return self._read_input_decoded("energy_export_total")
-
-    def _read_input_decoded(self, field_name: str) -> float:
+    def _read_scaled(self, field_name: str) -> float:
         config = self._get_field_config(field_name)
         address = self._get_address(config, field_name)
-
         decoder_key = config.get("decoder", "u32")
         decoder = self._DECODER_REGISTRY.get(decoder_key)
         if decoder is None:
-            raise ValueError(
-                f"Unsupported decoder '{decoder_key}' for field '{field_name}'"
-            )
+            raise ValueError(f"Unsupported decoder '{decoder_key}' for field '{field_name}'")
 
         registers = self._read_input_registers(address, decoder.count)
         raw_value = decoder.decode(registers)
         scale = config.get("scale", 1.0)
         if scale == 0:
             raise ValueError(f"Scale for field '{field_name}' must be non-zero")
-        return float(raw_value) / scale
+        return float(raw_value) / float(scale)
 
     def _read_input_registers(self, address: int, count: int):
-        self._ensure_connected()
-        result = self._call_with_unit_kwarg("read_input_registers", address, count=count)
-        if result is None:
-            raise RuntimeError(f"Modbus read returned no response at address {address}")
-        if result.isError():  # pragma: no cover - delegated to pymodbus
-            raise RuntimeError(f"Modbus read failed at address {address}")
-        return result.registers
+        attempts = 3
+        delay = self.timeout if self.timeout and self.timeout > 0 else 0.1
+        delay = min(delay, 0.5)
+        last_error: Optional[BaseException] = None
+
+        for attempt in range(attempts):
+            try:
+                self._ensure_connected()
+                result = self._call_with_unit_kwarg(
+                    "read_input_registers", address, count=count
+                )
+            except RuntimeError as exc:
+                if "Failed to connect Modbus client" not in str(exc):
+                    raise
+                last_error = exc
+            except (ConnectionException, ModbusIOException, OSError) as exc:
+                last_error = exc
+            else:
+                if result is None:
+                    last_error = RuntimeError(
+                        f"Modbus read returned no response at address {address}"
+                    )
+                elif result.isError():  # pragma: no cover - delegated to pymodbus
+                    last_error = RuntimeError(
+                        f"Modbus read failed at address {address}"
+                    )
+                else:
+                    return result.registers
+
+            if self._client:
+                self._client.close()
+
+            if attempt < attempts - 1:
+                import time
+
+                time.sleep(delay)
+                continue
+            break
+
+        error_message = (
+            f"Modbus read failed at address {address} after {attempts} attempts"
+        )
+        if last_error is None:
+            raise RuntimeError(error_message)
+        raise RuntimeError(error_message) from last_error
 
 
 __all__ = ["ModbusEnergyMeterSUTExample", "ModbusTcpClient"]

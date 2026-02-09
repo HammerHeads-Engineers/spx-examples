@@ -2,14 +2,18 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the Socomec DIRIS A-40 Modbus SUT device implementation."""
+"""Shared integration coverage for the Modbus energy meter SUT example."""
 
 import os
 import unittest
 
 from tests.common.modbus_utils import wait_for_modbus_endpoint
-from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition, wait_seconds
 from tests.common.repo import repo_root
+from tests.common.spx_utils import (
+    bootstrap_model_instance,
+    wait_for_condition,
+    wait_seconds,
+)
 from tests.devices.modbus_energy_meter_sut_example import (
     ModbusEnergyMeterSUTExample,
     ModbusTcpClient,
@@ -17,16 +21,9 @@ from tests.devices.modbus_energy_meter_sut_example import (
 
 
 ROOT = repo_root()
-MODEL_PATH = (
-    ROOT
-    / "library"
-    / "domains"
-    / "iot"
-    / "socomec"
-    / "diris_a40__modbus.yaml"
-)
-MODEL_KEY = "tests__diris_a40"
-INSTANCE_KEY = "socomec_diris_a40"
+MODEL_PATH = ROOT / "library" / "domains" / "iot" / "socomec" / "diris_a10__modbus.yaml"
+MODEL_KEY = "tests__energy_meter_diris_a10"
+INSTANCE_KEY = "generic_energy_meter_diris_a10"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
@@ -45,9 +42,7 @@ class TestModbusEnergyMeterSUTExampleIntegration(unittest.TestCase):
 
         product_key = os.environ.get("SPX_PRODUCT_KEY")
         if not product_key:
-            raise unittest.SkipTest(
-                "SPX_PRODUCT_KEY must be set to run integration tests."
-            )
+            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
         cls._spx = spx_python
         (
@@ -67,25 +62,10 @@ class TestModbusEnergyMeterSUTExampleIntegration(unittest.TestCase):
         self.model = self.__class__._instance
         wait_seconds(0.2)
 
-        for scenario_name in (
-            "peak_demand",
-            "voltage_sag",
-            "low_power_factor",
-        ):
+        # Ensure the Modbus adapter is attached before talking to it.
+        for comm_key in ("modbus_slave", "modbus_tcp"):
             try:
-                scenario = self.model["scenarios"][scenario_name]
-            except Exception:
-                continue
-            stop = getattr(scenario, "stop", None)
-            if callable(stop):
-                try:
-                    stop()
-                except Exception:
-                    pass
-
-        for comm_name in ("modbus_slave", "modbus_tcp"):
-            try:
-                comm = self.model["communication"][comm_name]
+                comm = self.model["communication"][comm_key]
             except Exception:
                 continue
             attach = getattr(comm, "attach", None)
@@ -107,6 +87,7 @@ class TestModbusEnergyMeterSUTExampleIntegration(unittest.TestCase):
 
         self._modbus_port = port
         self._modbus_unit_id = unit_id
+
         self.sut = ModbusEnergyMeterSUTExample(
             host="127.0.0.1",
             port=port,
@@ -114,78 +95,119 @@ class TestModbusEnergyMeterSUTExampleIntegration(unittest.TestCase):
             timeout=1.0,
         )
         if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):
-            self.skipTest(
-                f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})"
-            )
-        wait_seconds(0.2)
+            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})")
+        self._reset_model_state()
 
     def tearDown(self):
         if hasattr(self, "sut") and self.sut:
             self.sut.close()
 
-    def _prime_measurements(
+    def _reset_model_state(
         self,
-        voltage_l1_n: float,
-        voltage_l2_n: float,
-        voltage_l3_n: float,
-        voltage_l1_l2: float,
-        voltage_l2_l3: float,
-        voltage_l3_l1: float,
-        current_l1: float,
-        current_l2: float,
-        current_l3: float,
-        frequency: float,
-        power_factor: float,
+        *,
+        voltage_l1: float = 230.0,
+        voltage_l2: float = 228.5,
+        voltage_l3: float = 231.2,
+        current_l1: float = 12.0,
+        current_l2: float = 11.0,
+        current_l3: float = 13.0,
+        frequency_hz: float = 50.0,
+        power_factor: float = 0.95,
+        energy_import_kwh: float = 1234.0,
+        energy_export_kwh: float = 56.0,
     ) -> None:
         attrs = self.model["attributes"]
-        attrs["k__voltage_l1_n_v"].internal_value = voltage_l1_n
-        attrs["k__voltage_l2_n_v"].internal_value = voltage_l2_n
-        attrs["k__voltage_l3_n_v"].internal_value = voltage_l3_n
-        attrs["voltage_l1_l2_v"].internal_value = voltage_l1_l2
-        attrs["voltage_l2_l3_v"].internal_value = voltage_l2_l3
-        attrs["voltage_l3_l1_v"].internal_value = voltage_l3_l1
+        attrs["k__voltage_l1_n_v"].internal_value = voltage_l1
+        attrs["k__voltage_l2_n_v"].internal_value = voltage_l2
+        attrs["k__voltage_l3_n_v"].internal_value = voltage_l3
         attrs["k__current_l1_a"].internal_value = current_l1
         attrs["k__current_l2_a"].internal_value = current_l2
         attrs["k__current_l3_a"].internal_value = current_l3
-        attrs["k__frequency_hz"].internal_value = frequency
+        attrs["k__frequency_hz"].internal_value = frequency_hz
         attrs["k__power_factor"].internal_value = power_factor
-        wait_seconds(0.4)
+        attrs["k__energy_import_total_kwh"].internal_value = energy_import_kwh
+        attrs["k__energy_export_total_kwh"].internal_value = energy_export_kwh
+        attrs["_cycle_time_s"].internal_value = 0.0
+        wait_seconds(0.3)
 
-    def test_instantaneous_measurements(self):
-        self._prime_measurements(
-            voltage_l1_n=231.0,
-            voltage_l2_n=229.5,
-            voltage_l3_n=230.0,
-            voltage_l1_l2=412.0,
-            voltage_l2_l3=408.0,
-            voltage_l3_l1=410.0,
-            current_l1=21.0,
-            current_l2=19.5,
-            current_l3=20.5,
-            frequency=49.9,
-            power_factor=0.97,
+    def test_voltage_current_frequency_scaling(self):
+        self._reset_model_state(
+            voltage_l1=229.4,
+            current_l1=12.5,
+            frequency_hz=49.8,
         )
 
-        self.assertAlmostEqual(self.sut.read_voltage_l1_n(), 231.0, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_voltage_l2_n(), 229.5, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_voltage_l3_n(), 230.0, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_voltage_l1_l2(), 412.0, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_voltage_l2_l3(), 408.0, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_voltage_l3_l1(), 410.0, delta=0.5)
-        self.assertAlmostEqual(self.sut.read_current_l1(), 21.0, delta=0.1)
-        self.assertAlmostEqual(self.sut.read_current_l2(), 19.5, delta=0.1)
-        self.assertAlmostEqual(self.sut.read_current_l3(), 20.5, delta=0.1)
-        self.assertAlmostEqual(self.sut.read_frequency(), 49.9, delta=0.05)
+        self.assertTrue(
+            wait_for_condition(
+                lambda: abs(self.sut.read_voltage_l1_n() - 229.4) <= 0.1,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected L1-N voltage to match Modbus scaled value",
+        )
+        self.assertTrue(
+            wait_for_condition(
+                lambda: abs(self.sut.read_current_l1() - 12.5) <= 0.05,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected L1 current to match Modbus scaled value",
+        )
+        self.assertTrue(
+            wait_for_condition(
+                lambda: abs(self.sut.read_frequency() - 49.8) <= 0.05,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected frequency to match Modbus scaled value",
+        )
 
-        power = self.sut.read_active_power_l1()
-        self.assertGreater(power, 0.0, "Expected positive active power on L1")
+    def test_power_and_energy_registers(self):
+        self._reset_model_state(
+            voltage_l1=231.0,
+            voltage_l2=229.0,
+            voltage_l3=230.0,
+            current_l1=10.0,
+            current_l2=9.5,
+            current_l3=10.5,
+            power_factor=0.9,
+            energy_import_kwh=222.0,
+            energy_export_kwh=14.0,
+        )
 
-    def test_energy_accumulates(self):
-        initial_energy = self.sut.read_energy_import_total()
-        wait_seconds(1.5)
-        updated_energy = self.sut.read_energy_import_total()
-        self.assertGreaterEqual(
-            updated_energy,
-            initial_energy,
-            "Expected total imported energy to be non-decreasing",
+        expected_active_kw = 1e-3 * 0.9 * (
+            231.0 * 10.0 + 229.0 * 9.5 + 230.0 * 10.5
+        )
+
+        self.assertTrue(
+            wait_for_condition(
+                lambda: abs(self.sut.read_active_power_total_kw() - expected_active_kw) <= 0.05,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected total active power to match Modbus scaled value",
+        )
+        self.assertTrue(
+            wait_for_condition(
+                lambda: abs(self.sut.read_power_factor() - 0.9) <= 0.01,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected power factor to match Modbus scaled value",
+        )
+        self.assertTrue(
+            wait_for_condition(
+                lambda: self.sut.read_energy_import_kwh() == 222.0,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected import energy to match Modbus scaled value",
+        )
+        self.assertTrue(
+            wait_for_condition(
+                lambda: self.sut.read_energy_export_kwh() == 14.0,
+                timeout=6.0,
+                interval=0.2,
+            ),
+            "Expected export energy to match Modbus scaled value",
         )
