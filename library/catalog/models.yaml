@@ -241,6 +241,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.DigitalMultimeter.SiglentSdm3055.Scpi
+    name: Siglent SDM3055 Digital Multimeter (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.BenchPowerSupply.Scpi
     name: SCPI Bench Power Supply
     path: library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
