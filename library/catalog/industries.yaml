@@ -116,6 +116,8 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Lab.Multimeter.Scpi
         instance: spx_lab_multimeter
+      - model: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
+        instance: spx_lab_function_generator
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus

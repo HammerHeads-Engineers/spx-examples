@@ -7,6 +7,7 @@ models:
   - library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
   - library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
+  - library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
