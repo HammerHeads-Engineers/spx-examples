@@ -41,7 +41,6 @@ industries:
         instance: spx_energy_meter_em24_modbus
       - model: Energy.EnergyMeterEatonPxm2000.Modbus
         instance: spx_energy_meter_pxm2000_modbus
-
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
       - model: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt

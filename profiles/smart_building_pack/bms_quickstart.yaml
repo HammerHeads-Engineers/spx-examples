@@ -19,6 +19,7 @@ models:
   - library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
   - library/domains/iot/socomec/diris_a40__modbus.yaml
   - library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+  - library/domains/iot/eaton/eaton_pxm2000__modbus.yaml
   - library/domains/weather/weather_forecast__http.yaml
   - library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
   - library/domains/iot/generic/bms_controller__opcua.yaml
