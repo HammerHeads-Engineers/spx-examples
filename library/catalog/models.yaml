@@ -403,6 +403,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterPm3200.Modbus
+    name: Schneider Electric PowerLogic PM3200 Energy Meter (Modbus)
+    path: library/domains/iot/schneider/schneider_pm3200__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterPm5330.Modbus
     name: Schneider Electric PowerLogic PM5330 Energy Meter (Modbus)
     path: library/domains/iot/schneider/schneider_pm5330__modbus.yaml
