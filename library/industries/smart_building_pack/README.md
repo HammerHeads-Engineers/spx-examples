@@ -27,6 +27,8 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - APC NetShelter Rack PDU 2g (Modbus): `library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml`
   - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
   - Energy meter EM24 (Modbus): `library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`
+  - Energy meter SDM630 (Modbus): `library/domains/iot/eastron/eastron_sdm630__modbus.yaml`
+  - Eaton PXM2000 meter (Modbus): `library/domains/iot/eaton/eaton_pxm2000__modbus.yaml`
 - Lighting
   - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
   - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`

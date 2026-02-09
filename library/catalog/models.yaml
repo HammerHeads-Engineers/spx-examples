@@ -241,6 +241,24 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.DigitalMultimeter.SiglentSdm3055.Scpi
+    name: Siglent SDM3055 Digital Multimeter (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
+    name: Siglent SDG1032X Function Generator (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.BenchPowerSupply.Scpi
     name: SCPI Bench Power Supply
     path: library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
@@ -253,6 +271,15 @@ models:
   - id: Lab.Oscilloscope.Keysight1000X.Scpi
     name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.SiglentSds1000xE.Scpi
+    name: Siglent SDS1000X-E Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:
@@ -442,6 +469,24 @@ models:
   - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
     name: Carlo Gavazzi EM24 Energy Meter (Modbus)
     path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterEastronSdm630.Modbus
+    name: Eastron SDM630 Energy Meter (Modbus)
+    path: library/domains/iot/eastron/eastron_sdm630__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
+  - id: Energy.EnergyMeterEatonPxm2000.Modbus
+    name: Eaton Power Xpert Meter 2000 (Modbus TCP)
+    path: library/domains/iot/eaton/eaton_pxm2000__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:

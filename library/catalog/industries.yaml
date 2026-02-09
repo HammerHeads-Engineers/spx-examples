@@ -39,6 +39,10 @@ industries:
         instance: spx_energy_meter_diris_a40_modbus
       - model: Energy.EnergyMeterCarloGavazziEm24.Modbus
         instance: spx_energy_meter_em24_modbus
+      - model: Energy.EnergyMeterEastronSdm630.Modbus
+        instance: spx_energy_meter_sdm630_modbus
+      - model: Energy.EnergyMeterEatonPxm2000.Modbus
+        instance: spx_energy_meter_pxm2000_modbus
 
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
@@ -112,6 +116,8 @@ industries:
         instance: spx_env_sensor_lwm2m
       - model: Lab.Multimeter.Scpi
         instance: spx_lab_multimeter
+      - model: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
+        instance: spx_lab_function_generator
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus

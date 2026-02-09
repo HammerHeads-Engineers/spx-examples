@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Example SCPI multimeter SUT client used by integration tests."""
+"""Example SCPI function generator SUT client used by integration tests."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from typing import Optional
 TERMINATOR = "\n"
 
 
-class ScpiMultimeterSUTExample:
-    """Very small helper bridging TCP sockets with SCPI commands."""
+class ScpiFunctionGeneratorSUTExample:
+    """Minimal helper for SCPI-over-TCP function generator commands."""
 
     def __init__(
         self,
@@ -116,39 +116,35 @@ class ScpiMultimeterSUTExample:
             f"Failed to complete SCPI query after {self.reconnect_attempts + 1} attempt(s)"
         ) from last_exc
 
-    def drain(self, timeout: float = 0.05) -> None:
-        """Drain any pending responses (e.g., echoes from non-query commands)."""
-        sock = self._ensure_socket()
-        previous_timeout = sock.gettimeout()
-        sock.settimeout(timeout)
-        try:
-            while True:
-                try:
-                    chunk = sock.recv(1024)
-                except socket.timeout:
-                    break
-                if not chunk:
-                    break
-        finally:
-            sock.settimeout(previous_timeout)
-
     # ------------------------------------------------------------------
     # Convenience wrappers
     # ------------------------------------------------------------------
-    def measure_voltage(self) -> float:
-        return float(self.query("MEAS:VOLT?"))
+    def identify(self) -> str:
+        return self.query("*IDN?")
 
-    def measure_current(self) -> float:
-        return float(self.query("MEAS:CURR?"))
+    def set_waveform(self, channel: int, waveform: str) -> None:
+        self.write(f"C{channel}:BSWV WVTP,{waveform}")
 
-    def configure_voltage(self, value: float) -> str:
-        return self.query(f"CONF:VOLT {value}")
+    def set_frequency(self, channel: int, frequency_hz: float) -> None:
+        self.write(f"C{channel}:BSWV FRQ,{frequency_hz}")
 
-    def configure_current(self, value: float) -> str:
-        return self.query(f"CONF:CURR {value}")
+    def set_amplitude(self, channel: int, amplitude_vpp: float) -> None:
+        self.write(f"C{channel}:BSWV AMP,{amplitude_vpp}")
 
-    def system_version(self) -> str:
-        return self.query("SYST:VERS?")
+    def set_offset(self, channel: int, offset_v: float) -> None:
+        self.write(f"C{channel}:BSWV OFST,{offset_v}")
+
+    def query_basic_wave(self, channel: int) -> str:
+        return self.query(f"C{channel}:BSWV?")
+
+    def output_on(self, channel: int) -> None:
+        self.write(f"C{channel}:OUTP ON")
+
+    def output_off(self, channel: int) -> None:
+        self.write(f"C{channel}:OUTP OFF")
+
+    def query_output_status(self, channel: int) -> str:
+        return self.query(f"C{channel}:OUTP?")
 
     def _require_socket(self) -> socket.socket:
         if self._socket is None:
@@ -178,4 +174,4 @@ class ScpiMultimeterSUTExample:
         self._reset_socket()
 
 
-__all__ = ["ScpiMultimeterSUTExample"]
+__all__ = ["ScpiFunctionGeneratorSUTExample"]

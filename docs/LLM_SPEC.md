@@ -39,44 +39,56 @@ Do not treat this as a mandatory flow for unrelated repository tasks.
 - Confirm target domain/pack and protocol.
 - For vendor/protocol-specific models, require first-party documentation links.
 
-2) Implementation scope
+2) Develop-baseline dedupe gate (required)
+- Treat `origin/develop` as the canonical dedupe baseline for candidate discovery and replay checks.
+- Do not treat absence on `main` as a missing-model signal when the model already exists on `develop`.
+- Before selecting a fallback candidate, run `poetry run python tools/check_model_branch_guard.py --base-ref origin/develop`.
+
+3) Reconciler gate on automation branch (required)
+- Before generating or updating a model on `automation/model-yaml`, run the guard above again.
+- If the guard reports duplicate regressions/replay edits, stop and reconcile the branch first.
+- Editing existing model YAML files on `automation/model-yaml` requires explicit override (`SPX_ALLOW_EXISTING_MODEL_EDITS=1`) and a rationale in the PR/issue notes.
+
+4) Implementation scope
 - Add/update model YAML in `library/domains/...`.
 - Keep naming rules (`lower_snake_case`, `name` aligned with file stem).
 - Update catalogs/profiles/pack docs as required by AGENTS.md.
 - Register the model in the target pack explicitly:
   - add `packages: [<target_pack>]` in `library/catalog/models.yaml`,
   - include the model in at least one target-pack profile in `profiles/<target_pack>/*.yaml`,
-  - if one-click sample provisioning is expected for the pack, add `default_instances` (and `start_instances` when needed) in `library/catalog/industries.yaml`.
+- if one-click sample provisioning is expected for the pack, add `default_instances` (and `start_instances` when needed) in `library/catalog/industries.yaml`.
 - Keep changes additive and backward-compatible.
 
-3) Runtime smoke gate (required)
+5) Runtime smoke gate (required)
 - Add a minimal integration smoke test for each new model.
 - Smoke test must load/register the model via `spx_python`, create/reset/start an instance, and assert it reaches `running`.
 - For protocol models, verify at least one protocol-level read/write probe on the exposed endpoint (for Modbus: resolve endpoint and read key registers).
 - On failure, capture diagnostic context from instance state and CI logs.
 - Place the smoke test under the target pack integration suite (`tests/packs/<target_pack>/integration/`).
 
-4) Validation before push
+6) Validation before push
 - Run:
+  - `poetry run python tools/check_model_branch_guard.py --base-ref origin/develop`
   - `poetry run python tools/validate_models.py`
   - `poetry run pytest`
 
-5) CI remediation loop
+7) CI remediation loop
 - After push, monitor CI for the branch.
 - If CI fails: fetch failing job logs, apply targeted fixes, commit, and push on the same branch.
 - Retry CI remediation up to 3 consecutive attempts.
 
-6) Process upgrade gate (required for new-model workflow)
+8) Process upgrade gate (required for new-model workflow)
 - Keep or add a CI-visible guard that enforces: new model YAML changes must include runtime smoke coverage in the target pack integration tests.
+- Keep or add a CI-visible guard that enforces: no duplicate-model regression versus `origin/develop` and no replay edits on `automation/model-yaml` without explicit override.
 - The guard may be implemented as a pytest check, validation script check, or equivalent repository-native CI check.
 - If the guard fails, treat it as a blocker and fix it before opening/updating the PR.
 
-7) Success path
+9) Success path
 - Open or update a PR with base branch `develop` only.
 - Never target `main` from automation.
 - Include source links, rationale, and test/validation evidence in the PR body.
 
-8) Failure fallback (after 3 failed CI remediation attempts)
+10) Failure fallback (after 3 failed CI remediation attempts)
 - Stop automated fix attempts.
 - Open an issue in the repository summarizing:
   - branch and commit,

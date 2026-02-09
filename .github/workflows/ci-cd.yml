@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -47,6 +49,12 @@ jobs:
 
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Fetch develop baseline
+        run: git fetch origin develop
+
+      - name: Guard model-yaml branch against duplicate/replay additions
+        run: poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
 
       - name: Validate model definitions
         run: poetry run python tools/validate_models.py

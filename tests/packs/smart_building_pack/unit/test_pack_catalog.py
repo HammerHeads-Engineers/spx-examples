@@ -16,6 +16,11 @@ from tests.shared.pack_catalog import (
 
 
 PACK_ID = "smart_building_pack"
+REQUIRED_SMOKE_TESTS = {
+    "Energy.EnergyMeterEatonPxm2000.Modbus": (
+        "tests/packs/smart_building_pack/integration/test_modbus_pxm2000_smoke.py"
+    ),
+}
 
 
 def test_pack_catalog_models_exist_and_load() -> None:
@@ -68,3 +73,12 @@ def test_pack_profiles_reference_catalog_models() -> None:
             model_entry = models_by_path[model_path]
             packages = model_entry.get("packages", []) or []
             assert PACK_ID in packages, f"Catalog model {model_entry.get('id')} is missing '{PACK_ID}' in packages"
+
+
+def test_required_pack_smoke_tests_are_present() -> None:
+    root = repo_root()
+    models_by_id = model_index_by_id()
+    for model_id, smoke_rel in REQUIRED_SMOKE_TESTS.items():
+        assert model_id in models_by_id, f"Required smoke-test model id is missing: {model_id}"
+        smoke_path = root / smoke_rel
+        assert smoke_path.exists(), f"Required smoke test is missing: {smoke_rel}"

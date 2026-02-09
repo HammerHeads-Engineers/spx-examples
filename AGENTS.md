@@ -33,6 +33,7 @@ This file is the entry point for automated agents and contributors.
 ## Local validation and tests
 ```bash
 poetry install --with dev
+poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
 poetry run python tools/validate_models.py
 poetry run pytest
 ```
