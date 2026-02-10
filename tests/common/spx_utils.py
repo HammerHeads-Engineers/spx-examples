@@ -59,11 +59,55 @@ def ensure_model(client, model_key: str, model_def: Dict[str, Any]) -> bool:
     return False
 
 
+def _meta_defaults(model_def: Optional[Dict[str, Any]]) -> tuple[Dict[str, Any], list[str]]:
+    meta = (model_def or {}).get("meta_parameters", {})
+    if not isinstance(meta, dict):
+        return {}, []
+
+    params: Dict[str, Any] = {}
+    missing: list[str] = []
+    for name, spec in meta.items():
+        if not isinstance(spec, dict):
+            continue
+        if "default" in spec:
+            params[name] = {"cycle": [spec.get("default")]}
+        elif spec.get("required") is True:
+            missing.append(name)
+    return params, missing
+
+
+def _create_instance_with_meta_defaults(
+    instances: Any,
+    instance_key: str,
+    model_key: str,
+    model_def: Optional[Dict[str, Any]],
+) -> None:
+    has_meta = isinstance(model_def, dict) and bool(model_def.get("meta_parameters"))
+    if has_meta:
+        params, missing = _meta_defaults(model_def)
+        if missing:
+            raise RuntimeError(
+                f"Missing defaults for required meta_parameters in {model_key}: {', '.join(missing)}"
+            )
+        generate = getattr(instances, "generate", None)
+        if params and callable(generate):
+            generate(
+                template=model_key,
+                count=1,
+                name=instance_key,
+                parameters=params,
+            )
+            return
+
+    instances[instance_key] = model_key
+
+
 def ensure_instance(
     client,
     instance_key: str,
     model_key: str,
     *,
+    model_def: Optional[Dict[str, Any]] = None,
     overrides: Optional[Dict[str, Any]] = None,
     recreate: bool = False,
     ensure_running: bool = True,
@@ -89,7 +133,7 @@ def ensure_instance(
             except Exception:
                 pass
 
-        instances[instance_key] = model_key
+        _create_instance_with_meta_defaults(instances, instance_key, model_key, model_def)
         inst = instances[instance_key]
         if reset_on_create:
             inst.reset()
@@ -150,6 +194,7 @@ def bootstrap_model_instance(
         client,
         instance_key,
         model_key,
+        model_def=model_def,
         recreate=model_changed,
         overrides=None,
         ensure_running=False,
