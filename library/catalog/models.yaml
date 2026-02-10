@@ -268,6 +268,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.PowerSupply.KeysightE36312A.Scpi
+    name: Keysight E36312A Triple Output Power Supply (SCPI)
+    path: library/domains/measurement_instruments/keysight/keysight_e36312a__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.Keysight1000X.Scpi
     name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml

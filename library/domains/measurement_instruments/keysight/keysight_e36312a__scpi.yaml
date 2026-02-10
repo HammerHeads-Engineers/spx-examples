@@ -1,0 +1,111 @@
+name: keysight_e36312a__scpi
+description: |
+  Keysight E36312A triple-output DC power supply model driven by SCPI
+  (ASCII/TCP). The model exposes per-channel voltage/current setpoints and
+  output state to support lab automation workflows.
+
+attributes:
+  idn: "KEYSIGHT TECHNOLOGIES,E36312A,MY00000000,1.0"
+
+  k__selected_output: 1
+
+  k__ch1_voltage_set_v: 5.0
+  k__ch1_current_limit_a: 1.0
+  k__ch1_output_state: 0
+  ch1_voltage_readback_v: 0.0
+  ch1_current_readback_a: 0.0
+
+  k__ch2_voltage_set_v: 12.0
+  k__ch2_current_limit_a: 0.5
+  k__ch2_output_state: 0
+  ch2_voltage_readback_v: 0.0
+  ch2_current_readback_a: 0.0
+
+  k__ch3_voltage_set_v: 12.0
+  k__ch3_current_limit_a: 0.5
+  k__ch3_output_state: 0
+  ch3_voltage_readback_v: 0.0
+  ch3_current_readback_a: 0.0
+
+  error_status: '0,"No error"'
+
+actions:
+  - function: $in(ch1_voltage_readback_v)
+    name: update_ch1_voltage
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_current_readback_a)
+    name: update_ch1_current
+    call: ($in(k__ch1_current_limit_a) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch2_voltage_readback_v)
+    name: update_ch2_voltage
+    call: ($in(k__ch2_voltage_set_v) if $in(k__ch2_output_state) == 1 else 0.0)
+  - function: $in(ch2_current_readback_a)
+    name: update_ch2_current
+    call: ($in(k__ch2_current_limit_a) if $in(k__ch2_output_state) == 1 else 0.0)
+  - function: $in(ch3_voltage_readback_v)
+    name: update_ch3_voltage
+    call: ($in(k__ch3_voltage_set_v) if $in(k__ch3_output_state) == 1 else 0.0)
+  - function: $in(ch3_current_readback_a)
+    name: update_ch3_current
+    call: ($in(k__ch3_current_limit_a) if $in(k__ch3_output_state) == 1 else 0.0)
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+        ":SYSTem:ERRor?": "#out(error_status)"
+
+        ":INSTrument:NSELect {channel}":
+          "#attr(k__selected_output)": "channel"
+          response: "OK"
+        ":INSTrument:NSELect?": "#out(k__selected_output)"
+
+        ":SOURce:VOLTage {voltage}, (@1)":
+          "#attr(k__ch1_voltage_set_v)": "voltage"
+        ":SOURce:CURRent {current}, (@1)":
+          "#attr(k__ch1_current_limit_a)": "current"
+        ":SOURce:VOLTage? (@1)": "#out(k__ch1_voltage_set_v)"
+        ":SOURce:CURRent? (@1)": "#out(k__ch1_current_limit_a)"
+
+        ":SOURce:VOLTage {voltage}, (@2)":
+          "#attr(k__ch2_voltage_set_v)": "voltage"
+        ":SOURce:CURRent {current}, (@2)":
+          "#attr(k__ch2_current_limit_a)": "current"
+        ":SOURce:VOLTage? (@2)": "#out(k__ch2_voltage_set_v)"
+        ":SOURce:CURRent? (@2)": "#out(k__ch2_current_limit_a)"
+
+        ":SOURce:VOLTage {voltage}, (@3)":
+          "#attr(k__ch3_voltage_set_v)": "voltage"
+        ":SOURce:CURRent {current}, (@3)":
+          "#attr(k__ch3_current_limit_a)": "current"
+        ":SOURce:VOLTage? (@3)": "#out(k__ch3_voltage_set_v)"
+        ":SOURce:CURRent? (@3)": "#out(k__ch3_current_limit_a)"
+
+        ":OUTPut ON, (@1)":
+          "#attr(k__ch1_output_state)": 1
+        ":OUTPut OFF, (@1)":
+          "#attr(k__ch1_output_state)": 0
+        ":OUTPut? (@1)": "#out(k__ch1_output_state)"
+
+        ":OUTPut ON, (@2)":
+          "#attr(k__ch2_output_state)": 1
+        ":OUTPut OFF, (@2)":
+          "#attr(k__ch2_output_state)": 0
+        ":OUTPut? (@2)": "#out(k__ch2_output_state)"
+
+        ":OUTPut ON, (@3)":
+          "#attr(k__ch3_output_state)": 1
+        ":OUTPut OFF, (@3)":
+          "#attr(k__ch3_output_state)": 0
+        ":OUTPut? (@3)": "#out(k__ch3_output_state)"
+
+        ":MEASure:VOLTage? CH1": "#out(ch1_voltage_readback_v)"
+        ":MEASure:CURRent? CH1": "#out(ch1_current_readback_a)"
+        ":MEASure:VOLTage? CH2": "#out(ch2_voltage_readback_v)"
+        ":MEASure:CURRent? CH2": "#out(ch2_current_readback_a)"
+        ":MEASure:VOLTage? CH3": "#out(ch3_voltage_readback_v)"
+        ":MEASure:CURRent? CH3": "#out(ch3_current_readback_a)"

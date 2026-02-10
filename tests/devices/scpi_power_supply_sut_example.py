@@ -15,7 +15,7 @@ TERMINATOR = "\n"
 
 
 class ScpiPowerSupplySUTExample:
-    """Minimal helper for SCPI-over-TCP power supply commands."""
+    """Very small helper bridging TCP sockets with SCPI commands."""
 
     def __init__(
         self,
@@ -122,35 +122,32 @@ class ScpiPowerSupplySUTExample:
     def identify(self) -> str:
         return self.query("*IDN?")
 
-    def set_voltage(self, channel: int, voltage: float) -> None:
-        self.write(f":SOURce{channel}:VOLTage {voltage}")
+    def select_output(self, channel: int) -> str:
+        return self.query(f":INSTrument:NSELect {channel}")
 
-    def set_current(self, channel: int, current: float) -> None:
-        self.write(f":SOURce{channel}:CURRent {current}")
+    def selected_output(self) -> int:
+        return int(float(self.query(":INSTrument:NSELect?")))
 
-    def query_voltage_set(self, channel: int) -> float:
-        return float(self.query(f":SOURce{channel}:VOLTage?"))
+    def set_voltage(self, channel: int, value: float) -> None:
+        self.write(f":SOURce:VOLTage {value}, (@{channel})")
 
-    def query_current_set(self, channel: int) -> float:
-        return float(self.query(f":SOURce{channel}:CURRent?"))
+    def set_current(self, channel: int, value: float) -> None:
+        self.write(f":SOURce:CURRent {value}, (@{channel})")
 
     def output_on(self, channel: int) -> None:
-        self.write(f":OUTP CH{channel},ON")
+        self.write(f":OUTPut ON, (@{channel})")
 
     def output_off(self, channel: int) -> None:
-        self.write(f":OUTP CH{channel},OFF")
+        self.write(f":OUTPut OFF, (@{channel})")
 
-    def query_output_state(self, channel: int) -> str:
-        return self.query(f":OUTP? CH{channel}")
+    def output_state(self, channel: int) -> int:
+        return int(float(self.query(f":OUTPut? (@{channel})")))
 
     def measure_voltage(self, channel: int) -> float:
-        return float(self.query(f":MEAS:VOLT? CH{channel}"))
+        return float(self.query(f":MEASure:VOLTage? CH{channel}"))
 
     def measure_current(self, channel: int) -> float:
-        return float(self.query(f":MEAS:CURR? CH{channel}"))
-
-    def measure_power(self, channel: int) -> float:
-        return float(self.query(f":MEAS:POWE? CH{channel}"))
+        return float(self.query(f":MEASure:CURRent? CH{channel}"))
 
     def _require_socket(self) -> socket.socket:
         if self._socket is None:
