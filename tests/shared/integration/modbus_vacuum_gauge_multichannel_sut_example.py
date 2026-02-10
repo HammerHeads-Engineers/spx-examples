@@ -32,7 +32,6 @@ MODEL_PATH = (
 MODEL_KEY = "tests__vacuum_gauge_multichannel"
 INSTANCE_KEY = "generic_vacuum_gauge_multichannel"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
-META_PARAMETERS = {"modbus_port": 5622, "modbus_unit_id": 22}
 
 
 class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
@@ -66,7 +65,6 @@ class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            meta_parameters=META_PARAMETERS,
             attribute_overrides=None,
         )
 

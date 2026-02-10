@@ -9,10 +9,10 @@ description: |
 meta_parameters:
   modbus_port:
     type: int
-    default: 5614
+    default: 502
   modbus_unit_id:
     type: int
-    default: 14
+    default: 1
 
 attributes:
   device_state: 0

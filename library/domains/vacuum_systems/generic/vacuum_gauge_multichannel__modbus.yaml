@@ -1,14 +1,6 @@
 name: vacuum_gauge_multichannel__modbus
 description: Multichannel vacuum gauge / impulse counter exposed over Modbus with dwell-based measurement handoff.
 
-meta_parameters:
-  modbus_port:
-    type: int
-    default: 5622
-  modbus_unit_id:
-    type: int
-    default: 22
-
 attributes:
   measure_done:
     type: int
@@ -200,8 +192,8 @@ polling:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: "$param(modbus_port)"
-      unit_id: "$param(modbus_unit_id)"
+      port: 5022
+      unit_id: 1
       zero_fill: true
       mapping:
         measure_done:          { address: [0,0],    group: h_r, type: uint_16 }

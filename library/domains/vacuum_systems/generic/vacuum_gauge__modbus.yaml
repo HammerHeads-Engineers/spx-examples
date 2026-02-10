@@ -3,14 +3,6 @@
 # See the accompanying LICENSE file for terms.
 
 # Two-channel vacuum gauge simulation with roughing and high-vacuum readings.
-meta_parameters:
-  modbus_port:
-    type: int
-    default: 5621
-  modbus_unit_id:
-    type: int
-    default: 21
-
 attributes:
   rough_pressure: 1.0              # mbar, roughing gauge covering atmosphere to 1e-3
   high_pressure: 5.0e-1            # mbar, high-vacuum gauge covering 1e-1 to 1e-9
@@ -192,8 +184,8 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: "$param(modbus_port)"
-      unit_id: "$param(modbus_unit_id)"
+      port: 5021
+      unit_id: 1
       zero_fill: true
       # poll_interval: 0.2
       mapping:
