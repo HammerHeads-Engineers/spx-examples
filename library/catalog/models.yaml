@@ -331,6 +331,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.XraySourceEmissionController.PrevacXR40BEC.Modbus
+    name: Prevac XR40B-EC X-Ray Source Emission Controller (Modbus)
+    path: library/domains/iot/prevac/prevac_xr40b_ec__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Embedded.HealthMonitor.BleGatt
     name: BLE Vital Signs Monitor
     path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
