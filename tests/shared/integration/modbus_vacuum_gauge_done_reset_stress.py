@@ -28,6 +28,7 @@ MODEL_PATH = (
 MODEL_KEY = "tests__vacuum_gauge_multichannel"
 INSTANCE_KEY = "generic_vacuum_gauge_multichannel"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
+META_PARAMETERS = {"modbus_port": 5622, "modbus_unit_id": 22}
 
 
 class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
@@ -62,7 +63,7 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=1,
+            meta_parameters=META_PARAMETERS,
             attribute_overrides=None,
         )
 
@@ -81,27 +82,6 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
         except Exception:
             pass
         wait_seconds(0.1)
-
-        # Keep the communication adapter attached; some runtimes may auto-run enabled scenarios.
-        try:
-            scenario = self.model["scenarios"]["modbus_disconnect"]
-        except Exception:
-            scenario = None
-        stop = getattr(scenario, "stop", None) if scenario is not None else None
-        if callable(stop):
-            try:
-                stop()
-            except Exception:
-                pass
-            wait_seconds(0.1)
-
-        try:
-            comm = self.model["communication"]["modbus_slave"]
-            attach = getattr(comm, "attach", None)
-            if callable(attach):
-                attach()
-        except Exception:
-            pass
 
         try:
             port, unit_id = wait_for_modbus_endpoint(

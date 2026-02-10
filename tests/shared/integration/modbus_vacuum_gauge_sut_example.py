@@ -32,6 +32,7 @@ MODEL_PATH = (
 MODEL_KEY = "tests__vacuum_gauge"
 INSTANCE_KEY = "generic_vacuum_gauge"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
+META_PARAMETERS = {"modbus_port": 5621, "modbus_unit_id": 21}
 PUMPDOWN_PRESSURE_LIMIT = float(os.environ.get("VACUUM_GAUGE_PUMPDOWN_LIMIT", "5e-3"))
 PUMPDOWN_TIMEOUT = float(os.environ.get("VACUUM_GAUGE_PUMPDOWN_TIMEOUT", "20.0"))
 
@@ -67,7 +68,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=2,
+            meta_parameters=META_PARAMETERS,
         )
 
     def setUp(self):
@@ -79,7 +80,6 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             "discharge_spike",
             "slow_leak",
             "ionizer_trip",
-            "modbus_disconnect",
             "relay_sweep",
             "sensor_drift",
         ):
@@ -94,14 +94,6 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
                 except Exception:
                     pass
         wait_seconds(0.1)
-
-        try:
-            comm = self.model["communication"]["modbus_slave"]
-            attach = getattr(comm, "attach", None)
-            if callable(attach):
-                attach()
-        except Exception:
-            pass
 
         try:
             port, unit_id = wait_for_modbus_endpoint(

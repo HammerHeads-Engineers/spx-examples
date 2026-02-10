@@ -8,7 +8,7 @@ description: |
 meta_parameters:
   modbus_port:
     type: int
-    default: 502
+    default: 5612
   modbus_unit_id:
     type: int
     default: 1
