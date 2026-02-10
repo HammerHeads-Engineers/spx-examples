@@ -11,7 +11,7 @@ meta_parameters:
     default: 5612
   modbus_unit_id:
     type: int
-    default: 1
+    default: 12
 
 attributes:
   cmd__pump1_operate_on: 0

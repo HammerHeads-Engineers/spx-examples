@@ -11,7 +11,7 @@ meta_parameters:
     default: 5613
   modbus_unit_id:
     type: int
-    default: 1
+    default: 13
 
 attributes:
   status_word_1: 0

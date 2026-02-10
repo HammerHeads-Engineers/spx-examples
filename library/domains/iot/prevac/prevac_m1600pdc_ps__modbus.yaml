@@ -11,7 +11,7 @@ meta_parameters:
     default: 5611
   modbus_unit_id:
     type: int
-    default: 1
+    default: 11
 
 attributes:
   device_state: 0
