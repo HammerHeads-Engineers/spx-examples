@@ -295,6 +295,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.RohdeSchwarzHmo1002.Scpi
+    name: Rohde & Schwarz HMO1002 Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmo1002__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.TektronixMdo3000.Scpi
     name: Tektronix MDO3000 Series Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/tektronix/tektronix_mdo3000__scpi.yaml
