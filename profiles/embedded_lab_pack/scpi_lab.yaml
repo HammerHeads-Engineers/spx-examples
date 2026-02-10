@@ -12,6 +12,7 @@ models:
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
   - library/domains/measurement_instruments/tektronix/tektronix_mdo3000__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
+  - library/domains/measurement_instruments/rigol/rigol_mso5000__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
   - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
   - library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml

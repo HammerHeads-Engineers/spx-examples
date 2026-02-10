@@ -1,0 +1,56 @@
+name: rigol_mso5000__scpi
+description: |
+  Virtual Rigol MSO5000-series oscilloscope exposing a subset of the SCPI
+  measurement interface for VPP/VRMS/VAVG/frequency and ID queries over TCP.
+attributes:
+  channel1_vpp_v: 2.0
+  channel1_vrms_v: 0.7071
+  channel1_vavg_v: 0.0
+  channel1_freq_hz: 1000.0
+  channel1_period_s: 0.001
+  idn: "RIGOL,MSO5000,MS5A000000000,00.01.00"
+
+actions:
+  - function: $in(channel1_period_s)
+    name: update_period
+    params:
+      min_freq_hz: 0.1
+    call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
+  - function: $in(channel1_vrms_v)
+    name: update_vrms
+    params:
+      scale: 0.353553
+    call: $in(channel1_vpp_v) * scale
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+        ":MEASure:ITEM? VPP,CHANnel1": "#out(channel1_vpp_v)"
+        ":MEASure:ITEM? VRMS,CHANnel1": "#out(channel1_vrms_v)"
+        ":MEASure:ITEM? VAVG,CHANnel1": "#out(channel1_vavg_v)"
+        ":MEASure:ITEM? FREQuency,CHANnel1": "#out(channel1_freq_hz)"
+        ":MEASure:ITEM? PERiod,CHANnel1": "#out(channel1_period_s)"
+
+scenarios:
+  amplitude_sweep:
+    description: "Slowly ramp channel 1 amplitude for lab demos."
+    period: 0.2
+    actions:
+      - function: $in(channel1_vpp_v)
+        params:
+          min_vpp: 0.5
+          max_vpp: 5.0
+          step_vpp: 0.1
+        call: |
+          (lambda v, min_vpp, max_vpp, step_vpp:
+            min_vpp if v >= max_vpp else v + step_vpp
+          )($in(channel1_vpp_v), min_vpp, max_vpp, step_vpp)
+      - function: $in(channel1_vrms_v)
+        params:
+          scale: 0.353553
+        call: $in(channel1_vpp_v) * scale
