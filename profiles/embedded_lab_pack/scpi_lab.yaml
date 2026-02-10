@@ -10,6 +10,7 @@ models:
   - library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+  - library/domains/measurement_instruments/tektronix/tektronix_mdo3000__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
   - library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
   - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
