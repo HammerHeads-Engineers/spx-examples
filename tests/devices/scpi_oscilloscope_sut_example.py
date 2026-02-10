@@ -116,6 +116,22 @@ class ScpiOscilloscopeSUTExample:
             f"Failed to complete SCPI query after {self.reconnect_attempts + 1} attempt(s)"
         ) from last_exc
 
+    def drain(self, timeout: float = 0.05) -> None:
+        """Drain pending responses (e.g. OK/echo payloads from write commands)."""
+        sock = self._ensure_socket()
+        previous_timeout = sock.gettimeout()
+        sock.settimeout(timeout)
+        try:
+            while True:
+                try:
+                    chunk = sock.recv(1024)
+                except socket.timeout:
+                    break
+                if not chunk:
+                    break
+        finally:
+            sock.settimeout(previous_timeout)
+
     # ------------------------------------------------------------------
     # Convenience wrappers
     # ------------------------------------------------------------------

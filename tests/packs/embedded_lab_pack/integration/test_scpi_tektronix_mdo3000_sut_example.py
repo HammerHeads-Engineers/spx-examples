@@ -119,6 +119,10 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
             )
         return reply
 
+    def _write_and_drain(self, command: str) -> None:
+        self.sut.write(command)
+        self.sut.drain()
+
     # ------------------------------------------------------------------
     # Tests
     # ------------------------------------------------------------------
@@ -135,47 +139,47 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
         self._set_attribute("channel1_freq_hz", 1234.0)
         self._set_attribute("channel1_period_s", 0.00075)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe VPP")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe VPP")
         wait_seconds(0.1)
         vpp = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(vpp, 2.5, places=2)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe VRMS")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe VRMS")
         wait_seconds(0.1)
         vrms = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(vrms, 0.88, places=2)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe MEAN")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe MEAN")
         wait_seconds(0.1)
         vavg = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(vavg, 0.12, places=2)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe FREQ")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe FREQ")
         wait_seconds(0.1)
         freq = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(freq, 1234.0, places=1)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe PER")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe PER")
         wait_seconds(0.1)
         period = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(period, 0.00075, places=5)
 
     def test_channel_scale_round_trip(self):
-        self.sut.write(":CHANnel1:SCAle 0.2")
+        self._write_and_drain(":CHANnel1:SCAle 0.2")
         wait_seconds(0.1)
         scale = float(self._query_or_skip(":CHANnel1:SCAle?"))
         self.assertAlmostEqual(scale, 0.2, places=3)
         self.assertAlmostEqual(self._get_attribute("k__channel_1_scale_v"), 0.2, places=3)
 
     def test_timebase_scale_round_trip(self):
-        self.sut.write(":HORizontal:MAIn:SCAle 0.0005")
+        self._write_and_drain(":HORizontal:MAIn:SCAle 0.0005")
         wait_seconds(0.1)
         scale = float(self._query_or_skip(":HORizontal:MAIn:SCAle?"))
         self.assertAlmostEqual(scale, 0.0005, places=6)
         self.assertAlmostEqual(self._get_attribute("k__timebase_scale_s"), 0.0005, places=6)
 
     def test_trigger_level_round_trip(self):
-        self.sut.write(":TRIGger:A:LEVel 0.05")
+        self._write_and_drain(":TRIGger:A:LEVel 0.05")
         wait_seconds(0.1)
         level = float(self._query_or_skip(":TRIGger:A:LEVel?"))
         self.assertAlmostEqual(level, 0.05, places=3)
@@ -203,12 +207,12 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
             start()
         wait_seconds(0.3)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe VPP")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe VPP")
         wait_seconds(0.1)
         vpp = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(vpp, 2.0, places=2)
 
-        self.sut.write(":MEASUrement:IMMed:TYPe FREQ")
+        self._write_and_drain(":MEASUrement:IMMed:TYPe FREQ")
         wait_seconds(0.1)
         freq = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
         self.assertAlmostEqual(freq, 1000.0, places=1)

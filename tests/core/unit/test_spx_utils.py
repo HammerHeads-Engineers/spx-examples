@@ -199,6 +199,41 @@ def test_ensure_instance_uses_generate_for_meta_parameter_defaults() -> None:
     ]
 
 
+def test_ensure_instance_uses_generate_for_meta_parameter_overrides() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+            "modbus_unit_id": {"type": "int", "default": 1},
+        }
+    }
+
+    instance = spx_utils.ensure_instance(
+        client,
+        "inst",
+        "model",
+        model_def=model_def,
+        meta_parameters={"modbus_port": 5601, "modbus_unit_id": 11},
+        recreate=True,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
+    )
+
+    assert instance is client["instances"]["inst"]
+    assert client["instances"].generate_calls == [
+        {
+            "template": "model",
+            "count": 1,
+            "name": "inst",
+            "parameters": {
+                "modbus_port": {"cycle": [5601]},
+                "modbus_unit_id": {"cycle": [11]},
+            },
+        }
+    ]
+
+
 def test_ensure_instance_errors_when_required_meta_default_missing() -> None:
     client = _FakeClient()
     model_def = {
@@ -213,6 +248,28 @@ def test_ensure_instance_errors_when_required_meta_default_missing() -> None:
             "inst",
             "model",
             model_def=model_def,
+            recreate=True,
+            ensure_running=False,
+            reset_on_create=False,
+            start_on_create=False,
+        )
+
+
+def test_ensure_instance_errors_when_unknown_meta_override_is_provided() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="Unknown meta_parameters provided"):
+        spx_utils.ensure_instance(
+            client,
+            "inst",
+            "model",
+            model_def=model_def,
+            meta_parameters={"modbus_unit_id": 11},
             recreate=True,
             ensure_running=False,
             reset_on_create=False,

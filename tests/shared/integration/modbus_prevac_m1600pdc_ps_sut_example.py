@@ -32,6 +32,7 @@ MODEL_PATH = (
 MODEL_KEY = "tests__prevac_m1600pdc_ps"
 INSTANCE_KEY = "prevac_m1600pdc_ps"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
+META_PARAMETERS = {"modbus_port": 5611, "modbus_unit_id": 11}
 
 
 class TestModbusPrevacM1600PDCPSExampleIntegration(unittest.TestCase):
@@ -65,6 +66,7 @@ class TestModbusPrevacM1600PDCPSExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
+            meta_parameters=META_PARAMETERS,
         )
 
     def setUp(self):

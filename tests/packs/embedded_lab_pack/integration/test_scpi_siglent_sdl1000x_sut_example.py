@@ -102,6 +102,7 @@ class TestScpiSiglentSdl1000xSutExample(unittest.TestCase):
         self.sut.set_voltage(12.0)
         self.sut.set_power(15.0)
         self.sut.set_resistance(8.0)
+        self.sut.drain()
         wait_seconds(0.2)
 
         self.assertAlmostEqual(self.sut.current_setpoint(), 1.25, places=2)
@@ -119,6 +120,7 @@ class TestScpiSiglentSdl1000xSutExample(unittest.TestCase):
         self.sut.set_voltage(10.0)
         self.sut.set_power(25.0)
         self.sut.input_on()
+        self.sut.drain()
         wait_seconds(0.2)
 
         mode = self.sut.mode()
@@ -135,11 +137,13 @@ class TestScpiSiglentSdl1000xSutExample(unittest.TestCase):
 
     def test_input_state_toggle(self):
         self.sut.input_on()
+        self.sut.drain()
         wait_seconds(0.1)
         self.assertEqual(self.sut.input_state(), 1)
         self.assertEqual(self._get_attribute("k__input_state"), "ON")
 
         self.sut.input_off()
+        self.sut.drain()
         wait_seconds(0.1)
         self.assertEqual(self.sut.input_state(), 0)
         self.assertEqual(self._get_attribute("k__input_state"), "OFF")
