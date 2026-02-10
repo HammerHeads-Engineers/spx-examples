@@ -75,6 +75,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
         # Ensure scenarios do not leak state between tests (some runtimes may auto-run enabled scenarios).
         for scenario_name in (
+            "modbus_disconnect",
             "discharge_spike",
             "slow_leak",
             "ionizer_trip",

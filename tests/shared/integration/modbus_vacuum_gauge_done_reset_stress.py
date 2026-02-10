@@ -79,6 +79,18 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
                 attrs["measure_start"].internal_value = 0
         except Exception:
             pass
+
+        # Keep the Modbus channel attached for deterministic reads.
+        try:
+            scenario = self.model["scenarios"]["modbus_disconnect"]
+        except Exception:
+            scenario = None
+        stop = getattr(scenario, "stop", None) if scenario is not None else None
+        if callable(stop):
+            try:
+                stop()
+            except Exception:
+                pass
         wait_seconds(0.1)
 
         try:

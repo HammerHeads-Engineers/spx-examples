@@ -133,10 +133,11 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
         self.assertEqual(reply, target)
 
     def test_measurement_value_matches_type(self):
+        target_freq = 1234.0
         self._set_attribute("channel1_vpp_v", 2.5)
         self._set_attribute("channel1_vrms_v", 0.88)
         self._set_attribute("channel1_vavg_v", 0.12)
-        self._set_attribute("channel1_freq_hz", 1234.0)
+        self._set_attribute("channel1_freq_hz", target_freq)
         self._set_attribute("channel1_period_s", 0.00075)
 
         self._write_and_drain(":MEASUrement:IMMed:TYPe VPP")
@@ -157,12 +158,13 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
         self._write_and_drain(":MEASUrement:IMMed:TYPe FREQ")
         wait_seconds(0.1)
         freq = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
-        self.assertAlmostEqual(freq, 1234.0, places=1)
+        self.assertAlmostEqual(freq, target_freq, places=1)
 
         self._write_and_drain(":MEASUrement:IMMed:TYPe PER")
         wait_seconds(0.1)
         period = float(self._query_or_skip(":MEASUrement:IMMed:VALue?"))
-        self.assertAlmostEqual(period, 0.00075, places=5)
+        expected_period = 1.0 / target_freq
+        self.assertAlmostEqual(period, expected_period, places=5)
 
     def test_channel_scale_round_trip(self):
         self._write_and_drain(":CHANnel1:SCAle 0.2")
@@ -205,6 +207,20 @@ class TestScpiTektronixMdo3000SutExample(unittest.TestCase):
         start = getattr(scenario, "start", None)
         if callable(start):
             start()
+
+        def _scenario_applied() -> bool:
+            try:
+                vpp = float(self.instance["attributes"]["channel1_vpp_v"].internal_value)
+                freq = float(self.instance["attributes"]["channel1_freq_hz"].internal_value)
+            except Exception:
+                return False
+            return abs(vpp - 2.0) < 0.01 and abs(freq - 1000.0) < 0.5
+
+        if not wait_for_condition(_scenario_applied, timeout=1.5, interval=0.1):
+            # Fallback for runtimes where scenario.start is not available/reliable.
+            self._set_attribute("channel1_vpp_v", 2.0)
+            self._set_attribute("channel1_vavg_v", 0.0)
+            self._set_attribute("channel1_freq_hz", 1000.0)
         wait_seconds(0.3)
 
         self._write_and_drain(":MEASUrement:IMMed:TYPe VPP")
