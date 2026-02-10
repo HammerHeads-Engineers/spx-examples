@@ -8,6 +8,7 @@ models:
   - library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_e36312a__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
+  - library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
   - library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
