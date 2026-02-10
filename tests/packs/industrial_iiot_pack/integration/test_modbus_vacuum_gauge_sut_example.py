@@ -38,19 +38,6 @@ class TestModbusVacuumGaugeSUTExampleIntegration(shared_vg.TestModbusVacuumGauge
             cls._client,
             INSTANCE_KEY,
             expected_model_id=MODEL_ID,
-            ensure_running=False,
+            ensure_running=True,
         )
         cls._model_changed = False
-
-        try:
-            cls._instance.stop()
-        except Exception:
-            pass
-        try:
-            cls._instance.reset()
-        except Exception:
-            pass
-        try:
-            cls._instance.start()
-        except Exception:
-            pass
