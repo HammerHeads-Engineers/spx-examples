@@ -5,7 +5,7 @@ factory monitoring. The present iteration links the models we already maintain;
 additional Redfish device twins can land alongside.
 
 - **Protocols**: Modbus TCP, MQTT, HTTP, SCPI, OPC UA.
-- **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, WAGO, APC Rack PDU).
+- **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, Schneider Electric, WAGO, APC Rack PDU).
 - **OPC UA**: process-focused twins:
   * `Process.ProcessCell.OpcUa` – thermal/pressure loop mirroring AsyncUA tests.
   * `Process.Workcell.OpcUa` – robotic/machining gniazdo z pomiarem cykli i alarmami.

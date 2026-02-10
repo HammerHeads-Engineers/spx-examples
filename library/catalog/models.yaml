@@ -484,6 +484,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [industrial_iiot_pack]
     profiles: []
+  - id: Motion.VFDrive.SchneiderAltivar320.Modbus
+    name: Schneider Electric Altivar Machine ATV320 VFD (Modbus)
+    path: library/domains/motion_controllers/schneider/schneider_altivar_320__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
   - id: IO.IOModule.Modbus
     name: IO Module (Modbus)
     path: library/domains/iot/generic/io_module__modbus.yaml
