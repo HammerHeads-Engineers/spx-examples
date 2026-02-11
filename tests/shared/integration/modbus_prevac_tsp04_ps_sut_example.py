@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Integration coverage for the example Modbus Prevac M600DC-PS SUT device implementation."""
+"""Integration coverage for the example Modbus Prevac TSP04-PS SUT device implementation."""
 
 import os
 import unittest
@@ -14,8 +14,8 @@ from tests.common.spx_utils import (
     wait_seconds,
 )
 from tests.common.repo import repo_root
-from tests.devices.modbus_prevac_m600dc_ps_sut_example import (
-    ModbusPrevacM600DCPSExample,
+from tests.devices.modbus_prevac_tsp04_ps_sut_example import (
+    ModbusPrevacTSP04PSExample,
     ModbusTcpClient,
 )
 
@@ -27,15 +27,15 @@ MODEL_PATH = (
     / "domains"
     / "iot"
     / "prevac"
-    / "prevac_m600dc_ps__modbus.yaml"
+    / "prevac_tsp04_ps__modbus.yaml"
 )
-MODEL_KEY = "tests__prevac_m600dc_ps"
-INSTANCE_KEY = "prevac_m600dc_ps"
+MODEL_KEY = "tests__prevac_tsp04_ps"
+INSTANCE_KEY = "prevac_tsp04_ps"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
-META_PARAMETERS = {"modbus_port": 5614, "modbus_unit_id": 14}
+META_PARAMETERS = {"modbus_port": 5612, "modbus_unit_id": 12}
 
 
-class TestModbusPrevacM600DCPSExampleIntegration(unittest.TestCase):
+class TestModbusPrevacTSP04PSExampleIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
@@ -91,14 +91,16 @@ class TestModbusPrevacM600DCPSExampleIntegration(unittest.TestCase):
         except TimeoutError as exc:
             self.skipTest(str(exc))
 
-        self.sut = ModbusPrevacM600DCPSExample(
+        self.sut = ModbusPrevacTSP04PSExample(
             host="127.0.0.1",
             port=port,
             unit_id=unit_id,
             timeout=1.0,
         )
         if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):
-            self.skipTest(f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})")
+            self.skipTest(
+                f"Modbus server not reachable at 127.0.0.1:{port} (unit {unit_id})"
+            )
         wait_seconds(0.2)
 
     def tearDown(self):
@@ -106,30 +108,29 @@ class TestModbusPrevacM600DCPSExampleIntegration(unittest.TestCase):
             self.sut.close()
 
     def test_read_status_and_measurements(self):
-        state = self.sut.read_u16("device_state")
-        power = self.sut.read_float("magnetron_power_w")
-        voltage = self.sut.read_float("magnetron_voltage_v")
-        current = self.sut.read_float("magnetron_current_ma")
+        status = self.sut.read_u16("pump1_status_word")
+        current = self.sut.read_u16("pump1_output_current_a")
+        voltage = self.sut.read_float("pump1_output_voltage_v")
 
-        self.assertIsInstance(state, int)
-        self.assertGreaterEqual(state, 0)
-        for value in (power, voltage, current):
-            self.assertIsInstance(value, float)
+        self.assertIsInstance(status, int)
+        self.assertGreaterEqual(status, 0)
+        self.assertIsInstance(current, int)
+        self.assertIsInstance(voltage, float)
 
-    def test_write_power_setpoint(self):
-        target = 150.0
-        self.sut.set_float("power_set_w", target)
+    def test_write_current_setpoint(self):
+        target = 10
+        self.sut.set_u16("k__pump1_output_current_set_a", target)
 
         def _read_back() -> bool:
             try:
-                value = float(self.sut.read_float("power_set_w"))
+                value = int(self.sut.read_u16("k__pump1_output_current_set_a"))
             except Exception:
                 return False
-            return abs(value - target) < 0.1
+            return value == target
 
         self.assertTrue(
             wait_for_condition(_read_back, timeout=5.0, interval=0.2),
-            "Expected power setpoint to be writable and readable via Modbus",
+            "Expected pump current setpoint to be writable and readable via Modbus",
         )
 
 

@@ -1,0 +1,121 @@
+name: siglent_sdl1000x__scpi
+description: |
+  Virtual Siglent SDL1000X series programmable DC electronic load exposing
+  core SCPI commands for mode selection, setpoints, input state, and
+  measurements over ASCII/TCP.
+
+attributes:
+  idn: "SIGLENT,SDL1020X,SDL1000X0000000,1.01.01.15"
+
+  k__mode: "CURRent"
+  k__input_state: "OFF"
+  k__current_set_a: 1.0
+  k__voltage_set_v: 12.0
+  k__power_set_w: 10.0
+  k__resistance_set_ohm: 10.0
+
+  voltage_v: 0.0
+  current_a: 0.0
+  power_w: 0.0
+  resistance_ohm: 0.0
+
+  mode_status: "CURRENT"
+  input_state_value: "0"
+
+actions:
+  - function: $in(mode_status)
+    name: update_mode_status
+    call: |
+      (lambda mode:
+        "CURRENT" if mode == "CURRent"
+        else "VOLTAGE" if mode == "VOLTage"
+        else "POWER" if mode == "POWer"
+        else "RESISTANCE" if mode == "RESistance"
+        else str(mode).upper()
+      )($in(k__mode))
+  - function: $in(input_state_value)
+    name: update_input_state_value
+    call: ("1" if $in(k__input_state) == "ON" else "0")
+  - function: $in(voltage_v)
+    name: update_voltage
+    call: ($in(k__voltage_set_v) if $in(k__input_state) == "ON" else 0.0)
+  - function: $in(current_a)
+    name: update_current
+    call: |
+      (lambda enabled, mode, i_set, v_set, p_set, r_set:
+        0.0 if not enabled
+        else i_set if mode == "CURRent"
+        else (p_set / v_set if v_set > 0.0 else 0.0) if mode == "POWer"
+        else (v_set / r_set if r_set > 0.0 else 0.0) if mode == "RESistance"
+        else i_set
+      )(
+        $in(k__input_state) == "ON",
+        $in(k__mode),
+        $in(k__current_set_a),
+        $in(k__voltage_set_v),
+        $in(k__power_set_w),
+        $in(k__resistance_set_ohm),
+      )
+  - function: $in(resistance_ohm)
+    name: update_resistance
+    call: |
+      (lambda enabled, mode, r_set, v_set, current:
+        0.0 if not enabled
+        else r_set if mode == "RESistance"
+        else (v_set / current if current > 0.0 else 0.0)
+      )(
+        $in(k__input_state) == "ON",
+        $in(k__mode),
+        $in(k__resistance_set_ohm),
+        $in(k__voltage_set_v),
+        $in(current_a),
+      )
+  - function: $in(power_w)
+    name: update_power
+    call: ($in(voltage_v) * $in(current_a) if $in(k__input_state) == "ON" else 0.0)
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        ":SOURce:FUNCtion CURRent":
+          "#attr(k__mode)": "CURRent"
+        ":SOURce:FUNCtion VOLTage":
+          "#attr(k__mode)": "VOLTage"
+        ":SOURce:FUNCtion POWer":
+          "#attr(k__mode)": "POWer"
+        ":SOURce:FUNCtion RESistance":
+          "#attr(k__mode)": "RESistance"
+        ":SOURce:FUNCtion?": "#out(mode_status)"
+
+        ":SOURce:INPut:STATe ON":
+          "#attr(k__input_state)": "ON"
+        ":SOURce:INPut:STATe OFF":
+          "#attr(k__input_state)": "OFF"
+        ":SOURce:INPut:STATe?": "#out(input_state_value)"
+
+        ":SOURce:CURRent:LEVel:IMMediate {current}":
+          "#attr(k__current_set_a)": "current"
+        ":SOURce:CURRent:LEVel:IMMediate?": "#out(k__current_set_a)"
+
+        ":SOURce:VOLTage:LEVel:IMMediate {voltage}":
+          "#attr(k__voltage_set_v)": "voltage"
+        ":SOURce:VOLTage:LEVel:IMMediate?": "#out(k__voltage_set_v)"
+
+        ":SOURce:POWer:LEVel:IMMediate {power}":
+          "#attr(k__power_set_w)": "power"
+        ":SOURce:POWer:LEVel:IMMediate?": "#out(k__power_set_w)"
+
+        ":SOURce:RESistance:LEVel:IMMediate {resistance}":
+          "#attr(k__resistance_set_ohm)": "resistance"
+        ":SOURce:RESistance:LEVel:IMMediate?": "#out(k__resistance_set_ohm)"
+
+        ":MEASure:CURRent?": "#out(current_a)"
+        ":MEASure:VOLTage?": "#out(voltage_v)"
+        ":MEASure:POWer?": "#out(power_w)"
+        ":MEASure:RESistance?": "#out(resistance_ohm)"

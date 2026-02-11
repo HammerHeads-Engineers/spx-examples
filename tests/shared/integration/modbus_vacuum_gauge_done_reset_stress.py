@@ -62,7 +62,6 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=1,
             attribute_overrides=None,
         )
 
@@ -80,9 +79,8 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
                 attrs["measure_start"].internal_value = 0
         except Exception:
             pass
-        wait_seconds(0.1)
 
-        # Keep the communication adapter attached; some runtimes may auto-run enabled scenarios.
+        # Keep the Modbus channel attached for deterministic reads.
         try:
             scenario = self.model["scenarios"]["modbus_disconnect"]
         except Exception:
@@ -93,15 +91,7 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
                 stop()
             except Exception:
                 pass
-            wait_seconds(0.1)
-
-        try:
-            comm = self.model["communication"]["modbus_slave"]
-            attach = getattr(comm, "attach", None)
-            if callable(attach):
-                attach()
-        except Exception:
-            pass
+        wait_seconds(0.1)
 
         try:
             port, unit_id = wait_for_modbus_endpoint(

@@ -54,6 +54,7 @@ class _FakeInstance:
 class _FakeInstances:
     def __init__(self) -> None:
         self._store: Dict[str, _FakeInstance] = {}
+        self.generate_calls: list[Dict[str, Any]] = []
 
     def __getitem__(self, key: str) -> _FakeInstance:
         return self._store[key]
@@ -63,6 +64,24 @@ class _FakeInstances:
 
     def __delitem__(self, key: str) -> None:
         del self._store[key]
+
+    def generate(
+        self,
+        *,
+        template: str,  # noqa: ARG002
+        count: int,  # noqa: ARG002
+        name: str,
+        parameters: Dict[str, Any],
+    ) -> None:
+        self.generate_calls.append(
+            {
+                "template": template,
+                "count": count,
+                "name": name,
+                "parameters": parameters,
+            }
+        )
+        self._store[name] = _FakeInstance()
 
 
 class _FakeClient(dict):
@@ -144,6 +163,118 @@ def test_bootstrap_model_instance_resets_and_applies_overrides_after_reset(tmp_p
     names_after = [name for name, _payload in instance.calls]
     assert names_after.count("reset") == 2
     assert names_after.count("start") == 2
+
+
+def test_ensure_instance_uses_generate_for_meta_parameter_defaults() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+            "modbus_unit_id": {"type": "int", "default": 1},
+        }
+    }
+
+    instance = spx_utils.ensure_instance(
+        client,
+        "inst",
+        "model",
+        model_def=model_def,
+        recreate=True,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
+    )
+
+    assert instance is client["instances"]["inst"]
+    assert client["instances"].generate_calls == [
+        {
+            "template": "model",
+            "count": 1,
+            "name": "inst",
+            "parameters": {
+                "modbus_port": {"cycle": [5023]},
+                "modbus_unit_id": {"cycle": [1]},
+            },
+        }
+    ]
+
+
+def test_ensure_instance_uses_generate_for_meta_parameter_overrides() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+            "modbus_unit_id": {"type": "int", "default": 1},
+        }
+    }
+
+    instance = spx_utils.ensure_instance(
+        client,
+        "inst",
+        "model",
+        model_def=model_def,
+        meta_parameters={"modbus_port": 5601, "modbus_unit_id": 11},
+        recreate=True,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
+    )
+
+    assert instance is client["instances"]["inst"]
+    assert client["instances"].generate_calls == [
+        {
+            "template": "model",
+            "count": 1,
+            "name": "inst",
+            "parameters": {
+                "modbus_port": {"cycle": [5601]},
+                "modbus_unit_id": {"cycle": [11]},
+            },
+        }
+    ]
+
+
+def test_ensure_instance_errors_when_required_meta_default_missing() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "required": True},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="Missing defaults for required meta_parameters"):
+        spx_utils.ensure_instance(
+            client,
+            "inst",
+            "model",
+            model_def=model_def,
+            recreate=True,
+            ensure_running=False,
+            reset_on_create=False,
+            start_on_create=False,
+        )
+
+
+def test_ensure_instance_errors_when_unknown_meta_override_is_provided() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="Unknown meta_parameters provided"):
+        spx_utils.ensure_instance(
+            client,
+            "inst",
+            "model",
+            model_def=model_def,
+            meta_parameters={"modbus_unit_id": 11},
+            recreate=True,
+            ensure_running=False,
+            reset_on_create=False,
+            start_on_create=False,
+        )
 
 
 def test_require_existing_instance_skips_when_missing() -> None:

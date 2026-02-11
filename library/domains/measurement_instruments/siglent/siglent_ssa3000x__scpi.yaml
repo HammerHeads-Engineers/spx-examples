@@ -1,0 +1,45 @@
+name: siglent_ssa3000x__scpi
+description: |
+  Virtual Siglent SSA3000X series spectrum analyzer exposing a subset of the
+  SCPI (ASCII/TCP) command set for center frequency, span, reference level,
+  and marker readback queries.
+attributes:
+  idn: "SIGLENT,SSA3000X,SSA3X0000000,1.0"
+
+  k__center_frequency_hz: 1000000000.0
+  k__span_hz: 10000000.0
+  k__reference_level_dbm: -20.0
+  k__marker_1_enabled: 1
+
+  marker_1_level_dbm: -50.0
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        ":SENSe:FREQuency:CENTer?": "#out(k__center_frequency_hz)"
+        ":SENSe:FREQuency:CENTer {frequency}":
+          "#attr(k__center_frequency_hz)": "frequency"
+          response: "OK"
+
+        ":SENSe:FREQuency:SPAN?": "#out(k__span_hz)"
+        ":SENSe:FREQuency:SPAN {span}":
+          "#attr(k__span_hz)": "span"
+          response: "OK"
+
+        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel?": "#out(k__reference_level_dbm)"
+        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel {level}":
+          "#attr(k__reference_level_dbm)": "level"
+          response: "OK"
+
+        ":CALCulate:MARKer1:STATe?": "#out(k__marker_1_enabled)"
+        ":CALCulate:MARKer1:STATe {state}":
+          "#attr(k__marker_1_enabled)": "state"
+          response: "OK"
+
+        ":CALCulate:MARKer1:Y?": "#out(marker_1_level_dbm)"

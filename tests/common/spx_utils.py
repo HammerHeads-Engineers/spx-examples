@@ -59,11 +59,75 @@ def ensure_model(client, model_key: str, model_def: Dict[str, Any]) -> bool:
     return False
 
 
+def _meta_defaults(
+    model_def: Optional[Dict[str, Any]],
+    overrides: Optional[Dict[str, Any]] = None,
+) -> tuple[Dict[str, Any], list[str]]:
+    meta = (model_def or {}).get("meta_parameters", {})
+    if not isinstance(meta, dict):
+        return {}, []
+
+    overrides = dict(overrides or {})
+    unknown = sorted(set(overrides.keys()) - set(meta.keys()))
+    if unknown:
+        raise RuntimeError(
+            f"Unknown meta_parameters provided: {', '.join(unknown)}"
+        )
+
+    params: Dict[str, Any] = {}
+    missing: list[str] = []
+    for name, spec in meta.items():
+        if name in overrides:
+            params[name] = {"cycle": [overrides[name]]}
+            continue
+        if not isinstance(spec, dict):
+            continue
+        if "default" in spec:
+            params[name] = {"cycle": [spec.get("default")]}
+        elif spec.get("required") is True:
+            missing.append(name)
+    return params, missing
+
+
+def _create_instance_with_meta_defaults(
+    instances: Any,
+    instance_key: str,
+    model_key: str,
+    model_def: Optional[Dict[str, Any]],
+    meta_parameters: Optional[Dict[str, Any]] = None,
+) -> None:
+    has_meta = isinstance(model_def, dict) and bool(model_def.get("meta_parameters"))
+    if meta_parameters and not has_meta:
+        raise RuntimeError(
+            f"Meta parameter overrides provided for {model_key}, but model has no meta_parameters."
+        )
+
+    if has_meta:
+        params, missing = _meta_defaults(model_def, overrides=meta_parameters)
+        if missing:
+            raise RuntimeError(
+                f"Missing defaults for required meta_parameters in {model_key}: {', '.join(missing)}"
+            )
+        generate = getattr(instances, "generate", None)
+        if callable(generate):
+            generate(
+                template=model_key,
+                count=1,
+                name=instance_key,
+                parameters=params,
+            )
+            return
+
+    instances[instance_key] = model_key
+
+
 def ensure_instance(
     client,
     instance_key: str,
     model_key: str,
     *,
+    model_def: Optional[Dict[str, Any]] = None,
+    meta_parameters: Optional[Dict[str, Any]] = None,
     overrides: Optional[Dict[str, Any]] = None,
     recreate: bool = False,
     ensure_running: bool = True,
@@ -89,7 +153,13 @@ def ensure_instance(
             except Exception:
                 pass
 
-        instances[instance_key] = model_key
+        _create_instance_with_meta_defaults(
+            instances,
+            instance_key,
+            model_key,
+            model_def,
+            meta_parameters=meta_parameters,
+        )
         inst = instances[instance_key]
         if reset_on_create:
             inst.reset()
@@ -135,6 +205,7 @@ def bootstrap_model_instance(
     model_key: str,
     instance_key: str,
     unit_id: Optional[int] = None,
+    meta_parameters: Optional[Dict[str, Any]] = None,
     attribute_overrides: Optional[Dict[str, Any]] = None,
 ):
     """Load a model and ensure an instance is available, returning (client, instance, model_changed)."""
@@ -150,6 +221,8 @@ def bootstrap_model_instance(
         client,
         instance_key,
         model_key,
+        model_def=model_def,
+        meta_parameters=meta_parameters,
         recreate=model_changed,
         overrides=None,
         ensure_running=False,

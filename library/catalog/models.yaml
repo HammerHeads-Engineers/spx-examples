@@ -250,9 +250,36 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.DigitalMultimeter.TektronixDmm4050.Scpi
+    name: Tektronix DMM4050 Digital Multimeter (SCPI)
+    path: library/domains/measurement_instruments/tektronix/tektronix_dmm4050__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.DigitalMultimeter.RohdeSchwarzHmc8012.Scpi
+    name: Rohde & Schwarz HMC8012 Digital Multimeter (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
     name: Siglent SDG1032X Function Generator (SCPI)
     path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.ElectronicLoad.SiglentSdl1000x.Scpi
+    name: Siglent SDL1000X Programmable DC Electronic Load (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sdl1000x__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:
@@ -268,9 +295,36 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.PowerSupply.KeysightE36312A.Scpi
+    name: Keysight E36312A Triple Output Power Supply (SCPI)
+    path: library/domains/measurement_instruments/keysight/keysight_e36312a__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.Keysight1000X.Scpi
     name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.RohdeSchwarzHmo1002.Scpi
+    name: Rohde & Schwarz HMO1002 Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmo1002__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.TektronixMdo3000.Scpi
+    name: Tektronix MDO3000 Series Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/tektronix/tektronix_mdo3000__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:
@@ -286,9 +340,36 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.SiglentSds2000xHd.Scpi
+    name: Siglent SDS2000X HD Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_sds2000x_hd__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.SpectrumAnalyzer.SiglentSsa3000x.Scpi
+    name: Siglent SSA3000X Spectrum Analyzer (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_ssa3000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.Oscilloscope.RigolDs1000z.Scpi
     name: Rigol DS1000Z Oscilloscope (SCPI)
     path: library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.Oscilloscope.RigolMso5000.Scpi
+    name: Rigol MSO5000 Oscilloscope (SCPI)
+    path: library/domains/measurement_instruments/rigol/rigol_mso5000__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:
@@ -307,6 +388,33 @@ models:
   - id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
     name: Prevac M600DC-PS Magnetron Power Supply (Modbus)
     path: library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.MagnetronPowerSupply.PrevacM1600PDCPS.Modbus
+    name: Prevac M1600PDC-PS Magnetron Power Supply (Modbus)
+    path: library/domains/iot/prevac/prevac_m1600pdc_ps__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.SublimationPumpPowerSupply.PrevacTSP04PS.Modbus
+    name: Prevac TSP04-PS Sublimation Pump Power Supply (Modbus)
+    path: library/domains/iot/prevac/prevac_tsp04_ps__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.XraySourceEmissionController.PrevacXR40BEC.Modbus
+    name: Prevac XR40B-EC X-Ray Source Emission Controller (Modbus)
+    path: library/domains/iot/prevac/prevac_xr40b_ec__modbus.yaml
     domain: iot
     protocols: [modbus]
     services:
@@ -370,6 +478,15 @@ models:
   - id: Motion.VFDrive.SiemensG120C.Modbus
     name: Siemens SINAMICS G120C VFD (Modbus TCP)
     path: library/domains/motion_controllers/siemens/g120c__modbus.yaml
+    domain: motion_controllers
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [industrial_iiot_pack]
+    profiles: []
+  - id: Motion.VFDrive.SchneiderAltivar320.Modbus
+    name: Schneider Electric Altivar Machine ATV320 VFD (Modbus)
+    path: library/domains/motion_controllers/schneider/schneider_altivar_320__modbus.yaml
     domain: motion_controllers
     protocols: [modbus]
     services:

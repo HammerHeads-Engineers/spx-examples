@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Example SCPI oscilloscope SUT client used by integration tests."""
+"""Example SCPI spectrum analyzer SUT client used by integration tests."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from typing import Optional
 TERMINATOR = "\n"
 
 
-class ScpiOscilloscopeSUTExample:
-    """Minimal helper for SCPI-over-TCP oscilloscope queries."""
+class ScpiSpectrumAnalyzerSUTExample:
+    """Very small helper bridging TCP sockets with SCPI commands."""
 
     def __init__(
         self,
@@ -117,7 +117,7 @@ class ScpiOscilloscopeSUTExample:
         ) from last_exc
 
     def drain(self, timeout: float = 0.05) -> None:
-        """Drain pending responses (e.g. OK/echo payloads from write commands)."""
+        """Drain any pending responses (e.g., echoes from non-query commands)."""
         sock = self._ensure_socket()
         previous_timeout = sock.gettimeout()
         sock.settimeout(timeout)
@@ -135,23 +135,32 @@ class ScpiOscilloscopeSUTExample:
     # ------------------------------------------------------------------
     # Convenience wrappers
     # ------------------------------------------------------------------
-    def identify(self) -> str:
-        return self.query("*IDN?")
+    def query_center_frequency(self) -> float:
+        return float(self.query(":SENSe:FREQuency:CENTer?"))
 
-    def measure_vpp(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VPP,CHANnel{channel}"))
+    def set_center_frequency(self, value: float) -> str:
+        return self.query(f":SENSe:FREQuency:CENTer {value}")
 
-    def measure_vrms(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VRMS,CHANnel{channel}"))
+    def query_span(self) -> float:
+        return float(self.query(":SENSe:FREQuency:SPAN?"))
 
-    def measure_vavg(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VAVG,CHANnel{channel}"))
+    def set_span(self, value: float) -> str:
+        return self.query(f":SENSe:FREQuency:SPAN {value}")
 
-    def measure_frequency(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? FREQuency,CHANnel{channel}"))
+    def query_reference_level(self) -> float:
+        return float(self.query(":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel?"))
 
-    def measure_period(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? PERiod,CHANnel{channel}"))
+    def set_reference_level(self, value: float) -> str:
+        return self.query(f":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel {value}")
+
+    def query_marker_state(self) -> str:
+        return self.query(":CALCulate:MARKer1:STATe?")
+
+    def set_marker_state(self, value: int) -> str:
+        return self.query(f":CALCulate:MARKer1:STATe {value}")
+
+    def query_marker_level(self) -> float:
+        return float(self.query(":CALCulate:MARKer1:Y?"))
 
     def _require_socket(self) -> socket.socket:
         if self._socket is None:
@@ -181,4 +190,4 @@ class ScpiOscilloscopeSUTExample:
         self._reset_socket()
 
 
-__all__ = ["ScpiOscilloscopeSUTExample"]
+__all__ = ["ScpiSpectrumAnalyzerSUTExample"]

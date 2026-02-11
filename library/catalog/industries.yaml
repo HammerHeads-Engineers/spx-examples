@@ -120,6 +120,8 @@ industries:
         instance: spx_lab_multimeter
       - model: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
         instance: spx_lab_function_generator
+      - model: Lab.PowerSupply.KeysightE36312A.Scpi
+        instance: spx_lab_power_supply
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
       - model: Process.VacuumGaugeMultichannel.Modbus
@@ -174,6 +176,8 @@ industries:
         instance: spx_vfd_drive
       - model: Motion.VFDrive.SiemensG120C.Modbus
         instance: spx_g120c_vfd
+      - model: Motion.VFDrive.SchneiderAltivar320.Modbus
+        instance: spx_altivar_320_vfd
       - model: IO.IOModule.Modbus
         instance: spx_io_module
       - model: IO.IOModule.Wago750_8000.Modbus
@@ -200,6 +204,7 @@ industries:
       - spx_eurotherm_3216_temp
       - spx_eurotherm_3504_pressure
       - spx_g120c_vfd
+      - spx_altivar_320_vfd
       - spx_wago_750_8000_io
       - spx_s7_1500_process_cell
     path: library/industries/industrial_iiot_pack

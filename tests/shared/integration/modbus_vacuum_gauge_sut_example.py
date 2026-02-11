@@ -67,7 +67,6 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
             model_path=MODEL_PATH,
             model_key=MODEL_KEY,
             instance_key=INSTANCE_KEY,
-            unit_id=2,
         )
 
     def setUp(self):
@@ -76,10 +75,10 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
 
         # Ensure scenarios do not leak state between tests (some runtimes may auto-run enabled scenarios).
         for scenario_name in (
+            "modbus_disconnect",
             "discharge_spike",
             "slow_leak",
             "ionizer_trip",
-            "modbus_disconnect",
             "relay_sweep",
             "sensor_drift",
         ):
@@ -94,14 +93,6 @@ class TestModbusVacuumGaugeSUTExampleIntegration(unittest.TestCase):
                 except Exception:
                     pass
         wait_seconds(0.1)
-
-        try:
-            comm = self.model["communication"]["modbus_slave"]
-            attach = getattr(comm, "attach", None)
-            if callable(attach):
-                attach()
-        except Exception:
-            pass
 
         try:
             port, unit_id = wait_for_modbus_endpoint(

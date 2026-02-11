@@ -1,0 +1,96 @@
+# SPDX-License-Identifier: MIT
+
+name: schneider_altivar_320__modbus
+description: |
+  Schneider Electric Altivar Machine ATV320 VFD (sim) using Modbus serial link
+  scanner words from the ATV320 Modbus manual (NVE41308, 04/2016).
+  Default COM scanner mapping:
+    - 12741 ETA status word (input word 1)
+    - 12742 RFRD actual speed (input word 2)
+    - 12761 CMD control word (output word 1)
+    - 12762 LFRD speed reference (output word 2)
+
+attributes:
+  cmd__control_word_raw: 0
+  k__speed_setpoint_raw: 0
+  status_word_raw: 0
+  speed_actual_raw: 0
+
+  speed_setpoint_hz: 0.0
+  speed_actual_hz: 0.0
+  run_enable: 0
+  fault_active: 0
+
+  speed_scale_hz_per_unit: 1.0
+  speed_max_hz: 60.0
+  speed_dev_hz: 0.5
+  accel_ramp_s: 2.5
+  decel_ramp_s: 3.5
+  cycle_time_s: 0.1
+
+actions:
+  - function: $in(speed_setpoint_hz)
+    name: decode_setpoint
+    description: Convert raw Modbus speed reference into Hz using the scale factor.
+    call: max(0.0, min($in(speed_max_hz), $in(k__speed_setpoint_raw) * $in(speed_scale_hz_per_unit)))
+
+  - function: $in(run_enable)
+    name: decode_run_enable
+    description: Run enable when a non-zero command word is present and no fault is active.
+    call: 1 if ($in(cmd__control_word_raw) != 0 and $in(fault_active) == 0) else 0
+
+  - function: $in(speed_actual_hz)
+    name: track_speed
+    description: First-order speed tracking with independent accel/decel ramps.
+    call: (
+          $in(speed_actual_hz)
+          + (
+              (
+                ($in(speed_setpoint_hz) if $in(run_enable) == 1 else 0.0)
+                - $in(speed_actual_hz)
+              )
+              * (
+                $in(cycle_time_s)
+                / max(
+                    0.1,
+                    ($in(accel_ramp_s) if abs($in(speed_setpoint_hz)) > abs($in(speed_actual_hz)) else $in(decel_ramp_s))
+                  )
+              )
+            )
+        )
+
+  - function: $in(status_word_raw)
+    name: build_status_word
+    description: Encode a minimal ready/run/fault/deviation status word for telemetry.
+    call: >-
+          (
+            (1 if $in(fault_active) == 0 else 0)
+            + (2 if ($in(run_enable) == 1 and $in(fault_active) == 0) else 0)
+            + (4 if ($in(run_enable) == 1 and abs($in(speed_actual_hz)) > 0.1 and $in(fault_active) == 0) else 0)
+            + (8 if $in(fault_active) == 1 else 0)
+            + (
+              256
+              if abs(
+                $in(speed_actual_hz)
+                - ($in(speed_setpoint_hz) if $in(run_enable) == 1 else 0.0)
+              ) > $in(speed_dev_hz)
+              else 0
+            )
+          )
+
+  - function: $in(speed_actual_raw)
+    name: encode_speed_actual
+    description: Encode actual speed into the raw register using the scale factor.
+    call: int(round(abs($in(speed_actual_hz) / max(0.001, $in(speed_scale_hz_per_unit)))))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5030
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        cmd__control_word_raw: { address: [12761,12761], group: h_r, type: uint_16 }
+        k__speed_setpoint_raw: { address: [12762,12762], group: h_r, type: uint_16 }
+        status_word_raw: { address: [12741,12741], group: h_r, type: uint_16 }
+        speed_actual_raw: { address: [12742,12742], group: h_r, type: uint_16 }

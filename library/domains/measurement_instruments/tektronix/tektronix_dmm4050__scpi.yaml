@@ -1,0 +1,82 @@
+name: tektronix_dmm4050__scpi
+description: |
+  Virtual Tektronix DMM4050 digital multimeter exposing a focused SCPI command
+  set for DC voltage/current, resistance, frequency, and period measurements.
+
+attributes:
+  idn: "TEKTRONIX,DMM4050,0000000,1.0"
+
+  k__mode: "VOLT:DC"
+  k__range_v: 10.0
+  k__range_a: 1.0
+  k__range_ohm: 1000.0
+
+  voltage_dc_v: 1.234
+  current_dc_a: 0.123
+  resistance_ohm: 1000.0
+  frequency_hz: 1000.0
+  period_s: 0.001
+
+  readback_value: 1.234
+  error_status: "0,No error"
+
+actions:
+  - function: $in(readback_value)
+    name: update_readback
+    call: |
+      (lambda mode, v, i, r, f, p:
+        v if mode == "VOLT:DC"
+        else i if mode == "CURR:DC"
+        else r if mode == "RES"
+        else f if mode == "FREQ"
+        else p if mode == "PER"
+        else v
+      )(
+        $in(k__mode),
+        $in(voltage_dc_v),
+        $in(current_dc_a),
+        $in(resistance_ohm),
+        $in(frequency_hz),
+        $in(period_s),
+      )
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        "CONF:VOLT:DC":
+          "#attr(k__mode)": "VOLT:DC"
+        "CONF:VOLT:DC {range}":
+          "#attr(k__mode)": "VOLT:DC"
+          "#attr(k__range_v)": "range"
+
+        "CONF:CURR:DC":
+          "#attr(k__mode)": "CURR:DC"
+        "CONF:CURR:DC {range}":
+          "#attr(k__mode)": "CURR:DC"
+          "#attr(k__range_a)": "range"
+
+        "CONF:RES":
+          "#attr(k__mode)": "RES"
+        "CONF:RES {range}":
+          "#attr(k__mode)": "RES"
+          "#attr(k__range_ohm)": "range"
+
+        "CONF:FREQ":
+          "#attr(k__mode)": "FREQ"
+        "CONF:PER":
+          "#attr(k__mode)": "PER"
+
+        "MEAS:VOLT:DC?": "#out(voltage_dc_v)"
+        "MEAS:CURR:DC?": "#out(current_dc_a)"
+        "MEAS:RES?": "#out(resistance_ohm)"
+        "MEAS:FREQ?": "#out(frequency_hz)"
+        "MEAS:PER?": "#out(period_s)"
+        "READ?": "#out(readback_value)"
+
+        "SYST:ERR?": "#out(error_status)"

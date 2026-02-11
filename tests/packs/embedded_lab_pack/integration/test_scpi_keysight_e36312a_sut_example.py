@@ -3,26 +3,23 @@
 import os
 import unittest
 
-import tests.shared.integration.modbus_vacuum_gauge_sut_example as shared_vg
+import tests.shared.integration.scpi_keysight_e36312a_sut_example as shared_scpi
 
 from tests.common.spx_utils import require_existing_instance
 
 
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
-INSTANCE_KEY = "spx_vacuum_gauge"
-MODEL_ID = "Process.VacuumGauge.Modbus"
+INSTANCE_KEY = "spx_lab_power_supply"
+MODEL_ID = "Lab.PowerSupply.KeysightE36312A.Scpi"
 
 
-class TestModbusVacuumGaugeSUTExampleIntegration(shared_vg.TestModbusVacuumGaugeSUTExampleIntegration):
-    """Run the shared vacuum-gauge suite against the installer-created instance."""
+class TestScpiKeysightE36312ASUTExample(
+    shared_scpi.TestScpiKeysightE36312ASUTExample
+):
+    """Run the shared Keysight E36312A SCPI suite against installer instance."""
 
     @classmethod
     def setUpClass(cls):
-        if shared_vg.ModbusTcpClient is None:  # pragma: no cover - dependency missing
-            raise unittest.SkipTest(
-                "pymodbus is not available. Install pymodbus to run Modbus integration tests."
-            )
-
         try:
             import spx_python  # type: ignore
         except ImportError as exc:  # pragma: no cover - optional dependency
@@ -30,7 +27,7 @@ class TestModbusVacuumGaugeSUTExampleIntegration(shared_vg.TestModbusVacuumGauge
 
         product_key = os.environ.get("SPX_PRODUCT_KEY")
         if not product_key:
-            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
+            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run SCPI integration tests.")
 
         cls._spx = spx_python
         cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
@@ -38,6 +35,19 @@ class TestModbusVacuumGaugeSUTExampleIntegration(shared_vg.TestModbusVacuumGauge
             cls._client,
             INSTANCE_KEY,
             expected_model_id=MODEL_ID,
-            ensure_running=True,
+            ensure_running=False,
         )
         cls._model_changed = False
+
+        try:
+            cls._instance.stop()
+        except Exception:
+            pass
+        try:
+            cls._instance.reset()
+        except Exception:
+            pass
+        try:
+            cls._instance.start()
+        except Exception:
+            pass

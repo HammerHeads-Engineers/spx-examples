@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: MIT
+
+name: prevac_xr40b_ec__modbus
+description: |
+  Prevac XR40B-EC X-ray source emission controller with Modbus RTU/TCP register map.
+  Mapping follows the user manual register table (rev. 2, firmware 1.5.6).
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5613
+  modbus_unit_id:
+    type: int
+    default: 13
+
+attributes:
+  status_word_1: 0
+  status_word_2: 0
+  status_word_3: 0
+  supported_source_count: 0
+  emission_voltage_v: 0
+  emission_current_ma: 0.0
+  cathode_current_a: 0.0
+  cooling_water_temperature_c: 0.0
+  cooling_water_pressure_bar: 0.0
+  cooling_water_flow_l_min: 0.0
+  leak_current_ma: 0.0
+  anode_power_dissipation_w: 0
+  crystal_temperature_c: 0.0
+  cmd__go_operate: 0
+  cmd__go_standby: 0
+  cmd__crystal_heating_on: 0
+  cmd__crystal_heating_off: 0
+  k__emission_voltage_set_v: 0
+  k__emission_current_set_ma: 0.0
+  k__active_source: 0
+  k__emission_voltage_ramp_rate_v_s_source1: 0
+  k__emission_voltage_ramp_rate_v_s_source2: 0
+  k__emission_current_ramp_rate_ma_s_source1: 0.0
+  k__emission_current_ramp_rate_ma_s_source2: 0.0
+  k__source1_anode_selection: 0
+  k__source2_anode_selection: 0
+  k__focus_voltage_1_v: 0
+  k__focus_voltage_2_v: 0
+  k__focus_voltage_3_v: 0
+  k__focus_voltage_4_v: 0
+  k__timer_direction: 0
+  operate_time_s: 0
+  k__operate_time_setpoint_s: 0
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        status_word_1: { address: [1,1], group: h_r, type: int_16 }
+        status_word_2: { address: [2,2], group: h_r, type: int_16 }
+        status_word_3: { address: [3,3], group: h_r, type: int_16 }
+        supported_source_count: { address: [4,4], group: h_r, type: uint_16 }
+        emission_voltage_v: { address: [5,5], group: h_r, type: int_16 }
+        emission_current_ma: { address: [6,7], group: h_r, type: float }
+        cathode_current_a: { address: [8,9], group: h_r, type: float }
+        cooling_water_temperature_c: { address: [10,11], group: h_r, type: float }
+        cooling_water_pressure_bar: { address: [12,13], group: h_r, type: float }
+        cooling_water_flow_l_min: { address: [14,15], group: h_r, type: float }
+        leak_current_ma: { address: [16,17], group: h_r, type: float }
+        anode_power_dissipation_w: { address: [18,18], group: h_r, type: int_16 }
+        crystal_temperature_c: { address: [35,36], group: h_r, type: float }
+        cmd__go_operate: { address: [37,37], group: h_r, type: uint_16 }
+        cmd__go_standby: { address: [38,38], group: h_r, type: uint_16 }
+        cmd__crystal_heating_on: { address: [39,39], group: h_r, type: uint_16 }
+        cmd__crystal_heating_off: { address: [40,40], group: h_r, type: uint_16 }
+        k__emission_voltage_set_v: { address: [41,41], group: h_r, type: int_16 }
+        k__emission_current_set_ma: { address: [42,43], group: h_r, type: float }
+        k__active_source: { address: [44,44], group: h_r, type: uint_16 }
+        k__emission_voltage_ramp_rate_v_s_source1: { address: [45,45], group: h_r, type: int_16 }
+        k__emission_voltage_ramp_rate_v_s_source2: { address: [46,46], group: h_r, type: int_16 }
+        k__emission_current_ramp_rate_ma_s_source1: { address: [47,48], group: h_r, type: float }
+        k__emission_current_ramp_rate_ma_s_source2: { address: [49,50], group: h_r, type: float }
+        k__source1_anode_selection: { address: [51,51], group: h_r, type: uint_16 }
+        k__source2_anode_selection: { address: [52,52], group: h_r, type: uint_16 }
+        k__focus_voltage_1_v: { address: [53,53], group: h_r, type: int_16 }
+        k__focus_voltage_2_v: { address: [54,54], group: h_r, type: int_16 }
+        k__focus_voltage_3_v: { address: [55,55], group: h_r, type: int_16 }
+        k__focus_voltage_4_v: { address: [56,56], group: h_r, type: int_16 }
+        k__timer_direction: { address: [65,65], group: h_r, type: uint_16 }
+        operate_time_s: { address: [66,67], group: h_r, type: int_32 }
+        k__operate_time_setpoint_s: { address: [68,69], group: h_r, type: int_32 }

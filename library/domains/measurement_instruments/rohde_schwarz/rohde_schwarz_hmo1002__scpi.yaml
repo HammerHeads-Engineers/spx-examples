@@ -1,0 +1,103 @@
+name: rohde_schwarz_hmo1002__scpi
+description: |
+  Virtual Rohde & Schwarz HMO1002 oscilloscope with SCPI commands for
+  vertical scaling, timebase configuration, trigger level control, and
+  basic measurement queries for channel 1.
+
+attributes:
+  idn: "Rohde&Schwarz,HMO1002,0000000000,1.00"
+
+  k__channel_1_scale_v: 1.0
+  k__channel_1_offset_v: 0.0
+  k__timebase_scale_s: 0.001
+  k__trigger_level_v: 0.0
+  k__measurement_type: VPP
+
+  channel1_vpp_v: 2.0
+  channel1_vrms_v: 0.7071
+  channel1_vavg_v: 0.0
+  channel1_freq_hz: 1000.0
+  channel1_period_s: 0.001
+
+  measurement_value: 2.0
+  error_status: "0,No error"
+
+actions:
+  - function: $in(channel1_period_s)
+    name: update_period
+    params:
+      min_freq_hz: 0.1
+    call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
+  - function: $in(channel1_vrms_v)
+    name: update_vrms
+    params:
+      scale: 0.353553
+    call: $in(channel1_vpp_v) * scale
+  - function: $in(measurement_value)
+    name: update_measurement_value
+    call: |
+      (
+        $in(channel1_vpp_v) if $in(k__measurement_type) == "VPP" else
+        $in(channel1_vrms_v) if $in(k__measurement_type) == "VRMS" else
+        $in(channel1_vavg_v) if $in(k__measurement_type) == "VAVG" else
+        $in(channel1_freq_hz) if $in(k__measurement_type) == "FREQ" else
+        $in(channel1_period_s) if $in(k__measurement_type) == "PER" else
+        $in(channel1_vpp_v)
+      )
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        "CHANnel1:SCALe?": "#out(k__channel_1_scale_v)"
+        "CHANnel1:SCALe {scale}":
+          "#attr(k__channel_1_scale_v)": "scale"
+          response: "OK"
+        "CHANnel1:OFFSet?": "#out(k__channel_1_offset_v)"
+        "CHANnel1:OFFSet {offset}":
+          "#attr(k__channel_1_offset_v)": "offset"
+          response: "OK"
+
+        "TIMebase:SCALe?": "#out(k__timebase_scale_s)"
+        "TIMebase:SCALe {scale}":
+          "#attr(k__timebase_scale_s)": "scale"
+          response: "OK"
+
+        "TRIGger:A:LEVel1?": "#out(k__trigger_level_v)"
+        "TRIGger:A:LEVel1 {level}":
+          "#attr(k__trigger_level_v)": "level"
+          response: "OK"
+
+        "MEASurement1:MAIN?": "#out(k__measurement_type)"
+        "MEASurement1:MAIN {mtype}":
+          "#attr(k__measurement_type)": "mtype"
+          response: "OK"
+        "MEASurement1:RESult?": "#out(measurement_value)"
+
+        "SYSTem:ERRor:ALL?": "#out(error_status)"
+
+        ":MEASure:ITEM? VPP,CHANnel1": "#out(channel1_vpp_v)"
+        ":MEASure:ITEM? VRMS,CHANnel1": "#out(channel1_vrms_v)"
+        ":MEASure:ITEM? VAVG,CHANnel1": "#out(channel1_vavg_v)"
+        ":MEASure:ITEM? FREQuency,CHANnel1": "#out(channel1_freq_hz)"
+        ":MEASure:ITEM? PERiod,CHANnel1": "#out(channel1_period_s)"
+
+scenarios:
+  calibration_tone:
+    display_name: "Calibration Tone"
+    description: "Stable 1 kHz, 2 Vpp signal for verification runs."
+    overrides:
+      $out(channel1_vpp_v): 2.0
+      $out(channel1_vavg_v): 0.0
+      $out(channel1_freq_hz): 1000.0
+  transient_spike:
+    display_name: "Transient Spike"
+    description: "Short 5 Vpp excursion to validate trigger thresholds."
+    duration: 1.0
+    overrides:
+      $out(channel1_vpp_v): 5.0

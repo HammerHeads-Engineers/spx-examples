@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Example SCPI oscilloscope SUT client used by integration tests."""
+"""Example SCPI electronic load SUT client used by integration tests."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from typing import Optional
 TERMINATOR = "\n"
 
 
-class ScpiOscilloscopeSUTExample:
-    """Minimal helper for SCPI-over-TCP oscilloscope queries."""
+class ScpiElectronicLoadSUTExample:
+    """Very small helper bridging TCP sockets with SCPI commands."""
 
     def __init__(
         self,
@@ -138,20 +138,56 @@ class ScpiOscilloscopeSUTExample:
     def identify(self) -> str:
         return self.query("*IDN?")
 
-    def measure_vpp(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VPP,CHANnel{channel}"))
+    def set_mode(self, mode: str) -> None:
+        self.write(f":SOURce:FUNCtion {mode}")
 
-    def measure_vrms(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VRMS,CHANnel{channel}"))
+    def mode(self) -> str:
+        return self.query(":SOURce:FUNCtion?")
 
-    def measure_vavg(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? VAVG,CHANnel{channel}"))
+    def input_on(self) -> None:
+        self.write(":SOURce:INPut:STATe ON")
 
-    def measure_frequency(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? FREQuency,CHANnel{channel}"))
+    def input_off(self) -> None:
+        self.write(":SOURce:INPut:STATe OFF")
 
-    def measure_period(self, channel: int = 1) -> float:
-        return float(self.query(f":MEASure:ITEM? PERiod,CHANnel{channel}"))
+    def input_state(self) -> int:
+        return int(float(self.query(":SOURce:INPut:STATe?")))
+
+    def set_current(self, value: float) -> None:
+        self.write(f":SOURce:CURRent:LEVel:IMMediate {value}")
+
+    def current_setpoint(self) -> float:
+        return float(self.query(":SOURce:CURRent:LEVel:IMMediate?"))
+
+    def set_voltage(self, value: float) -> None:
+        self.write(f":SOURce:VOLTage:LEVel:IMMediate {value}")
+
+    def voltage_setpoint(self) -> float:
+        return float(self.query(":SOURce:VOLTage:LEVel:IMMediate?"))
+
+    def set_power(self, value: float) -> None:
+        self.write(f":SOURce:POWer:LEVel:IMMediate {value}")
+
+    def power_setpoint(self) -> float:
+        return float(self.query(":SOURce:POWer:LEVel:IMMediate?"))
+
+    def set_resistance(self, value: float) -> None:
+        self.write(f":SOURce:RESistance:LEVel:IMMediate {value}")
+
+    def resistance_setpoint(self) -> float:
+        return float(self.query(":SOURce:RESistance:LEVel:IMMediate?"))
+
+    def measure_current(self) -> float:
+        return float(self.query(":MEASure:CURRent?"))
+
+    def measure_voltage(self) -> float:
+        return float(self.query(":MEASure:VOLTage?"))
+
+    def measure_power(self) -> float:
+        return float(self.query(":MEASure:POWer?"))
+
+    def measure_resistance(self) -> float:
+        return float(self.query(":MEASure:RESistance?"))
 
     def _require_socket(self) -> socket.socket:
         if self._socket is None:
@@ -181,4 +217,4 @@ class ScpiOscilloscopeSUTExample:
         self._reset_socket()
 
 
-__all__ = ["ScpiOscilloscopeSUTExample"]
+__all__ = ["ScpiElectronicLoadSUTExample"]
