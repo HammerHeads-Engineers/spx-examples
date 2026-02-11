@@ -12,6 +12,7 @@ models:
   - library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdl1000x__scpi.yaml
+  - library/domains/measurement_instruments/siglent/siglent_spd1000x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sds2000x_hd__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_ssa3000x__scpi.yaml

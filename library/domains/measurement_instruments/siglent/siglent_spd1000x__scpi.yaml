@@ -1,0 +1,70 @@
+name: siglent_spd1000x__scpi
+description: |
+  Siglent SPD1000X series single-channel programmable DC power supply driven by
+  SCPI (ASCII/TCP). Exposes voltage/current setpoints, output state, and basic
+  measurements for lab automation workflows.
+
+attributes:
+  idn: "SIGLENT,SPD1000X,SPD1000X0000000,1.01"
+
+  k__selected_output: "CH1"
+
+  k__ch1_voltage_set_v: 5.0
+  k__ch1_current_limit_a: 1.0
+  k__ch1_output_state: 0
+
+  ch1_voltage_readback_v: 0.0
+  ch1_current_readback_a: 0.0
+  ch1_power_readback_w: 0.0
+
+  system_status: 0
+  system_version: "1.00"
+  error_status: '0,"No error"'
+
+actions:
+  - function: $in(ch1_voltage_readback_v)
+    name: update_ch1_voltage
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_current_readback_a)
+    name: update_ch1_current
+    call: ($in(k__ch1_current_limit_a) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_power_readback_w)
+    name: update_ch1_power
+    call: ($in(ch1_voltage_readback_v) * $in(ch1_current_readback_a))
+  - function: $in(system_status)
+    name: update_system_status
+    call: (1 if $in(k__ch1_output_state) == 1 else 0)
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+        ":SYSTem:ERRor?": "#out(error_status)"
+        ":SYSTem:VERSion?": "#out(system_version)"
+        ":SYSTem:STATus?": "#out(system_status)"
+
+        ":INSTrument CH1":
+          "#attr(k__selected_output)": "CH1"
+          response: "OK"
+        ":INSTrument?": "#out(k__selected_output)"
+
+        "CH1:VOLTage {voltage}":
+          "#attr(k__ch1_voltage_set_v)": "voltage"
+        "CH1:VOLTage?": "#out(k__ch1_voltage_set_v)"
+
+        "CH1:CURRent {current}":
+          "#attr(k__ch1_current_limit_a)": "current"
+        "CH1:CURRent?": "#out(k__ch1_current_limit_a)"
+
+        ":OUTPut CH1,ON":
+          "#attr(k__ch1_output_state)": 1
+        ":OUTPut CH1,OFF":
+          "#attr(k__ch1_output_state)": 0
+
+        ":MEASure:VOLTage? CH1": "#out(ch1_voltage_readback_v)"
+        ":MEASure:CURRent? CH1": "#out(ch1_current_readback_a)"
+        ":MEASure:POWEr? CH1": "#out(ch1_power_readback_w)"
