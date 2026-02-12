@@ -268,6 +268,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.PowerAnalyzer.RohdeSchwarzHmc8015.Scpi
+    name: Rohde & Schwarz HMC8015 Power Analyzer (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8015__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
     name: Siglent SDG1032X Function Generator (SCPI)
     path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml

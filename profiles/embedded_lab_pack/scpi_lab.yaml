@@ -10,6 +10,7 @@ models:
   - library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
   - library/domains/measurement_instruments/tektronix/tektronix_dmm4050__scpi.yaml
   - library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
+  - library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8015__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_sdl1000x__scpi.yaml
   - library/domains/measurement_instruments/siglent/siglent_spd1000x__scpi.yaml
