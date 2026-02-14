@@ -190,11 +190,12 @@ communication:
       zero_fill: true
       mapping:
         # Voltages (V) Float32
-        voltage_l1_l2_v:     { address: [19008, 19009], group: i_r, type: float }
-        voltage_l2_l3_v:     { address: [19010, 19011], group: i_r, type: float }
-        k__voltage_l1_n_v:   { address: [19002, 19003], group: i_r, type: float }
-        k__voltage_l2_n_v:   { address: [19004, 19005], group: i_r, type: float }
-        k__voltage_l3_n_v:   { address: [19006, 19007], group: i_r, type: float }
+        k__voltage_l1_n_v:   { address: [19000, 19001], group: i_r, type: float }
+        k__voltage_l2_n_v:   { address: [19002, 19003], group: i_r, type: float }
+        k__voltage_l3_n_v:   { address: [19004, 19005], group: i_r, type: float }
+        voltage_l1_l2_v:     { address: [19006, 19007], group: i_r, type: float }
+        voltage_l2_l3_v:     { address: [19008, 19009], group: i_r, type: float }
+        voltage_l3_l1_v:     { address: [19010, 19011], group: i_r, type: float }
 
         # Currents (A) Float32
         k__current_l1_a:     { address: [19012, 19013], group: i_r, type: float }
@@ -203,9 +204,9 @@ communication:
         current_neutral_a:   { address: [19018, 19019], group: i_r, type: float }
 
         # Power factor + frequency Float32
-        k__power_factor_l1:  { address: [19028, 19029], group: i_r, type: float }
-        k__power_factor_l2:  { address: [19030, 19031], group: i_r, type: float }
-        k__power_factor_l3:  { address: [19032, 19033], group: i_r, type: float }
+        k__power_factor_l1:  { address: [19044, 19045], group: i_r, type: float }
+        k__power_factor_l2:  { address: [19046, 19047], group: i_r, type: float }
+        k__power_factor_l3:  { address: [19048, 19049], group: i_r, type: float }
         k__frequency_hz:     { address: [19050, 19051], group: i_r, type: float }
 
         # Active power (W) Float32
@@ -215,16 +216,16 @@ communication:
         k__active_power_total_w: { address: [19026, 19027], group: i_r, type: float }
 
         # Apparent power (VA) Float32
-        apparent_power_l1_va: { address: [19034, 19035], group: i_r, type: float }
-        apparent_power_l2_va: { address: [19036, 19037], group: i_r, type: float }
-        apparent_power_l3_va: { address: [19038, 19039], group: i_r, type: float }
-        k__apparent_power_total_va: { address: [19040, 19041], group: i_r, type: float }
+        apparent_power_l1_va: { address: [19028, 19029], group: i_r, type: float }
+        apparent_power_l2_va: { address: [19030, 19031], group: i_r, type: float }
+        apparent_power_l3_va: { address: [19032, 19033], group: i_r, type: float }
+        k__apparent_power_total_va: { address: [19034, 19035], group: i_r, type: float }
 
         # Reactive power (var) Float32
-        reactive_power_l1_var: { address: [19042, 19043], group: i_r, type: float }
-        reactive_power_l2_var: { address: [19044, 19045], group: i_r, type: float }
-        reactive_power_l3_var: { address: [19046, 19047], group: i_r, type: float }
-        k__reactive_power_total_var: { address: [19048, 19049], group: i_r, type: float }
+        reactive_power_l1_var: { address: [19036, 19037], group: i_r, type: float }
+        reactive_power_l2_var: { address: [19038, 19039], group: i_r, type: float }
+        reactive_power_l3_var: { address: [19040, 19041], group: i_r, type: float }
+        k__reactive_power_total_var: { address: [19042, 19043], group: i_r, type: float }
 
         # Energy (Wh) Float32
         energy_l1_wh:         { address: [19054, 19055], group: i_r, type: float }

@@ -33,7 +33,7 @@ def test_janitza_umg604_pro_modbus_model_loads() -> None:
 
     mapping = modbus.get("mapping")
     assert isinstance(mapping, dict)
-    assert mapping["k__voltage_l1_n_v"]["address"] == [19002, 19003]
+    assert mapping["k__voltage_l1_n_v"]["address"] == [19000, 19001]
     assert mapping["k__current_l1_a"]["address"] == [19012, 19013]
     assert mapping["k__active_power_total_w"]["address"] == [19026, 19027]
     assert mapping["k__energy_total_wh"]["address"] == [19060, 19061]
