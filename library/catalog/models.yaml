@@ -745,6 +745,15 @@ models:
       - id: ocpp_central_system
     packages: [energy_pack]
     profiles: [ev_csms_demo]
+  - id: Energy.EVSE.SiemensVersiChargeAc.Modbus
+    name: Siemens VersiCharge AC EVSE (Modbus TCP)
+    path: library/domains/energy/emobility/siemens_versicharge_ac__modbus.yaml
+    domain: energy
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
   - id: Energy.CSMS.Ocpp
     name: CSMS Control Simulator (OCPP 1.6)
     path: library/domains/energy/emobility/csms__ocpp.yaml
