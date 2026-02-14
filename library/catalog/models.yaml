@@ -664,6 +664,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.PowerQualityAnalyzerUmg604Pro.Modbus
+    name: Janitza UMG 604-PRO Power Quality Analyzer (Modbus)
+    path: library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterDirisA10.Modbus
     name: Socomec DIRIS A-10 Energy Meter (Modbus)
     path: library/domains/iot/socomec/diris_a10__modbus.yaml
