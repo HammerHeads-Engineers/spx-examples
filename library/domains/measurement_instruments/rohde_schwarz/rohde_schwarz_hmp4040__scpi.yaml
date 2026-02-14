@@ -54,12 +54,15 @@ actions:
   - function: $in(k__selected_voltage_set_v)
     name: sync_selected_voltage
     call: |
-      (lambda sel, v1, v2, v3, v4:
-        v1 if sel == 1
+      (lambda cmd, selected, sel, v1, v2, v3, v4:
+        selected if cmd == 1
+        else v1 if sel == 1
         else v2 if sel == 2
         else v3 if sel == 3
         else v4
       )(
+        $in(cmd__apply_voltage),
+        $in(k__selected_voltage_set_v),
         $in(k__selected_channel),
         $in(k__ch1_voltage_set_v),
         $in(k__ch2_voltage_set_v),
@@ -69,12 +72,15 @@ actions:
   - function: $in(k__selected_current_set_a)
     name: sync_selected_current
     call: |
-      (lambda sel, c1, c2, c3, c4:
-        c1 if sel == 1
+      (lambda cmd, selected, sel, c1, c2, c3, c4:
+        selected if cmd == 1
+        else c1 if sel == 1
         else c2 if sel == 2
         else c3 if sel == 3
         else c4
       )(
+        $in(cmd__apply_current),
+        $in(k__selected_current_set_a),
         $in(k__selected_channel),
         $in(k__ch1_current_set_a),
         $in(k__ch2_current_set_a),
@@ -84,12 +90,15 @@ actions:
   - function: $in(k__selected_output_state)
     name: sync_selected_output
     call: |
-      (lambda sel, s1, s2, s3, s4:
-        s1 if sel == 1
+      (lambda cmd, selected, sel, s1, s2, s3, s4:
+        selected if cmd == 1
+        else s1 if sel == 1
         else s2 if sel == 2
         else s3 if sel == 3
         else s4
       )(
+        $in(cmd__apply_output),
+        $in(k__selected_output_state),
         $in(k__selected_channel),
         $in(k__ch1_output_state),
         $in(k__ch2_output_state),
