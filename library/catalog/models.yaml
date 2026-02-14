@@ -277,6 +277,15 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.PowerSupply.RohdeSchwarzHmp4040.Scpi
+    name: Rohde & Schwarz HMP4040 Power Supply (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmp4040__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
     name: Siglent SDG1032X Function Generator (SCPI)
     path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
