@@ -7,6 +7,7 @@ models:
   - library/domains/energy/emobility/csms__ocpp.yaml
   - library/domains/energy/emobility/evse__ocpp.yaml
   - library/domains/iot/schneider/schneider_pm5560__modbus.yaml
+  - library/domains/energy/emobility/siemens_versicharge_ac__modbus.yaml
 services:
   - ocpp_central_system
   - modbus_tcp_gateway

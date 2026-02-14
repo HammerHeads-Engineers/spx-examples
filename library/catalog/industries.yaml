@@ -87,6 +87,8 @@ industries:
         instance: spx_csms_ocpp
       - model: Energy.EVSE.Ocpp
         instance: spx_evse_ocpp
+      - model: Energy.EVSE.SiemensVersiChargeAc.Modbus
+        instance: spx_evse_versicharge_ac_modbus
       - model: Env.EnvSensor.Mqtt
         instance: spx_env_sensor_mqtt
       - model: Weather.WeatherFeed.Http

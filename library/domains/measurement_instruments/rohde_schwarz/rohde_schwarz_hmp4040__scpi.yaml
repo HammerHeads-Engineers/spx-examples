@@ -1,0 +1,358 @@
+name: rohde_schwarz_hmp4040__scpi
+description: |
+  Virtual Rohde & Schwarz HMP4040 programmable power supply with a focused
+  SCPI command subset for channel selection, setpoints, output control, and
+  measurement readback.
+
+attributes:
+  idn: "Rohde&Schwarz,HMP4040,0000000000,1.00"
+
+  k__selected_channel: 1
+  k__selected_voltage_set_v: 5.0
+  k__selected_current_set_a: 1.0
+  k__selected_output_state: 0
+
+  cmd__apply_voltage: 0
+  cmd__apply_current: 0
+  cmd__apply_output: 0
+
+  k__ch1_voltage_set_v: 5.0
+  k__ch1_current_set_a: 1.0
+  k__ch1_output_state: 0
+  ch1_voltage_v: 0.0
+  ch1_current_a: 0.0
+  ch1_power_w: 0.0
+
+  k__ch2_voltage_set_v: 5.0
+  k__ch2_current_set_a: 1.0
+  k__ch2_output_state: 0
+  ch2_voltage_v: 0.0
+  ch2_current_a: 0.0
+  ch2_power_w: 0.0
+
+  k__ch3_voltage_set_v: 5.0
+  k__ch3_current_set_a: 1.0
+  k__ch3_output_state: 0
+  ch3_voltage_v: 0.0
+  ch3_current_a: 0.0
+  ch3_power_w: 0.0
+
+  k__ch4_voltage_set_v: 5.0
+  k__ch4_current_set_a: 1.0
+  k__ch4_output_state: 0
+  ch4_voltage_v: 0.0
+  ch4_current_a: 0.0
+  ch4_power_w: 0.0
+
+  selected_voltage_v: 0.0
+  selected_current_a: 0.0
+  selected_power_w: 0.0
+
+  error_status: "0,No error"
+
+actions:
+  - function: $in(k__selected_voltage_set_v)
+    name: sync_selected_voltage
+    call: |
+      (lambda cmd, selected, sel, v1, v2, v3, v4:
+        selected if cmd == 1
+        else v1 if sel == 1
+        else v2 if sel == 2
+        else v3 if sel == 3
+        else v4
+      )(
+        $in(cmd__apply_voltage),
+        $in(k__selected_voltage_set_v),
+        $in(k__selected_channel),
+        $in(k__ch1_voltage_set_v),
+        $in(k__ch2_voltage_set_v),
+        $in(k__ch3_voltage_set_v),
+        $in(k__ch4_voltage_set_v),
+      )
+  - function: $in(k__selected_current_set_a)
+    name: sync_selected_current
+    call: |
+      (lambda cmd, selected, sel, c1, c2, c3, c4:
+        selected if cmd == 1
+        else c1 if sel == 1
+        else c2 if sel == 2
+        else c3 if sel == 3
+        else c4
+      )(
+        $in(cmd__apply_current),
+        $in(k__selected_current_set_a),
+        $in(k__selected_channel),
+        $in(k__ch1_current_set_a),
+        $in(k__ch2_current_set_a),
+        $in(k__ch3_current_set_a),
+        $in(k__ch4_current_set_a),
+      )
+  - function: $in(k__selected_output_state)
+    name: sync_selected_output
+    call: |
+      (lambda cmd, selected, sel, s1, s2, s3, s4:
+        selected if cmd == 1
+        else s1 if sel == 1
+        else s2 if sel == 2
+        else s3 if sel == 3
+        else s4
+      )(
+        $in(cmd__apply_output),
+        $in(k__selected_output_state),
+        $in(k__selected_channel),
+        $in(k__ch1_output_state),
+        $in(k__ch2_output_state),
+        $in(k__ch3_output_state),
+        $in(k__ch4_output_state),
+      )
+
+  - function: $in(k__ch1_voltage_set_v)
+    name: apply_ch1_voltage
+    call: |
+      ($in(k__selected_voltage_set_v)
+        if ($in(cmd__apply_voltage) == 1 and $in(k__selected_channel) == 1)
+        else $in(k__ch1_voltage_set_v)
+      )
+  - function: $in(k__ch2_voltage_set_v)
+    name: apply_ch2_voltage
+    call: |
+      ($in(k__selected_voltage_set_v)
+        if ($in(cmd__apply_voltage) == 1 and $in(k__selected_channel) == 2)
+        else $in(k__ch2_voltage_set_v)
+      )
+  - function: $in(k__ch3_voltage_set_v)
+    name: apply_ch3_voltage
+    call: |
+      ($in(k__selected_voltage_set_v)
+        if ($in(cmd__apply_voltage) == 1 and $in(k__selected_channel) == 3)
+        else $in(k__ch3_voltage_set_v)
+      )
+  - function: $in(k__ch4_voltage_set_v)
+    name: apply_ch4_voltage
+    call: |
+      ($in(k__selected_voltage_set_v)
+        if ($in(cmd__apply_voltage) == 1 and $in(k__selected_channel) == 4)
+        else $in(k__ch4_voltage_set_v)
+      )
+
+  - function: $in(k__ch1_current_set_a)
+    name: apply_ch1_current
+    call: |
+      ($in(k__selected_current_set_a)
+        if ($in(cmd__apply_current) == 1 and $in(k__selected_channel) == 1)
+        else $in(k__ch1_current_set_a)
+      )
+  - function: $in(k__ch2_current_set_a)
+    name: apply_ch2_current
+    call: |
+      ($in(k__selected_current_set_a)
+        if ($in(cmd__apply_current) == 1 and $in(k__selected_channel) == 2)
+        else $in(k__ch2_current_set_a)
+      )
+  - function: $in(k__ch3_current_set_a)
+    name: apply_ch3_current
+    call: |
+      ($in(k__selected_current_set_a)
+        if ($in(cmd__apply_current) == 1 and $in(k__selected_channel) == 3)
+        else $in(k__ch3_current_set_a)
+      )
+  - function: $in(k__ch4_current_set_a)
+    name: apply_ch4_current
+    call: |
+      ($in(k__selected_current_set_a)
+        if ($in(cmd__apply_current) == 1 and $in(k__selected_channel) == 4)
+        else $in(k__ch4_current_set_a)
+      )
+
+  - function: $in(k__ch1_output_state)
+    name: apply_ch1_output
+    call: |
+      ($in(k__selected_output_state)
+        if ($in(cmd__apply_output) == 1 and $in(k__selected_channel) == 1)
+        else $in(k__ch1_output_state)
+      )
+  - function: $in(k__ch2_output_state)
+    name: apply_ch2_output
+    call: |
+      ($in(k__selected_output_state)
+        if ($in(cmd__apply_output) == 1 and $in(k__selected_channel) == 2)
+        else $in(k__ch2_output_state)
+      )
+  - function: $in(k__ch3_output_state)
+    name: apply_ch3_output
+    call: |
+      ($in(k__selected_output_state)
+        if ($in(cmd__apply_output) == 1 and $in(k__selected_channel) == 3)
+        else $in(k__ch3_output_state)
+      )
+  - function: $in(k__ch4_output_state)
+    name: apply_ch4_output
+    call: |
+      ($in(k__selected_output_state)
+        if ($in(cmd__apply_output) == 1 and $in(k__selected_channel) == 4)
+        else $in(k__ch4_output_state)
+      )
+
+  - function: $in(cmd__apply_voltage)
+    name: clear_voltage_command
+    call: (0 if $in(cmd__apply_voltage) == 1 else $in(cmd__apply_voltage))
+  - function: $in(cmd__apply_current)
+    name: clear_current_command
+    call: (0 if $in(cmd__apply_current) == 1 else $in(cmd__apply_current))
+  - function: $in(cmd__apply_output)
+    name: clear_output_command
+    call: (0 if $in(cmd__apply_output) == 1 else $in(cmd__apply_output))
+
+  - function: $in(ch1_voltage_v)
+    name: update_ch1_voltage
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_current_a)
+    name: update_ch1_current
+    call: ($in(k__ch1_current_set_a) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_power_w)
+    name: update_ch1_power
+    call: |
+      ($in(k__ch1_voltage_set_v) * $in(k__ch1_current_set_a)
+        if $in(k__ch1_output_state) == 1
+        else 0.0
+      )
+
+  - function: $in(ch2_voltage_v)
+    name: update_ch2_voltage
+    call: ($in(k__ch2_voltage_set_v) if $in(k__ch2_output_state) == 1 else 0.0)
+  - function: $in(ch2_current_a)
+    name: update_ch2_current
+    call: ($in(k__ch2_current_set_a) if $in(k__ch2_output_state) == 1 else 0.0)
+  - function: $in(ch2_power_w)
+    name: update_ch2_power
+    call: |
+      ($in(k__ch2_voltage_set_v) * $in(k__ch2_current_set_a)
+        if $in(k__ch2_output_state) == 1
+        else 0.0
+      )
+
+  - function: $in(ch3_voltage_v)
+    name: update_ch3_voltage
+    call: ($in(k__ch3_voltage_set_v) if $in(k__ch3_output_state) == 1 else 0.0)
+  - function: $in(ch3_current_a)
+    name: update_ch3_current
+    call: ($in(k__ch3_current_set_a) if $in(k__ch3_output_state) == 1 else 0.0)
+  - function: $in(ch3_power_w)
+    name: update_ch3_power
+    call: |
+      ($in(k__ch3_voltage_set_v) * $in(k__ch3_current_set_a)
+        if $in(k__ch3_output_state) == 1
+        else 0.0
+      )
+
+  - function: $in(ch4_voltage_v)
+    name: update_ch4_voltage
+    call: ($in(k__ch4_voltage_set_v) if $in(k__ch4_output_state) == 1 else 0.0)
+  - function: $in(ch4_current_a)
+    name: update_ch4_current
+    call: ($in(k__ch4_current_set_a) if $in(k__ch4_output_state) == 1 else 0.0)
+  - function: $in(ch4_power_w)
+    name: update_ch4_power
+    call: |
+      ($in(k__ch4_voltage_set_v) * $in(k__ch4_current_set_a)
+        if $in(k__ch4_output_state) == 1
+        else 0.0
+      )
+
+  - function: $in(selected_voltage_v)
+    name: update_selected_voltage
+    call: |
+      (lambda sel, v1, v2, v3, v4:
+        v1 if sel == 1
+        else v2 if sel == 2
+        else v3 if sel == 3
+        else v4
+      )(
+        $in(k__selected_channel),
+        $in(ch1_voltage_v),
+        $in(ch2_voltage_v),
+        $in(ch3_voltage_v),
+        $in(ch4_voltage_v),
+      )
+  - function: $in(selected_current_a)
+    name: update_selected_current
+    call: |
+      (lambda sel, c1, c2, c3, c4:
+        c1 if sel == 1
+        else c2 if sel == 2
+        else c3 if sel == 3
+        else c4
+      )(
+        $in(k__selected_channel),
+        $in(ch1_current_a),
+        $in(ch2_current_a),
+        $in(ch3_current_a),
+        $in(ch4_current_a),
+      )
+  - function: $in(selected_power_w)
+    name: update_selected_power
+    call: |
+      (lambda sel, p1, p2, p3, p4:
+        p1 if sel == 1
+        else p2 if sel == 2
+        else p3 if sel == 3
+        else p4
+      )(
+        $in(k__selected_channel),
+        $in(ch1_power_w),
+        $in(ch2_power_w),
+        $in(ch3_power_w),
+        $in(ch4_power_w),
+      )
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+
+        ":INSTrument:NSELect 1":
+          "#attr(k__selected_channel)": 1
+        ":INSTrument:NSELect 2":
+          "#attr(k__selected_channel)": 2
+        ":INSTrument:NSELect 3":
+          "#attr(k__selected_channel)": 3
+        ":INSTrument:NSELect 4":
+          "#attr(k__selected_channel)": 4
+        ":INSTrument:NSELect?": "#out(k__selected_channel)"
+        ":INSTrument:SELect 1":
+          "#attr(k__selected_channel)": 1
+        ":INSTrument:SELect 2":
+          "#attr(k__selected_channel)": 2
+        ":INSTrument:SELect 3":
+          "#attr(k__selected_channel)": 3
+        ":INSTrument:SELect 4":
+          "#attr(k__selected_channel)": 4
+        ":INSTrument:SELect?": "#out(k__selected_channel)"
+
+        ":SOURce:VOLTage {voltage}":
+          "#attr(k__selected_voltage_set_v)": "voltage"
+          "#attr(cmd__apply_voltage)": 1
+        ":SOURce:VOLTage?": "#out(k__selected_voltage_set_v)"
+        ":SOURce:CURRent {current}":
+          "#attr(k__selected_current_set_a)": "current"
+          "#attr(cmd__apply_current)": 1
+        ":SOURce:CURRent?": "#out(k__selected_current_set_a)"
+
+        ":OUTPut ON":
+          "#attr(k__selected_output_state)": 1
+          "#attr(cmd__apply_output)": 1
+        ":OUTPut OFF":
+          "#attr(k__selected_output_state)": 0
+          "#attr(cmd__apply_output)": 1
+        ":OUTPut?": "#out(k__selected_output_state)"
+        ":OUTPut:STATe?": "#out(k__selected_output_state)"
+
+        ":MEASure:VOLTage?": "#out(selected_voltage_v)"
+        ":MEASure:CURRent?": "#out(selected_current_a)"
+        ":MEASure:POWer?": "#out(selected_power_w)"
+
+        "SYST:ERR?": "#out(error_status)"

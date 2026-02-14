@@ -1,0 +1,362 @@
+# SPDX-License-Identifier: MIT
+
+name: siemens_versicharge_ac__modbus
+description: |
+  Minimal Modbus TCP (slave) simulation of the Siemens VersiCharge AC EV charger.
+  Register mapping follows the Siemens "VersiCharge AC and OCPP Connectivity Guide"
+  (Modbus Register Map section) for pause control, max charging current, per-phase
+  current/voltage, power, power factor, and energy consumed.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5036
+  modbus_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  # Remote controls
+  cmd__pause: 2
+  k__max_charging_current_a: 16
+
+  # Electrical measurements
+  k__current_l1_a: 8.0
+  k__current_l2_a: 8.0
+  k__current_l3_a: 8.0
+  k__voltage_l1_n_v: 230.0
+  k__voltage_l2_n_v: 229.0
+  k__voltage_l3_n_v: 231.0
+  k__power_factor_l1: 0.98
+  k__power_factor_l2: 0.98
+  k__power_factor_l3: 0.98
+
+  current_phase_sum_a: 0.0
+  voltage_phase_sum_v: 0.0
+
+  active_power_l1_w: 0.0
+  active_power_l2_w: 0.0
+  active_power_l3_w: 0.0
+  active_power_sum_w: 0.0
+
+  apparent_power_l1_va: 0.0
+  apparent_power_l2_va: 0.0
+  apparent_power_l3_va: 0.0
+  apparent_power_sum_va: 0.0
+
+  reactive_power_l1_var: 0.0
+  reactive_power_l2_var: 0.0
+  reactive_power_l3_var: 0.0
+  reactive_power_sum_var: 0.0
+
+  power_factor_sum: 0.0
+
+  # Energy
+  energy_consumed_kwh: 0.0
+
+  # Modbus-scaled registers
+  _modbus_current_l1_raw: 0
+  _modbus_current_l2_raw: 0
+  _modbus_current_l3_raw: 0
+  _modbus_current_sum_raw: 0
+
+  _modbus_voltage_l1_raw: 0
+  _modbus_voltage_l2_raw: 0
+  _modbus_voltage_l3_raw: 0
+  _modbus_voltage_sum_raw: 0
+
+  _modbus_active_power_l1_raw: 0
+  _modbus_active_power_l2_raw: 0
+  _modbus_active_power_l3_raw: 0
+  _modbus_active_power_sum_raw: 0
+
+  _modbus_power_factor_l1_raw: 0
+  _modbus_power_factor_l2_raw: 0
+  _modbus_power_factor_l3_raw: 0
+  _modbus_power_factor_sum_raw: 0
+
+  _modbus_apparent_power_l1_raw: 0
+  _modbus_apparent_power_l2_raw: 0
+  _modbus_apparent_power_l3_raw: 0
+  _modbus_apparent_power_sum_raw: 0
+
+  _modbus_reactive_power_l1_raw: 0
+  _modbus_reactive_power_l2_raw: 0
+  _modbus_reactive_power_l3_raw: 0
+  _modbus_reactive_power_sum_raw: 0
+
+  _modbus_energy_consumed_raw: 0
+
+  _cycle_time_s: 1.0
+
+actions:
+  - function: $in(current_phase_sum_a)
+    name: compute_current_phase_sum
+    description: Sum of per-phase charging current.
+    call: $in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)
+
+  - function: $in(voltage_phase_sum_v)
+    name: compute_voltage_phase_sum
+    description: Sum of per-phase line-to-neutral voltages.
+    call: $in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)
+
+  - function: $in(apparent_power_l1_va)
+    name: compute_apparent_power_l1
+    description: Apparent power on phase L1 (VA).
+    call: max(0.0, $in(k__voltage_l1_n_v) * $in(k__current_l1_a))
+
+  - function: $in(apparent_power_l2_va)
+    name: compute_apparent_power_l2
+    description: Apparent power on phase L2 (VA).
+    call: max(0.0, $in(k__voltage_l2_n_v) * $in(k__current_l2_a))
+
+  - function: $in(apparent_power_l3_va)
+    name: compute_apparent_power_l3
+    description: Apparent power on phase L3 (VA).
+    call: max(0.0, $in(k__voltage_l3_n_v) * $in(k__current_l3_a))
+
+  - function: $in(apparent_power_sum_va)
+    name: compute_apparent_power_sum
+    description: Sum of apparent power across phases.
+    call: $in(apparent_power_l1_va) + $in(apparent_power_l2_va) + $in(apparent_power_l3_va)
+
+  - function: $in(active_power_l1_w)
+    name: compute_active_power_l1
+    description: Active power on phase L1 (W).
+    call: max(0.0, $in(apparent_power_l1_va) * $in(k__power_factor_l1))
+
+  - function: $in(active_power_l2_w)
+    name: compute_active_power_l2
+    description: Active power on phase L2 (W).
+    call: max(0.0, $in(apparent_power_l2_va) * $in(k__power_factor_l2))
+
+  - function: $in(active_power_l3_w)
+    name: compute_active_power_l3
+    description: Active power on phase L3 (W).
+    call: max(0.0, $in(apparent_power_l3_va) * $in(k__power_factor_l3))
+
+  - function: $in(active_power_sum_w)
+    name: compute_active_power_sum
+    description: Sum of active power across phases.
+    call: $in(active_power_l1_w) + $in(active_power_l2_w) + $in(active_power_l3_w)
+
+  - function: $in(reactive_power_l1_var)
+    name: compute_reactive_power_l1
+    description: Reactive power on phase L1 (var).
+    call: max(0.0, ($in(apparent_power_l1_va) ** 2 - $in(active_power_l1_w) ** 2) ** 0.5)
+
+  - function: $in(reactive_power_l2_var)
+    name: compute_reactive_power_l2
+    description: Reactive power on phase L2 (var).
+    call: max(0.0, ($in(apparent_power_l2_va) ** 2 - $in(active_power_l2_w) ** 2) ** 0.5)
+
+  - function: $in(reactive_power_l3_var)
+    name: compute_reactive_power_l3
+    description: Reactive power on phase L3 (var).
+    call: max(0.0, ($in(apparent_power_l3_va) ** 2 - $in(active_power_l3_w) ** 2) ** 0.5)
+
+  - function: $in(reactive_power_sum_var)
+    name: compute_reactive_power_sum
+    description: Sum of reactive power across phases.
+    call: $in(reactive_power_l1_var) + $in(reactive_power_l2_var) + $in(reactive_power_l3_var)
+
+  - function: $in(power_factor_sum)
+    name: compute_power_factor_sum
+    description: Power factor based on total active vs apparent power.
+    call: |
+      (lambda apparent:
+        0.0 if apparent <= 0.0 else max(0.0, min(1.0, $in(active_power_sum_w) / apparent))
+      )($in(apparent_power_sum_va))
+
+  - function: $in(energy_consumed_kwh)
+    name: integrate_energy
+    description: Integrate consumed energy from total active power.
+    call: $in(energy_consumed_kwh) + max(0.0, $in(active_power_sum_w)) * $in(_cycle_time_s) / 3600000.0
+
+  - function: $in(_modbus_current_l1_raw)
+    name: encode_current_l1
+    description: Register 41648 (A).
+    call: int(round(max(0.0, $in(k__current_l1_a))))
+
+  - function: $in(_modbus_current_l2_raw)
+    name: encode_current_l2
+    description: Register 41649 (A).
+    call: int(round(max(0.0, $in(k__current_l2_a))))
+
+  - function: $in(_modbus_current_l3_raw)
+    name: encode_current_l3
+    description: Register 41650 (A).
+    call: int(round(max(0.0, $in(k__current_l3_a))))
+
+  - function: $in(_modbus_current_sum_raw)
+    name: encode_current_sum
+    description: Register 41651 (A).
+    call: int(round(max(0.0, $in(current_phase_sum_a))))
+
+  - function: $in(_modbus_voltage_l1_raw)
+    name: encode_voltage_l1
+    description: Register 41652 (V).
+    call: int(round(max(0.0, $in(k__voltage_l1_n_v))))
+
+  - function: $in(_modbus_voltage_l2_raw)
+    name: encode_voltage_l2
+    description: Register 41653 (V).
+    call: int(round(max(0.0, $in(k__voltage_l2_n_v))))
+
+  - function: $in(_modbus_voltage_l3_raw)
+    name: encode_voltage_l3
+    description: Register 41654 (V).
+    call: int(round(max(0.0, $in(k__voltage_l3_n_v))))
+
+  - function: $in(_modbus_voltage_sum_raw)
+    name: encode_voltage_sum
+    description: Register 41655 (sum, V).
+    call: int(round(max(0.0, $in(voltage_phase_sum_v))))
+
+  - function: $in(_modbus_active_power_l1_raw)
+    name: encode_active_power_l1
+    description: Register 41663 (W).
+    call: int(round(max(0.0, $in(active_power_l1_w))))
+
+  - function: $in(_modbus_active_power_l2_raw)
+    name: encode_active_power_l2
+    description: Register 41664 (W).
+    call: int(round(max(0.0, $in(active_power_l2_w))))
+
+  - function: $in(_modbus_active_power_l3_raw)
+    name: encode_active_power_l3
+    description: Register 41665 (W).
+    call: int(round(max(0.0, $in(active_power_l3_w))))
+
+  - function: $in(_modbus_active_power_sum_raw)
+    name: encode_active_power_sum
+    description: Register 41666 (0.1 W).
+    call: int(round(max(0.0, $in(active_power_sum_w)) * 10.0))
+
+  - function: $in(_modbus_power_factor_l1_raw)
+    name: encode_power_factor_l1
+    description: Register 41667 (0.01).
+    call: int(round(max(0.0, min(1.0, $in(k__power_factor_l1))) * 100.0))
+
+  - function: $in(_modbus_power_factor_l2_raw)
+    name: encode_power_factor_l2
+    description: Register 41668 (0.01).
+    call: int(round(max(0.0, min(1.0, $in(k__power_factor_l2))) * 100.0))
+
+  - function: $in(_modbus_power_factor_l3_raw)
+    name: encode_power_factor_l3
+    description: Register 41669 (0.01).
+    call: int(round(max(0.0, min(1.0, $in(k__power_factor_l3))) * 100.0))
+
+  - function: $in(_modbus_power_factor_sum_raw)
+    name: encode_power_factor_sum
+    description: Register 41670 (0.01).
+    call: int(round(max(0.0, min(1.0, $in(power_factor_sum))) * 100.0))
+
+  - function: $in(_modbus_apparent_power_l1_raw)
+    name: encode_apparent_power_l1
+    description: Register 41671 (VA).
+    call: int(round(max(0.0, $in(apparent_power_l1_va))))
+
+  - function: $in(_modbus_apparent_power_l2_raw)
+    name: encode_apparent_power_l2
+    description: Register 41672 (VA).
+    call: int(round(max(0.0, $in(apparent_power_l2_va))))
+
+  - function: $in(_modbus_apparent_power_l3_raw)
+    name: encode_apparent_power_l3
+    description: Register 41673 (VA).
+    call: int(round(max(0.0, $in(apparent_power_l3_va))))
+
+  - function: $in(_modbus_apparent_power_sum_raw)
+    name: encode_apparent_power_sum
+    description: Register 41674 (VA).
+    call: int(round(max(0.0, $in(apparent_power_sum_va))))
+
+  - function: $in(_modbus_reactive_power_l1_raw)
+    name: encode_reactive_power_l1
+    description: Register 41675 (var).
+    call: int(round(max(0.0, $in(reactive_power_l1_var))))
+
+  - function: $in(_modbus_reactive_power_l2_raw)
+    name: encode_reactive_power_l2
+    description: Register 41676 (var).
+    call: int(round(max(0.0, $in(reactive_power_l2_var))))
+
+  - function: $in(_modbus_reactive_power_l3_raw)
+    name: encode_reactive_power_l3
+    description: Register 41677 (var).
+    call: int(round(max(0.0, $in(reactive_power_l3_var))))
+
+  - function: $in(_modbus_reactive_power_sum_raw)
+    name: encode_reactive_power_sum
+    description: Register 41678 (var).
+    call: int(round(max(0.0, $in(reactive_power_sum_var))))
+
+  - function: $in(_modbus_energy_consumed_raw)
+    name: encode_energy_consumed
+    description: Register 41693-41694 (0.1 Wh).
+    call: int(round(max(0.0, $in(energy_consumed_kwh)) * 10000.0))
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
+      zero_fill: true
+      mapping:
+        cmd__pause:               { address: [41630,41630], group: h_r, type: uint_16 }
+        k__max_charging_current_a: { address: [41634,41634], group: h_r, type: uint_16 }
+
+        _modbus_current_l1_raw:   { address: [41648,41648], group: h_r, type: uint_16 }
+        _modbus_current_l2_raw:   { address: [41649,41649], group: h_r, type: uint_16 }
+        _modbus_current_l3_raw:   { address: [41650,41650], group: h_r, type: uint_16 }
+        _modbus_current_sum_raw:  { address: [41651,41651], group: h_r, type: uint_16 }
+
+        _modbus_voltage_l1_raw:   { address: [41652,41652], group: h_r, type: uint_16 }
+        _modbus_voltage_l2_raw:   { address: [41653,41653], group: h_r, type: uint_16 }
+        _modbus_voltage_l3_raw:   { address: [41654,41654], group: h_r, type: uint_16 }
+        _modbus_voltage_sum_raw:  { address: [41655,41655], group: h_r, type: uint_16 }
+
+        _modbus_active_power_l1_raw:  { address: [41663,41663], group: h_r, type: uint_16 }
+        _modbus_active_power_l2_raw:  { address: [41664,41664], group: h_r, type: uint_16 }
+        _modbus_active_power_l3_raw:  { address: [41665,41665], group: h_r, type: uint_16 }
+        _modbus_active_power_sum_raw: { address: [41666,41666], group: h_r, type: uint_16 }
+
+        _modbus_power_factor_l1_raw:  { address: [41667,41667], group: h_r, type: uint_16 }
+        _modbus_power_factor_l2_raw:  { address: [41668,41668], group: h_r, type: uint_16 }
+        _modbus_power_factor_l3_raw:  { address: [41669,41669], group: h_r, type: uint_16 }
+        _modbus_power_factor_sum_raw: { address: [41670,41670], group: h_r, type: uint_16 }
+
+        _modbus_apparent_power_l1_raw:  { address: [41671,41671], group: h_r, type: uint_16 }
+        _modbus_apparent_power_l2_raw:  { address: [41672,41672], group: h_r, type: uint_16 }
+        _modbus_apparent_power_l3_raw:  { address: [41673,41673], group: h_r, type: uint_16 }
+        _modbus_apparent_power_sum_raw: { address: [41674,41674], group: h_r, type: uint_16 }
+
+        _modbus_reactive_power_l1_raw:  { address: [41675,41675], group: h_r, type: uint_16 }
+        _modbus_reactive_power_l2_raw:  { address: [41676,41676], group: h_r, type: uint_16 }
+        _modbus_reactive_power_l3_raw:  { address: [41677,41677], group: h_r, type: uint_16 }
+        _modbus_reactive_power_sum_raw: { address: [41678,41678], group: h_r, type: uint_16 }
+
+        _modbus_energy_consumed_raw: { address: [41693,41694], group: h_r, type: uint_32 }
+
+scenarios:
+  fast_charge:
+    description: Higher current fast-charge profile.
+    duration: 30.0
+    overrides:
+      $in(k__current_l1_a): 24.0
+      $in(k__current_l2_a): 24.0
+      $in(k__current_l3_a): 24.0
+      $in(k__power_factor_l1): 0.99
+      $in(k__power_factor_l2): 0.99
+      $in(k__power_factor_l3): 0.99
+
+  paused:
+    description: Pause charging with low current draw.
+    duration: 20.0
+    overrides:
+      $in(cmd__pause): 1
+      $in(k__current_l1_a): 0.0
+      $in(k__current_l2_a): 0.0
+      $in(k__current_l3_a): 0.0

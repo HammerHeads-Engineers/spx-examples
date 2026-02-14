@@ -24,6 +24,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
   - ABB D13 15 energy meter (Modbus): `library/domains/iot/abb/abb_d13_15__modbus.yaml`
   - Energy meter EM4200 (Modbus): `library/domains/iot/schneider/schneider_em4200__modbus.yaml`
   - Siemens PAC3200 power meter (Modbus): `library/domains/iot/siemens/siemens_pac3200__modbus.yaml`
+  - Janitza UMG 604-PRO power quality analyzer (Modbus): `library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml`
   - APC NetShelter Rack PDU 2g (Modbus): `library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml`
   - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
   - Energy meter EM24 (Modbus): `library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`

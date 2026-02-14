@@ -268,6 +268,24 @@ models:
       - id: scpi_tcp_stack
     packages: [embedded_lab_pack]
     profiles: [scpi_lab]
+  - id: Lab.PowerAnalyzer.RohdeSchwarzHmc8015.Scpi
+    name: Rohde & Schwarz HMC8015 Power Analyzer (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8015__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.PowerSupply.RohdeSchwarzHmp4040.Scpi
+    name: Rohde & Schwarz HMP4040 Power Supply (SCPI)
+    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmp4040__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
   - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
     name: Siglent SDG1032X Function Generator (SCPI)
     path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
@@ -280,6 +298,15 @@ models:
   - id: Lab.ElectronicLoad.SiglentSdl1000x.Scpi
     name: Siglent SDL1000X Programmable DC Electronic Load (SCPI)
     path: library/domains/measurement_instruments/siglent/siglent_sdl1000x__scpi.yaml
+    domain: measurement_instruments
+    protocols: [scpi]
+    services:
+      - id: scpi_tcp_stack
+    packages: [embedded_lab_pack]
+    profiles: [scpi_lab]
+  - id: Lab.PowerSupply.SiglentSpd1000X.Scpi
+    name: Siglent SPD1000X Programmable DC Power Supply (SCPI)
+    path: library/domains/measurement_instruments/siglent/siglent_spd1000x__scpi.yaml
     domain: measurement_instruments
     protocols: [scpi]
     services:
@@ -637,6 +664,15 @@ models:
       - id: modbus_tcp_gateway
     packages: [smart_building_pack]
     profiles: [bms_quickstart]
+  - id: Energy.PowerQualityAnalyzerUmg604Pro.Modbus
+    name: Janitza UMG 604-PRO Power Quality Analyzer (Modbus)
+    path: library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml
+    domain: iot
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
+    packages: [smart_building_pack]
+    profiles: [bms_quickstart]
   - id: Energy.EnergyMeterDirisA10.Modbus
     name: Socomec DIRIS A-10 Energy Meter (Modbus)
     path: library/domains/iot/socomec/diris_a10__modbus.yaml
@@ -707,6 +743,15 @@ models:
     protocols: [ocpp]
     services:
       - id: ocpp_central_system
+    packages: [energy_pack]
+    profiles: [ev_csms_demo]
+  - id: Energy.EVSE.SiemensVersiChargeAc.Modbus
+    name: Siemens VersiCharge AC EVSE (Modbus TCP)
+    path: library/domains/energy/emobility/siemens_versicharge_ac__modbus.yaml
+    domain: energy
+    protocols: [modbus]
+    services:
+      - id: modbus_tcp_gateway
     packages: [energy_pack]
     profiles: [ev_csms_demo]
   - id: Energy.CSMS.Ocpp

@@ -1,0 +1,85 @@
+name: rohde_schwarz_hmc8015__scpi
+description: |
+  Virtual Rohde & Schwarz HMC8015 power analyzer with SCPI measurements for
+  RMS voltage/current plus active/reactive/apparent power metrics.
+
+attributes:
+  idn: "Rohde&Schwarz,HMC8015,0000000000,1.00"
+
+  k__measurement_functions: "URMS,IRMS,P,S,Q,LAMB,PHI,EPS,ETA"
+
+  voltage_rms_v: 230.0
+  current_rms_a: 1.25
+  lambda_pf: 0.98
+  phase_deg: 11.5
+
+  apparent_power_va: 287.5
+  active_power_w: 281.75
+  reactive_power_var: 57.2
+  energy_wh: 0.5
+  efficiency_pct: 96.5
+
+  measurement_data: "230.0,1.25,281.75,287.5,57.2,0.98,11.5,0.5,96.5"
+  error_status: "0,No error"
+
+actions:
+  - function: $in(apparent_power_va)
+    name: update_apparent_power
+    call: $in(voltage_rms_v) * $in(current_rms_a)
+  - function: $in(active_power_w)
+    name: update_active_power
+    call: $in(apparent_power_va) * $in(lambda_pf)
+  - function: $in(reactive_power_var)
+    name: update_reactive_power
+    imports: {math: math}
+    call: |
+      (lambda s, p:
+        math.sqrt(max(0.0, s * s - p * p))
+      )($in(apparent_power_va), $in(active_power_w))
+  - function: $in(measurement_data)
+    name: update_measurement_data
+    params:
+      default_functions: "URMS,IRMS,P,S,Q,LAMB,PHI,EPS,ETA"
+    call: |
+      (lambda functions, urms, irms, p, s, q, lamb, phi, eps, eta:
+        ",".join(
+          str({
+            "URMS": urms,
+            "IRMS": irms,
+            "P": p,
+            "S": s,
+            "Q": q,
+            "LAMB": lamb,
+            "PHI": phi,
+            "EPS": eps,
+            "ETA": eta,
+          }.get(f.strip().upper(), 0.0))
+          for f in (functions or default_functions).split(",")
+          if f.strip()
+        )
+      )(
+        $in(k__measurement_functions),
+        $in(voltage_rms_v),
+        $in(current_rms_a),
+        $in(active_power_w),
+        $in(apparent_power_va),
+        $in(reactive_power_var),
+        $in(lambda_pf),
+        $in(phase_deg),
+        $in(energy_wh),
+        $in(efficiency_pct),
+      )
+
+communication:
+  - ascii:
+      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?": "#out(idn)"
+        "SYST:ERR?": "#out(error_status)"
+        "CHAN:MEAS:DATA?": "#out(measurement_data)"
+        "CHAN:MEAS:FUNC {functions}":
+          "#attr(k__measurement_functions)": "functions"
+        "CHAN:MEAS:FUNC?": "#out(k__measurement_functions)"
