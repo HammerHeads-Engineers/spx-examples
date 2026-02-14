@@ -146,7 +146,8 @@ class ScpiRohdeSchwarzHmc8015SUTExample:
 
     def measurement_data(self) -> List[float]:
         reply = self.query("CHAN:MEAS:DATA?")
-        return [float(value) for value in reply.split(",") if value]
+        cleaned = reply.strip().strip("()")
+        return [float(value.strip()) for value in cleaned.split(",") if value.strip()]
 
     def system_error(self) -> str:
         return self.query("SYST:ERR?")
