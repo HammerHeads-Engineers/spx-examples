@@ -23,7 +23,33 @@ permissions:
   packages: write
 
 jobs:
+  pr-title-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|perf|refactor|docs|test|chore|ci|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "${PR_TITLE}" =~ ${pattern} ]]; then
+            echo "PR title must follow Conventional Commits."
+            echo "Expected: type(scope): subject"
+            echo "Examples:"
+            echo "  feat(models): add abb m1m modbus smoke coverage"
+            echo "  fix(ci): skip semantic release when no releasable commits"
+            echo "Current title: ${PR_TITLE}"
+            exit 1
+          fi
+
+      - name: Skip PR title validation for non-PR events
+        if: ${{ github.event_name != 'pull_request' }}
+        run: echo "Skipping PR title validation for event '${{ github.event_name }}'."
+
   tests:
+    needs: pr-title-gate
     runs-on: ubuntu-latest
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
@@ -287,8 +313,37 @@ jobs:
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
+      - name: Precheck releasable commits
+        id: release_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          if [ -n "${last_tag}" ]; then
+            range="${last_tag}..HEAD"
+          else
+            root="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            range="${root}..HEAD"
+          fi
+
+          echo "Checking releasable commits in range: ${range}"
+          if git log --format='%s%n%b' "${range}" | grep -Eiq '^(feat|fix|perf)(\([^)]+\))?!?: |BREAKING CHANGE:'; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Detected releasable commit."
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No releasable commit found (feat/fix/perf/BREAKING CHANGE)."
+          fi
+
+      - name: Skip release (no releasable commits)
+        if: steps.release_gate.outputs.should_release != 'true'
+        run: |
+          echo "Skipping semantic-release: no releasable commits since latest tag."
+
       - name: Action | Semantic Version Release
         id: release
+        if: steps.release_gate.outputs.should_release == 'true'
         uses: python-semantic-release/python-semantic-release@v10.4.1
         with:
           github_token: ${{ secrets.SPX_RELEASE_TOKEN }}

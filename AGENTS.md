@@ -54,5 +54,8 @@ poetry run pytest tests/packs/<pack>
 ## Rules
 - Backward compatibility: avoid renaming or removing existing model IDs, paths, or public APIs.
 - Naming: `lower_snake_case` file names; for new or updated models keep `name` aligned with the file stem; use `__protocol` suffix when applicable.
+- Release policy: for PRs targeting `develop`/`main`, use a Conventional Commit PR title (`type(scope): subject`).
+- Release policy: to trigger Semantic Release version bumps, use releasable types in PR titles/merge commits (`feat:`, `fix:`, `perf:`) or include `BREAKING CHANGE:` in body/footer.
+- Merge policy (recommended): prefer **Squash and merge** so the Conventional PR title becomes the commit message on `develop`/`main`.
 - Do: reuse existing examples, keep YAML indentation at 2 spaces, keep changes additive.
 - Do not: change runtime behavior unless required for tooling or validation.
