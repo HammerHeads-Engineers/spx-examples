@@ -102,11 +102,11 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         baseline_pressure = _float_attr(attrs_3504["pressure_sp_bar"])
         self.assertIsNotNone(baseline_pressure, "Unable to read Eurotherm 3504 pressure setpoint.")
 
-        attrs_3216["auto_man_raw"].internal_value = 0
-        attrs_3216["target_sp_raw"].internal_value = 600
+        attrs_3216["k__auto_man"].internal_value = 0
+        attrs_3216["k__setpoint_c"].internal_value = 60.0
 
         temp_ready = wait_for_condition(
-            lambda: abs((_float_attr(attrs_3216["setpoint_c"]) or 0.0) - 60.0) <= 0.1,
+            lambda: abs((_float_attr(attrs_3216["k__setpoint_c"]) or 0.0) - 60.0) <= 0.1,
             timeout=5.0,
             interval=0.2,
         )
@@ -119,7 +119,7 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
             "Eurotherm 3504 setpoint changed while updating Eurotherm 3216.",
         )
 
-        baseline_temp = _float_attr(attrs_3216["setpoint_c"])
+        baseline_temp = _float_attr(attrs_3216["k__setpoint_c"])
         self.assertIsNotNone(baseline_temp, "Unable to read Eurotherm 3216 temperature setpoint.")
 
         attrs_3504["auto_man_raw"].internal_value = 0
@@ -132,7 +132,7 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         )
         self.assertTrue(pressure_ready, "Eurotherm 3504 setpoint did not reach 2.5 bar.")
 
-        temp_after_pressure = _float_attr(attrs_3216["setpoint_c"])
+        temp_after_pressure = _float_attr(attrs_3216["k__setpoint_c"])
         self.assertIsNotNone(temp_after_pressure, "Unable to read Eurotherm 3216 temperature setpoint.")
         self.assertTrue(
             abs(temp_after_pressure - baseline_temp) <= 0.1,
