@@ -3,8 +3,8 @@ description: |
   BLE health wearable regression profile pairing the vital signs monitor with
   temperature probes to exercise btvirt-driven CI pipelines.
 models:
-  - library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
-  - library/domains/ble/generic/temperature_sensor__ble_gatt.yaml
+  - library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml
+  - library/domains/lab/sensor/generic/temperature_sensor__ble_gatt.yaml
 services:
   - btvirt_adapter
   - mqtt_broker

@@ -1,19 +1,19 @@
 """Load BLE models from YAML and spin up an instance for quick inspection."""
 
-from pathlib import Path
 import argparse
 import os
 import pprint
+from pathlib import Path
 
 import spx_python
 import yaml
 
 MODEL_PATHS = {
     "ble_temperature_sensor": Path(
-        "library/domains/ble/generic/temperature_sensor__ble_gatt.yaml"
+        "library/domains/lab/sensor/generic/temperature_sensor__ble_gatt.yaml"
     ),
     "ble_vital_signs_monitor": Path(
-        "library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml"
+        "library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml"
     ),
 }
 

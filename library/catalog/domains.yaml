@@ -1,33 +1,21 @@
 domains:
-  - id: iot
-    name: IoT & Edge Telemetry
-    description: Environmental sensors served over MQTT/LwM2M/HTTP.
-    path: library/domains/iot
-  - id: weather
-    name: Weather & Forecasting
-    description: Static/dynamic weather feeds via HTTP.
-    path: library/domains/weather
-  - id: energy
-    name: Energy & e-Mobility
-    description: EVSE/CSMS twins and DER-oriented telemetry for OCPP/SunSpec.
-    path: library/domains/energy
-  - id: motion_controllers
-    name: Motion Controllers
-    description: Actuator/drive models exposed over Modbus.
-    path: library/domains/motion_controllers
-  - id: thermal_controllers
-    name: Thermal Controllers
-    description: Heating/cooling loops with Modbus access.
-    path: library/domains/thermal_controllers
-  - id: vacuum_systems
-    name: Vacuum Systems
-    description: Vacuum gauges and process instrumentation.
-    path: library/domains/vacuum_systems
-  - id: measurement_instruments
-    name: Measurement Instruments
-    description: SCPI-grade bench instruments.
-    path: library/domains/measurement_instruments
-  - id: ble
-    name: BLE Devices
-    description: BLE GATT wearables and sensors.
-    path: library/domains/ble
+- id: building
+  name: Building Systems
+  description: HVAC, lighting, safety, access and room-control twins for building automation.
+  path: library/domains/building
+- id: environment
+  name: Environment & Weather
+  description: Environmental sensors, air-quality stations, weather feeds and edge gateways.
+  path: library/domains/environment
+- id: industrial
+  name: Industrial Systems
+  description: Process, motion, IO, logistics and condition-monitoring device models.
+  path: library/domains/industrial
+- id: energy
+  name: Energy & e-Mobility
+  description: Meters, power devices, EVSE/CSMS twins and energy telemetry models.
+  path: library/domains/energy
+- id: lab
+  name: Lab & Embedded
+  description: Bench instruments, BLE devices and lab power/process equipment.
+  path: library/domains/lab

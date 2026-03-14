@@ -4,11 +4,12 @@ Single source of truth for LLM and agent contributions.
 
 ## MUST
 - Keep runtime behavior unchanged unless the change is required for tooling or validation.
-- Place new models under `library/domains/<domain>/<vendor|generic>/`.
+- Place new models under `library/domains/<domain_group>/<device_class>/<vendor|generic>/`.
 - Follow `docs/MODEL_LANGUAGE.md` for YAML structure and expressions; update it if you add new constructs.
 - Update `library/catalog/models.yaml` for every new model.
 - Update `library/catalog/domains.yaml` and `library/catalog/services.yaml` if you add new domains or protocols.
 - Update `library/catalog/industries.yaml` and related `profiles/<pack>/*.yaml` when adding to packs.
+- Regenerate `library/industries/<pack>/MODELS.yaml` with `python tools/render_pack_indexes.py` when pack membership changes.
 - Add or update tests in `tests/` (pack tests in `tests/packs/<pack>/`).
 - Run validation (`python tools/validate_models.py`) and tests before opening a PR.
 
@@ -53,6 +54,7 @@ Do not treat this as a mandatory flow for unrelated repository tasks.
 - Add/update model YAML in `library/domains/...`.
 - Keep naming rules (`lower_snake_case`, `name` aligned with file stem).
 - Update catalogs/profiles/pack docs as required by AGENTS.md.
+- Regenerate pack model indexes with `python tools/render_pack_indexes.py`.
 - Register the model in the target pack explicitly:
   - add `packages: [<target_pack>]` in `library/catalog/models.yaml`,
   - include the model in at least one target-pack profile in `profiles/<target_pack>/*.yaml`,
@@ -69,6 +71,7 @@ Do not treat this as a mandatory flow for unrelated repository tasks.
 6) Validation before push
 - Run:
   - `poetry run python tools/check_model_branch_guard.py --base-ref origin/develop`
+  - `poetry run python tools/render_pack_indexes.py`
   - `poetry run python tools/validate_models.py`
   - `poetry run pytest`
 
@@ -152,8 +155,11 @@ Catalog entry:
 ```yaml
   - id: Demo.Sensor.Mqtt
     name: Demo Sensor (MQTT)
-    path: library/domains/iot/generic/demo_sensor__mqtt.yaml
-    domain: iot
+    path: library/domains/environment/sensor/generic/demo_sensor__mqtt.yaml
+    domain: environment
+    domain_group: environment
+    device_class: sensor
+    vendor: generic
     protocols: [mqtt]
     services:
       - id: mqtt_broker
@@ -167,17 +173,17 @@ name: demo_profile
 description: |
   Minimal demo of a single MQTT model.
 models:
-  - library/domains/iot/generic/demo_sensor__mqtt.yaml
+  - library/domains/environment/sensor/generic/demo_sensor__mqtt.yaml
 services:
   - mqtt_broker
 ```
 
 ## Golden standards (reference models)
-- `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`: rich attributes, multi-step actions, BACnet object map with states/units, scenario actions.
-- `library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: dual MQTT connections, availability, Home Assistant discovery payloads, condition-driven scenarios.
-- `library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml`: reusable action params/imports, conditions, and time-step aware control logic.
-- `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`: clear Modbus input/holding register mapping with derived measurements.
-- `library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml`: consistent multi-channel state/action patterns with KNX bindings.
+- `library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml`: rich attributes, multi-step actions, BACnet object map with states/units, scenario actions.
+- `library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: dual MQTT connections, availability, Home Assistant discovery payloads, condition-driven scenarios.
+- `library/domains/industrial/controller/generic/thermal_controller_advanced.yaml`: reusable action params/imports, conditions, and time-step aware control logic.
+- `library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml`: clear Modbus input/holding register mapping with derived measurements.
+- `library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml`: consistent multi-channel state/action patterns with KNX bindings.
 
 ## Modeling language (short rules)
 - Use top-level keys from `docs/MODEL_LANGUAGE.md` (`attributes`, `actions`, `conditions`, `communication`,

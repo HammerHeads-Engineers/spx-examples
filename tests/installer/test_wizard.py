@@ -3,19 +3,9 @@
 
 from __future__ import annotations
 
-
 import pytest
 
-from installer.manifest import (
-    DomainManifest,
-    IndustryManifest,
-    ManifestIndex,
-    ModelManifest,
-    ProfileManifest,
-    ServiceDeployment,
-    ServiceManifest,
-    ServicePort,
-)
+from installer import manifest
 from installer.wizard import InstallerWizard
 
 
@@ -25,39 +15,48 @@ def _product_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture()
-def manifest_index() -> ManifestIndex:
+def manifest_index() -> manifest.ManifestIndex:
     services = {
-        "mqtt_broker": ServiceManifest(
+        "mqtt_broker": manifest.ServiceManifest(
             id="mqtt_broker",
             name="MQTT Broker",
             protocol="mqtt",
             description="Test broker",
-            ports=[ServicePort(transport="tcp", host=1883, container=1883, purpose="telemetry")],
-            deployment=ServiceDeployment(runtime="docker", image="eclipse-mosquitto", container_name="mosquitto"),
+            ports=[
+                manifest.ServicePort(
+                    transport="tcp", host=1883, container=1883, purpose="telemetry"
+                )
+            ],
+            deployment=manifest.ServiceDeployment(
+                runtime="docker", image="eclipse-mosquitto", container_name="mosquitto"
+            ),
         ),
     }
     models = {
-        "sensor": ModelManifest(
+        "sensor": manifest.ModelManifest(
             id="sensor",
             name="Sensor",
-            path="library/domains/iot/sensor.yaml",
-            domain="iot",
+            path="library/domains/environment/sensor/generic/sensor.yaml",
+            domain="environment",
             protocols=["mqtt"],
             services=["mqtt_broker"],
             packages=["pack_a"],
             profiles=["profile_a"],
+            domain_group="environment",
+            device_class="sensor",
+            vendor="generic",
         )
     }
     domains = {
-        "iot": DomainManifest(
-            id="iot",
-            name="IoT",
-            description="IoT domain",
-            path="library/domains/iot",
+        "environment": manifest.DomainManifest(
+            id="environment",
+            name="Environment",
+            description="Environment domain",
+            path="library/domains/environment",
         )
     }
     industries = {
-        "pack_a": IndustryManifest(
+        "pack_a": manifest.IndustryManifest(
             id="pack_a",
             name="Pack A",
             description="Pack description",
@@ -68,17 +67,17 @@ def manifest_index() -> ManifestIndex:
         )
     }
     profiles = {
-        "profile_a": ProfileManifest(
+        "profile_a": manifest.ProfileManifest(
             id="profile_a",
             pack_id="pack_a",
             name="Profile A",
             description="Profile description",
-            models=["library/domains/iot/sensor.yaml"],
+            models=["library/domains/environment/sensor/generic/sensor.yaml"],
             services=["mqtt_broker"],
             path="profiles/pack_a/profile_a.yaml",
         )
     }
-    return ManifestIndex(
+    return manifest.ManifestIndex(
         services=services,
         models=models,
         domains=domains,
@@ -87,7 +86,9 @@ def manifest_index() -> ManifestIndex:
     )
 
 
-def test_wizard_with_inputs(monkeypatch: pytest.MonkeyPatch, manifest_index: ManifestIndex, capsys) -> None:
+def test_wizard_with_inputs(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
     # Mock loader to return our manifest index
     class FakeLoader:
         def load(self):
@@ -111,7 +112,9 @@ def test_wizard_with_inputs(monkeypatch: pytest.MonkeyPatch, manifest_index: Man
     assert selection.service_ids == ["mqtt_broker"]
 
 
-def test_wizard_protocol_selection(monkeypatch: pytest.MonkeyPatch, manifest_index: ManifestIndex, capsys) -> None:
+def test_wizard_protocol_selection(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
     class FakeLoader:
         def load(self):
             return manifest_index

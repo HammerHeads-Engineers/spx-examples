@@ -25,7 +25,8 @@ Each catalog model entry carries a higher-level taxonomy:
 - `device_class`: functional class such as `sensor`, `controller`, `meter`, `gateway`
 - `vendor`: vendor slug or `generic`
 
-Pack folders under `library/industries/<pack>/` are documentation-oriented views. Installer selection is driven by `library/catalog/*.yaml` and `profiles/<pack>/*.yaml`, not by pack-local model symlinks/placeholders.
+Pack folders under `library/industries/<pack>/` are documentation-oriented views. Installer selection is driven by `library/catalog/*.yaml` and `profiles/<pack>/*.yaml`.
+Each pack folder contains only `README.md`, `SPEC.md`, and a generated `MODELS.yaml` index.
 
 ## Quickstart
 
@@ -33,7 +34,7 @@ Follow these steps after cloning the repository to start a local SPX server, see
 
 1. **Check prerequisites**
    - Docker Engine/Desktop + Docker Compose v2 (`docker compose`).
-   - Python 3.9+ (CI runs 3.9–3.12).
+   - Python 3.9+ (CI runs 3.9-3.12).
    - (Optional) [Poetry](https://python-poetry.org/) for dependency management.
 
 2. **Provide your SPX credentials**

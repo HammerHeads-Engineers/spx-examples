@@ -10,7 +10,15 @@ ROOT = repo_root()
 
 
 def test_apc_rack_pdu_rpdu2g_modbus_model_loads() -> None:
-    path = ROOT / "library" / "domains" / "iot" / "apc" / "rack_pdu_rpdu2g__modbus.yaml"
+    path = (
+        ROOT
+        / "library"
+        / "domains"
+        / "energy"
+        / "rack_pdu"
+        / "apc"
+        / "rack_pdu_rpdu2g__modbus.yaml"
+    )
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     assert isinstance(doc, dict)
@@ -44,6 +52,7 @@ def test_apc_rack_pdu_rpdu2g_modbus_model_in_catalog() -> None:
         m
         for m in models
         if isinstance(m, dict)
-        and m.get("path") == "library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml"
+        and m.get("path")
+        == "library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml"
     ]
     assert matches, "Model is missing from library/catalog/models.yaml"

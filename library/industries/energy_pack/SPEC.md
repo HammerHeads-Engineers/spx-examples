@@ -16,7 +16,7 @@ Purpose: DER / e-mobility demo pack with OCPP charge point + CSMS handshake and 
 6. Add or update tests under `tests/packs/energy_pack/`.
 
 ## Golden references
-- `library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml`: control-loop patterns shared across packs.
+- `library/domains/industrial/controller/generic/thermal_controller_advanced.yaml`: control-loop patterns shared across packs.
 
 ## Validation
 ```bash

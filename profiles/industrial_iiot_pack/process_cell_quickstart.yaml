@@ -3,13 +3,13 @@ description: |
   Quick baseline for motion/process control containing the stepper axis, thermal
   loop, and vacuum instrumentation mapped through Modbus.
 models:
-  - library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
-  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
-  - library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
-  - library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
-  - library/domains/iot/generic/process_cell__opcua.yaml
-  - library/domains/iot/generic/production_workcell__opcua.yaml
-  - library/domains/iot/generic/packaging_line__opcua.yaml
+  - library/domains/industrial/controller/generic/stepper_controller__modbus.yaml
+  - library/domains/industrial/controller/generic/thermal_controller__modbus.yaml
+  - library/domains/industrial/sensor/generic/vacuum_gauge__modbus.yaml
+  - library/domains/energy/power_meter/abb/abb_m1m_power_meter__modbus.yaml
+  - library/domains/industrial/process_cell/generic/process_cell__opcua.yaml
+  - library/domains/industrial/workcell/generic/production_workcell__opcua.yaml
+  - library/domains/industrial/line/generic/packaging_line__opcua.yaml
 services:
   - modbus_tcp_gateway
   - opcua_server

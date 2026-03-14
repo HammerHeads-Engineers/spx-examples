@@ -11,7 +11,8 @@ MODEL_PATH = (
     ROOT
     / "library"
     / "domains"
-    / "thermal_controllers"
+    / "industrial"
+    / "controller"
     / "eurotherm"
     / "eurotherm_3216__modbus.yaml"
 )
@@ -65,7 +66,9 @@ def test_eurotherm_3216_modbus_model_uses_key_and_hidden_attributes() -> None:
         assert legacy_public_attr not in attributes
 
 
-def test_eurotherm_3216_modbus_model_maps_hidden_raw_registers_and_documents_scenarios() -> None:
+def test_eurotherm_3216_modbus_model_maps_hidden_raw_registers_and_documents_scenarios() -> (
+    None
+):
     doc = yaml.safe_load(MODEL_PATH.read_text(encoding="utf-8"))
 
     assert isinstance(doc, dict)
@@ -92,7 +95,9 @@ def test_eurotherm_3216_modbus_model_maps_hidden_raw_registers_and_documents_sce
 
     for name, scenario in scenarios.items():
         assert isinstance(scenario, dict), f"Scenario {name!r} must be a mapping"
-        assert isinstance(scenario.get("display_name"), str) and scenario["display_name"]
+        assert (
+            isinstance(scenario.get("display_name"), str) and scenario["display_name"]
+        )
         assert isinstance(scenario.get("description"), str) and scenario["description"]
         assert scenario.get("enabled") is not True
 
@@ -110,6 +115,6 @@ def test_eurotherm_3216_modbus_model_is_in_catalog() -> None:
         for model in models
         if isinstance(model, dict)
         and model.get("path")
-        == "library/domains/thermal_controllers/eurotherm/eurotherm_3216__modbus.yaml"
+        == "library/domains/industrial/controller/eurotherm/eurotherm_3216__modbus.yaml"
     ]
     assert matches, "Model is missing from library/catalog/models.yaml"
