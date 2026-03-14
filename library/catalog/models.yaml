@@ -1,1068 +1,1354 @@
 models:
-  - id: Env.EnvSensor.Mqtt
-    name: MQTT Environment Sensor
-    path: library/domains/iot/generic/environment_sensor__mqtt.yaml
-    domain: iot
-    domain_group: environment
-    device_class: sensor
-    vendor: generic
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [smart_building_pack, energy_pack, embedded_lab_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, ev_csms_demo, iiot_monitoring]
-  - id: Env.EnvSensor.Lwm2m
-    name: LwM2M Environment Sensor
-    path: library/domains/iot/generic/environment_sensor__lwm2m.yaml
-    domain: iot
-    domain_group: environment
-    device_class: sensor
-    vendor: generic
-    protocols: [lwm2m, coap]
-    services:
-      - id: lwm2m_server
-    packages: [smart_building_pack, embedded_lab_pack]
-    profiles: [bms_quickstart]
-  - id: Env.AirQualityStation.Http
-    name: Air Quality Station (HTTP)
-    path: library/domains/iot/generic/air_quality_station__http.yaml
-    domain: iot
-    domain_group: environment
-    device_class: station
-    vendor: generic
-    protocols: [http]
-    services:
-      - id: http_gateway
-    packages: [smart_building_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, iiot_monitoring]
-  - id: Building.BMSController.OpcUa
-    name: BMS Controller (OPC UA)
-    path: library/domains/iot/generic/bms_controller__opcua.yaml
-    domain: iot
-    domain_group: building
-    device_class: controller
-    vendor: generic
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.LightingPanel.OpcUa
-    name: Lighting Panel (OPC UA)
-    path: library/domains/iot/generic/lighting_panel__opcua.yaml
-    domain: iot
-    domain_group: building
-    device_class: panel
-    vendor: generic
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.RoomController.Knx
-    name: Room Controller (KNX)
-    path: library/domains/iot/generic/room_controller__knx.yaml
-    domain: iot
-    domain_group: building
-    device_class: controller
-    vendor: generic
-    protocols: [knx]
-    services:
-      - id: knx_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.LightingZone.Knx
-    name: Lighting Zone (KNX)
-    path: library/domains/iot/generic/lighting_zone__knx.yaml
-    domain: iot
-    domain_group: building
-    device_class: zone
-    vendor: generic
-    protocols: [knx]
-    services:
-      - id: knx_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.PresenceDetector.ThebenP360.Knx
-    name: Presence Detector (Theben theRonda P360 KNX)
-    path: library/domains/iot/theben/theronda_p360__knx.yaml
-    domain: iot
-    domain_group: building
-    device_class: sensor
-    vendor: theben
-    protocols: [knx]
-    services:
-      - id: knx_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
-    name: ABB SA/S12.16.5.1 Switch Actuator (KNX)
-    path: library/domains/iot/abb/abb_sa_s12_16_5_1__knx.yaml
-    domain: iot
-    domain_group: building
-    device_class: actuator
-    vendor: abb
-    protocols: [knx]
-    services:
-      - id: knx_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.CoverActuator.AbbJraS4_230_5_1.Knx
-    name: ABB JRA/S 4.230.5.1 Cover Actuator (KNX)
-    path: library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml
-    domain: iot
-    domain_group: building
-    device_class: actuator
-    vendor: abb
-    protocols: [knx]
-    services:
-      - id: knx_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.Thermostat.Matter
-    name: Thermostat (Matter)
-    path: library/domains/iot/generic/thermostat__matter.yaml
-    domain: iot
-    domain_group: building
-    device_class: thermostat
-    vendor: generic
-    protocols: [matter]
-    services:
-      - id: matter_server
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.SmartPlug.Matter
-    name: Smart Plug / Relay (Matter)
-    path: library/domains/iot/generic/smart_plug__matter.yaml
-    domain: iot
-    domain_group: building
-    device_class: actuator
-    vendor: generic
-    protocols: [matter]
-    services:
-      - id: matter_server
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.FireAlarmPanel.Bacnet
-    name: Fire Alarm Panel (BACnet)
-    path: library/domains/iot/generic/fire_alarm_panel__bacnet.yaml
-    domain: iot
-    domain_group: building
-    device_class: panel
-    vendor: generic
-    protocols: [bacnet]
-    services:
-      - id: bacnet_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.SecurityAccessController.Bacnet
-    name: Security Access Controller (BACnet)
-    path: library/domains/iot/generic/security_access_controller__bacnet.yaml
-    domain: iot
-    domain_group: building
-    device_class: controller
-    vendor: generic
-    protocols: [bacnet]
-    services:
-      - id: bacnet_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Building.HvacFlexitNordic.Bacnet
-    name: Flexit Nordic HVAC (BACnet)
-    path: library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
-    domain: iot
-    domain_group: building
-    device_class: controller
-    vendor: generic
-    protocols: [bacnet]
-    services:
-      - id: bacnet_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Weather.WeatherFeed.Http
-    name: Weather Forecast Feed
-    path: library/domains/weather/weather_forecast__http.yaml
-    domain: weather
-    domain_group: environment
-    device_class: feed
-    vendor: generic
-    protocols: [http]
-    services:
-      - id: http_gateway
-    packages: [smart_building_pack, energy_pack]
-    profiles: [bms_quickstart, ev_csms_demo]
-  - id: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
-    name: Weather Gateway (WAGO PFC200 + Vaisala WXT530, MQTT Discovery)
-    path: library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
-    domain: weather
-    domain_group: environment
-    device_class: gateway
-    vendor: wago_vaisala
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Process.ThermalController.Modbus
-    name: Thermal Controller (Modbus)
-    path: library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
-    domain: thermal_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
-  - id: Process.PressureController.Eurotherm3504.Modbus
-    name: Eurotherm 3504 Pressure Controller (Modbus TCP)
-    path: library/domains/thermal_controllers/eurotherm/eurotherm_3504__modbus.yaml
-    domain: thermal_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: eurotherm
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: Process.ThermalController.Eurotherm3216.Modbus
-    name: Eurotherm 3216 Temperature Controller (Modbus TCP)
-    path: library/domains/thermal_controllers/eurotherm/eurotherm_3216__modbus.yaml
-    domain: thermal_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: eurotherm
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: Process.ThermalController.PrevacBcu14.Modbus
-    name: Prevac BCU14 Bakeout Controller (Modbus)
-    path: library/domains/thermal_controllers/prevac/prevac_bcu14__modbus.yaml
-    domain: thermal_controllers
-    domain_group: lab
-    device_class: controller
-    vendor: prevac
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Process.ThermalController.Advanced
-    name: Thermal Controller (Advanced)
-    path: library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml
-    domain: thermal_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: generic
-    protocols: []
-    services: []
-    packages: [smart_building_pack, energy_pack, industrial_iiot_pack]
-    profiles: [bms_quickstart, ev_csms_demo, process_cell_quickstart]
-  - id: Motion.StepperController.Modbus
-    name: Stepper Controller (Modbus)
-    path: library/domains/motion_controllers/generic/stepper_controller__modbus.yaml
-    domain: motion_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Process.VacuumGauge.Modbus
-    name: Vacuum Gauge (Modbus)
-    path: library/domains/vacuum_systems/generic/vacuum_gauge__modbus.yaml
-    domain: vacuum_systems
-    domain_group: industrial
-    device_class: sensor
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack, industrial_iiot_pack]
-    profiles: [scpi_lab, process_cell_quickstart]
-  - id: Process.VacuumGaugeMultichannel.Modbus
-    name: Vacuum Gauge Multichannel (Modbus)
-    path: library/domains/vacuum_systems/generic/vacuum_gauge_multichannel__modbus.yaml
-    domain: vacuum_systems
-    domain_group: industrial
-    device_class: sensor
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack, industrial_iiot_pack]
-    profiles: []
-  - id: Lab.Multimeter.Scpi
-    name: SCPI Multimeter
-    path: library/domains/measurement_instruments/generic/multimeter__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: instrument
-    vendor: generic
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack, industrial_iiot_pack]
-    profiles: [scpi_lab, iiot_monitoring]
-  - id: Lab.DigitalMultimeter.Scpi
-    name: SCPI Digital Multimeter
-    path: library/domains/measurement_instruments/generic/digital_multimeter__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: digital_multimeter
-    vendor: generic
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.DigitalMultimeter.SiglentSdm3055.Scpi
-    name: Siglent SDM3055 Digital Multimeter (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_sdm3055__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: digital_multimeter
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.DigitalMultimeter.TektronixDmm4050.Scpi
-    name: Tektronix DMM4050 Digital Multimeter (SCPI)
-    path: library/domains/measurement_instruments/tektronix/tektronix_dmm4050__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: digital_multimeter
-    vendor: tektronix
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.DigitalMultimeter.RohdeSchwarzHmc8012.Scpi
-    name: Rohde & Schwarz HMC8012 Digital Multimeter (SCPI)
-    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: digital_multimeter
-    vendor: rohde_schwarz
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.PowerAnalyzer.RohdeSchwarzHmc8015.Scpi
-    name: Rohde & Schwarz HMC8015 Power Analyzer (SCPI)
-    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmc8015__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_analyzer
-    vendor: rohde_schwarz
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.PowerSupply.RohdeSchwarzHmp4040.Scpi
-    name: Rohde & Schwarz HMP4040 Power Supply (SCPI)
-    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmp4040__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_supply
-    vendor: rohde_schwarz
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
-    name: Siglent SDG1032X Function Generator (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_sdg1032x__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: function_generator
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.ElectronicLoad.SiglentSdl1000x.Scpi
-    name: Siglent SDL1000X Programmable DC Electronic Load (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_sdl1000x__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: electronic_load
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.PowerSupply.SiglentSpd1000X.Scpi
-    name: Siglent SPD1000X Programmable DC Power Supply (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_spd1000x__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_supply
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.BenchPowerSupply.Scpi
-    name: SCPI Bench Power Supply
-    path: library/domains/measurement_instruments/generic/bench_power_supply__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_supply
-    vendor: generic
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.PowerSupply.KeysightE36312A.Scpi
-    name: Keysight E36312A Triple Output Power Supply (SCPI)
-    path: library/domains/measurement_instruments/keysight/keysight_e36312a__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_supply
-    vendor: keysight
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.Keysight1000X.Scpi
-    name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/keysight/keysight_infiniivision_1000x__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: keysight
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.RohdeSchwarzHmo1002.Scpi
-    name: Rohde & Schwarz HMO1002 Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/rohde_schwarz/rohde_schwarz_hmo1002__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: rohde_schwarz
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.TektronixMdo3000.Scpi
-    name: Tektronix MDO3000 Series Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/tektronix/tektronix_mdo3000__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: tektronix
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.SiglentSds1000xE.Scpi
-    name: Siglent SDS1000X-E Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_sds1000x_e__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.SiglentSds2000xHd.Scpi
-    name: Siglent SDS2000X HD Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_sds2000x_hd__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.SpectrumAnalyzer.SiglentSsa3000x.Scpi
-    name: Siglent SSA3000X Spectrum Analyzer (SCPI)
-    path: library/domains/measurement_instruments/siglent/siglent_ssa3000x__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: spectrum_analyzer
-    vendor: siglent
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.RigolDs1000z.Scpi
-    name: Rigol DS1000Z Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/rigol/rigol_ds1000z__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: rigol
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.Oscilloscope.RigolMso5000.Scpi
-    name: Rigol MSO5000 Oscilloscope (SCPI)
-    path: library/domains/measurement_instruments/rigol/rigol_mso5000__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: oscilloscope
-    vendor: rigol
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.PowerSupply.RigolDp800.Scpi
-    name: Rigol DP800 Power Supply (SCPI)
-    path: library/domains/measurement_instruments/rigol/rigol_dp800__scpi.yaml
-    domain: measurement_instruments
-    domain_group: lab
-    device_class: power_supply
-    vendor: rigol
-    protocols: [scpi]
-    services:
-      - id: scpi_tcp_stack
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
-    name: Prevac M600DC-PS Magnetron Power Supply (Modbus)
-    path: library/domains/iot/prevac/prevac_m600dc_ps__modbus.yaml
-    domain: iot
-    domain_group: lab
-    device_class: magnetron_power_supply
-    vendor: prevac
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.MagnetronPowerSupply.PrevacM1600PDCPS.Modbus
-    name: Prevac M1600PDC-PS Magnetron Power Supply (Modbus)
-    path: library/domains/iot/prevac/prevac_m1600pdc_ps__modbus.yaml
-    domain: iot
-    domain_group: lab
-    device_class: magnetron_power_supply
-    vendor: prevac
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.SublimationPumpPowerSupply.PrevacTSP04PS.Modbus
-    name: Prevac TSP04-PS Sublimation Pump Power Supply (Modbus)
-    path: library/domains/iot/prevac/prevac_tsp04_ps__modbus.yaml
-    domain: iot
-    domain_group: lab
-    device_class: sublimation_pump_power_supply
-    vendor: prevac
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Lab.XraySourceEmissionController.PrevacXR40BEC.Modbus
-    name: Prevac XR40B-EC X-Ray Source Emission Controller (Modbus)
-    path: library/domains/iot/prevac/prevac_xr40b_ec__modbus.yaml
-    domain: iot
-    domain_group: lab
-    device_class: xray_source_emission_controller
-    vendor: prevac
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [embedded_lab_pack]
-    profiles: [scpi_lab]
-  - id: Embedded.HealthMonitor.BleGatt
-    name: BLE Vital Signs Monitor
-    path: library/domains/ble/generic/vital_signs_monitor__ble_gatt.yaml
-    domain: ble
-    domain_group: lab
-    device_class: monitor
-    vendor: generic
-    protocols: [ble]
-    services:
-      - id: btvirt_adapter
-    packages: [embedded_lab_pack]
-    profiles: [mhealth_ci]
-  - id: Embedded.TempSensor.BleGatt
-    name: BLE Temperature Sensor
-    path: library/domains/ble/generic/temperature_sensor__ble_gatt.yaml
-    domain: ble
-    domain_group: lab
-    device_class: sensor
-    vendor: generic
-    protocols: [ble]
-    services:
-      - id: btvirt_adapter
-    packages: [embedded_lab_pack]
-    profiles: [mhealth_ci]
-  - id: IIoT.LineCounter.Mqtt
-    name: Line Counter (MQTT)
-    path: library/domains/iot/generic/line_counter__mqtt.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: counter
-    vendor: generic
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: Energy.EnergyMeter3Ph.Mqtt
-    name: 3-Phase Energy Meter (MQTT)
-    path: library/domains/iot/generic/energy_meter_3ph__mqtt.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: generic
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [industrial_iiot_pack, energy_pack]
-    profiles: [iiot_monitoring]
-  - id: Condition.ConditionMonitor.Mqtt
-    name: Condition Monitor (MQTT)
-    path: library/domains/iot/generic/condition_monitor__mqtt.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: monitor
-    vendor: generic
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: Motion.VFDrive.Modbus
-    name: VFD Drive (Modbus)
-    path: library/domains/motion_controllers/generic/vfd_drive__modbus.yaml
-    domain: motion_controllers
-    domain_group: industrial
-    device_class: drive
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Motion.VFDrive.SiemensG120C.Modbus
-    name: Siemens SINAMICS G120C VFD (Modbus TCP)
-    path: library/domains/motion_controllers/siemens/g120c__modbus.yaml
-    domain: motion_controllers
-    domain_group: industrial
-    device_class: drive
-    vendor: siemens
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: Motion.VFDrive.SchneiderAltivar320.Modbus
-    name: Schneider Electric Altivar Machine ATV320 VFD (Modbus)
-    path: library/domains/motion_controllers/schneider/schneider_altivar_320__modbus.yaml
-    domain: motion_controllers
-    domain_group: industrial
-    device_class: drive
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: IO.IOModule.Modbus
-    name: IO Module (Modbus)
-    path: library/domains/iot/generic/io_module__modbus.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: io_module
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: IO.IOModule.Wago750_8000.Modbus
-    name: WAGO 750-8000 I/O System (Modbus TCP)
-    path: library/domains/iot/wago/wago_750_8000__modbus.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: io_module
-    vendor: wago
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: Process.PIDController.Modbus
-    name: PID Process Controller (Modbus)
-    path: library/domains/thermal_controllers/generic/pid_process_controller__modbus.yaml
-    domain: thermal_controllers
-    domain_group: industrial
-    device_class: controller
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Energy.EnergyMeter3Ph.Modbus
-    name: 3-Phase Energy Meter (Modbus)
-    path: library/domains/iot/generic/energy_meter_3ph__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack, energy_pack]
-    profiles: [iiot_monitoring]
-  - id: Energy.EnergyMeterIem3000.Modbus
-    name: Schneider Acti9 iEM3000 Energy Meter (Modbus)
-    path: library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterPm3200.Modbus
-    name: Schneider Electric PowerLogic PM3200 Energy Meter (Modbus)
-    path: library/domains/iot/schneider/schneider_pm3200__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterPm5330.Modbus
-    name: Schneider Electric PowerLogic PM5330 (Modbus)
-    path: library/domains/iot/schneider/schneider_pm5330__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterPm5560.Modbus
-    name: Schneider Electric PowerLogic PM5560 (Modbus)
-    path: library/domains/iot/schneider/schneider_pm5560__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [energy_pack]
-    profiles: [ev_csms_demo]
-  - id: Energy.EnergyMeterPm8000.Modbus
-    name: Schneider Electric PowerLogic PM8000 (Modbus)
-    path: library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterAbbD13_15.Modbus
-    name: ABB D13 15 Energy Meter (Modbus)
-    path: library/domains/iot/abb/abb_d13_15__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: abb
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterEastronSdm630.Modbus
-    name: Eastron SDM630 Energy Meter (Modbus)
-    path: library/domains/iot/eastron/eastron_sdm630__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: eastron
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterEatonPxm2000.Modbus
-    name: Eaton Power Xpert Meter 2000 (Modbus TCP)
-    path: library/domains/iot/eaton/eaton_pxm2000__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: eaton
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterEm4200.Modbus
-    name: Schneider Electric EM4200 Energy Meter (Modbus)
-    path: library/domains/iot/schneider/schneider_em4200__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: schneider
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterPac3200.Modbus
-    name: Siemens SENTRON PAC3200 Energy Meter (Modbus)
-    path: library/domains/iot/siemens/siemens_pac3200__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: siemens
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.PowerQualityAnalyzerUmg604Pro.Modbus
-    name: Janitza UMG 604-PRO Power Quality Analyzer (Modbus)
-    path: library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: power_quality_analyzer
-    vendor: janitza
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EnergyMeterDirisA10.Modbus
-    name: Socomec DIRIS A-10 Energy Meter (Modbus)
-    path: library/domains/iot/socomec/diris_a10__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: socomec
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [energy_pack]
-    profiles: []
-  - id: Energy.UpsEasy3M.Modbus
-    name: APC Easy UPS 3M (Modbus)
-    path: library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: ups
-    vendor: apc
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.RackPdu.ApcNetShelter2g.Modbus
-    name: APC NetShelter Rack PDU RPDU2g (Modbus)
-    path: library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: rack_pdu
-    vendor: apc
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack, smart_building_pack]
-    profiles: [iiot_monitoring, bms_quickstart]
-  - id: Energy.EnergyMeterCarloGavazziEm24.Modbus
-    name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
-    path: library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: carlo_gavazzi
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.PowerMeter.AbbM1M.Modbus
-    name: ABB M1M Power Meter (Modbus TCP)
-    path: library/domains/iot/abb/abb_m1m_power_meter__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: power_meter
-    vendor: abb
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Energy.EnergyMeterDirisA40.Modbus
-    name: Socomec DIRIS A-40 Energy Meter (Modbus TCP)
-    path: library/domains/iot/socomec/diris_a40__modbus.yaml
-    domain: iot
-    domain_group: energy
-    device_class: meter
-    vendor: socomec
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [smart_building_pack]
-    profiles: [bms_quickstart]
-  - id: Energy.EVSE.Ocpp
-    name: EVSE / Charge Point (OCPP 1.6)
-    path: library/domains/energy/emobility/evse__ocpp.yaml
-    domain: energy
-    domain_group: energy
-    device_class: evse
-    vendor: generic
-    protocols: [ocpp]
-    services:
-      - id: ocpp_central_system
-    packages: [energy_pack]
-    profiles: [ev_csms_demo]
-  - id: Energy.EVSE.SiemensVersiChargeAc.Modbus
-    name: Siemens VersiCharge AC EVSE (Modbus TCP)
-    path: library/domains/energy/emobility/siemens_versicharge_ac__modbus.yaml
-    domain: energy
-    domain_group: energy
-    device_class: evse
-    vendor: siemens
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [energy_pack]
-    profiles: [ev_csms_demo]
-  - id: Energy.CSMS.Ocpp
-    name: CSMS Control Simulator (OCPP 1.6)
-    path: library/domains/energy/emobility/csms__ocpp.yaml
-    domain: energy
-    domain_group: energy
-    device_class: csms
-    vendor: generic
-    protocols: [ocpp]
-    services:
-      - id: ocpp_central_system
-    packages: [energy_pack]
-    profiles: [ev_csms_demo]
-  - id: Process.PressureTransmitter.Modbus
-    name: Pressure Transmitter (Modbus)
-    path: library/domains/iot/generic/pressure_transmitter__modbus.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: pressure_transmitter
-    vendor: generic
-    protocols: [modbus]
-    services:
-      - id: modbus_tcp_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: Process.ProcessCell.OpcUa
-    name: Process Cell (OPC UA)
-    path: library/domains/iot/generic/process_cell__opcua.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: process_cell
-    vendor: generic
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Process.ProcessCell.SiemensS7_1500.OpcUa
-    name: Siemens SIMATIC S7-1500 Process Cell (OPC UA)
-    path: library/domains/iot/siemens/s7_1500_process_cell__opcua.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: process_cell
-    vendor: siemens
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [industrial_iiot_pack]
-    profiles: []
-  - id: Process.Workcell.OpcUa
-    name: Production Workcell (OPC UA)
-    path: library/domains/iot/generic/production_workcell__opcua.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: workcell
-    vendor: generic
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
-  - id: Logistics.AGVVehicle.Mqtt
-    name: AGV Vehicle (MQTT)
-    path: library/domains/iot/generic/agv_vehicle__mqtt.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: vehicle
-    vendor: generic
-    protocols: [mqtt]
-    services:
-      - id: mqtt_broker
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: Quality.VisionStation.Http
-    name: Vision Quality Station (HTTP)
-    path: library/domains/iot/generic/vision_quality_station__http.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: station
-    vendor: generic
-    protocols: [http]
-    services:
-      - id: http_gateway
-    packages: [industrial_iiot_pack]
-    profiles: [iiot_monitoring]
-  - id: Process.PackagingLine.OpcUa
-    name: Packaging Line (OPC UA)
-    path: library/domains/iot/generic/packaging_line__opcua.yaml
-    domain: iot
-    domain_group: industrial
-    device_class: line
-    vendor: generic
-    protocols: [opcua]
-    services:
-      - id: opcua_server
-    packages: [industrial_iiot_pack]
-    profiles: [process_cell_quickstart]
+- id: Env.EnvSensor.Mqtt
+  name: MQTT Environment Sensor
+  path: library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml
+  domain: environment
+  domain_group: environment
+  device_class: sensor
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - smart_building_pack
+  - energy_pack
+  - embedded_lab_pack
+  - industrial_iiot_pack
+  profiles:
+  - bms_quickstart
+  - ev_csms_demo
+  - iiot_monitoring
+- id: Env.EnvSensor.Lwm2m
+  name: LwM2M Environment Sensor
+  path: library/domains/environment/sensor/generic/environment_sensor__lwm2m.yaml
+  domain: environment
+  domain_group: environment
+  device_class: sensor
+  vendor: generic
+  protocols:
+  - lwm2m
+  - coap
+  services:
+  - id: lwm2m_server
+  packages:
+  - smart_building_pack
+  - embedded_lab_pack
+  profiles:
+  - bms_quickstart
+- id: Env.AirQualityStation.Http
+  name: Air Quality Station (HTTP)
+  path: library/domains/environment/station/generic/air_quality_station__http.yaml
+  domain: environment
+  domain_group: environment
+  device_class: station
+  vendor: generic
+  protocols:
+  - http
+  services:
+  - id: http_gateway
+  packages:
+  - smart_building_pack
+  - industrial_iiot_pack
+  profiles:
+  - bms_quickstart
+  - iiot_monitoring
+- id: Building.BMSController.OpcUa
+  name: BMS Controller (OPC UA)
+  path: library/domains/building/controller/generic/bms_controller__opcua.yaml
+  domain: building
+  domain_group: building
+  device_class: controller
+  vendor: generic
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.LightingPanel.OpcUa
+  name: Lighting Panel (OPC UA)
+  path: library/domains/building/panel/generic/lighting_panel__opcua.yaml
+  domain: building
+  domain_group: building
+  device_class: panel
+  vendor: generic
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.RoomController.Knx
+  name: Room Controller (KNX)
+  path: library/domains/building/controller/generic/room_controller__knx.yaml
+  domain: building
+  domain_group: building
+  device_class: controller
+  vendor: generic
+  protocols:
+  - knx
+  services:
+  - id: knx_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.LightingZone.Knx
+  name: Lighting Zone (KNX)
+  path: library/domains/building/zone/generic/lighting_zone__knx.yaml
+  domain: building
+  domain_group: building
+  device_class: zone
+  vendor: generic
+  protocols:
+  - knx
+  services:
+  - id: knx_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.PresenceDetector.ThebenP360.Knx
+  name: Presence Detector (Theben theRonda P360 KNX)
+  path: library/domains/building/sensor/theben/theronda_p360__knx.yaml
+  domain: building
+  domain_group: building
+  device_class: sensor
+  vendor: theben
+  protocols:
+  - knx
+  services:
+  - id: knx_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
+  name: ABB SA/S12.16.5.1 Switch Actuator (KNX)
+  path: library/domains/building/actuator/abb/abb_sa_s12_16_5_1__knx.yaml
+  domain: building
+  domain_group: building
+  device_class: actuator
+  vendor: abb
+  protocols:
+  - knx
+  services:
+  - id: knx_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.CoverActuator.AbbJraS4_230_5_1.Knx
+  name: ABB JRA/S 4.230.5.1 Cover Actuator (KNX)
+  path: library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml
+  domain: building
+  domain_group: building
+  device_class: actuator
+  vendor: abb
+  protocols:
+  - knx
+  services:
+  - id: knx_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.Thermostat.Matter
+  name: Thermostat (Matter)
+  path: library/domains/building/thermostat/generic/thermostat__matter.yaml
+  domain: building
+  domain_group: building
+  device_class: thermostat
+  vendor: generic
+  protocols:
+  - matter
+  services:
+  - id: matter_server
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.SmartPlug.Matter
+  name: Smart Plug / Relay (Matter)
+  path: library/domains/building/actuator/generic/smart_plug__matter.yaml
+  domain: building
+  domain_group: building
+  device_class: actuator
+  vendor: generic
+  protocols:
+  - matter
+  services:
+  - id: matter_server
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.FireAlarmPanel.Bacnet
+  name: Fire Alarm Panel (BACnet)
+  path: library/domains/building/panel/generic/fire_alarm_panel__bacnet.yaml
+  domain: building
+  domain_group: building
+  device_class: panel
+  vendor: generic
+  protocols:
+  - bacnet
+  services:
+  - id: bacnet_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.SecurityAccessController.Bacnet
+  name: Security Access Controller (BACnet)
+  path: library/domains/building/controller/generic/security_access_controller__bacnet.yaml
+  domain: building
+  domain_group: building
+  device_class: controller
+  vendor: generic
+  protocols:
+  - bacnet
+  services:
+  - id: bacnet_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.HvacFlexitNordic.Bacnet
+  name: Flexit Nordic HVAC (BACnet)
+  path: library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml
+  domain: building
+  domain_group: building
+  device_class: controller
+  vendor: generic
+  protocols:
+  - bacnet
+  services:
+  - id: bacnet_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Weather.WeatherFeed.Http
+  name: Weather Forecast Feed
+  path: library/domains/environment/feed/generic/weather_forecast__http.yaml
+  domain: environment
+  domain_group: environment
+  device_class: feed
+  vendor: generic
+  protocols:
+  - http
+  services:
+  - id: http_gateway
+  packages:
+  - smart_building_pack
+  - energy_pack
+  profiles:
+  - bms_quickstart
+  - ev_csms_demo
+- id: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
+  name: Weather Gateway (WAGO PFC200 + Vaisala WXT530, MQTT Discovery)
+  path: library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
+  domain: environment
+  domain_group: environment
+  device_class: gateway
+  vendor: wago_vaisala
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Process.ThermalController.Modbus
+  name: Thermal Controller (Modbus)
+  path: library/domains/industrial/controller/generic/thermal_controller__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  - energy_pack
+  - industrial_iiot_pack
+  profiles:
+  - bms_quickstart
+  - ev_csms_demo
+  - process_cell_quickstart
+- id: Process.PressureController.Eurotherm3504.Modbus
+  name: Eurotherm 3504 Pressure Controller (Modbus TCP)
+  path: library/domains/industrial/controller/eurotherm/eurotherm_3504__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: eurotherm
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: Process.ThermalController.Eurotherm3216.Modbus
+  name: Eurotherm 3216 Temperature Controller (Modbus TCP)
+  path: library/domains/industrial/controller/eurotherm/eurotherm_3216__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: eurotherm
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: Process.ThermalController.PrevacBcu14.Modbus
+  name: Prevac BCU14 Bakeout Controller (Modbus)
+  path: library/domains/lab/controller/prevac/prevac_bcu14__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: controller
+  vendor: prevac
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Process.ThermalController.Advanced
+  name: Thermal Controller (Advanced)
+  path: library/domains/industrial/controller/generic/thermal_controller_advanced.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
+  protocols: []
+  services: []
+  packages:
+  - smart_building_pack
+  - energy_pack
+  - industrial_iiot_pack
+  profiles:
+  - bms_quickstart
+  - ev_csms_demo
+  - process_cell_quickstart
+- id: Motion.StepperController.Modbus
+  name: Stepper Controller (Modbus)
+  path: library/domains/industrial/controller/generic/stepper_controller__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Process.VacuumGauge.Modbus
+  name: Vacuum Gauge (Modbus)
+  path: library/domains/industrial/sensor/generic/vacuum_gauge__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: sensor
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  - industrial_iiot_pack
+  profiles:
+  - scpi_lab
+  - process_cell_quickstart
+- id: Process.VacuumGaugeMultichannel.Modbus
+  name: Vacuum Gauge Multichannel (Modbus)
+  path: library/domains/industrial/sensor/generic/vacuum_gauge_multichannel__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: sensor
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  - industrial_iiot_pack
+  profiles: []
+- id: Lab.Multimeter.Scpi
+  name: SCPI Multimeter
+  path: library/domains/lab/instrument/generic/multimeter__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: instrument
+  vendor: generic
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  - industrial_iiot_pack
+  profiles:
+  - scpi_lab
+  - iiot_monitoring
+- id: Lab.DigitalMultimeter.Scpi
+  name: SCPI Digital Multimeter
+  path: library/domains/lab/digital_multimeter/generic/digital_multimeter__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: digital_multimeter
+  vendor: generic
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.DigitalMultimeter.SiglentSdm3055.Scpi
+  name: Siglent SDM3055 Digital Multimeter (SCPI)
+  path: library/domains/lab/digital_multimeter/siglent/siglent_sdm3055__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: digital_multimeter
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.DigitalMultimeter.TektronixDmm4050.Scpi
+  name: Tektronix DMM4050 Digital Multimeter (SCPI)
+  path: library/domains/lab/digital_multimeter/tektronix/tektronix_dmm4050__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: digital_multimeter
+  vendor: tektronix
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.DigitalMultimeter.RohdeSchwarzHmc8012.Scpi
+  name: Rohde & Schwarz HMC8012 Digital Multimeter (SCPI)
+  path: library/domains/lab/digital_multimeter/rohde_schwarz/rohde_schwarz_hmc8012__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: digital_multimeter
+  vendor: rohde_schwarz
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.PowerAnalyzer.RohdeSchwarzHmc8015.Scpi
+  name: Rohde & Schwarz HMC8015 Power Analyzer (SCPI)
+  path: library/domains/lab/power_analyzer/rohde_schwarz/rohde_schwarz_hmc8015__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_analyzer
+  vendor: rohde_schwarz
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.PowerSupply.RohdeSchwarzHmp4040.Scpi
+  name: Rohde & Schwarz HMP4040 Power Supply (SCPI)
+  path: library/domains/lab/power_supply/rohde_schwarz/rohde_schwarz_hmp4040__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: rohde_schwarz
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.FunctionGenerator.SiglentSdg1032X.Scpi
+  name: Siglent SDG1032X Function Generator (SCPI)
+  path: library/domains/lab/function_generator/siglent/siglent_sdg1032x__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: function_generator
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.ElectronicLoad.SiglentSdl1000x.Scpi
+  name: Siglent SDL1000X Programmable DC Electronic Load (SCPI)
+  path: library/domains/lab/electronic_load/siglent/siglent_sdl1000x__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: electronic_load
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.PowerSupply.SiglentSpd1000X.Scpi
+  name: Siglent SPD1000X Programmable DC Power Supply (SCPI)
+  path: library/domains/lab/power_supply/siglent/siglent_spd1000x__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.BenchPowerSupply.Scpi
+  name: SCPI Bench Power Supply
+  path: library/domains/lab/power_supply/generic/bench_power_supply__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: generic
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.PowerSupply.KeysightE36312A.Scpi
+  name: Keysight E36312A Triple Output Power Supply (SCPI)
+  path: library/domains/lab/power_supply/keysight/keysight_e36312a__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: keysight
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.Keysight1000X.Scpi
+  name: Keysight InfiniiVision 1000X Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/keysight/keysight_infiniivision_1000x__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: keysight
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.RohdeSchwarzHmo1002.Scpi
+  name: Rohde & Schwarz HMO1002 Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/rohde_schwarz/rohde_schwarz_hmo1002__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: rohde_schwarz
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.TektronixMdo3000.Scpi
+  name: Tektronix MDO3000 Series Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/tektronix/tektronix_mdo3000__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: tektronix
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.SiglentSds1000xE.Scpi
+  name: Siglent SDS1000X-E Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/siglent/siglent_sds1000x_e__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.SiglentSds2000xHd.Scpi
+  name: Siglent SDS2000X HD Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/siglent/siglent_sds2000x_hd__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.SpectrumAnalyzer.SiglentSsa3000x.Scpi
+  name: Siglent SSA3000X Spectrum Analyzer (SCPI)
+  path: library/domains/lab/spectrum_analyzer/siglent/siglent_ssa3000x__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: spectrum_analyzer
+  vendor: siglent
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.RigolDs1000z.Scpi
+  name: Rigol DS1000Z Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/rigol/rigol_ds1000z__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: rigol
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.Oscilloscope.RigolMso5000.Scpi
+  name: Rigol MSO5000 Oscilloscope (SCPI)
+  path: library/domains/lab/oscilloscope/rigol/rigol_mso5000__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: oscilloscope
+  vendor: rigol
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.PowerSupply.RigolDp800.Scpi
+  name: Rigol DP800 Power Supply (SCPI)
+  path: library/domains/lab/power_supply/rigol/rigol_dp800__scpi.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: rigol
+  protocols:
+  - scpi
+  services:
+  - id: scpi_tcp_stack
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
+  name: Prevac M600DC-PS Magnetron Power Supply (Modbus)
+  path: library/domains/lab/magnetron_power_supply/prevac/prevac_m600dc_ps__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: magnetron_power_supply
+  vendor: prevac
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.MagnetronPowerSupply.PrevacM1600PDCPS.Modbus
+  name: Prevac M1600PDC-PS Magnetron Power Supply (Modbus)
+  path: library/domains/lab/magnetron_power_supply/prevac/prevac_m1600pdc_ps__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: magnetron_power_supply
+  vendor: prevac
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.SublimationPumpPowerSupply.PrevacTSP04PS.Modbus
+  name: Prevac TSP04-PS Sublimation Pump Power Supply (Modbus)
+  path: library/domains/lab/sublimation_pump_power_supply/prevac/prevac_tsp04_ps__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: sublimation_pump_power_supply
+  vendor: prevac
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Lab.XraySourceEmissionController.PrevacXR40BEC.Modbus
+  name: Prevac XR40B-EC X-Ray Source Emission Controller (Modbus)
+  path: library/domains/lab/xray_source_emission_controller/prevac/prevac_xr40b_ec__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: xray_source_emission_controller
+  vendor: prevac
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - scpi_lab
+- id: Embedded.HealthMonitor.BleGatt
+  name: BLE Vital Signs Monitor
+  path: library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml
+  domain: lab
+  domain_group: lab
+  device_class: monitor
+  vendor: generic
+  protocols:
+  - ble
+  services:
+  - id: btvirt_adapter
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - mhealth_ci
+- id: Embedded.TempSensor.BleGatt
+  name: BLE Temperature Sensor
+  path: library/domains/lab/sensor/generic/temperature_sensor__ble_gatt.yaml
+  domain: lab
+  domain_group: lab
+  device_class: sensor
+  vendor: generic
+  protocols:
+  - ble
+  services:
+  - id: btvirt_adapter
+  packages:
+  - embedded_lab_pack
+  profiles:
+  - mhealth_ci
+- id: IIoT.LineCounter.Mqtt
+  name: Line Counter (MQTT)
+  path: library/domains/industrial/counter/generic/line_counter__mqtt.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: counter
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: Energy.EnergyMeter3Ph.Mqtt
+  name: 3-Phase Energy Meter (MQTT)
+  path: library/domains/energy/meter/generic/energy_meter_3ph__mqtt.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - industrial_iiot_pack
+  - energy_pack
+  profiles:
+  - iiot_monitoring
+- id: Condition.ConditionMonitor.Mqtt
+  name: Condition Monitor (MQTT)
+  path: library/domains/industrial/monitor/generic/condition_monitor__mqtt.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: monitor
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: Motion.VFDrive.Modbus
+  name: VFD Drive (Modbus)
+  path: library/domains/industrial/drive/generic/vfd_drive__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: drive
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Motion.VFDrive.SiemensG120C.Modbus
+  name: Siemens SINAMICS G120C VFD (Modbus TCP)
+  path: library/domains/industrial/drive/siemens/g120c__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: drive
+  vendor: siemens
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: Motion.VFDrive.SchneiderAltivar320.Modbus
+  name: Schneider Electric Altivar Machine ATV320 VFD (Modbus)
+  path: library/domains/industrial/drive/schneider/schneider_altivar_320__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: drive
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: IO.IOModule.Modbus
+  name: IO Module (Modbus)
+  path: library/domains/industrial/io_module/generic/io_module__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: io_module
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: IO.IOModule.Wago750_8000.Modbus
+  name: WAGO 750-8000 I/O System (Modbus TCP)
+  path: library/domains/industrial/io_module/wago/wago_750_8000__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: io_module
+  vendor: wago
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: Process.PIDController.Modbus
+  name: PID Process Controller (Modbus)
+  path: library/domains/industrial/controller/generic/pid_process_controller__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Energy.EnergyMeter3Ph.Modbus
+  name: 3-Phase Energy Meter (Modbus)
+  path: library/domains/energy/meter/generic/energy_meter_3ph__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  - energy_pack
+  profiles:
+  - iiot_monitoring
+- id: Energy.EnergyMeterIem3000.Modbus
+  name: Schneider Acti9 iEM3000 Energy Meter (Modbus)
+  path: library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterPm3200.Modbus
+  name: Schneider Electric PowerLogic PM3200 Energy Meter (Modbus)
+  path: library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterPm5330.Modbus
+  name: Schneider Electric PowerLogic PM5330 (Modbus)
+  path: library/domains/energy/meter/schneider/schneider_pm5330__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterPm5560.Modbus
+  name: Schneider Electric PowerLogic PM5560 (Modbus)
+  path: library/domains/energy/meter/schneider/schneider_pm5560__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - energy_pack
+  profiles:
+  - ev_csms_demo
+- id: Energy.EnergyMeterPm8000.Modbus
+  name: Schneider Electric PowerLogic PM8000 (Modbus)
+  path: library/domains/energy/meter/schneider/schneider_powerlogic_pm8000__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterAbbD13_15.Modbus
+  name: ABB D13 15 Energy Meter (Modbus)
+  path: library/domains/energy/meter/abb/abb_d13_15__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: abb
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterEastronSdm630.Modbus
+  name: Eastron SDM630 Energy Meter (Modbus)
+  path: library/domains/energy/meter/eastron/eastron_sdm630__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: eastron
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterEatonPxm2000.Modbus
+  name: Eaton Power Xpert Meter 2000 (Modbus TCP)
+  path: library/domains/energy/meter/eaton/eaton_pxm2000__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: eaton
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterEm4200.Modbus
+  name: Schneider Electric EM4200 Energy Meter (Modbus)
+  path: library/domains/energy/meter/schneider/schneider_em4200__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterPac3200.Modbus
+  name: Siemens SENTRON PAC3200 Energy Meter (Modbus)
+  path: library/domains/energy/meter/siemens/siemens_pac3200__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: siemens
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.PowerQualityAnalyzerUmg604Pro.Modbus
+  name: Janitza UMG 604-PRO Power Quality Analyzer (Modbus)
+  path: library/domains/energy/power_quality_analyzer/janitza/janitza_umg604_pro__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: power_quality_analyzer
+  vendor: janitza
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EnergyMeterDirisA10.Modbus
+  name: Socomec DIRIS A-10 Energy Meter (Modbus)
+  path: library/domains/energy/meter/socomec/diris_a10__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: socomec
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - energy_pack
+  profiles: []
+- id: Energy.UpsEasy3M.Modbus
+  name: APC Easy UPS 3M (Modbus)
+  path: library/domains/energy/ups/apc/apc_easy_ups_3m__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: ups
+  vendor: apc
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.RackPdu.ApcNetShelter2g.Modbus
+  name: APC NetShelter Rack PDU RPDU2g (Modbus)
+  path: library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: rack_pdu
+  vendor: apc
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  - smart_building_pack
+  profiles:
+  - iiot_monitoring
+  - bms_quickstart
+- id: Energy.EnergyMeterCarloGavazziEm24.Modbus
+  name: Carlo Gavazzi EM24 Energy Meter (Modbus TCP)
+  path: library/domains/energy/meter/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: carlo_gavazzi
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.PowerMeter.AbbM1M.Modbus
+  name: ABB M1M Power Meter (Modbus TCP)
+  path: library/domains/energy/power_meter/abb/abb_m1m_power_meter__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: power_meter
+  vendor: abb
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Energy.EnergyMeterDirisA40.Modbus
+  name: Socomec DIRIS A-40 Energy Meter (Modbus TCP)
+  path: library/domains/energy/meter/socomec/diris_a40__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: meter
+  vendor: socomec
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.EVSE.Ocpp
+  name: EVSE / Charge Point (OCPP 1.6)
+  path: library/domains/energy/evse/generic/evse__ocpp.yaml
+  domain: energy
+  domain_group: energy
+  device_class: evse
+  vendor: generic
+  protocols:
+  - ocpp
+  services:
+  - id: ocpp_central_system
+  packages:
+  - energy_pack
+  profiles:
+  - ev_csms_demo
+- id: Energy.EVSE.SiemensVersiChargeAc.Modbus
+  name: Siemens VersiCharge AC EVSE (Modbus TCP)
+  path: library/domains/energy/evse/siemens/siemens_versicharge_ac__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: evse
+  vendor: siemens
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - energy_pack
+  profiles:
+  - ev_csms_demo
+- id: Energy.CSMS.Ocpp
+  name: CSMS Control Simulator (OCPP 1.6)
+  path: library/domains/energy/csms/generic/csms__ocpp.yaml
+  domain: energy
+  domain_group: energy
+  device_class: csms
+  vendor: generic
+  protocols:
+  - ocpp
+  services:
+  - id: ocpp_central_system
+  packages:
+  - energy_pack
+  profiles:
+  - ev_csms_demo
+- id: Process.PressureTransmitter.Modbus
+  name: Pressure Transmitter (Modbus)
+  path: library/domains/industrial/pressure_transmitter/generic/pressure_transmitter__modbus.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: pressure_transmitter
+  vendor: generic
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: Process.ProcessCell.OpcUa
+  name: Process Cell (OPC UA)
+  path: library/domains/industrial/process_cell/generic/process_cell__opcua.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: process_cell
+  vendor: generic
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Process.ProcessCell.SiemensS7_1500.OpcUa
+  name: Siemens SIMATIC S7-1500 Process Cell (OPC UA)
+  path: library/domains/industrial/process_cell/siemens/s7_1500_process_cell__opcua.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: process_cell
+  vendor: siemens
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - industrial_iiot_pack
+  profiles: []
+- id: Process.Workcell.OpcUa
+  name: Production Workcell (OPC UA)
+  path: library/domains/industrial/workcell/generic/production_workcell__opcua.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: workcell
+  vendor: generic
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart
+- id: Logistics.AGVVehicle.Mqtt
+  name: AGV Vehicle (MQTT)
+  path: library/domains/industrial/vehicle/generic/agv_vehicle__mqtt.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: vehicle
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: Quality.VisionStation.Http
+  name: Vision Quality Station (HTTP)
+  path: library/domains/industrial/station/generic/vision_quality_station__http.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: station
+  vendor: generic
+  protocols:
+  - http
+  services:
+  - id: http_gateway
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - iiot_monitoring
+- id: Process.PackagingLine.OpcUa
+  name: Packaging Line (OPC UA)
+  path: library/domains/industrial/line/generic/packaging_line__opcua.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: line
+  vendor: generic
+  protocols:
+  - opcua
+  services:
+  - id: opcua_server
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - process_cell_quickstart

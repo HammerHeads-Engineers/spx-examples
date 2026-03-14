@@ -8,78 +8,92 @@ from pathlib import Path
 
 import yaml
 
-from installer.generator import DeploymentGenerator, SPX_UI_IMAGE
-from installer.manifest import (
-    DomainManifest,
-    IndustryManifest,
-    ManifestIndex,
-    ModelManifest,
-    ProfileManifest,
-    ServiceDeployment,
-    ServiceManifest,
-    ServicePort,
-)
+from installer import manifest
+from installer.generator import SPX_UI_IMAGE, DeploymentGenerator
 from installer.wizard import WizardSelection
 
 
-def build_index() -> ManifestIndex:
+def build_index() -> manifest.ManifestIndex:
     services = {
-        "mqtt_broker": ServiceManifest(
+        "mqtt_broker": manifest.ServiceManifest(
             id="mqtt_broker",
             name="MQTT Broker",
             protocol="mqtt",
             description="Test broker",
-            ports=[ServicePort(transport="tcp", host=1883, container=1883, purpose="telemetry")],
-            deployment=ServiceDeployment(
+            ports=[
+                manifest.ServicePort(
+                    transport="tcp", host=1883, container=1883, purpose="telemetry"
+                )
+            ],
+            deployment=manifest.ServiceDeployment(
                 runtime="docker",
                 image="eclipse-mosquitto:latest",
                 container_name="mosquitto-test",
                 volumes=["./library/assets/mosquitto/mosquitto.conf:/config:ro"],
             ),
         ),
-        "modbus_tcp_gateway": ServiceManifest(
+        "modbus_tcp_gateway": manifest.ServiceManifest(
             id="modbus_tcp_gateway",
             name="Modbus",
             protocol="modbus",
             description="Built-in",
-            ports=[ServicePort(transport="tcp", host=502, container=502, purpose="modbus")],
-            deployment=ServiceDeployment(runtime="builtin"),
+            ports=[
+                manifest.ServicePort(
+                    transport="tcp", host=502, container=502, purpose="modbus"
+                )
+            ],
+            deployment=manifest.ServiceDeployment(runtime="builtin"),
         ),
-        "bacnet_gateway": ServiceManifest(
+        "bacnet_gateway": manifest.ServiceManifest(
             id="bacnet_gateway",
             name="BACnet/IP",
             protocol="bacnet",
             description="Built-in",
             ports=[
-                ServicePort(transport="udp", host=47808, container=47808, purpose="bacnet flexit"),
-                ServicePort(transport="udp", host=47818, container=47818, purpose="bacnet security"),
-                ServicePort(transport="udp", host=47828, container=47828, purpose="bacnet fire"),
+                manifest.ServicePort(
+                    transport="udp",
+                    host=47808,
+                    container=47808,
+                    purpose="bacnet flexit",
+                ),
+                manifest.ServicePort(
+                    transport="udp",
+                    host=47818,
+                    container=47818,
+                    purpose="bacnet security",
+                ),
+                manifest.ServicePort(
+                    transport="udp", host=47828, container=47828, purpose="bacnet fire"
+                ),
             ],
-            deployment=ServiceDeployment(runtime="builtin"),
+            deployment=manifest.ServiceDeployment(runtime="builtin"),
         ),
     }
     models = {
-        "sensor": ModelManifest(
+        "sensor": manifest.ModelManifest(
             id="sensor",
             name="Sensor",
-            path=Path("library/domains/iot/sensor.yaml"),
-            domain="iot",
+            path=Path("library/domains/environment/sensor/generic/sensor.yaml"),
+            domain="environment",
             protocols=["mqtt"],
             services=["mqtt_broker", "modbus_tcp_gateway"],
             packages=["pack_a"],
             profiles=[],
+            domain_group="environment",
+            device_class="sensor",
+            vendor="generic",
         )
     }
     domains = {
-        "iot": DomainManifest(
-            id="iot",
-            name="IoT",
+        "environment": manifest.DomainManifest(
+            id="environment",
+            name="Environment",
             description="Domain",
-            path=Path("library/domains/iot"),
+            path=Path("library/domains/environment"),
         )
     }
     industries = {
-        "pack_a": IndustryManifest(
+        "pack_a": manifest.IndustryManifest(
             id="pack_a",
             name="Pack A",
             description="Pack",
@@ -90,8 +104,8 @@ def build_index() -> ManifestIndex:
             default_instances=[{"model": "sensor", "instance": "inst_001"}],
         )
     }
-    profiles: dict[str, ProfileManifest] = {}
-    return ManifestIndex(
+    profiles: dict[str, manifest.ProfileManifest] = {}
+    return manifest.ManifestIndex(
         services=services,
         models=models,
         domains=domains,
@@ -128,11 +142,15 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "spx-ui" not in services
     assert "mqtt_broker" in services
     assert "8000:8000" in services["spx-server"]["ports"]
-    assert "host.docker.internal:host-gateway" in services["spx-server"].get("extra_hosts", [])
+    assert "host.docker.internal:host-gateway" in services["spx-server"].get(
+        "extra_hosts", []
+    )
     assert "502:502" in services["spx-server"]["ports"]
     assert "1883:1883" in services["mqtt_broker"]["ports"]
     mqtt_volumes = services["mqtt_broker"].get("volumes", [])
-    assert any(vol.startswith("./assets/mosquitto/mosquitto.conf") for vol in mqtt_volumes)
+    assert any(
+        vol.startswith("./assets/mosquitto/mosquitto.conf") for vol in mqtt_volumes
+    )
 
     env_path = output_dir / ".env"
     assert env_path.read_text(encoding="utf-8").strip() == "SPX_PRODUCT_KEY=ABC-123"
@@ -146,7 +164,9 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway"]
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
-    assert bundle.get("instances") == [{"model_id": "sensor", "instance_key": "inst_001"}]
+    assert bundle.get("instances") == [
+        {"model_id": "sensor", "instance_key": "inst_001"}
+    ]
     assert bundle.get("start_instances") == ["inst_001"]
 
     start_path = output_dir / "spx-start.sh"
@@ -170,8 +190,11 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     start_ps_content = start_ps_path.read_text(encoding="utf-8")
     stop_ps_content = stop_ps_path.read_text(encoding="utf-8")
     assert "Cleanup-OnFailure" in start_ps_content
-    assert "Start-Process \"spx-ble-adapter\"" in start_ps_content
-    assert "docker compose -f (Join-Path $ScriptDir \"docker-compose.generated.yml\")" in start_ps_content
+    assert 'Start-Process "spx-ble-adapter"' in start_ps_content
+    assert (
+        'docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml")'
+        in start_ps_content
+    )
     assert "bootstrap_runner.py" in start_ps_content
     assert "Get-CimInstance Win32_Process" in stop_ps_content
 

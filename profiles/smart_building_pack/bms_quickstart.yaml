@@ -3,37 +3,37 @@ description: |
   Minimal smart-building baseline containing environmental telemetry, HVAC control
   and weather backhaul so installers can validate MQTT/Modbus wiring quickly.
 models:
-  - library/domains/iot/generic/environment_sensor__mqtt.yaml
-  - library/domains/iot/generic/environment_sensor__lwm2m.yaml
-  - library/domains/iot/generic/air_quality_station__http.yaml
-  - library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml
-  - library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml
-  - library/domains/iot/generic/energy_meter_iem3000__modbus.yaml
-  - library/domains/iot/schneider/schneider_pm3200__modbus.yaml
-  - library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml
-  - library/domains/iot/schneider/schneider_pm5330__modbus.yaml
-  - library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml
-  - library/domains/iot/abb/abb_d13_15__modbus.yaml
-  - library/domains/iot/schneider/schneider_em4200__modbus.yaml
-  - library/domains/iot/siemens/siemens_pac3200__modbus.yaml
-  - library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml
-  - library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
-  - library/domains/iot/socomec/diris_a40__modbus.yaml
-  - library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
-  - library/domains/iot/eastron/eastron_sdm630__modbus.yaml
-  - library/domains/iot/eaton/eaton_pxm2000__modbus.yaml
-  - library/domains/weather/weather_forecast__http.yaml
-  - library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
-  - library/domains/iot/generic/bms_controller__opcua.yaml
-  - library/domains/iot/generic/lighting_panel__opcua.yaml
-  - library/domains/iot/generic/room_controller__knx.yaml
-  - library/domains/iot/generic/lighting_zone__knx.yaml
-  - library/domains/iot/abb/abb_sa_s12_16_5_1__knx.yaml
-  - library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml
-  - library/domains/iot/generic/thermostat__matter.yaml
-  - library/domains/iot/generic/smart_plug__matter.yaml
-  - library/domains/iot/generic/fire_alarm_panel__bacnet.yaml
-  - library/domains/iot/generic/security_access_controller__bacnet.yaml
+  - library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml
+  - library/domains/environment/sensor/generic/environment_sensor__lwm2m.yaml
+  - library/domains/environment/station/generic/air_quality_station__http.yaml
+  - library/domains/industrial/controller/generic/thermal_controller__modbus.yaml
+  - library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml
+  - library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml
+  - library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml
+  - library/domains/energy/ups/apc/apc_easy_ups_3m__modbus.yaml
+  - library/domains/energy/meter/schneider/schneider_pm5330__modbus.yaml
+  - library/domains/energy/meter/schneider/schneider_powerlogic_pm8000__modbus.yaml
+  - library/domains/energy/meter/abb/abb_d13_15__modbus.yaml
+  - library/domains/energy/meter/schneider/schneider_em4200__modbus.yaml
+  - library/domains/energy/meter/siemens/siemens_pac3200__modbus.yaml
+  - library/domains/energy/power_quality_analyzer/janitza/janitza_umg604_pro__modbus.yaml
+  - library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml
+  - library/domains/energy/meter/socomec/diris_a40__modbus.yaml
+  - library/domains/energy/meter/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml
+  - library/domains/energy/meter/eastron/eastron_sdm630__modbus.yaml
+  - library/domains/energy/meter/eaton/eaton_pxm2000__modbus.yaml
+  - library/domains/environment/feed/generic/weather_forecast__http.yaml
+  - library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
+  - library/domains/building/controller/generic/bms_controller__opcua.yaml
+  - library/domains/building/panel/generic/lighting_panel__opcua.yaml
+  - library/domains/building/controller/generic/room_controller__knx.yaml
+  - library/domains/building/zone/generic/lighting_zone__knx.yaml
+  - library/domains/building/actuator/abb/abb_sa_s12_16_5_1__knx.yaml
+  - library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml
+  - library/domains/building/thermostat/generic/thermostat__matter.yaml
+  - library/domains/building/actuator/generic/smart_plug__matter.yaml
+  - library/domains/building/panel/generic/fire_alarm_panel__bacnet.yaml
+  - library/domains/building/controller/generic/security_access_controller__bacnet.yaml
 services:
   - mqtt_broker
   - modbus_tcp_gateway

@@ -16,6 +16,9 @@ ALLOWED_DOMAIN_GROUPS = {
     "lab",
 }
 SLUG_RE = re.compile(r"^[a-z0-9_]+$")
+MODEL_PATH_RE = re.compile(
+    r"^library/domains/(?P<domain>[a-z0-9_]+)/(?P<device_class>[a-z0-9_]+)/(?P<vendor>[a-z0-9_]+)/[a-z0-9_]+\.yaml$"
+)
 
 
 def test_catalog_models_include_taxonomy_metadata() -> None:
@@ -64,3 +67,37 @@ def test_catalog_model_ids_and_paths_are_unique() -> None:
         path for path, count in path_counts.items() if path and count > 1
     )
     assert not duplicate_paths, f"Duplicate model paths found: {duplicate_paths}"
+
+
+def test_catalog_model_paths_follow_semantic_tree() -> None:
+    for model in load_catalog_models():
+        model_id = model.get("id", "<missing>")
+        path = model.get("path")
+        assert isinstance(path, str) and path, f"Model '{model_id}' is missing path"
+
+        match = MODEL_PATH_RE.match(path)
+        assert match, (
+            f"Model '{model_id}' path '{path}' must match "
+            "library/domains/<domain_group>/<device_class>/<vendor>/<file>.yaml"
+        )
+
+        domain_group = model.get("domain_group")
+        device_class = model.get("device_class")
+        vendor = model.get("vendor")
+        domain = model.get("domain")
+
+        assert (
+            domain == domain_group
+        ), f"Model '{model_id}' has domain '{domain}' but domain_group '{domain_group}'"
+        assert match.group("domain") == domain_group, (
+            f"Model '{model_id}' path domain '{match.group('domain')}' "
+            f"does not match domain_group '{domain_group}'"
+        )
+        assert match.group("device_class") == device_class, (
+            f"Model '{model_id}' path device_class '{match.group('device_class')}' "
+            f"does not match device_class '{device_class}'"
+        )
+        assert match.group("vendor") == vendor, (
+            f"Model '{model_id}' path vendor '{match.group('vendor')}' "
+            f"does not match vendor '{vendor}'"
+        )

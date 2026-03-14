@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
+from typing import Any
 
 try:
     import yaml
 except ImportError as exc:  # pragma: no cover - import guard for CLI use
     raise SystemExit(
-        "Missing dependency: pyyaml. Install with 'poetry install --with dev'."
+        "Missing dependency: pyyaml. Install with 'poetry install --with dev --no-root'."
     ) from exc
 
 MODEL_NAME_RE = re.compile(r"^[a-z0-9_]+$")
@@ -22,6 +23,11 @@ ALLOWED_DOMAIN_GROUPS = {
     "energy",
     "lab",
 }
+MODEL_PATH_RE = re.compile(
+    r"^library/domains/(?P<domain>[a-z0-9_]+)/(?P<device_class>[a-z0-9_]+)/(?P<vendor>[a-z0-9_]+)/(?P<file>[a-z0-9_]+\.yaml)$"
+)
+PACK_INDEX_FIELDS = ("id", "path", "domain_group", "device_class", "vendor")
+ALLOWED_PACK_FILES = {"README.md", "SPEC.md", "MODELS.yaml"}
 
 
 class ValidationResult:
@@ -162,24 +168,191 @@ def validate_model_file(path: Path, data: object, result: ValidationResult) -> N
                         )
 
 
-def validate_model_catalog(root: Path, result: ValidationResult) -> None:
+def _load_catalog_mapping(
+    path: Path, result: ValidationResult
+) -> dict[str, Any] | None:
+    data = load_yaml(path, result)
+    if not isinstance(data, dict):
+        result.add(f"{path}: top-level YAML must be a mapping")
+        return None
+    return data
+
+
+def validate_domains_catalog(
+    root: Path, result: ValidationResult
+) -> dict[str, dict[str, Any]]:
+    catalog_path = root / "library" / "catalog" / "domains.yaml"
+    data = _load_catalog_mapping(catalog_path, result)
+    if data is None:
+        return {}
+
+    domains = data.get("domains")
+    if not isinstance(domains, list):
+        result.add(f"{catalog_path}: 'domains' must be a list")
+        return {}
+
+    seen_ids: set[str] = set()
+    domain_map: dict[str, dict[str, Any]] = {}
+    for entry in domains:
+        if not isinstance(entry, dict):
+            result.add(f"{catalog_path}: each domain entry must be a mapping")
+            continue
+
+        domain_id = entry.get("id")
+        if not isinstance(domain_id, str) or not domain_id.strip():
+            result.add(f"{catalog_path}: domain entry missing 'id'")
+            continue
+        if domain_id in seen_ids:
+            result.add(f"{catalog_path}: duplicate domain id '{domain_id}'")
+            continue
+        seen_ids.add(domain_id)
+
+        if not TAXONOMY_NAME_RE.match(domain_id):
+            result.add(f"{catalog_path}: invalid domain id '{domain_id}'")
+
+        path_value = entry.get("path")
+        expected_path = f"library/domains/{domain_id}"
+        if not isinstance(path_value, str) or not path_value.strip():
+            result.add(f"{catalog_path}: domain '{domain_id}' missing 'path'")
+        else:
+            if path_value != expected_path:
+                result.add(
+                    f"{catalog_path}: domain '{domain_id}' should use path '{expected_path}', got '{path_value}'"
+                )
+            domain_path = root / path_value
+            if not domain_path.is_dir():
+                result.add(f"{catalog_path}: domain path not found: {path_value}")
+
+        domain_map[domain_id] = entry
+
+    return domain_map
+
+
+def validate_industries_catalog(
+    root: Path, result: ValidationResult
+) -> dict[str, dict[str, Any]]:
+    catalog_path = root / "library" / "catalog" / "industries.yaml"
+    data = _load_catalog_mapping(catalog_path, result)
+    if data is None:
+        return {}
+
+    industries = data.get("industries")
+    if not isinstance(industries, list):
+        result.add(f"{catalog_path}: 'industries' must be a list")
+        return {}
+
+    seen_ids: set[str] = set()
+    industry_map: dict[str, dict[str, Any]] = {}
+    for entry in industries:
+        if not isinstance(entry, dict):
+            result.add(f"{catalog_path}: each industry entry must be a mapping")
+            continue
+
+        pack_id = entry.get("id")
+        if not isinstance(pack_id, str) or not pack_id.strip():
+            result.add(f"{catalog_path}: industry entry missing 'id'")
+            continue
+        if pack_id in seen_ids:
+            result.add(f"{catalog_path}: duplicate industry id '{pack_id}'")
+            continue
+        seen_ids.add(pack_id)
+
+        path_value = entry.get("path")
+        expected_path = f"library/industries/{pack_id}"
+        if not isinstance(path_value, str) or not path_value.strip():
+            result.add(f"{catalog_path}: industry '{pack_id}' missing 'path'")
+        else:
+            if path_value != expected_path:
+                result.add(
+                    f"{catalog_path}: industry '{pack_id}' should use path '{expected_path}', got '{path_value}'"
+                )
+            pack_dir = root / path_value
+            if not pack_dir.is_dir():
+                result.add(f"{catalog_path}: industry path not found: {path_value}")
+
+        profiles = entry.get("profiles")
+        if not isinstance(profiles, list):
+            result.add(f"{catalog_path}: industry '{pack_id}' missing 'profiles' list")
+        else:
+            for profile_path in profiles:
+                if not isinstance(profile_path, str) or not profile_path.strip():
+                    result.add(
+                        f"{catalog_path}: industry '{pack_id}' has invalid profile path '{profile_path}'"
+                    )
+                    continue
+                if not (root / profile_path).is_file():
+                    result.add(
+                        f"{catalog_path}: industry '{pack_id}' profile not found: {profile_path}"
+                    )
+
+        industry_map[pack_id] = entry
+
+    return industry_map
+
+
+def load_profiles(root: Path, result: ValidationResult) -> dict[str, dict[str, Any]]:
+    profiles_root = root / "profiles"
+    if not profiles_root.exists():
+        result.add(f"{profiles_root}: missing profiles directory")
+        return {}
+
+    profiles: dict[str, dict[str, Any]] = {}
+    for profile_path in sorted(profiles_root.glob("*/*.yaml")):
+        payload = load_yaml(profile_path, result)
+        if not isinstance(payload, dict):
+            result.add(f"{profile_path}: top-level YAML must be a mapping")
+            continue
+
+        profile_id = payload.get("name", profile_path.stem)
+        if not isinstance(profile_id, str) or not profile_id.strip():
+            result.add(f"{profile_path}: missing profile name")
+            continue
+        if profile_id in profiles:
+            result.add(f"{profile_path}: duplicate profile id '{profile_id}'")
+            continue
+
+        models = payload.get("models")
+        if not isinstance(models, list):
+            result.add(f"{profile_path}: 'models' must be a list")
+
+        services = payload.get("services")
+        if not isinstance(services, list):
+            result.add(f"{profile_path}: 'services' must be a list")
+
+        profiles[profile_id] = {
+            "id": profile_id,
+            "pack_id": profile_path.parent.name,
+            "path": profile_path.relative_to(root).as_posix(),
+            "data": payload,
+        }
+
+    return profiles
+
+
+def validate_model_catalog(
+    root: Path,
+    domain_map: dict[str, dict[str, Any]],
+    industry_map: dict[str, dict[str, Any]],
+    profiles: dict[str, dict[str, Any]],
+    result: ValidationResult,
+) -> list[dict[str, Any]]:
     catalog_path = root / "library" / "catalog" / "models.yaml"
     if not catalog_path.exists():
         result.add(f"{catalog_path}: missing catalog file")
-        return
+        return []
 
-    data = load_yaml(catalog_path, result)
-    if not isinstance(data, dict):
-        result.add(f"{catalog_path}: top-level YAML must be a mapping")
-        return
+    data = _load_catalog_mapping(catalog_path, result)
+    if data is None:
+        return []
 
     models = data.get("models")
     if not isinstance(models, list):
         result.add(f"{catalog_path}: 'models' must be a list")
-        return
+        return []
 
     seen_ids: set[str] = set()
     seen_paths: set[str] = set()
+    valid_models: list[dict[str, Any]] = []
 
     for entry in models:
         if not isinstance(entry, dict):
@@ -210,9 +383,20 @@ def validate_model_catalog(root: Path, result: ValidationResult) -> None:
         if not model_path.exists():
             result.add(f"{catalog_path}: model path not found: {path_value}")
 
+        match = MODEL_PATH_RE.match(path_value)
+        if not match:
+            result.add(
+                f"{catalog_path}: model entry '{entry_id}' path '{path_value}' must match "
+                "library/domains/<domain_group>/<device_class>/<vendor>/<file>.yaml"
+            )
+
         domain = entry.get("domain")
         if not isinstance(domain, str) or not domain.strip():
             result.add(f"{catalog_path}: model entry missing 'domain'")
+        elif domain not in domain_map:
+            result.add(
+                f"{catalog_path}: model entry '{entry_id}' references unknown domain '{domain}'"
+            )
 
         domain_group = entry.get("domain_group")
         if not isinstance(domain_group, str) or not domain_group.strip():
@@ -248,6 +432,154 @@ def validate_model_catalog(root: Path, result: ValidationResult) -> None:
                 result.add(
                     f"{catalog_path}: model entry '{entry_id}' missing '{list_key}' list"
                 )
+                continue
+
+            if list_key == "packages":
+                for package_id in value:
+                    if (
+                        not isinstance(package_id, str)
+                        or package_id not in industry_map
+                    ):
+                        result.add(
+                            f"{catalog_path}: model entry '{entry_id}' references unknown package '{package_id}'"
+                        )
+            if list_key == "profiles":
+                for profile_id in value:
+                    if not isinstance(profile_id, str) or profile_id not in profiles:
+                        result.add(
+                            f"{catalog_path}: model entry '{entry_id}' references unknown profile '{profile_id}'"
+                        )
+
+        if (
+            isinstance(domain, str)
+            and isinstance(domain_group, str)
+            and domain != domain_group
+        ):
+            result.add(
+                f"{catalog_path}: model entry '{entry_id}' has domain '{domain}' "
+                f"but domain_group '{domain_group}'"
+            )
+
+        if match:
+            if isinstance(domain_group, str) and match.group("domain") != domain_group:
+                result.add(
+                    f"{catalog_path}: model entry '{entry_id}' path domain "
+                    f"'{match.group('domain')}' does not match domain_group '{domain_group}'"
+                )
+            if (
+                isinstance(device_class, str)
+                and match.group("device_class") != device_class
+            ):
+                result.add(
+                    f"{catalog_path}: model entry '{entry_id}' path device_class "
+                    f"'{match.group('device_class')}' does not match device_class '{device_class}'"
+                )
+            if isinstance(vendor, str) and match.group("vendor") != vendor:
+                result.add(
+                    f"{catalog_path}: model entry '{entry_id}' path vendor "
+                    f"'{match.group('vendor')}' does not match vendor '{vendor}'"
+                )
+
+        valid_models.append(entry)
+
+    return valid_models
+
+
+def validate_profiles(
+    root: Path,
+    profiles: dict[str, dict[str, Any]],
+    model_paths: set[str],
+    industry_map: dict[str, dict[str, Any]],
+    result: ValidationResult,
+) -> None:
+    for profile in profiles.values():
+        profile_path = root / profile["path"]
+        payload = profile["data"]
+        pack_id = profile["pack_id"]
+
+        if pack_id not in industry_map:
+            result.add(f"{profile_path}: unknown pack directory '{pack_id}'")
+
+        models = payload.get("models", [])
+        if isinstance(models, list):
+            for model_path in models:
+                if not isinstance(model_path, str) or model_path not in model_paths:
+                    result.add(
+                        f"{profile_path}: references unknown model path '{model_path}'"
+                    )
+
+
+def _expected_pack_index_rows(
+    models: list[dict[str, Any]], pack_id: str
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for model in models:
+        packages = model.get("packages", [])
+        if not isinstance(packages, list) or pack_id not in packages:
+            continue
+        rows.append({field: model.get(field, "") for field in PACK_INDEX_FIELDS})
+    return sorted(rows, key=lambda row: (str(row["id"]), str(row["path"])))
+
+
+def validate_pack_indexes(
+    root: Path,
+    models: list[dict[str, Any]],
+    industry_map: dict[str, dict[str, Any]],
+    result: ValidationResult,
+) -> None:
+    industries_root = root / "library" / "industries"
+    if not industries_root.exists():
+        result.add(f"{industries_root}: missing industry directory")
+        return
+
+    for pack_id, industry in industry_map.items():
+        path_value = industry.get("path")
+        if not isinstance(path_value, str) or not path_value.strip():
+            continue
+
+        pack_dir = root / path_value
+        if not pack_dir.is_dir():
+            continue
+
+        contents = {item.name for item in pack_dir.iterdir()}
+        unsupported = contents - ALLOWED_PACK_FILES
+        if unsupported:
+            result.add(
+                f"{pack_dir}: contains unsupported files/directories {sorted(unsupported)}"
+            )
+
+        yaml_files = sorted(item.name for item in pack_dir.glob("*.yaml"))
+        if yaml_files != ["MODELS.yaml"]:
+            result.add(
+                f"{pack_dir}: expected only MODELS.yaml, found YAML files {yaml_files}"
+            )
+
+        pack_index_path = pack_dir / "MODELS.yaml"
+        if not pack_index_path.exists():
+            result.add(f"{pack_index_path}: missing pack model index")
+            continue
+
+        data = _load_catalog_mapping(pack_index_path, result)
+        if data is None:
+            continue
+        index_models = data.get("models")
+        if not isinstance(index_models, list):
+            result.add(f"{pack_index_path}: 'models' must be a list")
+            continue
+
+        actual_rows = [
+            {field: entry.get(field, "") for field in PACK_INDEX_FIELDS}
+            for entry in index_models
+            if isinstance(entry, dict)
+        ]
+        actual_rows = sorted(
+            actual_rows, key=lambda row: (str(row["id"]), str(row["path"]))
+        )
+        expected_rows = _expected_pack_index_rows(models, pack_id)
+        if actual_rows != expected_rows:
+            result.add(
+                f"{pack_index_path}: does not match models assigned to package '{pack_id}'"
+            )
 
 
 def validate_models(root: Path) -> ValidationResult:
@@ -263,7 +595,17 @@ def validate_models(root: Path) -> ValidationResult:
             continue
         validate_model_file(path, data, result)
 
-    validate_model_catalog(root, result)
+    domain_map = validate_domains_catalog(root, result)
+    industry_map = validate_industries_catalog(root, result)
+    profiles = load_profiles(root, result)
+    models = validate_model_catalog(root, domain_map, industry_map, profiles, result)
+    model_paths = {
+        model["path"]
+        for model in models
+        if isinstance(model.get("path"), str) and model.get("path")
+    }
+    validate_profiles(root, profiles, model_paths, industry_map, result)
+    validate_pack_indexes(root, models, industry_map, result)
     return result
 
 

@@ -9,14 +9,90 @@ import hashlib
 import json
 import time
 import unittest
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
 import yaml
 
 
-def load_model_definition(model_path: Path) -> Dict[str, Any]:
-    with Path(model_path).open("r", encoding="utf-8") as handle:
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=None)
+def _catalog_model_indexes(
+    repo_root: str,
+) -> tuple[Dict[str, Path], Dict[str, list[Path]]]:
+    catalog_path = Path(repo_root) / "library" / "catalog" / "models.yaml"
+    with catalog_path.open("r", encoding="utf-8") as handle:
+        models_doc = yaml.safe_load(handle) or {}
+
+    by_id: Dict[str, Path] = {}
+    by_name: Dict[str, list[Path]] = {}
+    for entry in models_doc.get("models", []):
+        if not isinstance(entry, dict):
+            continue
+        model_id = entry.get("id")
+        path_value = entry.get("path")
+        if not isinstance(model_id, str) or not isinstance(path_value, str):
+            continue
+        resolved_path = Path(repo_root) / path_value
+        by_id[model_id] = resolved_path
+        by_name.setdefault(resolved_path.name, []).append(resolved_path)
+
+    return by_id, by_name
+
+
+def resolve_model_path(
+    model_path: Path,
+    *,
+    model_key: Optional[str] = None,
+    repo_root: Optional[Path] = None,
+) -> Path:
+    resolved_input = Path(model_path)
+    if resolved_input.exists():
+        return resolved_input
+
+    root = Path(repo_root) if repo_root is not None else _repo_root()
+    by_id, by_name = _catalog_model_indexes(str(root))
+
+    if model_key:
+        candidate = by_id.get(model_key)
+        if candidate is not None and candidate.exists():
+            return candidate
+
+    name_candidates = by_name.get(resolved_input.name, [])
+    existing_candidates = [
+        candidate for candidate in name_candidates if candidate.exists()
+    ]
+    if len(existing_candidates) == 1:
+        return existing_candidates[0]
+    if len(existing_candidates) > 1:
+        formatted = ", ".join(str(candidate) for candidate in existing_candidates)
+        raise FileNotFoundError(
+            f"Model path '{resolved_input}' does not exist and filename '{resolved_input.name}' "
+            f"is ambiguous in library/catalog/models.yaml: {formatted}"
+        )
+
+    raise FileNotFoundError(
+        f"Model path '{resolved_input}' does not exist and no replacement was found in "
+        "library/catalog/models.yaml"
+    )
+
+
+def load_model_definition(
+    model_path: Path,
+    *,
+    model_key: Optional[str] = None,
+    repo_root: Optional[Path] = None,
+) -> Dict[str, Any]:
+    resolved_path = resolve_model_path(
+        model_path,
+        model_key=model_key,
+        repo_root=repo_root,
+    )
+    with resolved_path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
 
 
@@ -70,9 +146,7 @@ def _meta_defaults(
     overrides = dict(overrides or {})
     unknown = sorted(set(overrides.keys()) - set(meta.keys()))
     if unknown:
-        raise RuntimeError(
-            f"Unknown meta_parameters provided: {', '.join(unknown)}"
-        )
+        raise RuntimeError(f"Unknown meta_parameters provided: {', '.join(unknown)}")
 
     params: Dict[str, Any] = {}
     missing: list[str] = []
@@ -210,7 +284,7 @@ def bootstrap_model_instance(
 ):
     """Load a model and ensure an instance is available, returning (client, instance, model_changed)."""
     client = spx_module.init(address=base_url, product_key=product_key)
-    model_def = load_model_definition(model_path)
+    model_def = load_model_definition(model_path, model_key=model_key)
     model_changed = ensure_model(client, model_key, model_def)
 
     overrides = dict(attribute_overrides or {})

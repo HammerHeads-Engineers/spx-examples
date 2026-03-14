@@ -14,7 +14,8 @@ def test_janitza_umg604_pro_modbus_model_loads() -> None:
         ROOT
         / "library"
         / "domains"
-        / "iot"
+        / "energy"
+        / "power_quality_analyzer"
         / "janitza"
         / "janitza_umg604_pro__modbus.yaml"
     )
@@ -50,6 +51,7 @@ def test_janitza_umg604_pro_modbus_model_in_catalog() -> None:
         m
         for m in models
         if isinstance(m, dict)
-        and m.get("path") == "library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml"
+        and m.get("path")
+        == "library/domains/energy/power_quality_analyzer/janitza/janitza_umg604_pro__modbus.yaml"
     ]
     assert matches, "Model is missing from library/catalog/models.yaml"

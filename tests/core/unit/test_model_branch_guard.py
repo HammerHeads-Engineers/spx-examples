@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 import sys
+from pathlib import Path
 
 
 def _load_guard_module():
     root = Path(__file__).resolve().parents[3]
     script_path = root / "tools" / "check_model_branch_guard.py"
-    spec = importlib.util.spec_from_file_location("check_model_branch_guard", script_path)
+    spec = importlib.util.spec_from_file_location(
+        "check_model_branch_guard", script_path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -23,7 +25,7 @@ def test_parse_name_status_lines_supports_add_modify_and_rename() -> None:
 
     raw = "\n".join(
         [
-            "A\tlibrary/domains/iot/vendor/new_meter__modbus.yaml",
+            "A\tlibrary/domains/energy/meter/vendor/new_meter__modbus.yaml",
             "M\tlibrary/catalog/models.yaml",
             "R100\told.yaml\tnew.yaml",
         ]
@@ -66,14 +68,16 @@ def test_existing_model_edit_violations_blocks_modification_in_strict_mode() -> 
     changed = [
         guard.ChangedFile(
             status="M",
-            path="library/domains/iot/socomec/diris_a40__modbus.yaml",
+            path="library/domains/energy/meter/socomec/diris_a40__modbus.yaml",
             old_path=None,
         )
     ]
 
     errors = guard.existing_model_edit_violations(
         changed,
-        base_model_paths={"library/domains/iot/socomec/diris_a40__modbus.yaml"},
+        base_model_paths={
+            "library/domains/energy/meter/socomec/diris_a40__modbus.yaml"
+        },
         strict_mode=True,
         allow_existing_model_edits=False,
     )
@@ -89,9 +93,11 @@ def test_changed_name_status_falls_back_when_no_merge_base(monkeypatch, capsys) 
     def fake_run_git(root, args, check=True):
         calls.append(args)
         if args == ["diff", "--name-status", "origin/develop...HEAD"]:
-            raise RuntimeError("git diff --name-status origin/develop...HEAD failed: no merge base")
+            raise RuntimeError(
+                "git diff --name-status origin/develop...HEAD failed: no merge base"
+            )
         if args == ["diff", "--name-status", "origin/develop..HEAD"]:
-            return "A\tlibrary/domains/iot/vendor/new_meter__modbus.yaml\n"
+            return "A\tlibrary/domains/energy/meter/vendor/new_meter__modbus.yaml\n"
         return ""
 
     monkeypatch.setattr(guard, "_run_git", fake_run_git)

@@ -16,7 +16,7 @@ from installer import cli
 @pytest.fixture()
 def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     repo_root = tmp_path / "repo"
-    model_dir = repo_root / "library" / "domains" / "iot"
+    model_dir = repo_root / "library" / "domains" / "environment" / "sensor" / "generic"
     model_dir.mkdir(parents=True)
     (model_dir / "sensor.yaml").write_text("name: dummy_sensor\n", encoding="utf-8")
 
@@ -26,10 +26,10 @@ def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, 
         textwrap.dedent(
             """\
             domains:
-              - id: iot
-                name: IoT
+              - id: environment
+                name: Environment
                 description: Test domain
-                path: library/domains/iot
+                path: library/domains/environment
             """
         ),
         encoding="utf-8",
@@ -40,8 +40,11 @@ def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, 
             models:
               - id: sensor
                 name: Sensor
-                path: library/domains/iot/sensor.yaml
-                domain: iot
+                path: library/domains/environment/sensor/generic/sensor.yaml
+                domain: environment
+                domain_group: environment
+                device_class: sensor
+                vendor: generic
                 protocols: [mqtt]
                 services:
                   - id: mqtt_broker
@@ -101,7 +104,7 @@ def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, 
             name: test_profile
             description: Profile description
             models:
-              - library/domains/iot/sensor.yaml
+              - library/domains/environment/sensor/generic/sensor.yaml
             services:
               - mqtt_broker
             """
@@ -110,7 +113,11 @@ def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, 
     )
 
     monkeypatch.setattr(generator.paths, "repo_root", lambda: repo_root)
-    return {"repo_root": repo_root, "catalog_dir": catalog_dir, "profiles_dir": profiles_dir}
+    return {
+        "repo_root": repo_root,
+        "catalog_dir": catalog_dir,
+        "profiles_dir": profiles_dir,
+    }
 
 
 def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
@@ -147,14 +154,18 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     selection = json.loads(captured.out)
     assert selection["models"] == ["sensor"]
     assert selection["services"] == ["mqtt_broker"]
-    assert selection["instances"] == [{"model_id": "sensor", "instance_key": "pack_sensor_01"}]
+    assert selection["instances"] == [
+        {"model_id": "sensor", "instance_key": "pack_sensor_01"}
+    ]
     assert selection["start_instances"] == []
     assert selection["product_key_present"] is True
     assert "SECRET-KEY" not in captured.out
     assert "SECRET-KEY" not in captured.err
 
     assert (output_dir / "docker-compose.generated.yml").exists()
-    assert (output_dir / ".env").read_text(encoding="utf-8").strip() == "SPX_PRODUCT_KEY=SECRET-KEY"
+    assert (output_dir / ".env").read_text(
+        encoding="utf-8"
+    ).strip() == "SPX_PRODUCT_KEY=SECRET-KEY"
     assert (output_dir / "bundle.json").exists()
     assert (output_dir / "spx-start.sh").exists()
     assert (output_dir / "spx-stop.sh").exists()
@@ -194,7 +205,9 @@ def test_generate_allows_missing_product_key_when_flag_set(
     assert rc == 0
     selection = json.loads(captured.out)
     assert selection["product_key_present"] is False
-    assert (output_dir / ".env").read_text(encoding="utf-8").strip() == "SPX_PRODUCT_KEY=REPLACE_ME"
+    assert (output_dir / ".env").read_text(
+        encoding="utf-8"
+    ).strip() == "SPX_PRODUCT_KEY=REPLACE_ME"
 
 
 def test_generate_requires_product_key_by_default(

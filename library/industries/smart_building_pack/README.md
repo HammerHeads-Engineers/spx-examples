@@ -13,42 +13,42 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 ### Model highlights
 
 - HVAC and energy
-  - BMS controller (OPC UA): `library/domains/iot/generic/bms_controller__opcua.yaml`
-  - Flexit Nordic HVAC (BACnet): `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`
-  - Thermal controller (Modbus): `library/domains/thermal_controllers/generic/thermal_controller__modbus.yaml`
-  - Energy meter iEM3000 (Modbus): `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`
-  - Easy UPS 3M (Modbus): `library/domains/iot/apc/apc_easy_ups_3m__modbus.yaml`
-  - Energy meter PM3200 (Modbus): `library/domains/iot/schneider/schneider_pm3200__modbus.yaml`
-  - Energy meter PM5330 (Modbus): `library/domains/iot/schneider/schneider_pm5330__modbus.yaml`
-  - PowerLogic PM8000 meter (Modbus): `library/domains/iot/schneider_electric/schneider_powerlogic_pm8000__modbus.yaml`
-  - ABB D13 15 energy meter (Modbus): `library/domains/iot/abb/abb_d13_15__modbus.yaml`
-  - Energy meter EM4200 (Modbus): `library/domains/iot/schneider/schneider_em4200__modbus.yaml`
-  - Siemens PAC3200 power meter (Modbus): `library/domains/iot/siemens/siemens_pac3200__modbus.yaml`
-  - Janitza UMG 604-PRO power quality analyzer (Modbus): `library/domains/iot/janitza/janitza_umg604_pro__modbus.yaml`
-  - APC NetShelter Rack PDU 2g (Modbus): `library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml`
-  - Energy meter DIRIS A-40 (Modbus): `library/domains/iot/socomec/diris_a40__modbus.yaml`
-  - Energy meter EM24 (Modbus): `library/domains/iot/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`
-  - Energy meter SDM630 (Modbus): `library/domains/iot/eastron/eastron_sdm630__modbus.yaml`
-  - Eaton PXM2000 meter (Modbus): `library/domains/iot/eaton/eaton_pxm2000__modbus.yaml`
+  - BMS controller (OPC UA): `library/domains/building/controller/generic/bms_controller__opcua.yaml`
+  - Flexit Nordic HVAC (BACnet): `library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml`
+  - Thermal controller (Modbus): `library/domains/industrial/controller/generic/thermal_controller__modbus.yaml`
+  - Energy meter iEM3000 (Modbus): `library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml`
+  - Easy UPS 3M (Modbus): `library/domains/energy/ups/apc/apc_easy_ups_3m__modbus.yaml`
+  - Energy meter PM3200 (Modbus): `library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml`
+  - Energy meter PM5330 (Modbus): `library/domains/energy/meter/schneider/schneider_pm5330__modbus.yaml`
+  - PowerLogic PM8000 meter (Modbus): `library/domains/energy/meter/schneider/schneider_powerlogic_pm8000__modbus.yaml`
+  - ABB D13 15 energy meter (Modbus): `library/domains/energy/meter/abb/abb_d13_15__modbus.yaml`
+  - Energy meter EM4200 (Modbus): `library/domains/energy/meter/schneider/schneider_em4200__modbus.yaml`
+  - Siemens PAC3200 power meter (Modbus): `library/domains/energy/meter/siemens/siemens_pac3200__modbus.yaml`
+  - Janitza UMG 604-PRO power quality analyzer (Modbus): `library/domains/energy/power_quality_analyzer/janitza/janitza_umg604_pro__modbus.yaml`
+  - APC NetShelter Rack PDU 2g (Modbus): `library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml`
+  - Energy meter DIRIS A-40 (Modbus): `library/domains/energy/meter/socomec/diris_a40__modbus.yaml`
+  - Energy meter EM24 (Modbus): `library/domains/energy/meter/carlo_gavazzi/carlo_gavazzi_em24__modbus.yaml`
+  - Energy meter SDM630 (Modbus): `library/domains/energy/meter/eastron/eastron_sdm630__modbus.yaml`
+  - Eaton PXM2000 meter (Modbus): `library/domains/energy/meter/eaton/eaton_pxm2000__modbus.yaml`
 - Lighting
-  - Lighting panel (OPC UA): `library/domains/iot/generic/lighting_panel__opcua.yaml`
-  - Lighting zone (KNX): `library/domains/iot/generic/lighting_zone__knx.yaml`
-  - ABB switch actuator (KNX): `library/domains/iot/abb/abb_sa_s12_16_5_1__knx.yaml`
-  - ABB cover actuator (KNX): `library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml`
+  - Lighting panel (OPC UA): `library/domains/building/panel/generic/lighting_panel__opcua.yaml`
+  - Lighting zone (KNX): `library/domains/building/zone/generic/lighting_zone__knx.yaml`
+  - ABB switch actuator (KNX): `library/domains/building/actuator/abb/abb_sa_s12_16_5_1__knx.yaml`
+  - ABB cover actuator (KNX): `library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml`
 - Room and IAQ
-  - Room controller (KNX): `library/domains/iot/generic/room_controller__knx.yaml`
-  - Presence detector (KNX): `library/domains/iot/theben/theronda_p360__knx.yaml`
-  - Environment sensors (MQTT/LwM2M): `library/domains/iot/generic/environment_sensor__mqtt.yaml`,
-    `library/domains/iot/generic/environment_sensor__lwm2m.yaml`
-  - Air quality station (HTTP): `library/domains/iot/generic/air_quality_station__http.yaml`
+  - Room controller (KNX): `library/domains/building/controller/generic/room_controller__knx.yaml`
+  - Presence detector (KNX): `library/domains/building/sensor/theben/theronda_p360__knx.yaml`
+  - Environment sensors (MQTT/LwM2M): `library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml`,
+    `library/domains/environment/sensor/generic/environment_sensor__lwm2m.yaml`
+  - Air quality station (HTTP): `library/domains/environment/station/generic/air_quality_station__http.yaml`
 - Safety and security
-  - Fire alarm panel (BACnet): `library/domains/iot/generic/fire_alarm_panel__bacnet.yaml`
-  - Security access controller (BACnet): `library/domains/iot/generic/security_access_controller__bacnet.yaml`
+  - Fire alarm panel (BACnet): `library/domains/building/panel/generic/fire_alarm_panel__bacnet.yaml`
+  - Security access controller (BACnet): `library/domains/building/controller/generic/security_access_controller__bacnet.yaml`
 - Weather and Matter
-  - Weather forecast (HTTP): `library/domains/weather/weather_forecast__http.yaml`
-  - Weather gateway (MQTT): `library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`
-  - Thermostat (Matter): `library/domains/iot/generic/thermostat__matter.yaml`
-  - Smart plug (Matter): `library/domains/iot/generic/smart_plug__matter.yaml`
+  - Weather forecast (HTTP): `library/domains/environment/feed/generic/weather_forecast__http.yaml`
+  - Weather gateway (MQTT): `library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`
+  - Thermostat (Matter): `library/domains/building/thermostat/generic/thermostat__matter.yaml`
+  - Smart plug (Matter): `library/domains/building/actuator/generic/smart_plug__matter.yaml`
 
 ## Quickstart
 

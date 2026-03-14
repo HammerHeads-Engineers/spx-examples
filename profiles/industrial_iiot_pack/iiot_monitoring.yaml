@@ -3,10 +3,10 @@ description: |
   Monitoring-oriented profile that feeds MQTT/HTTP telemetry from the building
   sensors into factory dashboards.
 models:
-  - library/domains/iot/generic/environment_sensor__mqtt.yaml
-  - library/domains/iot/generic/air_quality_station__http.yaml
-  - library/domains/measurement_instruments/generic/multimeter__scpi.yaml
-  - library/domains/iot/apc/rack_pdu_rpdu2g__modbus.yaml
+  - library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml
+  - library/domains/environment/station/generic/air_quality_station__http.yaml
+  - library/domains/lab/instrument/generic/multimeter__scpi.yaml
+  - library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml
 services:
   - mqtt_broker
   - http_gateway
