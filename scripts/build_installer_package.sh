@@ -74,6 +74,14 @@ rsync_opts=(
 )
 
 command -v rsync >/dev/null 2>&1 || { echo "rsync is required for packaging." >&2; exit 1; }
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  echo "python3 or python is required for packaging." >&2
+  exit 1
+fi
 
 for entry in "${copy_entries[@]}"; do
   src="${REPO_ROOT}/${entry}"
@@ -83,6 +91,8 @@ for entry in "${copy_entries[@]}"; do
   fi
   rsync "${rsync_opts[@]}" "${src}" "${PACKAGE_DIR}/"
 done
+
+"${PYTHON_BIN}" -m installer.package_utils "${PACKAGE_DIR}"
 
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package

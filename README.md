@@ -17,6 +17,16 @@ This repository is prepared for LLM-first contributions so expanding or using SP
 - `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
 - For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
+## Model taxonomy
+
+Runtime model truth lives in `library/domains/` plus the catalog metadata in `library/catalog/models.yaml`.
+Each catalog model entry carries a higher-level taxonomy:
+- `domain_group`: `building`, `environment`, `industrial`, `energy`, or `lab`
+- `device_class`: functional class such as `sensor`, `controller`, `meter`, `gateway`
+- `vendor`: vendor slug or `generic`
+
+Pack folders under `library/industries/<pack>/` are documentation-oriented views. Installer selection is driven by `library/catalog/*.yaml` and `profiles/<pack>/*.yaml`, not by pack-local model symlinks/placeholders.
+
 ## Quickstart
 
 Follow these steps after cloning the repository to start a local SPX server, seed demo models/instances by running the tests, and (optionally) bring up the UI via the installer.
@@ -47,7 +57,7 @@ Follow these steps after cloning the repository to start a local SPX server, see
 3. **Install Python dependencies**
    - Use Poetry to install the runtime and test tooling (adds `pymodbus`, `spx-python`, pytest, etc.):
      ```bash
-     poetry install --with dev
+     poetry install --with dev --no-root
      ```
 
 4. **Start the SPX server**

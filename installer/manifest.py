@@ -61,6 +61,9 @@ class ModelManifest:
     services: List[str]
     packages: List[str]
     profiles: List[str]
+    domain_group: str = ""
+    device_class: str = ""
+    vendor: str = "generic"
 
 
 @dataclass(frozen=True)
@@ -141,7 +144,9 @@ class ManifestLoader:
         with path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle) or {}
         if not isinstance(data, Mapping):
-            raise ValueError(f"Manifest {path} must contain a mapping at the top level.")
+            raise ValueError(
+                f"Manifest {path} must contain a mapping at the top level."
+            )
         return data
 
     def _load_services(self, path: Path) -> Dict[str, ServiceManifest]:
@@ -211,6 +216,9 @@ class ManifestLoader:
                 services=services,
                 packages=list(entry.get("packages", []) or []),
                 profiles=list(entry.get("profiles", []) or []),
+                domain_group=entry.get("domain_group", ""),
+                device_class=entry.get("device_class", ""),
+                vendor=entry.get("vendor", "generic"),
             )
         return models
 
