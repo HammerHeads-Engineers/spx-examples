@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -35,7 +35,7 @@ def _resolve_industry_model_target(path: Path) -> Path:
         and "\n" not in raw
         and "\r" not in raw
     ):
-        return (path.parent / raw).resolve()
+        return (path.parent / Path(*PurePosixPath(normalized).parts)).resolve()
 
     pytest.fail(
         f"{path} is neither a symlink nor a relative placeholder reference into library/domains"

@@ -4,16 +4,40 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+import sys
+from pathlib import Path, PurePosixPath
 
 
-def _resolve_placeholder_target(path: Path) -> Path | None:
+class PackageMaterializationError(RuntimeError):
+    """Raised when an industry model reference cannot be materialized safely."""
+
+
+def _ensure_allowed_target(source: Path, target: Path, domains_root: Path) -> Path:
+    try:
+        resolved = target.resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise PackageMaterializationError(
+            f"{source} points to missing target {target}"
+        ) from exc
+
+    if not resolved.is_file():
+        raise PackageMaterializationError(
+            f"{source} points to non-file target {resolved}"
+        )
+
+    try:
+        resolved.relative_to(domains_root)
+    except ValueError as exc:
+        raise PackageMaterializationError(
+            f"{source} points outside {domains_root} (points to {resolved})"
+        ) from exc
+
+    return resolved
+
+
+def _resolve_placeholder_target(path: Path, domains_root: Path) -> Path | None:
     if path.is_symlink():
-        try:
-            target = path.resolve(strict=True)
-        except FileNotFoundError:
-            return None
-        return target if target.is_file() else None
+        return _ensure_allowed_target(path, path.resolve(strict=False), domains_root)
 
     try:
         raw = path.read_text(encoding="utf-8").strip()
@@ -26,8 +50,8 @@ def _resolve_placeholder_target(path: Path) -> Path | None:
     if "\n" in raw or "\r" in raw:
         return None
 
-    target = (path.parent / raw).resolve()
-    return target if target.is_file() else None
+    target = path.parent / Path(*PurePosixPath(normalized).parts)
+    return _ensure_allowed_target(path, target, domains_root)
 
 
 def materialize_industry_model_links(package_root: Path) -> int:
@@ -43,9 +67,10 @@ def materialize_industry_model_links(package_root: Path) -> int:
     if not industries_root.exists():
         return 0
 
+    domains_root = (package_root / "library" / "domains").resolve()
     materialized = 0
     for path in industries_root.rglob("*.yaml"):
-        target = _resolve_placeholder_target(path)
+        target = _resolve_placeholder_target(path, domains_root)
         if target is None:
             continue
 
@@ -67,7 +92,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     package_root = Path(args.package_root).resolve()
-    count = materialize_industry_model_links(package_root)
+    try:
+        count = materialize_industry_model_links(package_root)
+    except PackageMaterializationError as exc:
+        print(f"[package_utils] {exc}", file=sys.stderr)
+        return 1
     print(
         f"[package_utils] Materialized {count} industry model link(s) in {package_root}"
     )
