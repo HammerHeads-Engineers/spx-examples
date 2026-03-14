@@ -75,6 +75,19 @@ rsync_opts=(
 
 command -v rsync >/dev/null 2>&1 || { echo "rsync is required for packaging." >&2; exit 1; }
 
+python_supports_packaging() {
+  "$1" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1
+}
+
+if command -v python3 >/dev/null 2>&1 && python_supports_packaging python3; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1 && python_supports_packaging python; then
+  PYTHON_BIN="python"
+else
+  echo "Python 3.9+ is required for packaging." >&2
+  exit 1
+fi
+
 for entry in "${copy_entries[@]}"; do
   src="${REPO_ROOT}/${entry}"
   if [[ ! -e "${src}" ]]; then
@@ -83,6 +96,8 @@ for entry in "${copy_entries[@]}"; do
   fi
   rsync "${rsync_opts[@]}" "${src}" "${PACKAGE_DIR}/"
 done
+
+"${PYTHON_BIN}" "${REPO_ROOT}/installer/package_utils.py" "${PACKAGE_DIR}"
 
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
@@ -93,7 +108,7 @@ without cloning the full spx-examples repository.
 
 ## Requirements
 
-- Python 3.10+ with `pip`
+- Python 3.9+ with `pip`
 - Docker Desktop / Docker Engine with Compose V2
 
 ## Usage

@@ -9,14 +9,19 @@ This file is the entry point for automated agents and contributors.
 - Tests: `tests/` (pack tests in `tests/packs/<pack>/`)
 - Examples: `examples/` (not used by validation)
 
+Catalog taxonomy is the source of truth for pack membership and higher-level grouping:
+- `domain_group`: one of `building`, `environment`, `industrial`, `energy`, `lab`
+- `device_class`: lower_snake_case functional class such as `sensor`, `controller`, `meter`
+- `vendor`: lower_snake_case vendor slug or `generic`
+
 ## How to add a model
 1. Copy the closest existing model YAML in `library/domains/...`.
 2. Review the pack spec in `library/industries/<pack>/SPEC.md` if the model belongs to a pack.
 3. Name the file `lower_snake_case` with optional `__protocol` suffix; for new or updated models, keep `name` aligned with the file stem.
 4. For new or updated models, include `name`, `description`, and `attributes` when feasible (legacy models may omit `name`/`description`).
-5. Update `library/catalog/models.yaml` with the new entry.
+5. Update `library/catalog/models.yaml` with the new entry, including `domain_group`, `device_class`, and `vendor`.
 6. If you add a new domain or protocol, update `library/catalog/domains.yaml` or `library/catalog/services.yaml`.
-7. If the model belongs to a pack, update `library/catalog/industries.yaml`, relevant `profiles/<pack>/*.yaml`, and the pack README in `library/industries/<pack>/README.md`.
+7. If the model belongs to a pack, update `library/catalog/industries.yaml`, relevant `profiles/<pack>/*.yaml`, and the pack README in `library/industries/<pack>/README.md`. Do not treat `library/industries/<pack>/**/*.yaml` as a source of truth.
 8. Add or update tests under `tests/` (use existing pack tests as templates).
 
 ## How to add a pack
@@ -32,7 +37,7 @@ This file is the entry point for automated agents and contributors.
 
 ## Local validation and tests
 ```bash
-poetry install --with dev
+poetry install --with dev --no-root
 poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
 poetry run python tools/validate_models.py
 poetry run pytest
