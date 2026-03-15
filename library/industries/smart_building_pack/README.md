@@ -44,11 +44,13 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 - Safety and security
   - Fire alarm panel (BACnet): `library/domains/building/panel/generic/fire_alarm_panel__bacnet.yaml`
   - Security access controller (BACnet): `library/domains/building/controller/generic/security_access_controller__bacnet.yaml`
-- Weather and Matter
+- Weather
   - Weather forecast (HTTP): `library/domains/environment/feed/generic/weather_forecast__http.yaml`
   - Weather gateway (MQTT): `library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`
+- Generic devices
   - Thermostat (Matter): `library/domains/building/thermostat/generic/thermostat__matter.yaml`
   - Smart plug (Matter): `library/domains/building/actuator/generic/smart_plug__matter.yaml`
+  - Robot vacuum (MQTT): `library/domains/building/actuator/generic/robot_vacuum__mqtt.yaml`
 
 ## Quickstart
 
@@ -66,7 +68,7 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 
 | Service | Ports | Notes |
 | --- | --- | --- |
-| mqtt_broker | 1883/tcp | MQTT env sensors and weather gateway |
+| mqtt_broker | 1883/tcp | MQTT env sensors, weather gateway, and generic robot vacuum |
 | lwm2m_server | 5683/udp, 5684/udp, 8080/tcp | LwM2M env sensor + management UI |
 | http_gateway | 8091/tcp, 8092/tcp | Weather forecast + air quality feeds |
 | modbus_tcp_gateway | 502/tcp | Thermal controller via gateway; per-model Modbus ports live in YAML (e.g. iEM3000 uses 5023, D13 15 uses 5032) |

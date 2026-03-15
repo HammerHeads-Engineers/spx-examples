@@ -34,6 +34,11 @@ models:
   domain_group: building
   device_class: sensor
   vendor: theben
+- id: Building.RobotVacuum.Mqtt
+  path: library/domains/building/actuator/generic/robot_vacuum__mqtt.yaml
+  domain_group: building
+  device_class: actuator
+  vendor: generic
 - id: Building.RoomController.Knx
   path: library/domains/building/controller/generic/room_controller__knx.yaml
   domain_group: building

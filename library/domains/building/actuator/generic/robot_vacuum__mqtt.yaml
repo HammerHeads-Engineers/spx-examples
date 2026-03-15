@@ -1,0 +1,283 @@
+# SPDX-License-Identifier: MIT
+
+name: robot_vacuum__mqtt
+description: |
+  Generic MQTT-connected robot vacuum cleaner for smart-home and facility demos.
+  The model exposes simple command topics for start/dock requests and publishes
+  synthetic telemetry such as battery level, bin fill, cleaning progress, and
+  human-readable status text.
+
+attributes:
+  desired_cleaning: 0
+  dock_request: 0
+  cleaning_active: 0
+  returning_home: 0
+  docked: 1
+
+  battery_percent: 100.0
+  bin_fill_percent: 5.0
+  area_cleaned_m2: 0.0
+  runtime_min: 0.0
+  suction_level_percent: 70.0
+  active_power_w: 0.0
+
+  return_timer_s: 0.0
+  return_duration_s: 15.0
+  low_battery_threshold_percent: 15.0
+  bin_full_threshold_percent: 95.0
+  cleaning_rate_m2_per_min: 1.1
+  bin_fill_rate_percent_per_min: 1.8
+  discharge_clean_percent_per_min: 5.0
+  discharge_return_percent_per_min: 2.0
+  charge_rate_percent_per_min: 10.0
+  cycle_time_s: 1.0
+
+  error_code: 0
+  status_text: "DOCKED"
+
+actions:
+  - function: $in(desired_cleaning)
+    name: clear_clean_request_on_dock
+    description: Clear the clean request when a dock command is issued.
+    call: 0 if $in(dock_request) == 1 else $in(desired_cleaning)
+
+  - function: $in(cleaning_active)
+    name: drive_cleaning_state
+    description: Start cleaning when requested and safe; stop when docking or faulted.
+    call: (
+          0
+          if (
+            $in(dock_request) == 1
+            or $in(battery_percent) <= $in(low_battery_threshold_percent)
+            or $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
+          )
+          else (1 if $in(desired_cleaning) == 1 else 0)
+        )
+
+  - function: $in(returning_home)
+    name: drive_return_state
+    description: Return to the dock on command or when battery/bin thresholds are exceeded.
+    call: (
+          1
+          if (
+            $in(docked) == 0
+            and (
+              $in(dock_request) == 1
+              or (
+                $in(cleaning_active) == 1
+                and (
+                  $in(battery_percent) <= $in(low_battery_threshold_percent)
+                  or $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
+                )
+              )
+            )
+          )
+          else (0 if $in(docked) == 1 else $in(returning_home))
+        )
+
+  - function: $in(return_timer_s)
+    name: track_return_timer
+    description: Count the time required to get back to the docking station.
+    call: (
+          0.0
+          if $in(returning_home) == 0 or $in(docked) == 1
+          else min($in(return_duration_s), $in(return_timer_s) + $in(cycle_time_s))
+        )
+
+  - function: $in(docked)
+    name: drive_docked_state
+    description: Undock while moving and dock once the return timer elapses.
+    call: (
+          1
+          if $in(returning_home) == 1 and $in(return_timer_s) >= $in(return_duration_s)
+          else (0 if $in(cleaning_active) == 1 or $in(returning_home) == 1 else $in(docked))
+        )
+
+  - function: $in(dock_request)
+    name: clear_dock_request_when_arrived
+    description: Clear the dock request once the robot is back at the charger.
+    call: 0 if $in(docked) == 1 else $in(dock_request)
+
+  - function: $in(area_cleaned_m2)
+    name: integrate_cleaned_area
+    description: Increase covered floor area while cleaning.
+    call: (
+          $in(area_cleaned_m2)
+          + (
+              $in(cleaning_rate_m2_per_min) * $in(cycle_time_s) / 60.0
+              if $in(cleaning_active) == 1
+              else 0.0
+            )
+        )
+
+  - function: $in(runtime_min)
+    name: integrate_runtime
+    description: Track accumulated active cleaning runtime.
+    call: (
+          $in(runtime_min)
+          + (
+              $in(cycle_time_s) / 60.0
+              if $in(cleaning_active) == 1
+              else 0.0
+            )
+        )
+
+  - function: $in(bin_fill_percent)
+    name: fill_dust_bin
+    description: Gradually fill the dust bin while the robot is cleaning.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            $in(bin_fill_percent)
+            + (
+                $in(bin_fill_rate_percent_per_min) * $in(cycle_time_s) / 60.0
+                if $in(cleaning_active) == 1
+                else 0.0
+              )
+          )
+        )
+
+  - function: $in(battery_percent)
+    name: track_battery
+    description: Discharge while cleaning/returning and recharge when docked.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            $in(battery_percent)
+            + (
+                $in(charge_rate_percent_per_min) * $in(cycle_time_s) / 60.0
+                if ($in(docked) == 1 and $in(cleaning_active) == 0 and $in(returning_home) == 0)
+                else (
+                  -$in(discharge_clean_percent_per_min) * $in(cycle_time_s) / 60.0
+                  if $in(cleaning_active) == 1
+                  else (
+                    -$in(discharge_return_percent_per_min) * $in(cycle_time_s) / 60.0
+                    if $in(returning_home) == 1
+                    else 0.0
+                  )
+                )
+              )
+          )
+        )
+
+  - function: $in(active_power_w)
+    name: derive_power
+    description: Synthetic power draw based on state and suction setting.
+    call: (
+          22.0 + 0.75 * max(0.0, $in(suction_level_percent))
+          if $in(cleaning_active) == 1
+          else (
+            12.0
+            if $in(returning_home) == 1
+            else (
+              18.0
+              if $in(docked) == 1 and $in(battery_percent) < 99.5
+              else 4.0
+            )
+          )
+        )
+
+  - function: $in(error_code)
+    name: derive_error_code
+    description: Raise simple low-battery / bin-full status codes.
+    call: (
+          2 if $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
+          else (
+            1 if $in(battery_percent) <= $in(low_battery_threshold_percent) else 0
+          )
+        )
+
+  - function: $in(status_text)
+    name: report_status
+    description: Human-readable robot status for dashboards and demos.
+    call: (
+          "BIN_FULL" if $in(error_code) == 2
+          else (
+            "LOW_BATTERY" if $in(error_code) == 1 and $in(docked) == 0
+            else (
+              "RETURNING" if $in(returning_home) == 1
+              else (
+                "CLEANING" if $in(cleaning_active) == 1
+                else ("DOCKED" if $in(docked) == 1 else "IDLE")
+              )
+            )
+          )
+        )
+
+communication:
+  - mqtt:
+      broker: "host.docker.internal"
+      port: 1883
+      publish_interval: 1.0
+      topic_prefix: "spx/examples/robot_vacuum"
+      default_qos: 1
+      default_retain: false
+      bindings:
+        - attribute: $ext(cleaning_active)
+          topic: telemetry/cleaning_active
+          direction: publish
+        - attribute: $ext(returning_home)
+          topic: telemetry/returning_home
+          direction: publish
+        - attribute: $ext(docked)
+          topic: telemetry/docked
+          direction: publish
+        - attribute: $ext(battery_percent)
+          topic: telemetry/battery_percent
+          direction: publish
+        - attribute: $ext(bin_fill_percent)
+          topic: telemetry/bin_fill_percent
+          direction: publish
+        - attribute: $ext(area_cleaned_m2)
+          topic: telemetry/area_cleaned_m2
+          direction: publish
+        - attribute: $ext(runtime_min)
+          topic: telemetry/runtime_min
+          direction: publish
+        - attribute: $ext(active_power_w)
+          topic: telemetry/active_power_w
+          direction: publish
+        - attribute: $ext(error_code)
+          topic: telemetry/error_code
+          direction: publish
+        - attribute: $ext(status_text)
+          topic: telemetry/status
+          direction: publish
+        - attribute: $attr(desired_cleaning)
+          topic: command/desired_cleaning
+          direction: subscribe
+        - attribute: $attr(dock_request)
+          topic: command/dock_request
+          direction: subscribe
+        - attribute: $attr(suction_level_percent)
+          topic: command/suction_level_percent
+          direction: subscribe
+
+scenarios:
+  start_cleaning:
+    enabled: false
+    description: Start a normal cleaning cycle from the dock.
+    duration: 20.0
+    overrides:
+      $in(desired_cleaning): 1
+      $in(dock_request): 0
+      $in(suction_level_percent): 70.0
+
+  return_to_dock:
+    enabled: false
+    description: Request an immediate return to the charging dock.
+    duration: 20.0
+    overrides:
+      $in(dock_request): 1
+      $in(desired_cleaning): 0
+
+  bin_full_alarm:
+    enabled: false
+    description: Simulate cleaning with an almost full bin to raise the service state.
+    duration: 15.0
+    overrides:
+      $in(desired_cleaning): 1
+      $in(dock_request): 0
+      $in(bin_fill_percent): 97.0
