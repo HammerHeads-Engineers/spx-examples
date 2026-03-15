@@ -5,7 +5,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from spx_mcp.backend.bootstrap import bootstrap_pack, bootstrap_profile, ensure_instance
+from spx_mcp.backend.bootstrap import (
+    bootstrap_pack,
+    bootstrap_profile,
+    ensure_instance,
+    register_model_and_ensure_instance,
+)
 from spx_mcp.backend.instances import (
     delete_instance_scenario,
     ramp_attribute_value,
@@ -21,6 +26,7 @@ from spx_mcp.errors import exception_to_response, success_response
 
 SERVER_WRITE_TOOL_SPECS: List[Dict[str, Any]] = [
     {"name": "server_register_model_from_catalog", "description": "Validate and register one model from the repo catalog.", "write": True},
+    {"name": "server_register_model_and_ensure_instance", "description": "Register one catalog model and ensure one instance exists from it.", "write": True},
     {"name": "server_ensure_instance", "description": "Ensure an instance exists, creating it from the given model if needed.", "write": True},
     {"name": "server_start_instance", "description": "Start one instance.", "write": True},
     {"name": "server_stop_instance", "description": "Stop one instance.", "write": True},
@@ -50,6 +56,36 @@ def register_server_write_tools(server, runtime) -> None:
             client = runtime.create_client()
             return success_response(
                 result=register_model_from_catalog(client, runtime.catalog, model_id)
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_register_model_and_ensure_instance",
+        description="Register one catalog model and ensure one instance exists from it.",
+    )
+    def server_register_model_and_ensure_instance(
+        model_id: str,
+        instance_key: str,
+        start: bool = True,
+        recreate: bool = False,
+        overrides: Optional[Dict[str, Any]] = None,
+        meta_parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            return success_response(
+                **register_model_and_ensure_instance(
+                    client,
+                    runtime.catalog,
+                    model_id=model_id,
+                    instance_key=instance_key,
+                    start=start,
+                    recreate=recreate,
+                    overrides=overrides,
+                    meta_parameters=meta_parameters,
+                )
             )
         except Exception as exc:
             return exception_to_response(exc)

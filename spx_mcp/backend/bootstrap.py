@@ -129,6 +129,40 @@ def ensure_instance(
     )
 
 
+def register_model_and_ensure_instance(
+    client,
+    catalog: RepoCatalog,
+    *,
+    model_id: str,
+    instance_key: str,
+    start: bool = True,
+    recreate: bool = False,
+    overrides: Optional[Dict[str, Any]] = None,
+    meta_parameters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Register one catalog model on the server, then ensure one instance exists."""
+    registration = register_model_from_catalog(client, catalog, model_id)
+    instance = ensure_instance(
+        client,
+        model_id=model_id,
+        instance_key=instance_key,
+        model_path=catalog.get_model_path(model_id),
+        overrides=overrides,
+        meta_parameters=meta_parameters,
+        recreate=recreate,
+        ensure_running=start,
+        start_on_create=start,
+    )
+    return {
+        "model": registration,
+        "instance": {
+            "instance_key": instance_key,
+            "model_id": model_id,
+            "state": getattr(instance, "state", None),
+        },
+    }
+
+
 def bootstrap_pack(
     client,
     catalog: RepoCatalog,

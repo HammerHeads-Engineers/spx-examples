@@ -30,7 +30,9 @@ numeric changes, use `server_ramp_attr`. For richer runtime behavior, prefer the
 scenario tools `server_upsert_scenario`, `server_start_scenario`,
 `server_stop_scenario`, and `server_delete_scenario`, which let SPX execute the
 scenario DSL directly on the server side. Once a runtime scenario is proven out,
-persist it into the model YAML with `repo_upsert_model_scenario`.
+persist it into the model YAML with `repo_upsert_model_scenario`. For the server
+workflow "register this catalog model and ensure one instance exists from it",
+use `server_register_model_and_ensure_instance`.
 
 - CLI entrypoint: `poetry run spx-mcp ...`
 - Detailed usage: `docs/MCP.md`

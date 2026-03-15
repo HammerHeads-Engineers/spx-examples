@@ -19,6 +19,7 @@ def test_list_tools_excludes_write_tools_by_default(capsys) -> None:
     assert "server_set_attr" not in captured.out
     assert "server_set_attrs" not in captured.out
     assert "server_ramp_attr" not in captured.out
+    assert "server_register_model_and_ensure_instance" not in captured.out
     assert "server_upsert_scenario" not in captured.out
     assert "server_start_scenario" not in captured.out
     assert "server_stop_scenario" not in captured.out
@@ -34,6 +35,7 @@ def test_list_tools_includes_write_tools_when_enabled(capsys) -> None:
     assert rc == 0
     assert "repo_upsert_model_scenario" in captured.out
     assert "repo_delete_model_scenario" in captured.out
+    assert "server_register_model_and_ensure_instance" in captured.out
     assert "server_set_attr" in captured.out
     assert "server_set_attrs" in captured.out
     assert "server_ramp_attr" in captured.out

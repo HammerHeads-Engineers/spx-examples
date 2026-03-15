@@ -128,6 +128,7 @@ Write tools are exposed only with `--allow-write`:
 - `repo_upsert_model_scenario`
 - `repo_delete_model_scenario`
 - `server_register_model_from_catalog`
+- `server_register_model_and_ensure_instance`
 - `server_ensure_instance`
 - `server_start_instance`
 - `server_stop_instance`
@@ -170,6 +171,9 @@ Write tools are exposed only with `--allow-write`:
   definitions into the catalog model file itself; after using them, re-register the
   model with `server_register_model_from_catalog` and recreate affected instances
   if you want the running server to pick up the change.
+- `server_register_model_and_ensure_instance` is the convenience workflow for
+  "register this catalog model on the server and give me one instance from it"
+  in a single MCP call.
 - Runtime semantics matter:
   - scenario `overrides` behave like a temporary overlay and revert on `stop()`
   - scenario `actions` such as `function` or `set` materialize state changes and
