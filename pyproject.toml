@@ -9,10 +9,16 @@ description = "Runnable SPX examples and smoke tests using the Python client aga
 authors = ["Aleksander Stanik <aleksander.stanik@hammerheadsengineers.com>"]
 license = "MIT"
 readme = "README.md"
+packages = [
+    { include = "installer" },
+    { include = "spx_mcp" },
+    { include = "tools" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
 spx-python = "1.0.0-rc.3"           # SPX Python client for talking to the server
+mcp = {version = "^1.26.0", python = ">=3.10,<4.0"}  # Official MCP SDK (optional for the local MCP tool)
 numpy = "*"      # Py3.9-compatible upper bound
 plotly = "*"
 scipy = "*"      # Py3.9-compatible upper bound
@@ -37,6 +43,9 @@ python-semantic-release = "*"  # keep versioning & changelog automation
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+spx-mcp = "spx_mcp.cli:main"
 
 [tool.semantic_release]
 # Use pyproject version as the single source of truth

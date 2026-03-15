@@ -17,6 +17,22 @@ This repository is prepared for LLM-first contributions so expanding or using SP
 - `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
 - For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
+## Local MCP tool
+
+This repository includes a local MCP tool for code-oriented LLM workflows against
+`spx-server`. It is intended for local `stdio` use with tools such as Codex or
+Claude Code and is aware of the repository catalog, profiles, packs, model
+validation rules, runtime logs, `communication`, and protocol bindings.
+
+- CLI entrypoint: `poetry run spx-mcp ...`
+- Detailed usage: `docs/MCP.md`
+- Runtime note: the official Python MCP SDK currently requires Python 3.10+,
+  so use a 3.10+ Poetry environment when you want to run the MCP server itself.
+  The rest of the repository continues to support Python 3.9+.
+- Installation note: `spx-mcp` is available after `poetry install --with dev`.
+  If you keep using `poetry install --with dev --no-root`, invoke the tool as
+  `poetry run python -m spx_mcp ...`.
+
 ## Model taxonomy
 
 Runtime model truth lives in `library/domains/` plus the catalog metadata in `library/catalog/models.yaml`.

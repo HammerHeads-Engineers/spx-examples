@@ -44,6 +44,11 @@ poetry run python tools/validate_models.py
 poetry run pytest
 ```
 
+## Local MCP tool
+- Repo-local MCP entrypoint: `poetry run python -m spx_mcp ...`
+- Installed script entrypoint: `poetry run spx-mcp ...` after `poetry install --with dev`
+- Use the MCP tool for repo-aware catalog inspection, model validation, and live `spx-server` diagnostics when the task involves local runtime investigation.
+
 Pack tests (require `SPX_PRODUCT_KEY` and a running stack):
 ```bash
 poetry run pytest tests/packs/<pack>
