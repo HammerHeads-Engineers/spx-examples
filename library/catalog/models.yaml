@@ -188,6 +188,20 @@ models:
   - smart_building_pack
   profiles:
   - bms_quickstart
+- id: Building.RobotVacuum.Mqtt
+  name: Generic Robot Vacuum (MQTT)
+  path: library/domains/building/actuator/generic/robot_vacuum__mqtt.yaml
+  domain: building
+  domain_group: building
+  device_class: actuator
+  vendor: generic
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - smart_building_pack
+  profiles: []
 - id: Building.FireAlarmPanel.Bacnet
   name: Fire Alarm Panel (BACnet)
   path: library/domains/building/panel/generic/fire_alarm_panel__bacnet.yaml
