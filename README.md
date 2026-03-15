@@ -17,6 +17,32 @@ This repository is prepared for LLM-first contributions so expanding or using SP
 - `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
 - For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
+## Local MCP tool
+
+This repository includes a local MCP tool for code-oriented LLM workflows against
+`spx-server`. It is intended for local `stdio` use with tools such as Codex or
+Claude Code and is aware of the repository catalog, profiles, packs, model
+validation rules, runtime logs, `communication`, and protocol bindings.
+
+For attribute-heavy runtime workflows, prefer the batch MCP tools
+`server_get_attrs` and `server_set_attrs` to reduce round trips. For time-based
+numeric changes, use `server_ramp_attr`. For richer runtime behavior, prefer the
+scenario tools `server_upsert_scenario`, `server_start_scenario`,
+`server_stop_scenario`, and `server_delete_scenario`, which let SPX execute the
+scenario DSL directly on the server side. Once a runtime scenario is proven out,
+persist it into the model YAML with `repo_upsert_model_scenario`. For the server
+workflow "register this catalog model and ensure one instance exists from it",
+use `server_register_model_and_ensure_instance`.
+
+- CLI entrypoint: `poetry run spx-mcp ...`
+- Detailed usage: `docs/MCP.md`
+- Runtime note: the official Python MCP SDK currently requires Python 3.10+,
+  so use a 3.10+ Poetry environment when you want to run the MCP server itself.
+  The rest of the repository continues to support Python 3.9+.
+- Installation note: `spx-mcp` is available after `poetry install --with dev`.
+  If you keep using `poetry install --with dev --no-root`, invoke the tool as
+  `poetry run python -m spx_mcp ...`.
+
 ## Model taxonomy
 
 Runtime model truth lives in `library/domains/` plus the catalog metadata in `library/catalog/models.yaml`.

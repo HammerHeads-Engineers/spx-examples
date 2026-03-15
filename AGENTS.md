@@ -44,6 +44,19 @@ poetry run python tools/validate_models.py
 poetry run pytest
 ```
 
+## Local MCP tool
+- Repo-local MCP entrypoint: `poetry run python -m spx_mcp ...`
+- Installed script entrypoint: `poetry run spx-mcp ...` after `poetry install --with dev`
+- Use the MCP tool for repo-aware catalog inspection, model validation, and live `spx-server` diagnostics when the task involves local runtime investigation.
+- Bootstrap the repo-local Codex MCP config before first use or after interpreter changes:
+  - Windows: `powershell -ExecutionPolicy Bypass -File tools\setup_codex_mcp.ps1`
+  - Linux/macOS: `sh tools/setup_codex_mcp.sh`
+- After creating or updating `.codex/config.toml`, restart Codex or open a fresh thread in this workspace before relying on MCP tools.
+- When the host client already exposes the repo-local MCP server, prefer host-managed MCP tools over ad hoc shell calls or custom Python MCP client scripts.
+- Do not launch `python -m spx_mcp stdio` from the shell for routine read/write flows; reserve direct CLI use for bootstrap, `doctor`, `list-tools`, smoke tests, or MCP debugging.
+- Assume `stdio` session reuse only within the current host-managed session; do not rely on transport persistence across separate threads.
+- Prefer fewer, higher-level MCP calls over many small calls to reduce handshake and round-trip overhead.
+
 Pack tests (require `SPX_PRODUCT_KEY` and a running stack):
 ```bash
 poetry run pytest tests/packs/<pack>

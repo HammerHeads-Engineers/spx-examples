@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: MIT
+
+name: tdk_lambda_genesys_plus_g100_50__modbus
+description: |
+  TDK-Lambda Genesys+ G100-50 programmable DC power supply (simulation) with a
+  compact Modbus TCP surface for automation and commissioning tests.
+
+  The simulated ratings follow the Genesys+ 1U 5 kW family specification for the
+  G100-50 variant: 0-100 V, 0-50 A, 5000 W. The Modbus map below is a minimal
+  SPX-facing control/status profile for tests; it does not attempt to reproduce
+  the full vendor MDBS register table.
+
+attributes:
+  k__output_enable: 0
+  k__remote_mode: 1
+  k__voltage_set_v: 24.0
+  k__current_limit_a: 10.0
+
+  voltage_actual_v: 0.0
+  current_actual_a: 0.0
+  power_actual_w: 0.0
+  operating_mode_code: 0
+  status_word: 0
+
+  alarm_remote_inhibit: 0
+  alarm_limit_clamp: 0
+  alarm_summary: 0
+
+  load_resistance_ohm: 4.0
+  voltage_rise_rate_v_per_s: 80.0
+  voltage_fall_rate_v_per_s: 120.0
+  voltage_max_v: 100.0
+  current_max_a: 50.0
+  power_max_w: 5000.0
+  cycle_time_s: 0.1
+
+  _voltage_target_v: 0.0
+  _effective_current_limit_a: 0.0
+
+actions:
+  - function: $in(alarm_remote_inhibit)
+    name: detect_remote_inhibit
+    description: Raise an inhibit alarm when output is requested without remote mode.
+    call: 1 if ($in(k__output_enable) == 1 and $in(k__remote_mode) == 0) else 0
+
+  - function: $in(alarm_limit_clamp)
+    name: detect_limit_clamp
+    description: Flag commands that exceed the rated voltage or current envelope.
+    call: 1 if (
+            $in(k__voltage_set_v) < 0.0
+            or $in(k__voltage_set_v) > $in(voltage_max_v)
+            or $in(k__current_limit_a) < 0.0
+            or $in(k__current_limit_a) > $in(current_max_a)
+          ) else 0
+
+  - function: $in(alarm_summary)
+    name: build_alarm_summary
+    description: Collapse individual alarm flags into a single summary bit.
+    call: 1 if ($in(alarm_remote_inhibit) == 1 or $in(alarm_limit_clamp) == 1) else 0
+
+  - function: $in(_voltage_target_v)
+    name: clamp_voltage_target
+    description: Resolve the requested output voltage after range and inhibit checks.
+    call: 0.0 if ($in(k__output_enable) == 0 or $in(alarm_remote_inhibit) == 1)
+          else max(0.0, min($in(voltage_max_v), $in(k__voltage_set_v)))
+
+  - function: $in(_effective_current_limit_a)
+    name: compute_effective_current_limit
+    description: Respect both current and total power limits for the active setpoint.
+    call: max(
+          0.0,
+          min(
+            $in(current_max_a),
+            max(0.0, $in(k__current_limit_a)),
+            $in(power_max_w) / max(0.1, $in(_voltage_target_v))
+          )
+        )
+
+  - function: $in(voltage_actual_v)
+    name: track_output_voltage
+    description: Slew the output toward CV or CC equilibrium with bounded ramp rates.
+    call: >
+          (
+            $in(voltage_actual_v)
+            + max(
+                -$in(voltage_fall_rate_v_per_s) * $in(cycle_time_s),
+                min(
+                  $in(voltage_rise_rate_v_per_s) * $in(cycle_time_s),
+                  (
+                    min(
+                      $in(_voltage_target_v),
+                      $in(_effective_current_limit_a) * max(0.05, $in(load_resistance_ohm))
+                    )
+                    - $in(voltage_actual_v)
+                  )
+                )
+              )
+          )
+
+  - function: $in(current_actual_a)
+    name: compute_output_current
+    description: Resolve delivered current from load resistance and active current limit.
+    call: 0.0 if ($in(k__output_enable) == 0 or $in(alarm_remote_inhibit) == 1)
+          else min(
+            $in(_effective_current_limit_a),
+            $in(voltage_actual_v) / max(0.05, $in(load_resistance_ohm))
+          )
+
+  - function: $in(power_actual_w)
+    name: compute_output_power
+    description: Compute instantaneous delivered power.
+    call: max(0.0, $in(voltage_actual_v) * $in(current_actual_a))
+
+  - function: $in(operating_mode_code)
+    name: encode_operating_mode
+    description: Encode 0=off, 1=CV, 2=CC for Modbus clients.
+    cc_margin_a: 0.05
+    cv_margin_v: 0.05
+    call: 0 if ($in(k__output_enable) == 0 or $in(alarm_remote_inhibit) == 1)
+          else (
+            2
+            if (
+              abs($in(current_actual_a) - $in(_effective_current_limit_a)) <= cc_margin_a
+              and abs($in(voltage_actual_v) - $in(_voltage_target_v)) > cv_margin_v
+            )
+            else 1
+          )
+
+  - function: $in(status_word)
+    name: build_status_word
+    description: Encode output/remote/CV/CC/alarm bits into a compact status word.
+    call: >-
+          (
+            (1 if $in(k__output_enable) == 1 else 0)
+            + (2 if $in(k__remote_mode) == 1 else 0)
+            + (4 if $in(operating_mode_code) == 1 else 0)
+            + (8 if $in(operating_mode_code) == 2 else 0)
+            + (16 if $in(alarm_summary) == 1 else 0)
+          )
+
+communication:
+  - modbus_slave:
+      host: 0.0.0.0
+      port: 5033
+      unit_id: 1
+      zero_fill: true
+      mapping:
+        k__output_enable: { address: [41001,41001], group: h_r, type: uint_16 }
+        k__remote_mode: { address: [41002,41002], group: h_r, type: uint_16 }
+        k__voltage_set_v: { address: [41003,41004], group: h_r, type: float }
+        k__current_limit_a: { address: [41005,41006], group: h_r, type: float }
+        voltage_actual_v: { address: [41007,41008], group: h_r, type: float }
+        current_actual_a: { address: [41009,41010], group: h_r, type: float }
+        power_actual_w: { address: [41011,41012], group: h_r, type: float }
+        operating_mode_code: { address: [41013,41013], group: h_r, type: uint_16 }
+        status_word: { address: [41014,41014], group: h_r, type: uint_16 }
+        alarm_remote_inhibit: { address: [41015,41015], group: h_r, type: uint_16 }
+        alarm_limit_clamp: { address: [41016,41016], group: h_r, type: uint_16 }
+        alarm_summary: { address: [41017,41017], group: h_r, type: uint_16 }
+        load_resistance_ohm: { address: [41018,41019], group: h_r, type: float }
+        voltage_rise_rate_v_per_s: { address: [41020,41021], group: h_r, type: float }
+        voltage_fall_rate_v_per_s: { address: [41022,41023], group: h_r, type: float }
+        voltage_max_v: { address: [41024,41025], group: h_r, type: float }
+        current_max_a: { address: [41026,41027], group: h_r, type: float }
+        power_max_w: { address: [41028,41029], group: h_r, type: float }
+
+scenarios:
+  nominal_48v_load:
+    enabled: false
+    description: Start the supply at 48 V into a moderate resistive load in CV mode.
+    duration: 20.0
+    overrides:
+      $in(k__output_enable): 1
+      $in(k__remote_mode): 1
+      $in(k__voltage_set_v): 48.0
+      $in(k__current_limit_a): 25.0
+      $in(load_resistance_ohm): 4.0
+
+  current_limit_transition:
+    enabled: false
+    description: Force CC mode by requesting a higher voltage against a heavy load.
+    duration: 20.0
+    overrides:
+      $in(k__output_enable): 1
+      $in(k__remote_mode): 1
+      $in(k__voltage_set_v): 60.0
+      $in(k__current_limit_a): 8.0
+      $in(load_resistance_ohm): 2.5
+
+  remote_inhibit_demo:
+    enabled: false
+    description: Demonstrate the remote-inhibit alarm while output enable is requested.
+    duration: 10.0
+    overrides:
+      $in(k__output_enable): 1
+      $in(k__remote_mode): 0
