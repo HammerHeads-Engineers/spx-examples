@@ -29,6 +29,33 @@ poetry env use C:\Python314\python.exe
 poetry install --with dev
 ```
 
+## Bootstrap Codex config
+
+To generate a local Codex MCP config for this repository without committing
+machine-specific paths, use one of the bootstrap scripts below. They create
+`<repo>/.codex/config.toml` and add `.codex/config.toml` to the local
+git exclude file for the worktree.
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\setup_codex_mcp.ps1
+```
+
+Linux or macOS:
+
+```bash
+sh tools/setup_codex_mcp.sh
+```
+
+Optional flags:
+
+- `--read-only` to omit `--allow-write`
+- `--server-name custom_name` to use a different Codex MCP id
+
+The generated config prefers the local `.venv` Python interpreter when present
+and otherwise falls back to `poetry run python -m spx_mcp ...`.
+
 If you intentionally keep the repo in `--no-root` mode, use the module form:
 
 ```powershell

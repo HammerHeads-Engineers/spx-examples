@@ -57,11 +57,16 @@ class SpxMcpConfig:
         fault_verbose: Optional[bool] = None,
     ) -> "SpxMcpConfig":
         root = Path(repo_root or Path(__file__).resolve().parents[1]).resolve()
+        dotenv = _read_dotenv(root / ".env")
         resolved_base_url = normalize_base_url(
-            spx_base_url or os.environ.get("SPX_BASE_URL", "http://localhost:8000")
+            spx_base_url
+            or os.environ.get("SPX_BASE_URL")
+            or dotenv.get("SPX_BASE_URL", "http://localhost:8000")
         )
         resolved_product_key = (
-            product_key if product_key is not None else os.environ.get("SPX_PRODUCT_KEY")
+            product_key
+            if product_key is not None
+            else os.environ.get("SPX_PRODUCT_KEY") or dotenv.get("SPX_PRODUCT_KEY")
         )
         resolved_pretty = pretty_errors
         if resolved_pretty is None:
@@ -87,3 +92,29 @@ def _env_flag(name: str, *, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _read_dotenv(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].lstrip()
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            continue
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        values[key] = value
+
+    return values

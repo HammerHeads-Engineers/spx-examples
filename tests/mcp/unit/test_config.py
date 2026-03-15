@@ -24,3 +24,18 @@ def test_config_from_sources_uses_defaults(monkeypatch) -> None:
     assert config.spx_base_url == "http://example:8000"
     assert config.product_key == "KEY-123"
     assert config.allow_write is False
+
+
+def test_config_from_sources_reads_repo_dotenv(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("SPX_BASE_URL", raising=False)
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+    (tmp_path / ".env").write_text(
+        "SPX_BASE_URL=http://dotenv:8000/\nSPX_PRODUCT_KEY=DOTENV-KEY\n",
+        encoding="utf-8",
+    )
+
+    config = SpxMcpConfig.from_sources(repo_root=str(tmp_path))
+
+    assert config.repo_root == tmp_path.resolve()
+    assert config.spx_base_url == "http://dotenv:8000"
+    assert config.product_key == "DOTENV-KEY"
