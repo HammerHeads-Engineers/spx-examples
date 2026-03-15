@@ -708,6 +708,19 @@ models:
   - embedded_lab_pack
   profiles:
   - scpi_lab
+- id: Lab.PowerSupply.TdkLambdaGenesysPlusG10050.Modbus
+  name: TDK-Lambda Genesys+ G100-50 Power Supply (Modbus TCP)
+  path: library/domains/lab/power_supply/tdk_lambda/tdk_lambda_genesys_plus_g100_50__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: power_supply
+  vendor: tdk_lambda
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages: []
+  profiles: []
 - id: Lab.MagnetronPowerSupply.PrevacM600DCPS.Modbus
   name: Prevac M600DC-PS Magnetron Power Supply (Modbus)
   path: library/domains/lab/magnetron_power_supply/prevac/prevac_m600dc_ps__modbus.yaml
