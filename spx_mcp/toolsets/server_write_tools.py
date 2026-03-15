@@ -6,6 +6,15 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from spx_mcp.backend.bootstrap import bootstrap_pack, bootstrap_profile, ensure_instance
+from spx_mcp.backend.instances import (
+    delete_instance_scenario,
+    ramp_attribute_value,
+    start_instance_scenario,
+    set_attribute_value,
+    set_attribute_values,
+    stop_instance_scenario,
+    upsert_instance_scenario,
+)
 from spx_mcp.backend.models import register_model_from_catalog
 from spx_mcp.errors import exception_to_response, success_response
 
@@ -17,6 +26,12 @@ SERVER_WRITE_TOOL_SPECS: List[Dict[str, Any]] = [
     {"name": "server_stop_instance", "description": "Stop one instance.", "write": True},
     {"name": "server_reset_instance", "description": "Reset one instance.", "write": True},
     {"name": "server_set_attr", "description": "Set one instance attribute by path.", "write": True},
+    {"name": "server_set_attrs", "description": "Set multiple instance attributes by path.", "write": True},
+    {"name": "server_ramp_attr", "description": "Ramp one numeric instance attribute over time.", "write": True},
+    {"name": "server_upsert_scenario", "description": "Create or replace one runtime scenario on an instance.", "write": True},
+    {"name": "server_start_scenario", "description": "Start one runtime scenario on an instance.", "write": True},
+    {"name": "server_stop_scenario", "description": "Stop one runtime scenario on an instance.", "write": True},
+    {"name": "server_delete_scenario", "description": "Delete one runtime scenario from an instance.", "write": True},
     {"name": "repo_bootstrap_pack", "description": "Register a pack's models and create its default instances.", "write": True},
     {"name": "repo_bootstrap_profile", "description": "Register all models referenced by a quickstart profile.", "write": True},
 ]
@@ -124,8 +139,143 @@ def register_server_write_tools(server, runtime) -> None:
             runtime.require_write()
             client = runtime.create_client()
             instance = client["instances"][instance_key]
-            instance.put_attr(attr_path, value)
-            return success_response(instance_key=instance_key, attr_path=attr_path, value=value)
+            resolved_path = set_attribute_value(instance, attr_path, value)
+            return success_response(
+                instance_key=instance_key,
+                attr_path=attr_path,
+                resolved_path=resolved_path,
+                value=value,
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_set_attrs",
+        description="Set multiple instance attributes by path.",
+    )
+    def server_set_attrs(instance_key: str, values: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            resolved_paths = set_attribute_values(instance, values)
+            return success_response(
+                instance_key=instance_key,
+                values=values,
+                resolved_paths=resolved_paths,
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_ramp_attr",
+        description="Ramp one numeric instance attribute over time.",
+    )
+    def server_ramp_attr(
+        instance_key: str,
+        attr_path: str,
+        target: Any,
+        duration_s: float,
+        steps: int = 10,
+        start_value: Any = None,
+    ) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            result = ramp_attribute_value(
+                instance,
+                attr_path,
+                target,
+                duration_s=duration_s,
+                steps=steps,
+                start_value=start_value,
+            )
+            return success_response(instance_key=instance_key, **result)
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_upsert_scenario",
+        description="Create or replace one runtime scenario on an instance.",
+    )
+    def server_upsert_scenario(
+        instance_key: str,
+        scenario_name: str,
+        scenario: Dict[str, Any],
+        replace: bool = True,
+        start: bool = False,
+        stop_existing: bool = True,
+    ) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            result = upsert_instance_scenario(
+                instance,
+                scenario_name,
+                scenario,
+                replace=replace,
+                start=start,
+                stop_existing=stop_existing,
+            )
+            return success_response(instance_key=instance_key, **result)
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_start_scenario",
+        description="Start one runtime scenario on an instance.",
+    )
+    def server_start_scenario(instance_key: str, scenario_name: str) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            return success_response(
+                instance_key=instance_key,
+                **start_instance_scenario(instance, scenario_name),
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_stop_scenario",
+        description="Stop one runtime scenario on an instance.",
+    )
+    def server_stop_scenario(instance_key: str, scenario_name: str) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            return success_response(
+                instance_key=instance_key,
+                **stop_instance_scenario(instance, scenario_name),
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_delete_scenario",
+        description="Delete one runtime scenario from an instance.",
+    )
+    def server_delete_scenario(
+        instance_key: str,
+        scenario_name: str,
+        stop_if_running: bool = True,
+    ) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            return success_response(
+                instance_key=instance_key,
+                **delete_instance_scenario(
+                    instance,
+                    scenario_name,
+                    stop_if_running=stop_if_running,
+                ),
+            )
         except Exception as exc:
             return exception_to_response(exc)
 

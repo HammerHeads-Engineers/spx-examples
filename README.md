@@ -24,6 +24,14 @@ This repository includes a local MCP tool for code-oriented LLM workflows agains
 Claude Code and is aware of the repository catalog, profiles, packs, model
 validation rules, runtime logs, `communication`, and protocol bindings.
 
+For attribute-heavy runtime workflows, prefer the batch MCP tools
+`server_get_attrs` and `server_set_attrs` to reduce round trips. For time-based
+numeric changes, use `server_ramp_attr`. For richer runtime behavior, prefer the
+scenario tools `server_upsert_scenario`, `server_start_scenario`,
+`server_stop_scenario`, and `server_delete_scenario`, which let SPX execute the
+scenario DSL directly on the server side. Once a runtime scenario is proven out,
+persist it into the model YAML with `repo_upsert_model_scenario`.
+
 - CLI entrypoint: `poetry run spx-mcp ...`
 - Detailed usage: `docs/MCP.md`
 - Runtime note: the official Python MCP SDK currently requires Python 3.10+,

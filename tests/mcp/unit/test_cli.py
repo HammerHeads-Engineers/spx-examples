@@ -10,7 +10,20 @@ def test_list_tools_excludes_write_tools_by_default(capsys) -> None:
 
     captured = capsys.readouterr()
     assert rc == 0
+    assert "repo_list_model_scenarios" in captured.out
+    assert "repo_get_model_scenario" in captured.out
+    assert "server_list_scenarios" in captured.out
+    assert "server_get_scenario" in captured.out
+    assert "repo_upsert_model_scenario" not in captured.out
+    assert "repo_delete_model_scenario" not in captured.out
     assert "server_set_attr" not in captured.out
+    assert "server_set_attrs" not in captured.out
+    assert "server_ramp_attr" not in captured.out
+    assert "server_upsert_scenario" not in captured.out
+    assert "server_start_scenario" not in captured.out
+    assert "server_stop_scenario" not in captured.out
+    assert "server_delete_scenario" not in captured.out
+    assert "server_get_attrs" in captured.out
     assert "repo_list_packs" in captured.out
 
 
@@ -19,7 +32,15 @@ def test_list_tools_includes_write_tools_when_enabled(capsys) -> None:
 
     captured = capsys.readouterr()
     assert rc == 0
+    assert "repo_upsert_model_scenario" in captured.out
+    assert "repo_delete_model_scenario" in captured.out
     assert "server_set_attr" in captured.out
+    assert "server_set_attrs" in captured.out
+    assert "server_ramp_attr" in captured.out
+    assert "server_upsert_scenario" in captured.out
+    assert "server_start_scenario" in captured.out
+    assert "server_stop_scenario" in captured.out
+    assert "server_delete_scenario" in captured.out
 
 
 def test_doctor_fails_when_runtime_prerequisites_are_missing(tmp_path: Path, monkeypatch, capsys) -> None:

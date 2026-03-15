@@ -107,11 +107,16 @@ Read-only and diagnostics are always exposed:
 - `repo_find_models`
 - `repo_get_model`
 - `repo_validate_model`
+- `repo_list_model_scenarios`
+- `repo_get_model_scenario`
 - `health`
 - `server_list_models`
 - `server_list_instances`
 - `server_get_instance`
+- `server_list_scenarios`
+- `server_get_scenario`
 - `server_get_attr`
+- `server_get_attrs`
 - `server_get_node`
 - `server_get_logs`
 - `server_get_communication`
@@ -120,12 +125,20 @@ Read-only and diagnostics are always exposed:
 
 Write tools are exposed only with `--allow-write`:
 
+- `repo_upsert_model_scenario`
+- `repo_delete_model_scenario`
 - `server_register_model_from_catalog`
 - `server_ensure_instance`
 - `server_start_instance`
 - `server_stop_instance`
 - `server_reset_instance`
 - `server_set_attr`
+- `server_set_attrs`
+- `server_ramp_attr`
+- `server_upsert_scenario`
+- `server_start_scenario`
+- `server_stop_scenario`
+- `server_delete_scenario`
 - `repo_bootstrap_pack`
 - `repo_bootstrap_profile`
 
@@ -136,3 +149,28 @@ Write tools are exposed only with `--allow-write`:
   convenience bootstrap flows.
 - For runtime diagnostics, the tool can inspect generic tree paths, instance logs,
   communication blocks, and bindings.
+- `server_get_attr` and `server_get_attrs` default to reading `external_value`;
+  pass an explicit `.../internal_value` path only when you intentionally need an
+  internal read target.
+- For attribute-heavy flows, prefer `server_get_attrs` and `server_set_attrs` to
+  reduce round trips and stdio/session overhead.
+- `server_set_attr` and `server_set_attrs` default to writing `internal_value`;
+  pass an explicit `.../external_value` path only when you intentionally need an
+  external write target.
+- `server_ramp_attr` ramps one numeric attribute from its current value (or an
+  explicit `start_value`) to a target over `duration_s` and `steps`.
+- `server_upsert_scenario` accepts the raw SPX scenario DSL mapping and injects it
+  into `instance.scenarios` at runtime; use it for timed actions, conditions,
+  alarms, or multi-step sequences that should execute on the SPX server itself.
+- `server_start_scenario`, `server_stop_scenario`, and `server_delete_scenario`
+  manage the runtime lifecycle of those injected scenarios.
+- `repo_list_model_scenarios` and `repo_get_model_scenario` inspect scenario
+  definitions stored in the catalog model YAML.
+- `repo_upsert_model_scenario` and `repo_delete_model_scenario` persist scenario
+  definitions into the catalog model file itself; after using them, re-register the
+  model with `server_register_model_from_catalog` and recreate affected instances
+  if you want the running server to pick up the change.
+- Runtime semantics matter:
+  - scenario `overrides` behave like a temporary overlay and revert on `stop()`
+  - scenario `actions` such as `function` or `set` materialize state changes and
+    the resulting values remain after `stop()`

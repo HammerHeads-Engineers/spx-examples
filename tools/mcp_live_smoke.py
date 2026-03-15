@@ -160,13 +160,28 @@ async def run_smoke(
             },
         ),
         ("server_get_instance", {"instance_key": instance_key}),
+        ("server_list_scenarios", {"instance_key": instance_key}),
         ("server_get_logs", {"instance_key": instance_key}),
         ("server_get_communication", {"instance_key": instance_key}),
         ("server_diagnose_instance", {"instance_key": instance_key}),
-        ("server_stop_instance", {"instance_key": instance_key}),
-        ("server_start_instance", {"instance_key": instance_key}),
-        ("server_reset_instance", {"instance_key": instance_key}),
     ]
+    scenario_name = "mcp_smoke_runtime_action"
+    scenario_payload = {
+        "description": "Temporary runtime-injected action scenario used by the MCP smoke test.",
+        "duration": 0.8,
+        "period": 0.1,
+        "actions": [
+            {
+                "function": "$in(k__current_pm2_5)",
+                "params": {
+                    "low": 9.9,
+                    "high": 19.9,
+                    "switch_at": 0.25,
+                },
+                "call": "low if $attr(timer.time) < switch_at else high",
+            }
+        ],
+    }
 
     async with stdio_client(params) as (read_stream, write_stream):
         async with ClientSession(read_stream, write_stream) as session:
@@ -182,6 +197,93 @@ async def run_smoke(
             )
 
             for name, arguments in steps:
+                result = await session.call_tool(name, arguments)
+                summary = summarize_result(result)
+                print(f"\n[{name}]")
+                print(summary)
+                if not is_success(result):
+                    print(f"step_failed: {name}")
+                    return 1
+
+            scenario_result = await session.call_tool(
+                "server_upsert_scenario",
+                {
+                    "instance_key": instance_key,
+                    "scenario_name": scenario_name,
+                    "scenario": scenario_payload,
+                },
+            )
+            print("\n[server_upsert_scenario]")
+            print(summarize_result(scenario_result))
+            if not is_success(scenario_result):
+                print("step_failed: server_upsert_scenario")
+                return 1
+
+            get_result = await session.call_tool(
+                "server_get_scenario",
+                {
+                    "instance_key": instance_key,
+                    "scenario_name": scenario_name,
+                },
+            )
+            print("\n[server_get_scenario]")
+            print(summarize_result(get_result))
+            if not is_success(get_result):
+                print("step_failed: server_get_scenario")
+                return 1
+
+            start_result = await session.call_tool(
+                "server_start_scenario",
+                {
+                    "instance_key": instance_key,
+                    "scenario_name": scenario_name,
+                },
+            )
+            print("\n[server_start_scenario]")
+            print(summarize_result(start_result))
+            if not is_success(start_result):
+                print("step_failed: server_start_scenario")
+                return 1
+
+            await anyio.sleep(0.45)
+
+            attr_result = await session.call_tool(
+                "server_get_attr",
+                {
+                    "instance_key": instance_key,
+                    "attr_path": "attributes/k__current_pm2_5",
+                },
+            )
+            attr_summary = summarize_result(attr_result)
+            print("\n[server_get_attr after scenario]")
+            print(attr_summary)
+            if not is_success(attr_result):
+                print("step_failed: server_get_attr")
+                return 1
+            structured = attr_summary.get("structured") or {}
+            if structured.get("value") != 19.9:
+                print("step_failed: scenario_did_not_apply")
+                return 1
+
+            for name, arguments in [
+                (
+                    "server_stop_scenario",
+                    {
+                        "instance_key": instance_key,
+                        "scenario_name": scenario_name,
+                    },
+                ),
+                (
+                    "server_delete_scenario",
+                    {
+                        "instance_key": instance_key,
+                        "scenario_name": scenario_name,
+                    },
+                ),
+                ("server_stop_instance", {"instance_key": instance_key}),
+                ("server_start_instance", {"instance_key": instance_key}),
+                ("server_reset_instance", {"instance_key": instance_key}),
+            ]:
                 result = await session.call_tool(name, arguments)
                 summary = summarize_result(result)
                 print(f"\n[{name}]")

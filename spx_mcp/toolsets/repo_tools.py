@@ -5,7 +5,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from spx_mcp.backend.models import validate_catalog_model
+from spx_mcp.backend.models import (
+    get_model_scenario,
+    list_model_scenarios,
+    validate_catalog_model,
+)
 from spx_mcp.errors import exception_to_response, success_response
 
 
@@ -33,6 +37,16 @@ REPO_TOOL_SPECS: List[Dict[str, Any]] = [
     {
         "name": "repo_validate_model",
         "description": "Validate one catalog model with the repo's lightweight validator.",
+        "write": False,
+    },
+    {
+        "name": "repo_list_model_scenarios",
+        "description": "List scenario names defined in one catalog model.",
+        "write": False,
+    },
+    {
+        "name": "repo_get_model_scenario",
+        "description": "Return one scenario definition from a catalog model.",
         "write": False,
     },
 ]
@@ -101,6 +115,28 @@ def register_repo_tools(server, runtime) -> None:
         try:
             return success_response(
                 validation=validate_catalog_model(runtime.catalog, model_id)
+            )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="repo_list_model_scenarios",
+        description="List scenario names defined in one catalog model.",
+    )
+    def repo_list_model_scenarios(model_id: str) -> Dict[str, Any]:
+        try:
+            return success_response(**list_model_scenarios(runtime.catalog, model_id))
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="repo_get_model_scenario",
+        description="Return one scenario definition from a catalog model.",
+    )
+    def repo_get_model_scenario(model_id: str, scenario_name: str) -> Dict[str, Any]:
+        try:
+            return success_response(
+                **get_model_scenario(runtime.catalog, model_id, scenario_name)
             )
         except Exception as exc:
             return exception_to_response(exc)
