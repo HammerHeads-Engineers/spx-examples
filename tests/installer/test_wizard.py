@@ -132,3 +132,51 @@ def test_wizard_protocol_selection(
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == []
     assert selection.service_ids == ["mqtt_broker"]
+
+
+def test_wizard_masks_product_key_in_output(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+
+    inputs = iter(["1", "", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr(
+        "getpass.getpass",
+        lambda _: "COAUA-AAGRC-RWIUB-MRKIB-UMSHS-H7ZCU",
+    )
+
+    selection = wizard.run()
+    captured = capsys.readouterr()
+
+    assert selection.license_key == "COAUA-AAGRC-RWIUB-MRKIB-UMSHS-H7ZCU"
+    assert "COAUA-AAGRC-RWIUB-MRKIB-UMSHS-H7ZCU" not in captured.out
+    assert "SPX product key:" in captured.out
+    assert "*******************************7ZCU" in captured.out
+
+
+def test_wizard_masks_env_product_key_in_output(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+
+    inputs = iter(["1", "", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    selection = wizard.run()
+    captured = capsys.readouterr()
+
+    assert selection.license_key == "TEST-KEY"
+    assert "Detected SPX_PRODUCT_KEY in environment:" in captured.out
+    assert "TEST-KEY" not in captured.out
+    assert "****-KEY" in captured.out

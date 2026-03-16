@@ -172,6 +172,7 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     assert (output_dir / "spx-start.ps1").exists()
     assert (output_dir / "spx-stop.ps1").exists()
     assert (output_dir / "bootstrap_runner.py").exists()
+    assert (output_dir / "runtime_bootstrap.py").exists()
 
 
 def test_generate_allows_missing_product_key_when_flag_set(
