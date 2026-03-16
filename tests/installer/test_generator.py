@@ -174,7 +174,9 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert start_path.exists()
     assert stop_path.exists()
     runner_path = output_dir / "bootstrap_runner.py"
+    runtime_path = output_dir / "runtime_bootstrap.py"
     assert runner_path.exists()
+    assert runtime_path.exists()
     start_content = start_path.read_text(encoding="utf-8")
     stop_content = stop_path.read_text(encoding="utf-8")
     assert "BLE_ADAPTER_PID" in start_content
@@ -182,6 +184,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "down --remove-orphans" in start_content
     assert "docker compose" in start_content
     assert "bootstrap_runner.py" in start_content
+    assert "runtime_bootstrap.py" in start_content
+    assert "pip install --user" not in start_content
     assert "pkill -f spx-ble-adapter" in stop_content
     start_ps_path = output_dir / "spx-start.ps1"
     stop_ps_path = output_dir / "spx-stop.ps1"
@@ -196,6 +200,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         in start_ps_content
     )
     assert "bootstrap_runner.py" in start_ps_content
+    assert "runtime_bootstrap.py" in start_ps_content
+    assert "pip install --user" not in start_ps_content
     assert "Get-CimInstance Win32_Process" in stop_ps_content
 
 

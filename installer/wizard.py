@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import getpass
 import os
 from dataclasses import dataclass
 from shutil import get_terminal_size
@@ -369,12 +370,13 @@ class InstallerWizard:
     def _prompt_license_key(self) -> str:
         env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
         if env_value:
-            print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {env_value}"))
+            masked = self._mask_secret(env_value)
+            print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {masked}"))
             return env_value
 
         print(ui.heading("\nSPX Product Key"))
         while True:
-            raw = input("Enter SPX product key (required, q to quit): ").strip()
+            raw = getpass.getpass("Enter SPX product key (required, q to quit): ").strip()
             self._check_quit(raw)
             if raw:
                 return raw
@@ -384,6 +386,14 @@ class InstallerWizard:
         if raw.lower() in {"q", "quit"}:
             print(ui.warn("Exiting wizard."))
             raise SystemExit(0)
+
+    def _mask_secret(self, value: str, *, visible_tail: int = 4) -> str:
+        clean = value.strip()
+        if not clean:
+            return "N/A"
+        if len(clean) <= visible_tail:
+            return "*" * len(clean)
+        return f"{'*' * (len(clean) - visible_tail)}{clean[-visible_tail:]}"
 
     def _prompt_indices(
         self,
@@ -452,7 +462,7 @@ class InstallerWizard:
         print(f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}")
         print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
         print(f"Offline bundle: {ui.success('yes') if offline_bundle else ui.warn('no')}")
-        print(f"SPX product key: {ui.heading(license_key or 'N/A')}")
+        print(f"SPX product key: {ui.heading(self._mask_secret(license_key))}")
         print("\nModels:")
         for model_id in model_ids:
             manifest = index.models[model_id]

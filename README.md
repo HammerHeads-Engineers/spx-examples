@@ -209,6 +209,41 @@ This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 
 Hand the `.tgz` to teammates; they can extract it anywhere and run the platform launcher (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or `spx-setup.bat`) to go through the wizard locally.
 
+### 6. Build a trusted macOS installer (Developer ID + notarization)
+
+For a macOS-native distribution, build a signed `.pkg` that installs a single
+`SPX Setup.app` into `/Applications`. The app embeds the full installer payload
+inside the bundle, opens Terminal, and runs the existing terminal-based wizard
+without asking the user to trust a loose downloaded `.command` file.
+
+1. Confirm both Developer ID certificates are present in your keychain:
+
+```bash
+security find-identity -v -p basic | grep "Developer ID"
+```
+
+2. Store notarization credentials once in the keychain:
+
+```bash
+xcrun notarytool store-credentials spx-notary \
+  --apple-id "YOUR_APPLE_ID" \
+  --team-id "YOUR_TEAM_ID"
+```
+
+3. Build, sign, notarize, and staple the macOS installer package:
+
+```bash
+scripts/build_macos_pkg.sh \
+  --app-sign "Developer ID Application: Your Company (TEAMID1234)" \
+  --sign "Developer ID Installer: Your Company (TEAMID1234)" \
+  --notarytool-profile spx-notary
+```
+
+The output package is written to `dist/spx-installer-macos-<version>.pkg`. After
+installation, users launch `SPX Setup.app` from `/Applications`; the installer
+defaults to a user-writable output directory when it is running from a packaged
+location such as `/Applications`.
+
 ### 5. Produce single-file installers (optional)
 
 Convert the package into self-extracting files so users run a single artifact per platform:

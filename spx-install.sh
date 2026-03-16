@@ -2,20 +2,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -z "${PYTHON_BIN:-}" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN=python3
-  elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN=python
-  else
-    echo "[spx-install] Missing required command: python3 or python" >&2
-    exit 1
-  fi
-fi
-REQUIRED_MODULES=(
-  "yaml:pyyaml"
-  "colorama:colorama"
-)
+RUNTIME_BOOTSTRAP="${REPO_DIR}/installer/runtime_bootstrap.py"
 
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -24,30 +11,81 @@ need_cmd() {
   fi
 }
 
-check_python_modules() {
-  local missing_modules=()
-  local install_packages=()
-  for entry in "${REQUIRED_MODULES[@]}"; do
-    local module="${entry%%:*}"
-    local package="${entry##*:}"
-    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
-      missing_modules+=("$module")
-      install_packages+=("$package")
-    fi
-  done
-  if [ ${#missing_modules[@]} -eq 0 ]; then
+resolve_system_python() {
+  if [ -n "${PYTHON_BIN:-}" ]; then
+    printf '%s\n' "${PYTHON_BIN}"
     return
   fi
 
-  echo "[spx-install] Missing Python modules: ${missing_modules[*]}. Installing via pip..."
-  "$PYTHON_BIN" -m pip install --user "${install_packages[@]}"
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3\n'
+    return
+  fi
 
-  for module in "${missing_modules[@]}"; do
-    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
-      echo "[spx-install] Unable to import module '${module}' even after pip install." >&2
-      exit 1
-    fi
-  done
+  if command -v python >/dev/null 2>&1; then
+    printf 'python\n'
+    return
+  fi
+
+  echo "[spx-install] Missing required command: python3 or python" >&2
+  exit 1
+}
+
+resolve_runtime_root() {
+  if [ -n "${SPX_RUNTIME_HOME:-}" ]; then
+    printf '%s\n' "${SPX_RUNTIME_HOME}"
+    return
+  fi
+
+  if [ -w "${REPO_DIR}" ]; then
+    printf '%s\n' "${REPO_DIR}/.spx-runtime"
+    return
+  fi
+
+  case "$(uname -s)" in
+    Darwin)
+      printf '%s\n' "${HOME}/Library/Application Support/SPX/runtime"
+      ;;
+    *)
+      printf '%s\n' "${HOME}/.local/share/spx/runtime"
+      ;;
+  esac
+}
+
+resolve_default_output() {
+  if [ -n "${SPX_INSTALLER_OUTPUT_DIR:-}" ]; then
+    printf '%s\n' "${SPX_INSTALLER_OUTPUT_DIR}"
+    return
+  fi
+
+  if [ -w "${REPO_DIR}" ]; then
+    printf '%s\n' "${REPO_DIR}/build/spx-generated"
+    return
+  fi
+
+  case "$(uname -s)" in
+    Darwin)
+      printf '%s\n' "${HOME}/Library/Application Support/SPX/generated"
+      ;;
+    *)
+      printf '%s\n' "${HOME}/.local/share/spx/generated"
+      ;;
+  esac
+}
+
+bootstrap_python_runtime() {
+  local system_python="$1"
+  local runtime_root="$2"
+
+  if [ ! -f "${RUNTIME_BOOTSTRAP}" ]; then
+    echo "[spx-install] Missing runtime bootstrap helper: ${RUNTIME_BOOTSTRAP}" >&2
+    exit 1
+  fi
+
+  "$system_python" "${RUNTIME_BOOTSTRAP}" \
+    --venv-dir "${runtime_root}/installer" \
+    --package pyyaml \
+    --package colorama
 }
 
 check_docker() {
@@ -66,14 +104,22 @@ check_docker() {
   fi
 }
 
-need_cmd "$PYTHON_BIN"
+SYSTEM_PYTHON_BIN="$(resolve_system_python)"
+need_cmd "$SYSTEM_PYTHON_BIN"
 check_docker
-check_python_modules
+PYTHON_BIN="$(bootstrap_python_runtime "$SYSTEM_PYTHON_BIN" "$(resolve_runtime_root)")"
+if [ ! -x "${PYTHON_BIN}" ]; then
+  echo "[spx-install] Python runtime bootstrap did not return an executable interpreter." >&2
+  exit 1
+fi
+export PYTHON_BIN
 
 cd "$REPO_DIR"
 
 if [ $# -eq 0 ]; then
-  set -- generate --output build/spx-generated
+  DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
+  echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
+  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
 fi
 
 echo "[spx-install] Running installer CLI: $PYTHON_BIN -m installer $*"
