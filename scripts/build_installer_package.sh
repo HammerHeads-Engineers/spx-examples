@@ -54,10 +54,16 @@ copy_entries=(
   "library"
   "profiles"
   "extensions"
+  "spx_mcp"
+  "tools"
+  "docs"
+  "AGENTS.md"
   "spx-setup.command"
   "spx-setup.desktop"
   "spx-setup.sh"
   "spx-setup.bat"
+  "spx-mcp-setup.command"
+  "spx-mcp-setup.sh"
   "spx-install.sh"
   "spx-install.ps1"
   "README.md"
@@ -95,6 +101,7 @@ without cloning the full spx-examples repository.
 
 - Python 3.9+ with `pip`
 - Docker Desktop / Docker Engine with Compose V2
+- Python 3.10+ if you want to bootstrap the local Codex MCP workspace
 
 ## Usage
 
@@ -106,6 +113,17 @@ without cloning the full spx-examples repository.
    - macOS/Linux shells: `./spx-setup.sh`
 3. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
 4. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
+
+## Optional Codex MCP workspace
+
+If you want a repo-like workspace that Codex can open with the local `spx-mcp`
+server preconfigured, run:
+
+- macOS: `./spx-mcp-setup.command`
+- macOS/Linux shells: `./spx-mcp-setup.sh`
+
+This creates an installer-managed workspace and a local `.codex/config.toml`
+for that folder. Open Codex in the generated workspace and start a fresh thread.
 
 You can safely redistribute the extracted folder (including `build/spx-generated`) to teammates.
 EOF
