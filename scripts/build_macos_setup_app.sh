@@ -16,6 +16,8 @@ Options:
   --staging-dir DIR   Directory for intermediate payload files (default: build/macos-app)
   --app-name NAME     App bundle name without extension (default: SPX Setup)
   --bundle-id ID      CFBundleIdentifier for the app (default: com.hammerheadsengineers.spx.setup)
+  --script-source P   AppleScript source used to build the app (default: installer/macos/spx_setup_launcher.applescript)
+  --skip-payload      Build the launcher without embedding the installer payload
   --version VERSION   App version (default: pyproject.toml version or dev)
   --sign IDENTITY     Sign with this Developer ID Application identity
   -h, --help          Show this help
@@ -43,6 +45,8 @@ OUTPUT_DIR="dist"
 STAGING_DIR="build/macos-app"
 APP_NAME="SPX Setup"
 BUNDLE_ID="com.hammerheadsengineers.spx.setup"
+SCRIPT_SOURCE_REL="installer/macos/spx_setup_launcher.applescript"
+SKIP_PAYLOAD=0
 VERSION=""
 SIGN_IDENTITY=""
 PAYLOAD_NAME="spx-installer"
@@ -64,6 +68,14 @@ while [[ $# -gt 0 ]]; do
     --bundle-id)
       BUNDLE_ID="$2"
       shift 2
+      ;;
+    --script-source)
+      SCRIPT_SOURCE_REL="$2"
+      shift 2
+      ;;
+    --skip-payload)
+      SKIP_PAYLOAD=1
+      shift
       ;;
     --version)
       VERSION="$2"
@@ -94,7 +106,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
 STAGING_ROOT="${REPO_ROOT}/${STAGING_DIR}"
 PAYLOAD_DIR="${STAGING_ROOT}/${PAYLOAD_NAME}"
-SCRIPT_SOURCE="${REPO_ROOT}/installer/macos/spx_setup_launcher.applescript"
+SCRIPT_SOURCE="${REPO_ROOT}/${SCRIPT_SOURCE_REL}"
 APP_PATH="${DEST_DIR}/${APP_NAME}.app"
 
 if [[ -z "${VERSION}" ]]; then
@@ -111,15 +123,19 @@ mkdir -p "${DEST_DIR}"
 mkdir -p "${STAGING_ROOT}"
 rm -rf "${APP_PATH}"
 
-"${REPO_ROOT}/scripts/build_installer_package.sh" \
-  --output-dir "${STAGING_DIR}" \
-  --package-name "${PAYLOAD_NAME}"
+if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
+  "${REPO_ROOT}/scripts/build_installer_package.sh" \
+    --output-dir "${STAGING_DIR}" \
+    --package-name "${PAYLOAD_NAME}"
+fi
 
 xcrun osacompile -o "${APP_PATH}" "${SCRIPT_SOURCE}"
 
-RESOURCE_PAYLOAD_DIR="${APP_PATH}/Contents/Resources/${PAYLOAD_NAME}"
-mkdir -p "${RESOURCE_PAYLOAD_DIR}"
-rsync -a --delete "${PAYLOAD_DIR}/" "${RESOURCE_PAYLOAD_DIR}/"
+if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
+  RESOURCE_PAYLOAD_DIR="${APP_PATH}/Contents/Resources/${PAYLOAD_NAME}"
+  mkdir -p "${RESOURCE_PAYLOAD_DIR}"
+  rsync -a --delete "${PAYLOAD_DIR}/" "${RESOURCE_PAYLOAD_DIR}/"
+fi
 
 plist="${APP_PATH}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string '${BUNDLE_ID}'" "${plist}" 2>/dev/null || \

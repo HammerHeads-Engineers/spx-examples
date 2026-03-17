@@ -211,10 +211,13 @@ Hand the `.tgz` to teammates; they can extract it anywhere and run the platform 
 
 ### 6. Build a trusted macOS installer (Developer ID + notarization)
 
-For a macOS-native distribution, build a signed `.pkg` that installs a single
-`SPX Setup.app` into `/Applications`. The app embeds the full installer payload
-inside the bundle, opens Terminal, and runs the existing terminal-based wizard
-without asking the user to trust a loose downloaded `.command` file.
+For a macOS-native distribution, build a signed `.pkg` that installs
+`SPX Setup.app`, `SPX Start.app`, `SPX Stop.app`, and `SPX Cleanup.app` into
+`/Applications`. `SPX Setup.app` embeds the full installer payload inside the
+bundle, opens Terminal, and runs the existing terminal-based wizard without
+asking the user to trust a loose downloaded `.command` file. The other
+launchers operate on the generated environment in
+`~/Library/Application Support/SPX/generated`.
 
 1. Confirm both Developer ID certificates are present in your keychain:
 
@@ -242,7 +245,15 @@ scripts/build_macos_pkg.sh \
 The output package is written to `dist/spx-installer-macos-<version>.pkg`. After
 installation, users launch `SPX Setup.app` from `/Applications`; the installer
 defaults to a user-writable output directory when it is running from a packaged
-location such as `/Applications`.
+location such as `/Applications`. Once they have generated a local environment,
+they can later manage it via the companion launchers in the same Applications
+folder:
+
+- `SPX Start.app` opens the generated `spx-start.command`.
+- `SPX Stop.app` opens the generated `spx-stop.command`.
+- `SPX Cleanup.app` stops the generated stack, asks Docker to remove the
+  generated environment's containers, images, and volumes, then deletes the
+  local generated/runtime directories without uninstalling the macOS apps.
 
 ### 5. Produce single-file installers (optional)
 
