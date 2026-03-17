@@ -25,8 +25,28 @@ def test_detect_server_invocation_prefers_local_venv_windows(tmp_path) -> None:
     )
 
     assert strategy == "local-venv"
-    assert invocation.command == python_exe.resolve().as_posix()
+    assert invocation.command == python_exe.as_posix()
     assert invocation.args == ["-m", "spx_mcp", "stdio", "--allow-write"]
+    assert invocation.cwd == tmp_path.resolve().as_posix()
+
+
+def test_detect_server_invocation_prefers_local_venv_posix_without_resolving_symlink(tmp_path) -> None:
+    python_exe = tmp_path / ".venv" / "bin" / "python"
+    python_exe.parent.mkdir(parents=True)
+    python_exe.write_text("", encoding="utf-8")
+
+    invocation, strategy = detect_server_invocation(
+        tmp_path,
+        allow_write=False,
+        startup_timeout_sec=20,
+        tool_timeout_sec=120,
+        platform_name="linux",
+        which=lambda _: None,
+    )
+
+    assert strategy == "local-venv"
+    assert invocation.command == python_exe.as_posix()
+    assert invocation.args == ["-m", "spx_mcp", "stdio"]
     assert invocation.cwd == tmp_path.resolve().as_posix()
 
 

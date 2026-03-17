@@ -7,9 +7,10 @@ usage() {
 Usage: scripts/build_macos_pkg.sh [options]
 
  Builds a macOS flat installer package (.pkg) that installs SPX Setup.app,
- SPX Start.app, SPX Stop.app, and SPX Cleanup.app into /Applications.
- SPX Setup.app contains the full installer payload; the other launchers operate
- on the generated environment in the user's Application Support directory.
+ SPX MCP Setup.app, SPX Start.app, SPX Stop.app, and SPX Cleanup.app into
+ /Applications. SPX Setup.app contains the full installer payload; the other
+ launchers operate on the generated environment in the user's Application
+ Support directory or bootstrap a managed Codex MCP workspace.
 
 Options:
   --output-dir DIR              Directory for the final .pkg (default: dist)
@@ -53,6 +54,8 @@ VERSION=""
 INSTALL_LOCATION="/Applications"
 APP_NAME="SPX Setup"
 APP_BUNDLE_ID="com.hammerheadsengineers.spx.setup"
+MCP_SETUP_APP_NAME="SPX MCP Setup"
+MCP_SETUP_APP_BUNDLE_ID="com.hammerheadsengineers.spx.mcp.setup"
 START_APP_NAME="SPX Start"
 START_APP_BUNDLE_ID="com.hammerheadsengineers.spx.start"
 STOP_APP_NAME="SPX Stop"
@@ -176,6 +179,19 @@ if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
 fi
 
 "${REPO_ROOT}/scripts/build_macos_setup_app.sh" "${build_app_args[@]}"
+
+build_mcp_setup_app_args=(
+  --output-dir "${STAGING_DIR}/root"
+  --app-name "${MCP_SETUP_APP_NAME}"
+  --bundle-id "${MCP_SETUP_APP_BUNDLE_ID}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+  build_mcp_setup_app_args+=(--sign "${APP_SIGN_IDENTITY}")
+fi
+
+"${REPO_ROOT}/scripts/build_macos_mcp_setup_app.sh" "${build_mcp_setup_app_args[@]}"
 
 build_start_app_args=(
   --output-dir "${STAGING_DIR}/root"

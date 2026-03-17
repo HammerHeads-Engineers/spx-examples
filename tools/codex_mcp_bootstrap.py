@@ -100,7 +100,7 @@ def detect_server_invocation(
     if venv_python.exists():
         return (
             ServerInvocation(
-                command=venv_python.resolve().as_posix(),
+                command=venv_python.as_posix(),
                 args=args,
                 cwd=repo_root.as_posix(),
                 startup_timeout_sec=startup_timeout_sec,
