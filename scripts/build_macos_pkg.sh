@@ -6,9 +6,10 @@ usage() {
   cat <<'EOF'
 Usage: scripts/build_macos_pkg.sh [options]
 
-Builds a macOS flat installer package (.pkg) that installs SPX Setup.app into
-/Applications. The app contains the full installer payload inside its bundle,
-so the user gets a Finder-clickable launcher rather than a loose .command file.
+ Builds a macOS flat installer package (.pkg) that installs SPX Setup.app,
+ SPX Start.app, SPX Stop.app, and SPX Cleanup.app into /Applications.
+ SPX Setup.app contains the full installer payload; the other launchers operate
+ on the generated environment in the user's Application Support directory.
 
 Options:
   --output-dir DIR              Directory for the final .pkg (default: dist)
@@ -52,6 +53,12 @@ VERSION=""
 INSTALL_LOCATION="/Applications"
 APP_NAME="SPX Setup"
 APP_BUNDLE_ID="com.hammerheadsengineers.spx.setup"
+START_APP_NAME="SPX Start"
+START_APP_BUNDLE_ID="com.hammerheadsengineers.spx.start"
+STOP_APP_NAME="SPX Stop"
+STOP_APP_BUNDLE_ID="com.hammerheadsengineers.spx.stop"
+CLEANUP_APP_NAME="SPX Cleanup"
+CLEANUP_APP_BUNDLE_ID="com.hammerheadsengineers.spx.cleanup"
 APP_SIGN_IDENTITY=""
 SIGN_IDENTITY=""
 KEYCHAIN_PATH=""
@@ -169,6 +176,45 @@ if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
 fi
 
 "${REPO_ROOT}/scripts/build_macos_setup_app.sh" "${build_app_args[@]}"
+
+build_start_app_args=(
+  --output-dir "${STAGING_DIR}/root"
+  --app-name "${START_APP_NAME}"
+  --bundle-id "${START_APP_BUNDLE_ID}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+  build_start_app_args+=(--sign "${APP_SIGN_IDENTITY}")
+fi
+
+"${REPO_ROOT}/scripts/build_macos_start_app.sh" "${build_start_app_args[@]}"
+
+build_stop_app_args=(
+  --output-dir "${STAGING_DIR}/root"
+  --app-name "${STOP_APP_NAME}"
+  --bundle-id "${STOP_APP_BUNDLE_ID}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+  build_stop_app_args+=(--sign "${APP_SIGN_IDENTITY}")
+fi
+
+"${REPO_ROOT}/scripts/build_macos_stop_app.sh" "${build_stop_app_args[@]}"
+
+build_cleanup_app_args=(
+  --output-dir "${STAGING_DIR}/root"
+  --app-name "${CLEANUP_APP_NAME}"
+  --bundle-id "${CLEANUP_APP_BUNDLE_ID}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+  build_cleanup_app_args+=(--sign "${APP_SIGN_IDENTITY}")
+fi
+
+"${REPO_ROOT}/scripts/build_macos_cleanup_app.sh" "${build_cleanup_app_args[@]}"
 
 PKG_PATH="${DEST_DIR}/${PKG_NAME}-${VERSION}.pkg"
 COMPONENT_PLIST="${STAGING_ROOT}/component.plist"
