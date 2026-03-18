@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -93,7 +94,10 @@ def default_workspace_dir(
     if platform_name == "darwin":
         return home / "Documents" / DEFAULT_WORKSPACE_NAME
     if platform_name.startswith("win"):
-        return home / "Documents" / DEFAULT_WORKSPACE_NAME
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data).expanduser().resolve() / "SPX" / "workspace"
+        return home / "AppData" / "Local" / "SPX" / "workspace"
     return home / "spx-codex-workspace"
 
 

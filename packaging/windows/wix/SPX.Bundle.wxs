@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix
+  xmlns="http://wixtoolset.org/schemas/v4/wxs"
+  xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+  xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+  <Bundle
+    Name="$(var.BundleName)"
+    Manufacturer="$(var.Manufacturer)"
+    Version="$(var.BundleVersion)"
+    IconSourceFile="$(var.BundleIconFile)"
+    UpgradeCode="229427D2-B3F9-4DFD-9DEF-9BF45CBE80B8"
+    Compressed="yes">
+    <util:RegistrySearch
+      Id="Python312InstallPathPerUserSearch"
+      Root="HKCU"
+      Key="SOFTWARE\Python\PythonCore\3.12\InstallPath"
+      Variable="Python312InstallPathPerUser"
+      Result="value"
+      Bitness="always64" />
+    <util:RegistrySearch
+      Id="Python312InstallPathPerMachineSearch"
+      Root="HKLM"
+      Key="SOFTWARE\Python\PythonCore\3.12\InstallPath"
+      Variable="Python312InstallPathPerMachine"
+      Result="value"
+      Bitness="always64" />
+    <util:RegistrySearch
+      Id="LegacyPerMachineSpxSearch"
+      Root="HKLM"
+      Key="Software\HammerHeads Engineers\SPX"
+      Value="Installed"
+      Variable="LegacyPerMachineSpxInstalled"
+      Result="exists"
+      Bitness="always64" />
+    <bal:Condition
+      Condition="LegacyPerMachineSpxInstalled &lt;&gt; &quot;true&quot;"
+      Message="A legacy machine-wide SPX preview is still installed on this computer. Uninstall the older 'SPX' entry from Windows Apps before installing SPX Tools again." />
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        Theme="rtfLicense"
+        ThemeFile="$(var.ThemeFile)"
+        LocalizationFile="$(var.ThemeLocalizationFile)"
+        LicenseFile="$(var.LicenseFile)"
+        LogoFile="$(var.LogoFile)"
+        ShowVersion="yes" />
+      <Payload Name="icon.ico" SourceFile="$(var.BundleIconFile)" Compressed="yes" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <ExePackage
+        Id="Python312Prerequisite"
+        DisplayName="$(var.PythonPackageDisplayName)"
+        SourceFile="$(var.PythonInstallerPath)"
+        InstallArguments="/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 InstallLauncherAllUsers=0 Include_test=0"
+        DetectCondition="Python312InstallPathPerMachine OR Python312InstallPathPerUser"
+        Compressed="yes"
+        Cache="keep"
+        PerMachine="no"
+        Permanent="yes"
+        Vital="yes" />
+      <MsiPackage
+        Id="SpxMsi"
+        SourceFile="$(var.MsiPath)"
+        Visible="no"
+        Vital="yes" />
+    </Chain>
+  </Bundle>
+</Wix>
