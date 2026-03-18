@@ -269,7 +269,10 @@ folder:
 The repository now includes an additive Windows packaging scaffold under
 `packaging/windows/` that stages the existing installer payload, publishes a
 Windows launcher executable, generates a WiX fragment for the payload, builds an
-MSI, and wraps it in a Burn bootstrapper EXE.
+MSI, downloads and Authenticode-verifies the official Python 3.12 offline
+installer, and wraps everything in a Burn bootstrapper EXE. The Windows build
+flow also supports both classic thumbprint-based code signing and Azure Trusted
+Signing.
 
 See `packaging/windows/README.md` for the current build flow, prerequisites, and
 known gaps. The first iteration keeps macOS behavior untouched and reuses the

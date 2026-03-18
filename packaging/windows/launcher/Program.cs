@@ -57,6 +57,7 @@ internal static class Program
     {
         var scriptPath = Path.Combine(installRoot, "spx-install.ps1");
         EnsureFileExists(scriptPath, "Missing installed script 'spx-install.ps1'. Reinstall SPX.");
+        var pythonExecutable = ResolvePythonExecutable();
 
         var arguments = new List<string>
         {
@@ -78,7 +79,15 @@ internal static class Program
             arguments.AddRange(extraArgs);
         }
 
-        return RunCommand(GetPowerShellExecutable(), arguments, installRoot);
+        return RunCommand(
+            GetPowerShellExecutable(),
+            arguments,
+            installRoot,
+            environment: new Dictionary<string, string>
+            {
+                ["PYTHON_BIN"] = pythonExecutable,
+            }
+        );
     }
 
     private static int RunMcpSetup(string installRoot, IReadOnlyList<string> extraArgs)
@@ -302,7 +311,8 @@ internal static class Program
         string fileName,
         IEnumerable<string> arguments,
         string workingDirectory,
-        bool allowFailure = false
+        bool allowFailure = false,
+        IReadOnlyDictionary<string, string>? environment = null
     )
     {
         var startInfo = new ProcessStartInfo
@@ -311,6 +321,14 @@ internal static class Program
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
         };
+        if (environment is not null)
+        {
+            foreach (var pair in environment)
+            {
+                startInfo.Environment[pair.Key] = pair.Value;
+            }
+        }
+
         foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);

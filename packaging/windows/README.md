@@ -18,20 +18,23 @@ The current scaffold does the following:
 
 - stages the same repo payload that ships in the portable installer package,
 - publishes a self-contained `SpxLauncher.exe`,
+- downloads or reuses a cached official Python 3.12 offline installer and verifies its Authenticode signature,
 - generates a WiX fragment for the staged files,
 - builds an MSI that installs the payload under `Program Files\SPX`,
-- builds a Burn bundle EXE that chains the MSI.
+- builds a Burn bundle EXE that chains the Python prerequisite and the MSI.
 
-The current scaffold does not yet bundle prerequisites such as Python or Docker. `SpxLauncher.exe` still delegates into the existing PowerShell/Python flows after installation.
+The current scaffold still does not install Docker. `SpxLauncher.exe` delegates into the existing PowerShell/Python flows after installation, but `setup` now exports `PYTHON_BIN` explicitly so the installed flow uses the resolved Python interpreter instead of relying on `PATH` ordering.
 
 ## Prerequisites
 
 - .NET SDK 8.0+
 - WiX Toolset v6 CLI on `PATH`
 - Poetry environment for this repository
-- `signtool` plus a public-trust code-signing certificate if you want signed artifacts
+- `signtool` plus either a public-trust code-signing certificate or Azure Trusted Signing inputs if you want signed artifacts
 
 Installer builds normalize repository semver into Windows-friendly numeric versions. The MSI uses `major.minor.patch`; the Burn bundle carries `major.minor.patch.revision` when the repo version ends with a numeric prerelease suffix such as `-rc.24`.
+
+The Burn bundle defaults to Python `3.12.10`, which is the last Python 3.12 release that still ships the classic Windows offline installer. You can override the cached installer path or URL if you need a different payload.
 
 Quick install via `winget`:
 
@@ -52,13 +55,36 @@ Useful options:
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
   -Configuration Release `
   -RuntimeIdentifier win-x64 `
+  -PythonInstallerPath C:\cache\python-3.12.10-amd64.exe `
   -SignThumbprint YOUR_CERT_THUMBPRINT
 ```
 
 Artifacts are written under `build/windows/artifacts/`.
 
+The Python prerequisite is cached under `build/windows/cache/` by default and is validated with `Get-AuthenticodeSignature` against the `Python Software Foundation` signer before WiX consumes it.
+
+## Signing
+
+Classic certificate signing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
+  -SignThumbprint YOUR_CERT_THUMBPRINT
+```
+
+Azure Trusted Signing:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
+  -TrustedSigningDlibPath C:\signing\Azure.CodeSigning.Dlib.dll `
+  -TrustedSigningMetadataPath C:\signing\metadata.json `
+  -SignToolPath "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
+```
+
+Trusted Signing expects a modern Windows SDK `signtool.exe` and the build script switches the default timestamp service to `http://timestamp.acs.microsoft.com/` when that mode is active.
+
 ## Next steps
 
-- Add a Burn prerequisite chain for Python 3.12 and a clear Docker prerequisite UX.
+- Add a clearer Docker Desktop prerequisite UX in the bootstrapper and launcher.
 - Decide whether the final install scope should stay `Program Files` per-machine or move to a per-user layout.
 - Add a CI job that builds and signs the Windows artifacts on a trusted Windows runner.
