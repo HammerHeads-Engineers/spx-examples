@@ -1,0 +1,337 @@
+using System.Diagnostics;
+
+namespace SpxLauncher;
+
+internal static class Program
+{
+    private const string GeneratedRootFolderName = "SPX";
+    private const string GeneratedDirectoryName = "generated";
+    private const string WorkspaceDirectoryName = "SPX Codex Workspace";
+
+    public static int Main(string[] args)
+    {
+        try
+        {
+            return Run(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[spx-launcher] {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static int Run(string[] args)
+    {
+        var mode = args.Length == 0 ? "setup" : args[0].Trim().ToLowerInvariant();
+        var extraArgs = args.Skip(1).ToArray();
+        var installRoot = Path.GetFullPath(AppContext.BaseDirectory);
+
+        return mode switch
+        {
+            "setup" => RunSetup(installRoot, extraArgs),
+            "mcp-setup" => RunMcpSetup(installRoot, extraArgs),
+            "start" => RunGeneratedPowerShell("spx-start.ps1"),
+            "stop" => RunGeneratedPowerShell("spx-stop.ps1"),
+            "cleanup" => RunCleanup(),
+            "help" or "--help" or "-h" => ShowHelp(),
+            _ => throw new InvalidOperationException(
+                $"Unknown mode '{mode}'. Use one of: setup, mcp-setup, start, stop, cleanup."
+            ),
+        };
+    }
+
+    private static int ShowHelp()
+    {
+        Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup]");
+        Console.WriteLine();
+        Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
+        Console.WriteLine("  mcp-setup  Create the installer-managed Codex MCP workspace.");
+        Console.WriteLine("  start      Run the generated SPX start script.");
+        Console.WriteLine("  stop       Run the generated SPX stop script.");
+        Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");
+        return 0;
+    }
+
+    private static int RunSetup(string installRoot, IReadOnlyList<string> extraArgs)
+    {
+        var scriptPath = Path.Combine(installRoot, "spx-install.ps1");
+        EnsureFileExists(scriptPath, "Missing installed script 'spx-install.ps1'. Reinstall SPX.");
+
+        var arguments = new List<string>
+        {
+            "-ExecutionPolicy",
+            "Bypass",
+            "-NoProfile",
+            "-File",
+            scriptPath,
+        };
+
+        if (extraArgs.Count == 0)
+        {
+            arguments.Add("generate");
+            arguments.Add("--output");
+            arguments.Add(GetGeneratedDirectory());
+        }
+        else
+        {
+            arguments.AddRange(extraArgs);
+        }
+
+        return RunCommand(GetPowerShellExecutable(), arguments, installRoot);
+    }
+
+    private static int RunMcpSetup(string installRoot, IReadOnlyList<string> extraArgs)
+    {
+        var pythonExecutable = ResolvePythonExecutable();
+        var scriptPath = Path.Combine(installRoot, "installer", "mcp_workspace.py");
+        EnsureFileExists(scriptPath, "Missing installed script 'installer\\mcp_workspace.py'. Reinstall SPX.");
+
+        var arguments = new List<string>
+        {
+            scriptPath,
+            "--source-root",
+            installRoot,
+            "--workspace-dir",
+            GetWorkspaceDirectory(),
+            "--python",
+            pythonExecutable,
+            "--server-name",
+            "spx",
+        };
+        arguments.AddRange(extraArgs);
+
+        return RunCommand(pythonExecutable, arguments, installRoot);
+    }
+
+    private static int RunGeneratedPowerShell(string scriptName)
+    {
+        var scriptPath = Path.Combine(GetGeneratedDirectory(), scriptName);
+        EnsureFileExists(
+            scriptPath,
+            $"Missing generated launcher '{scriptName}'. Run SPX Setup first."
+        );
+
+        var arguments = new[]
+        {
+            "-ExecutionPolicy",
+            "Bypass",
+            "-NoProfile",
+            "-File",
+            scriptPath,
+        };
+        return RunCommand(GetPowerShellExecutable(), arguments, GetGeneratedDirectory());
+    }
+
+    private static int RunCleanup()
+    {
+        var generatedDirectory = GetGeneratedDirectory();
+        if (!Directory.Exists(generatedDirectory))
+        {
+            Console.WriteLine("[spx-launcher] No generated SPX environment found.");
+            return 0;
+        }
+
+        var composePath = Path.Combine(generatedDirectory, "docker-compose.generated.yml");
+        var envPath = Path.Combine(generatedDirectory, ".env");
+        if (File.Exists(composePath) && TryResolveCommand("docker.exe", out var dockerExecutable))
+        {
+            Console.WriteLine("[spx-launcher] Removing Docker resources from generated environment...");
+            _ = RunCommand(
+                dockerExecutable,
+                new[]
+                {
+                    "compose",
+                    "-f",
+                    composePath,
+                    "--env-file",
+                    envPath,
+                    "down",
+                    "--remove-orphans",
+                    "--volumes",
+                    "--rmi",
+                    "all",
+                },
+                generatedDirectory,
+                allowFailure: true
+            );
+        }
+
+        Directory.Delete(generatedDirectory, recursive: true);
+        Console.WriteLine($"[spx-launcher] Removed {generatedDirectory}");
+        return 0;
+    }
+
+    private static string ResolvePythonExecutable()
+    {
+        var envPython = Environment.GetEnvironmentVariable("PYTHON_BIN");
+        if (!string.IsNullOrWhiteSpace(envPython))
+        {
+            var resolved = TryResolvePythonExecutable(envPython, Array.Empty<string>());
+            if (resolved is not null)
+            {
+                return resolved;
+            }
+
+            throw new InvalidOperationException(
+                $"PYTHON_BIN is set to '{envPython}' but is not a working Python 3.10+ interpreter."
+            );
+        }
+
+        foreach (var candidate in new[]
+                 {
+                     new PythonCandidate("py", new[] { "-3.12" }),
+                     new PythonCandidate("py", new[] { "-3" }),
+                     new PythonCandidate("python", Array.Empty<string>()),
+                     new PythonCandidate("python3", Array.Empty<string>()),
+                 })
+        {
+            var resolved = TryResolvePythonExecutable(candidate.FileName, candidate.PrefixArguments);
+            if (resolved is not null)
+            {
+                return resolved;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Python 3.10+ is required for 'mcp-setup'. Install Python 3.12 and retry."
+        );
+    }
+
+    private static string? TryResolvePythonExecutable(string fileName, IReadOnlyList<string> prefixArguments)
+    {
+        var versionCheck = new List<string>(prefixArguments)
+        {
+            "-c",
+            "import sys; print(sys.executable); raise SystemExit(0 if sys.version_info[:2] >= (3, 10) else 1)",
+        };
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in versionCheck)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return null;
+            }
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            _ = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+            {
+                return null;
+            }
+
+            var executable = stdout
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+            return string.IsNullOrWhiteSpace(executable) ? null : executable.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string GetPowerShellExecutable()
+    {
+        if (TryResolveCommand("powershell.exe", out var executable))
+        {
+            return executable;
+        }
+
+        if (TryResolveCommand("pwsh.exe", out executable))
+        {
+            return executable;
+        }
+
+        throw new InvalidOperationException("Unable to locate PowerShell on PATH.");
+    }
+
+    private static bool TryResolveCommand(string command, out string resolvedPath)
+    {
+        var pathValue = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var segment in pathValue.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(segment.Trim(), command);
+            if (File.Exists(candidate))
+            {
+                resolvedPath = candidate;
+                return true;
+            }
+        }
+
+        resolvedPath = string.Empty;
+        return false;
+    }
+
+    private static string GetGeneratedDirectory()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(localAppData, GeneratedRootFolderName, GeneratedDirectoryName);
+    }
+
+    private static string GetWorkspaceDirectory()
+    {
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return Path.Combine(documents, WorkspaceDirectoryName);
+    }
+
+    private static void EnsureFileExists(string path, string message)
+    {
+        if (!File.Exists(path))
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static int RunCommand(
+        string fileName,
+        IEnumerable<string> arguments,
+        string workingDirectory,
+        bool allowFailure = false
+    )
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+        };
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(startInfo);
+        if (process is null)
+        {
+            throw new InvalidOperationException($"Failed to launch {fileName}.");
+        }
+
+        process.WaitForExit();
+        if (!allowFailure && process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"{Path.GetFileName(fileName)} failed with exit code {process.ExitCode}."
+            );
+        }
+
+        return process.ExitCode;
+    }
+
+    private sealed record PythonCandidate(string FileName, IReadOnlyList<string> PrefixArguments);
+}

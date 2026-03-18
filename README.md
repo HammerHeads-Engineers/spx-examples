@@ -264,6 +264,17 @@ folder:
   generated environment's containers, images, and volumes, then deletes the
   local generated/runtime directories without uninstalling the macOS apps.
 
+### Windows trusted installer foundation (WiX MSI/EXE)
+
+The repository now includes an additive Windows packaging scaffold under
+`packaging/windows/` that stages the existing installer payload, publishes a
+Windows launcher executable, generates a WiX fragment for the payload, builds an
+MSI, and wraps it in a Burn bootstrapper EXE.
+
+See `packaging/windows/README.md` for the current build flow, prerequisites, and
+known gaps. The first iteration keeps macOS behavior untouched and reuses the
+current Python installer logic as the payload source of truth.
+
 ### 5. Produce single-file installers (optional)
 
 Convert the package into self-extracting files so users run a single artifact per platform:
