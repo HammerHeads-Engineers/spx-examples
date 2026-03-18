@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Shared integration coverage for the multichannel Modbus vacuum gauge SUT device implementation."""
+"""Shared integration coverage for the Prevac MCD7 Modbus SUT implementation."""
 
 import os
 import unittest
@@ -14,9 +14,9 @@ from tests.common.spx_utils import (
     wait_seconds,
 )
 from tests.common.repo import repo_root
-from tests.devices.modbus_vacuum_gauge_multichannel_sut_example import (
+from tests.devices.modbus_prevac_mcd7_sut_example import (
     ModbusTcpClient,
-    ModbusVacuumGaugeMultichannelSUTExample,
+    ModbusPrevacMCD7SUTExample,
 )
 
 
@@ -25,16 +25,17 @@ MODEL_PATH = (
     ROOT
     / "library"
     / "domains"
-    / "vacuum_systems"
-    / "generic"
-    / "vacuum_gauge_multichannel__modbus.yaml"
+    / "lab"
+    / "detector"
+    / "prevac"
+    / "prevac_mcd7__modbus.yaml"
 )
-MODEL_KEY = "tests__vacuum_gauge_multichannel"
-INSTANCE_KEY = "generic_vacuum_gauge_multichannel"
+MODEL_KEY = "tests__prevac_mcd7"
+INSTANCE_KEY = "prevac_mcd7"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
-class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
+class TestModbusPrevacMCD7SUTExampleIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if ModbusTcpClient is None:  # pragma: no cover - dependency missing
@@ -105,7 +106,7 @@ class TestModbusVacuumGaugeMultichannelSUTExampleIntegration(unittest.TestCase):
         except TimeoutError as exc:
             self.skipTest(str(exc))
 
-        self.sut = ModbusVacuumGaugeMultichannelSUTExample(
+        self.sut = ModbusPrevacMCD7SUTExample(
             host="127.0.0.1", port=port, unit_id=unit_id, timeout=1.0
         )
         if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):

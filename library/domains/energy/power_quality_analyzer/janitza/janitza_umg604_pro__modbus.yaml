@@ -68,12 +68,12 @@ attributes:
 
 actions:
   - function: $in(current_neutral_a)
-    name: compute_current_neutral
-    description: Vector sum of phase currents (neutral).
+    name: approximate_neutral_current_a
+    description: Approximate neutral-current indicator using the arithmetic sum of phase currents.
     call: $in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)
 
   - function: $in(power_factor_avg)
-    name: compute_power_factor_avg
+    name: compute_average_power_factor
     description: Average per-phase power factor.
     call: ($in(k__power_factor_l1) + $in(k__power_factor_l2) + $in(k__power_factor_l3)) / 3.0
 
@@ -108,7 +108,7 @@ actions:
     call: $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
 
   - function: $in(k__apparent_power_total_va)
-    name: compute_apparent_power_total
+    name: compute_total_apparent_power_va
     description: Total apparent power (sum of per-phase values).
     call: $in(apparent_power_l1_va) + $in(apparent_power_l2_va) + $in(apparent_power_l3_va)
 
@@ -128,7 +128,7 @@ actions:
     call: $in(k__power_factor_l3) * $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
 
   - function: $in(k__active_power_total_w)
-    name: compute_active_power_total
+    name: compute_total_active_power_w
     description: Total active power (sum of per-phase values).
     call: $in(active_power_l1_w) + $in(active_power_l2_w) + $in(active_power_l3_w)
 
@@ -148,7 +148,7 @@ actions:
     call: (max(0.0, ($in(apparent_power_l3_va) ** 2) - ($in(active_power_l3_w) ** 2)) ** 0.5)
 
   - function: $in(k__reactive_power_total_var)
-    name: compute_reactive_power_total
+    name: compute_total_reactive_power_var
     description: Total reactive power magnitude (sum of per-phase values).
     call: $in(reactive_power_l1_var) + $in(reactive_power_l2_var) + $in(reactive_power_l3_var)
 
@@ -168,17 +168,17 @@ actions:
     call: $in(energy_l3_wh) + max(0.0, $in(active_power_l3_w)) * $in(_cycle_time_s) / 3600.0
 
   - function: $in(k__energy_total_wh)
-    name: compute_energy_total
+    name: compute_total_energy_wh
     description: Total energy (Wh) as sum of per-phase energies.
     call: $in(energy_l1_wh) + $in(energy_l2_wh) + $in(energy_l3_wh)
 
   - function: $in(k__energy_import_total_wh)
-    name: integrate_energy_import
+    name: integrate_import_energy_wh
     description: Total imported energy (Wh) from positive active power.
     call: $in(k__energy_import_total_wh) + max(0.0, $in(k__active_power_total_w)) * $in(_cycle_time_s) / 3600.0
 
   - function: $in(k__energy_export_total_wh)
-    name: integrate_energy_export
+    name: integrate_export_energy_wh
     description: Total exported energy (Wh) from negative active power.
     call: $in(k__energy_export_total_wh) + max(0.0, -$in(k__active_power_total_w)) * $in(_cycle_time_s) / 3600.0
 
@@ -234,3 +234,52 @@ communication:
         k__energy_total_wh:   { address: [19060, 19061], group: i_r, type: float }
         k__energy_import_total_wh: { address: [19068, 19069], group: i_r, type: float }
         k__energy_export_total_wh: { address: [19076, 19077], group: i_r, type: float }
+
+scenarios:
+  balanced_nominal_load:
+    enabled: false
+    display_name: "Balanced Nominal Load"
+    description: Simulate a balanced three-phase load near nominal voltage and power factor.
+    duration: 20.0
+    overrides:
+      $in(k__voltage_l1_n_v): 230.0
+      $in(k__voltage_l2_n_v): 230.0
+      $in(k__voltage_l3_n_v): 230.0
+      $in(k__current_l1_a): 12.0
+      $in(k__current_l2_a): 12.0
+      $in(k__current_l3_a): 12.0
+      $in(k__power_factor_l1): 0.98
+      $in(k__power_factor_l2): 0.98
+      $in(k__power_factor_l3): 0.98
+
+  phase_l2_unbalance:
+    enabled: false
+    display_name: "Phase L2 Current Unbalance"
+    description: Increase L2 loading to emulate a visible phase-current imbalance.
+    duration: 20.0
+    overrides:
+      $in(k__voltage_l1_n_v): 230.0
+      $in(k__voltage_l2_n_v): 227.5
+      $in(k__voltage_l3_n_v): 231.0
+      $in(k__current_l1_a): 10.0
+      $in(k__current_l2_a): 22.0
+      $in(k__current_l3_a): 9.5
+      $in(k__power_factor_l1): 0.97
+      $in(k__power_factor_l2): 0.91
+      $in(k__power_factor_l3): 0.98
+
+  low_power_factor_shift:
+    enabled: false
+    display_name: "Low Power Factor Shift"
+    description: Lower the power factor across all phases while keeping currents near nominal.
+    duration: 20.0
+    overrides:
+      $in(k__voltage_l1_n_v): 229.0
+      $in(k__voltage_l2_n_v): 229.0
+      $in(k__voltage_l3_n_v): 229.0
+      $in(k__current_l1_a): 14.0
+      $in(k__current_l2_a): 13.5
+      $in(k__current_l3_a): 13.8
+      $in(k__power_factor_l1): 0.72
+      $in(k__power_factor_l2): 0.70
+      $in(k__power_factor_l3): 0.74

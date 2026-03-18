@@ -126,8 +126,8 @@ industries:
         instance: spx_lab_power_supply
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
-      - model: Process.VacuumGaugeMultichannel.Modbus
-        instance: spx_vacuum_gauge_multichannel
+      - model: Lab.Detector.PrevacMCD7.Modbus
+        instance: spx_prevac_mcd7
     start_instances:
       - spx_health_monitor_ble
       - spx_temp_sensor_ble
@@ -156,8 +156,8 @@ industries:
         instance: spx_eurotherm_3504_pressure
       - model: Process.VacuumGauge.Modbus
         instance: spx_vacuum_gauge
-      - model: Process.VacuumGaugeMultichannel.Modbus
-        instance: spx_vacuum_gauge_multichannel
+      - model: Lab.Detector.PrevacMCD7.Modbus
+        instance: spx_prevac_mcd7
       - model: Env.EnvSensor.Mqtt
         instance: spx_env_sensor_mqtt
       - model: Env.AirQualityStation.Http

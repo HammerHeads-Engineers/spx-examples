@@ -11,6 +11,7 @@ from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
+from .selection import apply_platform_compatibility
 from . import ui
 
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
@@ -87,6 +88,23 @@ class InstallerWizard:
         ):
             allowed = set(start_instances)
             instances = [entry for entry in instances if entry.get("instance_key") in allowed]
+
+        compatibility = apply_platform_compatibility(
+            model_ids=model_ids,
+            service_ids=service_ids,
+            instances=instances,
+            start_instances=start_instances,
+            index=index,
+        )
+        model_ids = compatibility.model_ids
+        service_ids = compatibility.service_ids
+        instances = compatibility.instances
+        start_instances = compatibility.start_instances
+
+        if compatibility.warnings:
+            print(ui.warn("\nPlatform compatibility adjustments:"))
+            for warning in compatibility.warnings:
+                print(f"  - {warning}")
 
         self._print_summary(
             packages,

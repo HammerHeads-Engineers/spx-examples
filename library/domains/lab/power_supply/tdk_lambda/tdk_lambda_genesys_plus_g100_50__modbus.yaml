@@ -11,21 +11,25 @@ description: |
   the full vendor MDBS register table.
 
 attributes:
+  # Remote command and control surface
   k__output_enable: 0
   k__remote_mode: 1
   k__voltage_set_v: 24.0
   k__current_limit_a: 10.0
 
+  # Observable output telemetry ([V], [A], [W], uint16 code/bitfield)
   voltage_actual_v: 0.0
   current_actual_a: 0.0
   power_actual_w: 0.0
   operating_mode_code: 0
   status_word: 0
 
+  # Alarm bits (int 0/1 flags)
   alarm_remote_inhibit: 0
   alarm_limit_clamp: 0
   alarm_summary: 0
 
+  # Simulation envelope and timing ([ohm], [V/s], [A], [W], [s])
   load_resistance_ohm: 4.0
   voltage_rise_rate_v_per_s: 80.0
   voltage_fall_rate_v_per_s: 120.0
@@ -39,12 +43,12 @@ attributes:
 
 actions:
   - function: $in(alarm_remote_inhibit)
-    name: detect_remote_inhibit
+    name: detect_remote_mode_inhibit_alarm
     description: Raise an inhibit alarm when output is requested without remote mode.
     call: 1 if ($in(k__output_enable) == 1 and $in(k__remote_mode) == 0) else 0
 
   - function: $in(alarm_limit_clamp)
-    name: detect_limit_clamp
+    name: detect_limit_clamp_alarm
     description: Flag commands that exceed the rated voltage or current envelope.
     call: 1 if (
             $in(k__voltage_set_v) < 0.0
@@ -54,18 +58,18 @@ actions:
           ) else 0
 
   - function: $in(alarm_summary)
-    name: build_alarm_summary
+    name: update_alarm_summary
     description: Collapse individual alarm flags into a single summary bit.
     call: 1 if ($in(alarm_remote_inhibit) == 1 or $in(alarm_limit_clamp) == 1) else 0
 
   - function: $in(_voltage_target_v)
-    name: clamp_voltage_target
+    name: resolve_output_voltage_target_v
     description: Resolve the requested output voltage after range and inhibit checks.
     call: 0.0 if ($in(k__output_enable) == 0 or $in(alarm_remote_inhibit) == 1)
           else max(0.0, min($in(voltage_max_v), $in(k__voltage_set_v)))
 
   - function: $in(_effective_current_limit_a)
-    name: compute_effective_current_limit
+    name: resolve_effective_current_limit_a
     description: Respect both current and total power limits for the active setpoint.
     call: max(
           0.0,
@@ -77,7 +81,7 @@ actions:
         )
 
   - function: $in(voltage_actual_v)
-    name: track_output_voltage
+    name: update_output_voltage_v
     description: Slew the output toward CV or CC equilibrium with bounded ramp rates.
     call: >
           (
@@ -98,7 +102,7 @@ actions:
           )
 
   - function: $in(current_actual_a)
-    name: compute_output_current
+    name: update_output_current_a
     description: Resolve delivered current from load resistance and active current limit.
     call: 0.0 if ($in(k__output_enable) == 0 or $in(alarm_remote_inhibit) == 1)
           else min(
@@ -107,12 +111,12 @@ actions:
           )
 
   - function: $in(power_actual_w)
-    name: compute_output_power
+    name: update_output_power_w
     description: Compute instantaneous delivered power.
     call: max(0.0, $in(voltage_actual_v) * $in(current_actual_a))
 
   - function: $in(operating_mode_code)
-    name: encode_operating_mode
+    name: encode_operating_mode_code
     description: Encode 0=off, 1=CV, 2=CC for Modbus clients.
     cc_margin_a: 0.05
     cv_margin_v: 0.05
@@ -127,7 +131,7 @@ actions:
           )
 
   - function: $in(status_word)
-    name: build_status_word
+    name: encode_status_word
     description: Encode output/remote/CV/CC/alarm bits into a compact status word.
     call: >-
           (
@@ -167,6 +171,7 @@ communication:
 scenarios:
   nominal_48v_load:
     enabled: false
+    display_name: "Nominal 48 V CV Load"
     description: Start the supply at 48 V into a moderate resistive load in CV mode.
     duration: 20.0
     overrides:
@@ -178,6 +183,7 @@ scenarios:
 
   current_limit_transition:
     enabled: false
+    display_name: "Current-Limit Transition"
     description: Force CC mode by requesting a higher voltage against a heavy load.
     duration: 20.0
     overrides:
@@ -189,6 +195,7 @@ scenarios:
 
   remote_inhibit_demo:
     enabled: false
+    display_name: "Remote Inhibit Alarm"
     description: Demonstrate the remote-inhibit alarm while output enable is requested.
     duration: 10.0
     overrides:

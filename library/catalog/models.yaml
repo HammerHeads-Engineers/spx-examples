@@ -390,13 +390,13 @@ models:
   profiles:
   - scpi_lab
   - process_cell_quickstart
-- id: Process.VacuumGaugeMultichannel.Modbus
-  name: Vacuum Gauge Multichannel (Modbus)
-  path: library/domains/industrial/sensor/generic/vacuum_gauge_multichannel__modbus.yaml
-  domain: industrial
-  domain_group: industrial
-  device_class: sensor
-  vendor: generic
+- id: Lab.Detector.PrevacMCD7.Modbus
+  name: Prevac MCD7 Multichanneltron Detector (Modbus)
+  path: library/domains/lab/detector/prevac/prevac_mcd7__modbus.yaml
+  domain: lab
+  domain_group: lab
+  device_class: detector
+  vendor: prevac
   protocols:
   - modbus
   services:

@@ -8,12 +8,14 @@ description: |
   human-readable status text.
 
 attributes:
+  # Command latches and discrete state (int 0/1 flags)
   desired_cleaning: 0
   dock_request: 0
   cleaning_active: 0
   returning_home: 0
   docked: 1
 
+  # Telemetry ([%], [m2], [min], [W])
   battery_percent: 100.0
   bin_fill_percent: 5.0
   area_cleaned_m2: 0.0
@@ -21,6 +23,7 @@ attributes:
   suction_level_percent: 70.0
   active_power_w: 0.0
 
+  # Timing and behavior tuning ([s], [%], [m2/min], [%/min])
   return_timer_s: 0.0
   return_duration_s: 15.0
   low_battery_threshold_percent: 15.0
@@ -37,12 +40,12 @@ attributes:
 
 actions:
   - function: $in(desired_cleaning)
-    name: clear_clean_request_on_dock
+    name: clear_clean_request_on_dock_command
     description: Clear the clean request when a dock command is issued.
     call: 0 if $in(dock_request) == 1 else $in(desired_cleaning)
 
   - function: $in(cleaning_active)
-    name: drive_cleaning_state
+    name: update_cleaning_active_state
     description: Start cleaning when requested and safe; stop when docking or faulted.
     call: (
           0
@@ -55,7 +58,7 @@ actions:
         )
 
   - function: $in(returning_home)
-    name: drive_return_state
+    name: update_returning_home_state
     description: Return to the dock on command or when battery/bin thresholds are exceeded.
     call: (
           1
@@ -76,7 +79,7 @@ actions:
         )
 
   - function: $in(return_timer_s)
-    name: track_return_timer
+    name: update_return_timer_s
     description: Count the time required to get back to the docking station.
     call: (
           0.0
@@ -85,7 +88,7 @@ actions:
         )
 
   - function: $in(docked)
-    name: drive_docked_state
+    name: update_docked_state
     description: Undock while moving and dock once the return timer elapses.
     call: (
           1
@@ -94,12 +97,12 @@ actions:
         )
 
   - function: $in(dock_request)
-    name: clear_dock_request_when_arrived
+    name: clear_dock_request_on_arrival
     description: Clear the dock request once the robot is back at the charger.
     call: 0 if $in(docked) == 1 else $in(dock_request)
 
   - function: $in(area_cleaned_m2)
-    name: integrate_cleaned_area
+    name: update_area_cleaned_m2
     description: Increase covered floor area while cleaning.
     call: (
           $in(area_cleaned_m2)
@@ -111,7 +114,7 @@ actions:
         )
 
   - function: $in(runtime_min)
-    name: integrate_runtime
+    name: update_runtime_min
     description: Track accumulated active cleaning runtime.
     call: (
           $in(runtime_min)
@@ -123,7 +126,7 @@ actions:
         )
 
   - function: $in(bin_fill_percent)
-    name: fill_dust_bin
+    name: update_bin_fill_percent
     description: Gradually fill the dust bin while the robot is cleaning.
     call: max(
           0.0,
@@ -139,7 +142,7 @@ actions:
         )
 
   - function: $in(battery_percent)
-    name: track_battery
+    name: update_battery_percent
     description: Discharge while cleaning/returning and recharge when docked.
     call: max(
           0.0,
@@ -163,7 +166,7 @@ actions:
         )
 
   - function: $in(active_power_w)
-    name: derive_power
+    name: compute_active_power_w
     description: Synthetic power draw based on state and suction setting.
     call: (
           22.0 + 0.75 * max(0.0, $in(suction_level_percent))
@@ -180,7 +183,7 @@ actions:
         )
 
   - function: $in(error_code)
-    name: derive_error_code
+    name: compute_error_code
     description: Raise simple low-battery / bin-full status codes.
     call: (
           2 if $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
@@ -190,7 +193,7 @@ actions:
         )
 
   - function: $in(status_text)
-    name: report_status
+    name: update_status_text
     description: Human-readable robot status for dashboards and demos.
     call: (
           "BIN_FULL" if $in(error_code) == 2
@@ -215,49 +218,63 @@ communication:
       default_qos: 1
       default_retain: false
       bindings:
-        - attribute: $ext(cleaning_active)
+        - name: telemetry_cleaning_active
+          attribute: $ext(cleaning_active)
           topic: telemetry/cleaning_active
           direction: publish
-        - attribute: $ext(returning_home)
+        - name: telemetry_returning_home
+          attribute: $ext(returning_home)
           topic: telemetry/returning_home
           direction: publish
-        - attribute: $ext(docked)
+        - name: telemetry_docked
+          attribute: $ext(docked)
           topic: telemetry/docked
           direction: publish
-        - attribute: $ext(battery_percent)
+        - name: telemetry_battery_percent
+          attribute: $ext(battery_percent)
           topic: telemetry/battery_percent
           direction: publish
-        - attribute: $ext(bin_fill_percent)
+        - name: telemetry_bin_fill_percent
+          attribute: $ext(bin_fill_percent)
           topic: telemetry/bin_fill_percent
           direction: publish
-        - attribute: $ext(area_cleaned_m2)
+        - name: telemetry_area_cleaned_m2
+          attribute: $ext(area_cleaned_m2)
           topic: telemetry/area_cleaned_m2
           direction: publish
-        - attribute: $ext(runtime_min)
+        - name: telemetry_runtime_min
+          attribute: $ext(runtime_min)
           topic: telemetry/runtime_min
           direction: publish
-        - attribute: $ext(active_power_w)
+        - name: telemetry_active_power_w
+          attribute: $ext(active_power_w)
           topic: telemetry/active_power_w
           direction: publish
-        - attribute: $ext(error_code)
+        - name: telemetry_error_code
+          attribute: $ext(error_code)
           topic: telemetry/error_code
           direction: publish
-        - attribute: $ext(status_text)
+        - name: telemetry_status_text
+          attribute: $ext(status_text)
           topic: telemetry/status
           direction: publish
-        - attribute: $attr(desired_cleaning)
+        - name: command_desired_cleaning
+          attribute: $attr(desired_cleaning)
           topic: command/desired_cleaning
           direction: subscribe
-        - attribute: $attr(dock_request)
+        - name: command_dock_request
+          attribute: $attr(dock_request)
           topic: command/dock_request
           direction: subscribe
-        - attribute: $attr(suction_level_percent)
+        - name: command_suction_level_percent
+          attribute: $attr(suction_level_percent)
           topic: command/suction_level_percent
           direction: subscribe
 
 scenarios:
   start_cleaning:
     enabled: false
+    display_name: "Start Cleaning Cycle"
     description: Start a normal cleaning cycle from the dock.
     duration: 20.0
     overrides:
@@ -267,6 +284,7 @@ scenarios:
 
   return_to_dock:
     enabled: false
+    display_name: "Return To Dock"
     description: Request an immediate return to the charging dock.
     duration: 20.0
     overrides:
@@ -275,6 +293,7 @@ scenarios:
 
   bin_full_alarm:
     enabled: false
+    display_name: "Dust Bin Full Alarm"
     description: Simulate cleaning with an almost full bin to raise the service state.
     duration: 15.0
     overrides:

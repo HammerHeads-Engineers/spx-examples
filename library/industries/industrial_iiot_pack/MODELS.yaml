@@ -49,6 +49,11 @@ models:
   domain_group: industrial
   device_class: io_module
   vendor: wago
+- id: Lab.Detector.PrevacMCD7.Modbus
+  path: library/domains/lab/detector/prevac/prevac_mcd7__modbus.yaml
+  domain_group: lab
+  device_class: detector
+  vendor: prevac
 - id: Lab.Multimeter.Scpi
   path: library/domains/lab/instrument/generic/multimeter__scpi.yaml
   domain_group: lab
@@ -126,11 +131,6 @@ models:
   vendor: generic
 - id: Process.VacuumGauge.Modbus
   path: library/domains/industrial/sensor/generic/vacuum_gauge__modbus.yaml
-  domain_group: industrial
-  device_class: sensor
-  vendor: generic
-- id: Process.VacuumGaugeMultichannel.Modbus
-  path: library/domains/industrial/sensor/generic/vacuum_gauge_multichannel__modbus.yaml
   domain_group: industrial
   device_class: sensor
   vendor: generic

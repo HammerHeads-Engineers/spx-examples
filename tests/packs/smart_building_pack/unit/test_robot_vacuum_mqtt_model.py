@@ -45,15 +45,21 @@ def test_robot_vacuum_mqtt_model_loads() -> None:
     bindings = mqtt.get("bindings")
     assert isinstance(bindings, list) and bindings
     topics = {binding.get("topic") for binding in bindings if isinstance(binding, dict)}
+    binding_names = {binding.get("name") for binding in bindings if isinstance(binding, dict)}
     assert "telemetry/status" in topics
     assert "command/desired_cleaning" in topics
     assert "command/dock_request" in topics
+    assert "telemetry_status_text" in binding_names
+    assert "command_dock_request" in binding_names
 
     scenarios = doc["scenarios"]
     assert isinstance(scenarios, dict)
     assert "start_cleaning" in scenarios
     assert "return_to_dock" in scenarios
     assert "bin_full_alarm" in scenarios
+    assert scenarios["start_cleaning"].get("display_name") == "Start Cleaning Cycle"
+    assert scenarios["return_to_dock"].get("display_name") == "Return To Dock"
+    assert scenarios["bin_full_alarm"].get("display_name") == "Dust Bin Full Alarm"
 
 
 def test_robot_vacuum_mqtt_model_in_catalog() -> None:

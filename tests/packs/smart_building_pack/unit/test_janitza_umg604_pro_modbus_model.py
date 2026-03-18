@@ -39,6 +39,12 @@ def test_janitza_umg604_pro_modbus_model_loads() -> None:
     assert mapping["k__active_power_total_w"]["address"] == [19026, 19027]
     assert mapping["k__energy_total_wh"]["address"] == [19060, 19061]
 
+    scenarios = doc.get("scenarios")
+    assert isinstance(scenarios, dict)
+    assert scenarios["balanced_nominal_load"]["display_name"] == "Balanced Nominal Load"
+    assert scenarios["phase_l2_unbalance"]["display_name"] == "Phase L2 Current Unbalance"
+    assert scenarios["low_power_factor_shift"]["display_name"] == "Low Power Factor Shift"
+
 
 def test_janitza_umg604_pro_modbus_model_in_catalog() -> None:
     catalog_path = ROOT / "library" / "catalog" / "models.yaml"

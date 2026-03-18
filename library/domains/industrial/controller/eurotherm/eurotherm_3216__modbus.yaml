@@ -72,40 +72,40 @@ attributes:
 
 actions:
   - function: $in(k__auto_man)
-    name: sync_auto_man
+    name: decode_auto_manual_mode
     description: Resolve auto/manual mode from the Modbus register.
     call: $in(k__auto_man) if $in(_auto_man_raw) == $in(_auto_man_raw_prev)
           else (1 if $in(_auto_man_raw) else 0)
 
   - function: $in(k__setpoint_c)
-    name: sync_target_sp
+    name: decode_target_setpoint_c
     description: Decode Target SP (0.1 resolution scaled integer).
     call: $in(k__setpoint_c) if $in(_target_sp_raw) == $in(_target_sp_raw_prev)
           else max($in(sp_min_c), min($in(sp_max_c), $in(_target_sp_raw) / $in(_scale_0p1)))
 
   - function: $in(k__manual_out_pct)
-    name: sync_manual_out
+    name: decode_manual_output_pct
     description: Decode Manual Output (0.1 resolution scaled integer).
     call: $in(k__manual_out_pct) if $in(_manual_out_raw) == $in(_manual_out_raw_prev)
           else max($in(out_min), min($in(out_max), $in(_manual_out_raw) / $in(_scale_0p1)))
 
   - function: $in(working_setpoint_c)
-    name: sync_working_sp
+    name: update_working_setpoint_c
     description: Use Target SP as Working SP for the minimal simulation.
     call: $in(k__setpoint_c)
 
   - function: $in(_power_derivative)
-    name: update_derivative
+    name: update_power_derivative_term
     description: Derivative contribution based on PV error slope.
     call: 0.0 if $in(k__auto_man) == 1
           else $in(power_derivative_gain) * (($in(k__setpoint_c) - $in(temperature_c)) - $in(_power_error_prev))
 
   - function: $in(_power_error_prev)
-    name: update_error_prev
+    name: update_power_error_prev
     call: 0.0 if $in(k__auto_man) == 1 else ($in(k__setpoint_c) - $in(temperature_c))
 
   - function: $in(_power_integral)
-    name: update_integral
+    name: update_power_integral_term
     description: Integrator bias to offset steady-state error.
     call: 0.0 if $in(k__auto_man) == 1
           else (
@@ -121,7 +121,7 @@ actions:
           )
 
   - function: $in(output_pct)
-    name: compute_output
+    name: compute_output_pct
     description: Use PID output in auto, manual out value in manual.
     call: (
           max(
@@ -136,7 +136,7 @@ actions:
         )
 
   - function: $in(temperature_c)
-    name: update_pv
+    name: update_process_temperature_c
     description: First-order thermal response toward the setpoint.
     call: max(
           $in(temp_min_c),
@@ -152,56 +152,56 @@ actions:
         )
 
   - function: $in(_pv_raw)
-    name: encode_pv_raw
+    name: encode_process_value_raw
     description: Encode PV into 0.1 resolution register.
     call: int(round(max($in(temp_min_c), min($in(temp_max_c), $in(temperature_c))) * $in(_scale_0p1)))
 
   - function: $in(_target_sp_raw)
-    name: encode_target_sp_raw
+    name: encode_target_setpoint_raw
     description: Clamp and encode Target SP.
     call: $in(_target_sp_raw) if abs($in(k__setpoint_c) - $in(_setpoint_c_prev)) < 1e-9
           else int(round(max($in(sp_min_c), min($in(sp_max_c), $in(k__setpoint_c))) * $in(_scale_0p1)))
 
   - function: $in(_working_out_raw)
-    name: encode_working_out_raw
+    name: encode_working_output_raw
     call: int(round(max($in(out_min), min($in(out_max), $in(output_pct))) * $in(_scale_0p1)))
 
   - function: $in(_working_sp_raw)
-    name: encode_working_sp_raw
+    name: encode_working_setpoint_raw
     call: int(round(max($in(sp_min_c), min($in(sp_max_c), $in(working_setpoint_c))) * $in(_scale_0p1)))
 
   - function: $in(_manual_out_raw)
-    name: encode_manual_out_raw
+    name: encode_manual_output_raw
     call: $in(_manual_out_raw) if abs($in(k__manual_out_pct) - $in(_manual_out_pct_prev)) < 1e-9
           else int(round(max($in(out_min), min($in(out_max), $in(k__manual_out_pct))) * $in(_scale_0p1)))
 
   - function: $in(_auto_man_raw)
-    name: encode_auto_man_raw
+    name: encode_auto_manual_raw
     call: $in(_auto_man_raw) if $in(k__auto_man) == $in(_auto_man_prev)
           else (1 if $in(k__auto_man) == 1 else 0)
 
   - function: $in(_target_sp_raw_prev)
-    name: remember_target_sp_raw
+    name: store_target_setpoint_raw_prev
     call: $in(_target_sp_raw)
 
   - function: $in(_manual_out_raw_prev)
-    name: remember_manual_out_raw
+    name: store_manual_output_raw_prev
     call: $in(_manual_out_raw)
 
   - function: $in(_auto_man_raw_prev)
-    name: remember_auto_man_raw
+    name: store_auto_manual_raw_prev
     call: $in(_auto_man_raw)
 
   - function: $in(_setpoint_c_prev)
-    name: remember_setpoint_c
+    name: store_setpoint_prev
     call: $in(k__setpoint_c)
 
   - function: $in(_manual_out_pct_prev)
-    name: remember_manual_out_pct
+    name: store_manual_output_pct_prev
     call: $in(k__manual_out_pct)
 
   - function: $in(_auto_man_prev)
-    name: remember_auto_man
+    name: store_auto_manual_prev
     call: $in(k__auto_man)
 
 communication:
@@ -220,6 +220,7 @@ communication:
 
 scenarios:
   auto_heat_step:
+    enabled: false
     display_name: "Auto Heat Step"
     description: Raise the temperature setpoint while keeping the controller in auto mode.
     duration: 20.0
@@ -229,6 +230,7 @@ scenarios:
       $in(k__manual_out_pct): 0.0
 
   auto_cool_step:
+    enabled: false
     display_name: "Auto Cool Step"
     description: Drop the requested setpoint back toward ambient while staying in auto mode.
     duration: 20.0
@@ -237,6 +239,7 @@ scenarios:
       $in(k__setpoint_c): 25.0
 
   manual_hold_35:
+    enabled: false
     display_name: "Manual Hold 35%"
     description: Hold a fixed manual output and keep the loop in manual mode.
     duration: 15.0
@@ -246,6 +249,7 @@ scenarios:
       $in(k__setpoint_c): 35.0
 
   setpoint_ramp_up:
+    enabled: false
     display_name: "Setpoint Ramp Up"
     description: Ramp the temperature setpoint from 30 C to 75 C in auto mode.
     duration: 24.0
@@ -264,6 +268,7 @@ scenarios:
         call: start_sp + (target_sp - start_sp) * min(1.0, $attr(timer.time) / ramp_duration)
 
   manual_to_auto_transfer:
+    enabled: false
     display_name: "Manual To Auto Transfer"
     description: Start in manual mode, then hand control back to the automatic loop.
     duration: 24.0
@@ -286,6 +291,7 @@ scenarios:
             value: 55.0
 
   ambient_disturbance:
+    enabled: false
     display_name: "Ambient Disturbance"
     description: Alternate ambient temperature every 5 s to exercise controller compensation.
     duration: 30.0
