@@ -272,7 +272,11 @@ Windows launcher executable, generates a WiX fragment for the payload, builds an
 MSI, downloads and Authenticode-verifies the official Python 3.12 offline
 installer, and wraps everything in a Burn bootstrapper EXE. The Windows build
 flow also supports both classic thumbprint-based code signing and Azure Trusted
-Signing.
+Signing. The Windows bundle now presents itself as `SPX Tools`, while the
+installed environment wizard keeps the `SPX Setup` name and the installer file
+stays versioned as `spx-installer-<version>.exe`. Installer-managed Windows content now lives under a single per-user root at
+`%LocalAppData%\SPX\...`.
+The Windows launcher, bundle, and Apps entry also reuse one shared SPX icon asset.
 
 See `packaging/windows/README.md` for the current build flow, prerequisites, and
 known gaps. The first iteration keeps macOS behavior untouched and reuses the

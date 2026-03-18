@@ -5,8 +5,8 @@ param(
     [string]$BuildRoot = "build/windows",
     [string]$Version = "",
     [string]$Manufacturer = "HammerHeads Engineers Sp. z o.o.",
-    [string]$ProductName = "SPX",
-    [string]$BundleName = "SPX Setup",
+    [string]$ProductName = "SPX Tools",
+    [string]$BundleName = "SPX Tools",
     [string]$PythonVersion = "3.12.10",
     [string]$PythonInstallerPath = "",
     [string]$PythonInstallerUrl = "",
@@ -366,6 +366,10 @@ $PayloadFragmentPath = Join-Path $BuildRootPath "Payload.wxs"
 $ArtifactsDir = Join-Path $BuildRootPath "artifacts"
 $LauncherProjectPath = Join-Path $RepoRoot "packaging\windows\launcher\SpxLauncher.csproj"
 $LicenseFilePath = Join-Path $RepoRoot "packaging\windows\LICENSE.rtf"
+$ProductIconFilePath = Resolve-RequiredFile -Path (Join-Path $RepoRoot "packaging\windows\assets\spx.ico") -Label "Product icon"
+$BundleLogoFilePath = Resolve-RequiredFile -Path (Join-Path $RepoRoot "packaging\windows\assets\spx.png") -Label "Bundle logo"
+$BundleThemeFilePath = Resolve-RequiredFile -Path (Join-Path $RepoRoot "packaging\windows\wix\theme\RtfTheme.xml") -Label "Bundle theme"
+$BundleThemeLocalizationFilePath = Resolve-RequiredFile -Path (Join-Path $RepoRoot "packaging\windows\wix\theme\RtfTheme.wxl") -Label "Bundle theme localization"
 $ProductWxsPath = Join-Path $RepoRoot "packaging\windows\wix\SPX.Product.wxs"
 $BundleWxsPath = Join-Path $RepoRoot "packaging\windows\wix\SPX.Bundle.wxs"
 
@@ -425,7 +429,7 @@ Invoke-Process -FileName "poetry" -WorkingDirectory $RepoRoot -Arguments @(
 )
 
 $MsiOutputPath = Join-Path $ArtifactsDir ("spx-windows-{0}.msi" -f $Version)
-$BundleOutputPath = Join-Path $ArtifactsDir ("spx-setup-{0}.exe" -f $Version)
+$BundleOutputPath = Join-Path $ArtifactsDir ("spx-installer-{0}.exe" -f $Version)
 
 Invoke-Process -FileName $WixCommand -WorkingDirectory $RepoRoot -Arguments @(
     "build",
@@ -440,7 +444,9 @@ Invoke-Process -FileName $WixCommand -WorkingDirectory $RepoRoot -Arguments @(
     "-d",
     "Manufacturer=$Manufacturer",
     "-d",
-    "ProductName=$ProductName"
+    "ProductName=$ProductName",
+    "-d",
+    "ProductIconFile=$ProductIconFilePath"
 )
 
 Invoke-SignTool `
@@ -471,6 +477,14 @@ Invoke-Process -FileName $WixCommand -WorkingDirectory $RepoRoot -Arguments @(
     "BundleName=$BundleName",
     "-d",
     "LicenseFile=$LicenseFilePath",
+    "-d",
+    "BundleIconFile=$ProductIconFilePath",
+    "-d",
+    "ThemeFile=$BundleThemeFilePath",
+    "-d",
+    "ThemeLocalizationFile=$BundleThemeLocalizationFilePath",
+    "-d",
+    "LogoFile=$BundleLogoFilePath",
     "-d",
     "MsiPath=$MsiOutputPath",
     "-d",

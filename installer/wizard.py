@@ -58,8 +58,8 @@ class InstallerWizard:
             )
             if install_models:
                 install_instances = self._prompt_yes_no(
-                    "Add default instances? [Y/n]: ",
-                    default=True,
+                    "Add default instances? [y/N]: ",
+                    default=False,
                 )
                 if install_instances:
                     start_instances = self._prompt_start_instances(packages, index)

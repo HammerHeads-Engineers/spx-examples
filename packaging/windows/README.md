@@ -9,7 +9,7 @@ This directory contains the first Windows-native installer scaffold for SPX:
 ## Goals
 
 - Keep `origin/develop` as the source of truth for the payload and installer logic.
-- Present a signed `SPX Setup.exe` / `SPX.msi` workflow on Windows instead of exposing `.bat` and `.ps1` directly.
+- Present a signed Windows bundle for `SPX Tools` instead of exposing `.bat` and `.ps1` directly.
 - Reuse the existing Python installer CLI and MCP workspace bootstrap instead of forking product logic.
 
 ## Current shape
@@ -20,10 +20,17 @@ The current scaffold does the following:
 - publishes a self-contained `SpxLauncher.exe`,
 - downloads or reuses a cached official Python 3.12 offline installer and verifies its Authenticode signature,
 - generates a WiX fragment for the staged files,
-- builds an MSI that installs the payload under `Program Files\SPX`,
+- builds an MSI that installs the payload under `%LocalAppData%\SPX\app`,
 - builds a Burn bundle EXE that chains the Python prerequisite and the MSI.
 
 The current scaffold still does not install Docker. `SpxLauncher.exe` delegates into the existing PowerShell/Python flows after installation, but `setup` now exports `PYTHON_BIN` explicitly so the installed flow uses the resolved Python interpreter instead of relying on `PATH` ordering.
+Start Menu shortcuts are grouped under `SPX Tools` and append `--pause-on-error`, so user-visible failures stay on screen until ENTER is pressed instead of closing immediately.
+The launcher, Burn bundle, and Windows Apps entry reuse the shared icon at `packaging/windows/assets/spx.ico`. The bundle window uses the square logo `packaging/windows/assets/spx.png` and a custom theme under `packaging/windows/wix/theme/` so the product title can sit a bit lower and align visually with the logo.
+Installer-managed SPX content now lives under one user-writable root:
+
+- `%LocalAppData%\SPX\app`
+- `%LocalAppData%\SPX\generated`
+- `%LocalAppData%\SPX\workspace`
 
 ## Prerequisites
 
@@ -59,7 +66,10 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
   -SignThumbprint YOUR_CERT_THUMBPRINT
 ```
 
-Artifacts are written under `build/windows/artifacts/`.
+Artifacts are written under `build/windows/artifacts/`. The user-facing bundle file is emitted as `spx-installer-<version>.exe`, while its display name in the installer UI and Windows Apps is `SPX Tools`. The installed environment wizard remains `SPX Setup`, so its name is no longer overloaded with the bootstrap bundle.
+The Burn license dialog is sourced from `packaging/windows/LICENSE.rtf` and is intentionally installer-specific; it does not change the repository-wide `MIT` license files.
+
+If you are upgrading from an older preview that installed into `Program Files\SPX`, uninstall that preview first before testing the per-user layout. The current bundle now blocks installation when it detects that legacy machine-wide preview, because Windows otherwise merges the old all-users Start Menu folder with the new per-user one and shows duplicate `SPX` shortcuts.
 
 The Python prerequisite is cached under `build/windows/cache/` by default and is validated with `Get-AuthenticodeSignature` against the `Python Software Foundation` signer before WiX consumes it.
 
@@ -86,5 +96,4 @@ Trusted Signing expects a modern Windows SDK `signtool.exe` and the build script
 ## Next steps
 
 - Add a clearer Docker Desktop prerequisite UX in the bootstrapper and launcher.
-- Decide whether the final install scope should stay `Program Files` per-machine or move to a per-user layout.
 - Add a CI job that builds and signs the Windows artifacts on a trusted Windows runner.

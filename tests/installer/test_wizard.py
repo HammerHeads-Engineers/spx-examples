@@ -64,6 +64,8 @@ def manifest_index() -> manifest.ManifestIndex:
             services=["mqtt_broker"],
             profiles=["profile_a"],
             path="library/industries/pack_a",
+            default_instances=[{"model": "sensor", "instance": "pack_a_sensor_01"}],
+            start_instances=["pack_a_sensor_01"],
         )
     }
     profiles = {
@@ -105,11 +107,33 @@ def test_wizard_with_inputs(
     assert selection.profiles == []
     assert selection.protocols == []
     assert selection.install_examples is True
+    assert selection.instances == []
+    assert selection.start_instances == []
     assert selection.install_spx_ui is False
     assert selection.offline_bundle is False
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == ["sensor"]
     assert selection.service_ids == ["mqtt_broker"]
+
+
+def test_wizard_can_opt_in_to_default_instances(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+
+    inputs = iter(["1", "", "y", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    selection = wizard.run()
+
+    assert selection.packages == ["pack_a"]
+    assert selection.install_examples is True
+    assert selection.instances == [{"model_id": "sensor", "instance_key": "pack_a_sensor_01"}]
+    assert selection.start_instances == ["pack_a_sensor_01"]
 
 
 def test_wizard_protocol_selection(

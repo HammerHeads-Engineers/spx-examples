@@ -18,6 +18,20 @@ def test_default_workspace_dir_uses_documents_on_macos(tmp_path: Path) -> None:
     assert result == home / "Documents" / "SPX Codex Workspace"
 
 
+def test_default_workspace_dir_uses_local_app_data_on_windows(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    home = tmp_path / "home"
+    local_app_data = home / "AppData" / "Local"
+    local_app_data.mkdir(parents=True)
+    monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
+
+    result = mcp_workspace.default_workspace_dir(home=home, platform_name="win32")
+
+    assert result == local_app_data / "SPX" / "workspace"
+
+
 def test_build_workspace_env_prefers_seed_and_defaults() -> None:
     values = mcp_workspace.build_workspace_env(
         existing={"CUSTOM_FLAG": "1"},

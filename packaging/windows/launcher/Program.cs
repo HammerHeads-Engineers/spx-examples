@@ -4,12 +4,14 @@ namespace SpxLauncher;
 
 internal static class Program
 {
-    private const string GeneratedRootFolderName = "SPX";
+    private const string SpxRootFolderName = "SPX";
     private const string GeneratedDirectoryName = "generated";
-    private const string WorkspaceDirectoryName = "SPX Codex Workspace";
+    private const string WorkspaceDirectoryName = "workspace";
+    private const string PauseOnErrorArgument = "--pause-on-error";
 
     public static int Main(string[] args)
     {
+        var pauseOnError = HasPauseOnError(args);
         try
         {
             return Run(args);
@@ -17,14 +19,21 @@ internal static class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[spx-launcher] {ex.Message}");
+            if (pauseOnError)
+            {
+                PauseBeforeExit();
+            }
             return 1;
         }
     }
 
     private static int Run(string[] args)
     {
-        var mode = args.Length == 0 ? "setup" : args[0].Trim().ToLowerInvariant();
-        var extraArgs = args.Skip(1).ToArray();
+        var filteredArgs = args
+            .Where(argument => !string.Equals(argument, PauseOnErrorArgument, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var mode = filteredArgs.Length == 0 ? "setup" : filteredArgs[0].Trim().ToLowerInvariant();
+        var extraArgs = filteredArgs.Skip(1).ToArray();
         var installRoot = Path.GetFullPath(AppContext.BaseDirectory);
 
         return mode switch
@@ -43,14 +52,29 @@ internal static class Program
 
     private static int ShowHelp()
     {
-        Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup]");
+        Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup] [--pause-on-error]");
         Console.WriteLine();
         Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
         Console.WriteLine("  mcp-setup  Create the installer-managed Codex MCP workspace.");
         Console.WriteLine("  start      Run the generated SPX start script.");
         Console.WriteLine("  stop       Run the generated SPX stop script.");
         Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");
+        Console.WriteLine("  --pause-on-error  Wait for ENTER before closing after an error.");
         return 0;
+    }
+
+    private static bool HasPauseOnError(IEnumerable<string> args)
+    {
+        return args.Any(
+            argument => string.Equals(argument, PauseOnErrorArgument, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    private static void PauseBeforeExit()
+    {
+        Console.Error.WriteLine();
+        Console.Error.Write("[spx-launcher] Press ENTER to close...");
+        _ = Console.ReadLine();
     }
 
     private static int RunSetup(string installRoot, IReadOnlyList<string> extraArgs)
@@ -289,14 +313,18 @@ internal static class Program
 
     private static string GetGeneratedDirectory()
     {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return Path.Combine(localAppData, GeneratedRootFolderName, GeneratedDirectoryName);
+        return Path.Combine(GetSpxRootDirectory(), GeneratedDirectoryName);
     }
 
     private static string GetWorkspaceDirectory()
     {
-        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        return Path.Combine(documents, WorkspaceDirectoryName);
+        return Path.Combine(GetSpxRootDirectory(), WorkspaceDirectoryName);
+    }
+
+    private static string GetSpxRootDirectory()
+    {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        return Path.Combine(localAppData, SpxRootFolderName);
     }
 
     private static void EnsureFileExists(string path, string message)

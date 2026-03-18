@@ -6,7 +6,7 @@
     Version="$(var.PackageVersion)"
     UpgradeCode="1DBF769E-E4C6-4AE7-A3A7-4C5675465FCA"
     InstallerVersion="500"
-    Scope="perMachine"
+    Scope="perUser"
     Compressed="yes">
     <SummaryInformation
       Description="$(var.ProductName) Windows installer"
@@ -15,13 +15,17 @@
       AllowSameVersionUpgrades="yes"
       DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="ProductIcon" SourceFile="$(var.ProductIconFile)" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="SPX" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="SPXROOTDIR" Name="SPX">
+        <Directory Id="INSTALLFOLDER" Name="app" />
+      </Directory>
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="ProgramMenuDir" Name="SPX" />
+      <Directory Id="ProgramMenuDir" Name="SPX Tools" />
     </StandardDirectory>
 
     <Feature Id="MainFeature" Title="$(var.ProductName)" Level="1">
@@ -35,7 +39,7 @@
       <Component Id="cmpProgramMenuFolder" Guid="BDA149B8-5FB1-4A8C-8F09-87BE255A709A">
         <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
         <RegistryValue
-          Root="HKLM"
+          Root="HKCU"
           Key="Software\HammerHeads Engineers\SPX"
           Name="Installed"
           Type="integer"

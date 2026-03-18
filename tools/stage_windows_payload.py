@@ -43,20 +43,35 @@ MAX_WIX_ID_LENGTH = 72
 WIX_ID_HASH_LENGTH = 10
 
 SHORTCUTS = (
-    ("shortcutSpxSetup", "SPX Setup", "Launch the SPX environment wizard.", "setup"),
+    (
+        "shortcutSpxSetup",
+        "SPX Setup",
+        "Launch the SPX environment wizard.",
+        "setup --pause-on-error",
+    ),
     (
         "shortcutSpxMcpSetup",
         "SPX MCP Setup",
         "Create the local Codex MCP workspace for SPX.",
-        "mcp-setup",
+        "mcp-setup --pause-on-error",
     ),
-    ("shortcutSpxStart", "SPX Start", "Start the generated SPX environment.", "start"),
-    ("shortcutSpxStop", "SPX Stop", "Stop the generated SPX environment.", "stop"),
+    (
+        "shortcutSpxStart",
+        "SPX Start",
+        "Start the generated SPX environment.",
+        "start --pause-on-error",
+    ),
+    (
+        "shortcutSpxStop",
+        "SPX Stop",
+        "Stop the generated SPX environment.",
+        "stop --pause-on-error",
+    ),
     (
         "shortcutSpxCleanup",
         "SPX Cleanup",
         "Remove the generated SPX environment and related Docker resources.",
-        "cleanup",
+        "cleanup --pause-on-error",
     ),
 )
 
