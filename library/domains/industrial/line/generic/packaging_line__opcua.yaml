@@ -2,33 +2,83 @@
 
 name: packaging_line__opcua
 description: |
-  OPC UA model of a packaging line with infeed queue, wrapper and palletizer diagnostics.
-  Provides bidirectional commands for speed/targets and exposes typical jam / low-film alarms.
+  OPC UA model of a packaging line with infeed queue, wrapper, and palletizer
+  diagnostics. Provides bidirectional commands for speed and targets while
+  exposing typical jam and low-film alarms.
 
 attributes:
-  line_state: stopped            # stopped, running, fault
-  line_mode: automatic           # automatic/manual
-  shift_order_id: "PKG-1001"
-  pallet_destination: "Dock-A"
+  line_state:
+    type: str
+    default: "stopped"
+  line_mode:
+    type: str
+    default: "automatic"
+  shift_order_id:
+    type: str
+    default: "PKG-1001"
+  pallet_destination:
+    type: str
+    default: "Dock-A"
 
-  line_speed_mpm: 0.0
-  target_speed_mpm: 35.0
-  cases_per_min: 0.0
-  throughput_today: 0
-  reject_today: 0
-  infeed_queue_count: 12
-  pallet_count_ready: 1
+  line_speed_mpm:
+    type: float
+    default: 0.0
+    unit: m/min
+  target_speed_mpm:
+    type: float
+    default: 35.0
+    unit: m/min
+  cases_per_min:
+    type: float
+    default: 0.0
+    unit: count/min
+  throughput_today:
+    type: float
+    default: 0.0
+    unit: count
+  reject_today:
+    type: float
+    default: 0.0
+    unit: count
+  infeed_queue_count:
+    type: float
+    default: 12.0
+    unit: count
+  pallet_count_ready:
+    type: int
+    default: 1
+    unit: count
 
-  wrapper_temperature_c: 135.0
-  wrapper_target_temp_c: 140.0
-  film_roll_percent: 85.0
-  diverter_mode: main             # main / rework
+  wrapper_temperature_c:
+    type: float
+    default: 135.0
+    unit: degC
+  wrapper_target_temp_c:
+    type: float
+    default: 140.0
+    unit: degC
+  film_roll_percent:
+    type: float
+    default: 85.0
+    unit: percent
+  diverter_mode:
+    type: str
+    default: "main"
 
-  alarm_jam: 0
-  alarm_low_film: 0
-  alarm_overtemp: 0
+  alarm_jam:
+    type: int
+    default: 0
+  alarm_low_film:
+    type: int
+    default: 0
+  alarm_overtemp:
+    type: int
+    default: 0
 
-  cycle_time_s: 1.0
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(line_state)
@@ -73,7 +123,7 @@ actions:
 
   - function: $in(reject_today)
     name: integrate_rejects
-    description: Assume 2% reject rate when running.
+    description: Assume 2 percent reject rate when running.
     call: (
           $in(reject_today)
           + (0.02 * $in(cases_per_min) * cycle_time_s / 60.0 if $in(line_state) == "running" else 0.0)
@@ -257,6 +307,8 @@ communication:
 scenarios:
   steady_run:
     enabled: true
+    display_name: "Steady Run"
+    description: Run the line automatically at a stable target speed and wrapper temperature.
     duration: 40.0
     overrides:
       $in(line_mode): automatic
@@ -265,6 +317,8 @@ scenarios:
 
   film_break:
     enabled: true
+    display_name: "Film Break"
+    description: Simulate low film and a jammed packaging event.
     duration: 15.0
     overrides:
       $in(film_roll_percent): 5.0
@@ -273,6 +327,8 @@ scenarios:
 
   changeover_pause:
     enabled: true
+    display_name: "Changeover Pause"
+    description: Pause production during a manual changeover and divert to rework.
     duration: 25.0
     overrides:
       $in(line_mode): manual

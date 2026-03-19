@@ -25,50 +25,134 @@ meta_parameters:
 
 attributes:
   # Key control inputs written by external clients or scenarios.
-  k__setpoint_c: 30.0
-  k__manual_out_pct: 0.0
-  k__auto_man: 0
+  k__setpoint_c:
+    type: float
+    default: 30.0
+    unit: degC
+  k__manual_out_pct:
+    type: float
+    default: 0.0
+    unit: percent
+  k__auto_man:
+    type: int
+    default: 0
 
   # Observable process state.
-  temperature_c: 25.0
-  working_setpoint_c: 30.0
-  output_pct: 0.0
+  temperature_c:
+    type: float
+    default: 25.0
+    unit: degC
+  working_setpoint_c:
+    type: float
+    default: 30.0
+    unit: degC
+  output_pct:
+    type: float
+    default: 0.0
+    unit: percent
 
   # Environment, tuning, and limits.
-  ambient_c: 22.0
-  heat_coeff: 0.25
-  cool_coeff: 0.03
-  power_gain: 1.5
-  power_integral_gain: 0.2
-  power_integral_leak: 0.05
-  power_derivative_gain: 0.8
+  ambient_c:
+    type: float
+    default: 22.0
+    unit: degC
+  heat_coeff:
+    type: float
+    default: 0.25
+  cool_coeff:
+    type: float
+    default: 0.03
+  power_gain:
+    type: float
+    default: 1.5
+  power_integral_gain:
+    type: float
+    default: 0.2
+  power_integral_leak:
+    type: float
+    default: 0.05
+  power_derivative_gain:
+    type: float
+    default: 0.8
 
-  temp_min_c: 0.0
-  temp_max_c: 200.0
-  sp_min_c: 0.0
-  sp_max_c: 200.0
-  out_min: 0.0
-  out_max: 100.0
+  temp_min_c:
+    type: float
+    default: 0.0
+    unit: degC
+  temp_max_c:
+    type: float
+    default: 200.0
+    unit: degC
+  sp_min_c:
+    type: float
+    default: 0.0
+    unit: degC
+  sp_max_c:
+    type: float
+    default: 200.0
+    unit: degC
+  out_min:
+    type: float
+    default: 0.0
+    unit: percent
+  out_max:
+    type: float
+    default: 100.0
+    unit: percent
 
   # Hidden controller state.
-  _power_integral: 0.0
-  _power_derivative: 0.0
-  _power_error_prev: 0.0
-  _scale_0p1: 10.0
+  _power_integral:
+    type: float
+    default: 0.0
+  _power_derivative:
+    type: float
+    default: 0.0
+  _power_error_prev:
+    type: float
+    default: 0.0
+  _scale_0p1:
+    type: float
+    default: 10.0
 
   # Hidden Modbus transport payloads.
-  _pv_raw: 250
-  _target_sp_raw: 300
-  _manual_out_raw: 0
-  _working_out_raw: 0
-  _working_sp_raw: 300
-  _auto_man_raw: 0
-  _target_sp_raw_prev: 300
-  _manual_out_raw_prev: 0
-  _auto_man_raw_prev: 0
-  _setpoint_c_prev: 30.0
-  _manual_out_pct_prev: 0.0
-  _auto_man_prev: 0
+  _pv_raw:
+    type: int
+    default: 250
+  _target_sp_raw:
+    type: int
+    default: 300
+  _manual_out_raw:
+    type: int
+    default: 0
+  _working_out_raw:
+    type: int
+    default: 0
+  _working_sp_raw:
+    type: int
+    default: 300
+  _auto_man_raw:
+    type: int
+    default: 0
+  _target_sp_raw_prev:
+    type: int
+    default: 300
+  _manual_out_raw_prev:
+    type: int
+    default: 0
+  _auto_man_raw_prev:
+    type: int
+    default: 0
+  _setpoint_c_prev:
+    type: float
+    default: 30.0
+    unit: degC
+  _manual_out_pct_prev:
+    type: float
+    default: 0.0
+    unit: percent
+  _auto_man_prev:
+    type: int
+    default: 0
 
 actions:
   - function: $in(k__auto_man)

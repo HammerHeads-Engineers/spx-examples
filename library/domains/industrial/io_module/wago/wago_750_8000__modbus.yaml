@@ -2,30 +2,61 @@
 
 name: wago_750_8000__modbus
 description: |
-  WAGO 750-8000 I/O system (sim) exposing a minimal Modbus TCP slave process image
-  for digital inputs/outputs and analog inputs. Use it to validate PLC I/O
-  mappings and edge gateways.
+  WAGO 750-8000 I/O system simulation exposing a minimal Modbus TCP slave
+  process image for digital inputs, digital outputs, and analog inputs.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5024
+  modbus_unit_id:
+    type: int
+    default: 1
 
 attributes:
-  di_1: 0
-  di_2: 0
-  di_3: 0
-  di_4: 0
-  do_1: 0
-  do_2: 0
-  do_3: 0
-  do_4: 0
+  di_1:
+    type: int
+    default: 0
+  di_2:
+    type: int
+    default: 0
+  di_3:
+    type: int
+    default: 0
+  di_4:
+    type: int
+    default: 0
+  do_1:
+    type: int
+    default: 0
+  do_2:
+    type: int
+    default: 0
+  do_3:
+    type: int
+    default: 0
+  do_4:
+    type: int
+    default: 0
 
-  ai_1: 0.0   # e.g., 4-20 mA scaled engineering value
-  ai_2: 0.0
-  ai_3: 0.0
-  ai_4: 0.0
+  ai_1:
+    type: float
+    default: 0.0
+  ai_2:
+    type: float
+    default: 0.0
+  ai_3:
+    type: float
+    default: 0.0
+  ai_4:
+    type: float
+    default: 0.0
 
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5024
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         di_1: { address: [0,0], group: h_r, type: uint_16 }
@@ -44,6 +75,8 @@ communication:
 scenarios:
   all_clear:
     enabled: true
+    display_name: "All Clear"
+    description: Hold all digital channels low with low analog signal levels.
     duration: 15.0
     overrides:
       $in(di_1): 0
@@ -61,6 +94,8 @@ scenarios:
 
   alarm_trip:
     enabled: true
+    display_name: "Alarm Trip"
+    description: Assert alarm-style digital states and high analog inputs.
     duration: 8.0
     overrides:
       $in(di_1): 1
@@ -78,6 +113,8 @@ scenarios:
 
   analog_ramp_high:
     enabled: true
+    display_name: "Analog Ramp High"
+    description: Drive multiple analog inputs into a higher operating range.
     duration: 20.0
     overrides:
       $in(di_1): 0
@@ -95,6 +132,8 @@ scenarios:
 
   maintenance_loopback:
     enabled: true
+    display_name: "Maintenance Loopback"
+    description: Mirror alternating digital states for loopback and maintenance checks.
     duration: 25.0
     overrides:
       $in(di_1): 1

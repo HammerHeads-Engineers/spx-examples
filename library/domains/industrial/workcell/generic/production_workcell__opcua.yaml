@@ -2,41 +2,106 @@
 
 name: production_workcell__opcua
 description: |
-  OPC UA-enabled machining/assembly workcell exposing station state, spindle and robot
-  telemetry as well as quality counters. Useful for validating OPC UA client behaviour
-  around bidirectional setpoints, alarms, and basic scheduling data.
+  OPC UA-enabled machining and assembly workcell exposing station state,
+  spindle and robot telemetry, and quality counters. Useful for validating
+  OPC UA client behavior around bidirectional setpoints, alarms, and schedules.
 
 attributes:
-  machine_state: idle           # idle, running, fault
-  station_mode: auto            # auto or manual
-  order_id: "ORDER-001"
-  latest_serial: ""
-  part_present: 0
-  clamp_closed: 0
+  machine_state:
+    type: str
+    default: "idle"
+  station_mode:
+    type: str
+    default: "auto"
+  order_id:
+    type: str
+    default: "ORDER-001"
+  latest_serial:
+    type: str
+    default: ""
+  part_present:
+    type: int
+    default: 0
+  clamp_closed:
+    type: int
+    default: 0
 
-  cycle_progress_percent: 0.0
-  target_cycle_time_s: 22.0
-  actual_cycle_time_s: 22.0
-  cycle_counter_total: 0
-  cycle_counter_ok: 0
-  cycle_counter_nok: 0
-  quality_flag: 1
+  cycle_progress_percent:
+    type: float
+    default: 0.0
+    unit: percent
+  target_cycle_time_s:
+    type: float
+    default: 22.0
+    unit: s
+  actual_cycle_time_s:
+    type: float
+    default: 22.0
+    unit: s
+  cycle_counter_total:
+    type: int
+    default: 0
+    unit: count
+  cycle_counter_ok:
+    type: int
+    default: 0
+    unit: count
+  cycle_counter_nok:
+    type: int
+    default: 0
+    unit: count
+  quality_flag:
+    type: int
+    default: 1
 
-  robot_position_deg: 0.0
-  robot_target_deg: 0.0
-  spindle_rpm: 0.0
-  spindle_target_rpm: 3500.0
-  tool_temperature_c: 45.0
-  tool_temperature_limit_c: 80.0
+  robot_position_deg:
+    type: float
+    default: 0.0
+    unit: deg
+  robot_target_deg:
+    type: float
+    default: 0.0
+    unit: deg
+  spindle_rpm:
+    type: float
+    default: 0.0
+    unit: rpm
+  spindle_target_rpm:
+    type: float
+    default: 3500.0
+    unit: rpm
+  tool_temperature_c:
+    type: float
+    default: 45.0
+    unit: degC
+  tool_temperature_limit_c:
+    type: float
+    default: 80.0
+    unit: degC
 
-  maintenance_timer_hours: 120.0
-  maintenance_threshold_hours: 8.0
+  maintenance_timer_hours:
+    type: float
+    default: 120.0
+    unit: h
+  maintenance_threshold_hours:
+    type: float
+    default: 8.0
+    unit: h
 
-  alarm_safety_gate: 0
-  alarm_tool_overtemp: 0
-  alarm_robot_fault: 0
+  alarm_safety_gate:
+    type: int
+    default: 0
+  alarm_tool_overtemp:
+    type: int
+    default: 0
+  alarm_robot_fault:
+    type: int
+    default: 0
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(machine_state)
@@ -314,6 +379,8 @@ communication:
 scenarios:
   auto_cycle:
     enabled: true
+    display_name: "Auto Cycle"
+    description: Run the workcell in automatic mode with a present and clamped part.
     duration: 30.0
     overrides:
       $in(station_mode): auto
@@ -322,6 +389,8 @@ scenarios:
 
   safety_gate_fault:
     enabled: true
+    display_name: "Safety Gate Fault"
+    description: Trigger a safety-gate fault and stop normal automatic work.
     duration: 12.0
     overrides:
       $in(alarm_safety_gate): 1
@@ -329,6 +398,8 @@ scenarios:
 
   maintenance_pause:
     enabled: true
+    display_name: "Maintenance Pause"
+    description: Switch the workcell to manual mode for a maintenance stop.
     duration: 20.0
     overrides:
       $in(station_mode): manual

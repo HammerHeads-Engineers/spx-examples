@@ -2,35 +2,86 @@
 
 name: process_cell__opcua
 description: |
-  OPC UA process cell exporting typical temperature/flow/pressure tags via OPC UA sections.
-  The built-in dynamics and alarms let OPC UA clients exercise read/write flows,
-  username security tokens, and diagnostics trees without needing external hardware.
+  OPC UA process cell exporting typical temperature, flow, and pressure tags.
+  The built-in dynamics and alarms let OPC UA clients exercise read/write
+  flows, username security tokens, and diagnostics trees without external hardware.
 
 attributes:
-  temperature_c: 28.0
-  temperature_setpoint_c: 32.0
-  operator_setpoint_c: 32.0
-  ambient_c: 24.0
-  temperature_gain: 0.18
-  heat_loss_gain: 0.04
+  temperature_c:
+    type: float
+    default: 28.0
+    unit: degC
+  temperature_setpoint_c:
+    type: float
+    default: 32.0
+    unit: degC
+  operator_setpoint_c:
+    type: float
+    default: 32.0
+    unit: degC
+  ambient_c:
+    type: float
+    default: 24.0
+    unit: degC
+  temperature_gain:
+    type: float
+    default: 0.18
+  heat_loss_gain:
+    type: float
+    default: 0.04
 
-  pump_speed_percent: 45.0
-  pump_command_percent: 45.0
-  valve_position_percent: 35.0
+  pump_speed_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  pump_command_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  valve_position_percent:
+    type: float
+    default: 35.0
+    unit: percent
 
-  flow_target_lpm: 48.0
-  flow_rate_lpm: 45.0
+  flow_target_lpm:
+    type: float
+    default: 48.0
+    unit: L/min
+  flow_rate_lpm:
+    type: float
+    default: 45.0
+    unit: L/min
 
-  pressure_bar: 1.2
-  pressure_target_bar: 1.5
-  pressure_override_bar: 0.0
+  pressure_bar:
+    type: float
+    default: 1.2
+    unit: bar
+  pressure_target_bar:
+    type: float
+    default: 1.5
+    unit: bar
+  pressure_override_bar:
+    type: float
+    default: 0.0
+    unit: bar
 
-  alarm_overtemp: 0
-  alarm_pressure: 0
-  alarm_low_flow: 0
-  status_text: "IDLE"
+  alarm_overtemp:
+    type: int
+    default: 0
+  alarm_pressure:
+    type: int
+    default: 0
+  alarm_low_flow:
+    type: int
+    default: 0
+  status_text:
+    type: str
+    default: "IDLE"
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(temperature_setpoint_c)
@@ -241,6 +292,8 @@ communication:
 scenarios:
   heatup_cycle:
     enabled: true
+    display_name: "Heatup Cycle"
+    description: Raise temperature demand and pump command for an active process run.
     duration: 20.0
     overrides:
       $in(operator_setpoint_c): 70.0
@@ -248,6 +301,8 @@ scenarios:
 
   pressure_upset:
     enabled: true
+    display_name: "Pressure Upset"
+    description: Apply a pressure override and higher pump command for an upset case.
     duration: 12.0
     overrides:
       $in(flow_target_lpm): 95.0
@@ -256,6 +311,8 @@ scenarios:
 
   maintenance_idle:
     enabled: true
+    display_name: "Maintenance Idle"
+    description: Return the cell to a low-output maintenance-friendly idle state.
     duration: 15.0
     overrides:
       $in(operator_setpoint_c): 30.0

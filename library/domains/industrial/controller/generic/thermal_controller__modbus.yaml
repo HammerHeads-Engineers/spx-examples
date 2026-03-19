@@ -2,54 +2,92 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-# Thermal controller with safety features (overload protection)
-attributes:
-  # core
-  temperature: 25.0     # current process temperature [°C]
-  setpoint: 30.0        # target temperature [°C]
-  heating_power: 0.0    # actuator power 0..100 [%]
-  power_on: 1           # 1 = powered, 0 = off
-  ambient: 22.0         # ambient/environment temperature [°C]
-  heat_coeff: 0.25      # heat transfer coefficient scaling actuator power
-  cool_coeff: 0.03      # cooling coefficient driving decay to ambient
-  power_gain: 1.5       # proportional gain driving heating response to error
-  power_integral: 0.0   # integrator state compensating steady-state error
-  power_integral_gain: 0.2  # integration gain for biasing heating power
-  power_integral_leak: 0.05  # fractional decay applied when error is negative
-  power_derivative: 0.0     # derivative term damping overshoot
-  power_derivative_gain: 0.8  # derivative gain reacting to error slope
-  power_error_prev: 0.0      # stored previous control error for derivative term
+name: thermal_controller__modbus
+description: |
+  Thermal controller with safety features and a simple Modbus register map for
+  temperature-loop demos. The model exposes temperature, setpoint, power, and
+  overload-related state without changing the legacy public attribute names.
 
-  # safety
-  overload: 0           # 0/1 flag
-  overload_threshold: 70.0  # °C - demo value
-  overload_hyst: 2.0        # °C - hysteresis to avoid flicker
+attributes:
+  temperature:
+    type: float
+    default: 25.0
+    unit: degC
+  setpoint:
+    type: float
+    default: 30.0
+    unit: degC
+  heating_power:
+    type: float
+    default: 0.0
+    unit: percent
+  power_on:
+    type: int
+    default: 1
+  ambient:
+    type: float
+    default: 22.0
+    unit: degC
+  heat_coeff:
+    type: float
+    default: 0.25
+  cool_coeff:
+    type: float
+    default: 0.03
+  power_gain:
+    type: float
+    default: 1.5
+  power_integral:
+    type: float
+    default: 0.0
+  power_integral_gain:
+    type: float
+    default: 0.2
+  power_integral_leak:
+    type: float
+    default: 0.05
+  power_derivative:
+    type: float
+    default: 0.0
+  power_derivative_gain:
+    type: float
+    default: 0.8
+  power_error_prev:
+    type: float
+    default: 0.0
+
+  overload:
+    type: int
+    default: 0
+  overload_threshold:
+    type: float
+    default: 70.0
+    unit: degC
+  overload_hyst:
+    type: float
+    default: 2.0
+    unit: degC
 
 conditions:
-  # 1) Overload ON when temperature >= threshold
   - if: $in(temperature) >= $in(overload_threshold)
     actions:
       - set: $in(overload)
         value: 1
 
-  # 2) Overload OFF when temperature <= threshold - hysteresis
   - if: $in(temperature) <= ($in(overload_threshold) - $in(overload_hyst))
     actions:
       - set: $in(overload)
         value: 0
 
 actions:
-  # (1) Derivative contribution based on error slope; reset when controller disabled.
   - function: $in(power_derivative)
     call: 0.0 if ($in(power_on) == 0 or $in(overload) == 1)
           else $in(power_derivative_gain) * (($in(setpoint) - $in(temperature)) - $in(power_error_prev))
 
-  # (2) Track current error for next cycle; reset when controller disabled.
   - function: $in(power_error_prev)
     call: 0.0 if ($in(power_on) == 0 or $in(overload) == 1)
           else ($in(setpoint) - $in(temperature))
 
-  # (3) Integrator term that biases heating power to cancel ambient losses.
   - function: $in(power_integral)
     call: 0.0 if ($in(power_on) == 0 or $in(overload) == 1)
           else (
@@ -61,7 +99,6 @@ actions:
             )
           )
 
-  # (4) Slower PID blend (lower gain → gentler approach to setpoint) gated by power_on and overload state
   - function: $in(heating_power)
     call: 0.0 if ($in(power_on) == 0 or $in(overload) == 1)
           else max(
@@ -74,9 +111,6 @@ actions:
             ),
           )
 
-  # (5) Physics with guaranteed cooldown:
-  # step_factor keeps dynamics slow; cool_coeff ensures drift to ambient when power=0.
-  # temp_next = temp + step * (heat_coeff * power - cool_coeff * (temp - ambient))
   - function: $in(temperature)
     call: $in(temperature) + 0.2 * ($in(heat_coeff) * $in(heating_power) - $in(cool_coeff) * ($in(temperature) - $in(ambient)))
 
@@ -85,9 +119,9 @@ communication:
       poll_interval: 0.25
       mapping:
         temperature:        { address: [0,1], group: h_r, type: float }
-        setpoint:           { address: [2,3],  group: h_r, type: float }
+        setpoint:           { address: [2,3], group: h_r, type: float }
         heating_power:      { address: [4,5], group: h_r, type: float }
-        power_on:           { address: [6,6], group: c_o,  type: uint_16 }
+        power_on:           { address: [6,6], group: c_o, type: uint_16 }
         ambient:            { address: [7,8], group: h_r, type: float }
         overload:           { address: [9,9], group: h_r, type: uint_16 }
         overload_threshold: { address: [10,11], group: h_r, type: float }
@@ -103,6 +137,8 @@ communication:
 scenarios:
   heatup_nominal:
     enabled: true
+    display_name: "Heatup Nominal"
+    description: Run a nominal heat-up profile with a higher setpoint and gain.
     duration: 40.0
     overrides:
       $in(power_on): 1
@@ -112,6 +148,8 @@ scenarios:
 
   overload_trip_test:
     enabled: true
+    display_name: "Overload Trip Test"
+    description: Force the controller toward an overload trip condition.
     duration: 20.0
     overrides:
       $in(power_on): 1
@@ -121,6 +159,8 @@ scenarios:
 
   powered_cooldown:
     enabled: true
+    display_name: "Powered Cooldown"
+    description: Turn power off and let the thermal mass cool toward ambient.
     duration: 25.0
     overrides:
       $in(power_on): 0

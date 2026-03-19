@@ -18,93 +18,148 @@ meta_parameters:
     default: 8092
 
 attributes:
-  k__station_id: "PL-WAW-001"
-  k__station_name: "Warsaw Srodmiescie Monitor"
-  k__latitude: 52.2297
-  k__longitude: 21.0122
-  k__timezone: Europe/Warsaw
-  generation_time_ms: 11.2
-  measurement_interval_minutes: 60
-  monitoring_window_hours: 24
-  k__active_profile: urban-baseline
+  k__station_id:
+    type: str
+    default: "PL-WAW-001"
+  k__station_name:
+    type: str
+    default: "Warsaw Srodmiescie Monitor"
+  k__latitude:
+    type: float
+    default: 52.2297
+    unit: deg
+  k__longitude:
+    type: float
+    default: 21.0122
+    unit: deg
+  k__timezone:
+    type: str
+    default: "Europe/Warsaw"
+  generation_time_ms:
+    type: float
+    default: 11.2
+    unit: ms
+  measurement_interval_minutes:
+    type: int
+    default: 60
+    unit: min
+  monitoring_window_hours:
+    type: int
+    default: 24
+    unit: h
+  k__active_profile:
+    type: str
+    default: "urban-baseline"
 
   hourly_time:
-    - "2025-01-01T00:00"
-    - "2025-01-01T03:00"
-    - "2025-01-01T06:00"
-    - "2025-01-01T09:00"
-    - "2025-01-01T12:00"
-    - "2025-01-01T15:00"
-    - "2025-01-01T18:00"
-    - "2025-01-01T21:00"
-
+    type: list
+    default:
+      - "2025-01-01T00:00"
+      - "2025-01-01T03:00"
+      - "2025-01-01T06:00"
+      - "2025-01-01T09:00"
+      - "2025-01-01T12:00"
+      - "2025-01-01T15:00"
+      - "2025-01-01T18:00"
+      - "2025-01-01T21:00"
   hourly_pm2_5:
-    - 12.8
-    - 15.4
-    - 18.3
-    - 22.7
-    - 26.4
-    - 24.2
-    - 19.6
-    - 15.8
-
+    type: list
+    default:
+      - 12.8
+      - 15.4
+      - 18.3
+      - 22.7
+      - 26.4
+      - 24.2
+      - 19.6
+      - 15.8
+    unit: ug/m3
   hourly_pm10:
-    - 20.1
-    - 24.5
-    - 28.8
-    - 34.2
-    - 39.5
-    - 36.1
-    - 30.4
-    - 24.9
-
+    type: list
+    default:
+      - 20.1
+      - 24.5
+      - 28.8
+      - 34.2
+      - 39.5
+      - 36.1
+      - 30.4
+      - 24.9
+    unit: ug/m3
   hourly_no2:
-    - 18.5
-    - 20.1
-    - 22.4
-    - 25.7
-    - 28.3
-    - 26.5
-    - 23.6
-    - 21.0
-
+    type: list
+    default:
+      - 18.5
+      - 20.1
+      - 22.4
+      - 25.7
+      - 28.3
+      - 26.5
+      - 23.6
+      - 21.0
+    unit: ug/m3
   hourly_o3:
-    - 61.0
-    - 59.2
-    - 57.4
-    - 54.8
-    - 52.6
-    - 53.9
-    - 56.8
-    - 59.7
-
+    type: list
+    default:
+      - 61.0
+      - 59.2
+      - 57.4
+      - 54.8
+      - 52.6
+      - 53.9
+      - 56.8
+      - 59.7
+    unit: ug/m3
   hourly_aqi:
-    - 42
-    - 49
-    - 56
-    - 67
-    - 74
-    - 70
-    - 59
-    - 50
-
+    type: list
+    default:
+      - 42
+      - 49
+      - 56
+      - 67
+      - 74
+      - 70
+      - 59
+      - 50
+    unit: index
   hourly_aqi_category:
-    - good
-    - good
-    - moderate
-    - moderate
-    - moderate
-    - moderate
-    - moderate
-    - good
+    type: list
+    default:
+      - "good"
+      - "good"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "good"
 
-  k__current_timestamp: "2025-01-01T12:00"
-  k__current_pm2_5: 26.4
-  k__current_pm10: 39.5
-  k__current_no2: 28.3
-  k__current_o3: 52.6
-  k__current_aqi: 74
-  k__current_aqi_category: moderate
+  k__current_timestamp:
+    type: str
+    default: "2025-01-01T12:00"
+  k__current_pm2_5:
+    type: float
+    default: 26.4
+    unit: ug/m3
+  k__current_pm10:
+    type: float
+    default: 39.5
+    unit: ug/m3
+  k__current_no2:
+    type: float
+    default: 28.3
+    unit: ug/m3
+  k__current_o3:
+    type: float
+    default: 52.6
+    unit: ug/m3
+  k__current_aqi:
+    type: int
+    default: 74
+    unit: index
+  k__current_aqi_category:
+    type: str
+    default: "moderate"
 
 communication:
   - http_endpoint:
@@ -197,6 +252,8 @@ communication:
 
 scenarios:
   winter_smog_episode:
+    display_name: "Winter Smog Episode"
+    description: Apply elevated particulate and NO2 readings for a severe urban pollution episode.
     duration: 45.0
     overrides:
       $in(k__active_profile): "urban-smog"
@@ -215,6 +272,8 @@ scenarios:
       $in(hourly_aqi_category): [moderate, moderate, unhealthy, unhealthy, unhealthy, unhealthy, unhealthy, moderate]
 
   coastal_reset:
+    display_name: "Coastal Reset"
+    description: Reset the station to a cleaner coastal-style air profile.
     duration: 30.0
     overrides:
       $in(k__active_profile): "coastal-clean"
@@ -227,6 +286,8 @@ scenarios:
       $in(k__current_aqi_category): good
 
   station_relocation:
+    display_name: "Station Relocation"
+    description: Move the simulated station to a different monitored city and profile.
     duration: 60.0
     overrides:
       $in(k__station_id): "PL-LOD-004"

@@ -5,23 +5,76 @@ description: |
   Autonomous guided vehicle (AGV) model for intralogistics scenarios. Publishes
   position, battery state, mission status and load information over MQTT.
 
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: "host.docker.internal"
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/agv"
+  mqtt_publish_interval:
+    type: float
+    default: 0.5
+  mqtt_default_qos:
+    type: int
+    default: 1
+
 attributes:
-  pos_x_m: 0.0              # current X position [m]
-  pos_y_m: 0.0              # current Y position [m]
-  heading_deg: 0.0          # heading angle [deg]
-  speed_mps: 0.0            # current speed [m/s]
-  target_x_m: 10.0          # target waypoint X [m]
-  target_y_m: 0.0           # target waypoint Y [m]
-  target_speed_mps: 1.0     # commanded speed [m/s]
+  pos_x_m:
+    type: float
+    default: 0.0
+    unit: m
+  pos_y_m:
+    type: float
+    default: 0.0
+    unit: m
+  heading_deg:
+    type: float
+    default: 0.0
+    unit: deg
+  speed_mps:
+    type: float
+    default: 0.0
+    unit: m/s
+  target_x_m:
+    type: float
+    default: 10.0
+    unit: m
+  target_y_m:
+    type: float
+    default: 0.0
+    unit: m
+  target_speed_mps:
+    type: float
+    default: 1.0
+    unit: m/s
 
-  battery_soc_percent: 100.0   # state of charge [%]
-  battery_discharge_rate: 0.02 # discharge per second at nominal speed
+  battery_soc_percent:
+    type: float
+    default: 100.0
+    unit: percent
+  battery_discharge_rate:
+    type: float
+    default: 0.02
+    unit: percent/s
 
-  mission_state: idle       # idle, navigating, waiting, error
-  load_present: 0           # 1 = pallet/box on board
-  alarm_obstacle: 0         # 1 = obstacle detected
+  mission_state:
+    type: str
+    default: "idle"
+  load_present:
+    type: int
+    default: 0
+  alarm_obstacle:
+    type: int
+    default: 0
 
-  cycle_time_s: 0.5         # integration step [s]
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(speed_mps)
@@ -77,59 +130,75 @@ actions:
 
 communication:
   - mqtt:
-      broker: "host.docker.internal"
-      port: 1883
-      publish_interval: 0.5
-      topic_prefix: "spx/examples/agv"
-      default_qos: 1
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
-        - attribute: $ext(pos_x_m)
+        - name: publish_pos_x_m
+          attribute: $ext(pos_x_m)
           topic: telemetry/pos_x_m
           direction: publish
-        - attribute: $ext(pos_y_m)
+        - name: publish_pos_y_m
+          attribute: $ext(pos_y_m)
           topic: telemetry/pos_y_m
           direction: publish
-        - attribute: $ext(heading_deg)
+        - name: publish_heading_deg
+          attribute: $ext(heading_deg)
           topic: telemetry/heading_deg
           direction: publish
-        - attribute: $ext(speed_mps)
+        - name: publish_speed_mps
+          attribute: $ext(speed_mps)
           topic: telemetry/speed_mps
           direction: publish
-        - attribute: $ext(battery_soc_percent)
+        - name: publish_battery_soc_percent
+          attribute: $ext(battery_soc_percent)
           topic: telemetry/battery_soc_percent
           direction: publish
-        - attribute: $ext(mission_state)
+        - name: publish_mission_state
+          attribute: $ext(mission_state)
           topic: telemetry/mission_state
           direction: publish
-        - attribute: $ext(load_present)
+        - name: publish_load_present
+          attribute: $ext(load_present)
           topic: telemetry/load_present
           direction: publish
-        - attribute: $ext(alarm_obstacle)
+        - name: publish_alarm_obstacle
+          attribute: $ext(alarm_obstacle)
           topic: telemetry/alarms/obstacle
           direction: publish
-        - attribute: $attr(target_x_m)
+        - name: subscribe_target_x_m
+          attribute: $attr(target_x_m)
           topic: command/target_x_m
           direction: subscribe
-        - attribute: $attr(target_y_m)
+        - name: subscribe_target_y_m
+          attribute: $attr(target_y_m)
           topic: command/target_y_m
           direction: subscribe
-        - attribute: $attr(target_speed_mps)
+        - name: subscribe_target_speed_mps
+          attribute: $attr(target_speed_mps)
           topic: command/target_speed_mps
           direction: subscribe
-        - attribute: $attr(heading_deg)
+        - name: subscribe_heading_deg
+          attribute: $attr(heading_deg)
           topic: command/heading_deg
           direction: subscribe
-        - attribute: $attr(load_present)
+        - name: subscribe_load_present
+          attribute: $attr(load_present)
           topic: command/load_present
           direction: subscribe
-        - attribute: $attr(alarm_obstacle)
+        - name: subscribe_alarm_obstacle
+          attribute: $attr(alarm_obstacle)
           topic: command/obstacle
           direction: subscribe
 
 scenarios:
   mission_run:
     enabled: true
+    display_name: "Mission Run"
+    description: Drive toward a waypoint with cargo on board at nominal mission speed.
     duration: 30.0
     overrides:
       $in(target_x_m): 25.0
@@ -140,6 +209,8 @@ scenarios:
 
   obstacle_stop:
     enabled: true
+    display_name: "Obstacle Stop"
+    description: Force an obstacle alarm and halt the mission.
     duration: 10.0
     overrides:
       $in(target_speed_mps): 0.0
@@ -148,6 +219,8 @@ scenarios:
 
   battery_service_window:
     enabled: true
+    display_name: "Battery Service Window"
+    description: Slow the AGV and drop battery state into a maintenance window.
     duration: 20.0
     overrides:
       $in(target_speed_mps): 0.3

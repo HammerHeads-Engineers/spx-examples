@@ -5,20 +5,68 @@ description: |
   Simplified condition monitoring node for rotating equipment. Publishes vibration
   RMS values and winding temperature over MQTT with a derived health index.
 
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: "host.docker.internal"
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/condition_monitor"
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+  mqtt_default_qos:
+    type: int
+    default: 1
+
 attributes:
-  vib_rms_x: 2.0           # [mm/s]
-  vib_rms_y: 1.5           # [mm/s]
-  vib_rms_z: 1.8           # [mm/s]
-  vib_limit_warning: 4.5   # [mm/s]
-  vib_limit_alarm: 7.0     # [mm/s]
+  vib_rms_x:
+    type: float
+    default: 2.0
+    unit: mm/s
+  vib_rms_y:
+    type: float
+    default: 1.5
+    unit: mm/s
+  vib_rms_z:
+    type: float
+    default: 1.8
+    unit: mm/s
+  vib_limit_warning:
+    type: float
+    default: 4.5
+    unit: mm/s
+  vib_limit_alarm:
+    type: float
+    default: 7.0
+    unit: mm/s
 
-  temp_stator_c: 65.0      # [°C]
-  temp_limit_warning_c: 90.0
-  temp_limit_alarm_c: 110.0
+  temp_stator_c:
+    type: float
+    default: 65.0
+    unit: degC
+  temp_limit_warning_c:
+    type: float
+    default: 90.0
+    unit: degC
+  temp_limit_alarm_c:
+    type: float
+    default: 110.0
+    unit: degC
 
-  health_index: 100.0      # 0..100 (100 = perfect)
-  alarm_vibration: 0       # 1 = vibration alarm
-  alarm_temperature: 0     # 1 = over-temperature alarm
+  health_index:
+    type: float
+    default: 100.0
+    unit: score
+  alarm_vibration:
+    type: int
+    default: 0
+  alarm_temperature:
+    type: int
+    default: 0
 
 actions:
   - function: $in(health_index)
@@ -46,38 +94,47 @@ actions:
 
 communication:
   - mqtt:
-      broker: "host.docker.internal"
-      port: 1883
-      publish_interval: 1.0
-      topic_prefix: "spx/examples/condition_monitor"
-      default_qos: 1
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
-        - attribute: $ext(vib_rms_x)
+        - name: publish_vib_rms_x
+          attribute: $ext(vib_rms_x)
           topic: telemetry/vib_rms_x
           direction: publish
-        - attribute: $ext(vib_rms_y)
+        - name: publish_vib_rms_y
+          attribute: $ext(vib_rms_y)
           topic: telemetry/vib_rms_y
           direction: publish
-        - attribute: $ext(vib_rms_z)
+        - name: publish_vib_rms_z
+          attribute: $ext(vib_rms_z)
           topic: telemetry/vib_rms_z
           direction: publish
-        - attribute: $ext(temp_stator_c)
+        - name: publish_temp_stator_c
+          attribute: $ext(temp_stator_c)
           topic: telemetry/temp_stator_c
           direction: publish
-        - attribute: $ext(health_index)
+        - name: publish_health_index
+          attribute: $ext(health_index)
           topic: telemetry/health_index
           direction: publish
-        - attribute: $ext(alarm_vibration)
+        - name: publish_alarm_vibration
+          attribute: $ext(alarm_vibration)
           topic: telemetry/alarms/vibration
           direction: publish
-        - attribute: $ext(alarm_temperature)
+        - name: publish_alarm_temperature
+          attribute: $ext(alarm_temperature)
           topic: telemetry/alarms/temperature
           direction: publish
 
 scenarios:
   bearing_fault_spike:
     enabled: true
+    display_name: "Bearing Fault Spike"
+    description: Raise vibration on all axes to emulate a bearing failure signature.
     duration: 12.0
     overrides:
       $in(vib_rms_x): 8.0
@@ -86,6 +143,8 @@ scenarios:
 
   thermal_warning:
     enabled: true
+    display_name: "Thermal Warning"
+    description: Raise stator temperature into the warning range with moderate vibration.
     duration: 15.0
     overrides:
       $in(temp_stator_c): 105.0
@@ -95,6 +154,8 @@ scenarios:
 
   sensor_dropout:
     enabled: true
+    display_name: "Sensor Dropout"
+    description: Collapse measured vibration and temperature to emulate a sensor outage.
     duration: 6.0
     overrides:
       $in(vib_rms_x): 0.2

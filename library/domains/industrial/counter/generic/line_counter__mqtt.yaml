@@ -5,19 +5,66 @@ description: |
   Virtual production line counter publishing piece counts and line speed over MQTT.
   The model is suitable for testing OEE-style dashboards and simple MES consumers.
 
-attributes:
-  count_total: 0            # total pieces produced
-  count_good: 0             # good pieces
-  count_bad: 0              # rejected pieces
-  line_speed_mpm: 0.0       # current line speed [m/min]
-  target_speed_mpm: 30.0    # target line speed [m/min]
-  pulse_per_meter: 10.0     # encoder pulses per meter of material
-  scrap_rate_percent: 2.0   # nominal scrap rate [%]
-  running: 1                # 1 = running, 0 = stopped
-  jam_alarm: 0              # 1 = jam detected
-  state_text: "STOPPED"     # textual state for dashboards
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: "host.docker.internal"
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/line_counter"
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+  mqtt_default_qos:
+    type: int
+    default: 1
 
-  cycle_time_s: 1.0         # integration step [s]
+attributes:
+  count_total:
+    type: float
+    default: 0.0
+    unit: count
+  count_good:
+    type: float
+    default: 0.0
+    unit: count
+  count_bad:
+    type: float
+    default: 0.0
+    unit: count
+  line_speed_mpm:
+    type: float
+    default: 0.0
+    unit: m/min
+  target_speed_mpm:
+    type: float
+    default: 30.0
+    unit: m/min
+  pulse_per_meter:
+    type: float
+    default: 10.0
+    unit: pulse/m
+  scrap_rate_percent:
+    type: float
+    default: 2.0
+    unit: percent
+  running:
+    type: int
+    default: 1
+  jam_alarm:
+    type: int
+    default: 0
+  state_text:
+    type: str
+    default: "STOPPED"
+
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(line_speed_mpm)
@@ -77,41 +124,50 @@ actions:
 
 communication:
   - mqtt:
-      broker: "host.docker.internal"
-      port: 1883
-      publish_interval: 1.0
-      topic_prefix: "spx/examples/line_counter"
-      default_qos: 1
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
-        - attribute: $ext(count_total)
+        - name: publish_count_total
+          attribute: $ext(count_total)
           topic: telemetry/count_total
           direction: publish
-        - attribute: $ext(count_good)
+        - name: publish_count_good
+          attribute: $ext(count_good)
           topic: telemetry/count_good
           direction: publish
-        - attribute: $ext(count_bad)
+        - name: publish_count_bad
+          attribute: $ext(count_bad)
           topic: telemetry/count_bad
           direction: publish
-        - attribute: $ext(line_speed_mpm)
+        - name: publish_line_speed_mpm
+          attribute: $ext(line_speed_mpm)
           topic: telemetry/line_speed_mpm
           direction: publish
-        - attribute: $ext(jam_alarm)
+        - name: publish_jam_alarm
+          attribute: $ext(jam_alarm)
           topic: telemetry/alarms/jam
           direction: publish
-        - attribute: $ext(state_text)
+        - name: publish_state_text
+          attribute: $ext(state_text)
           topic: telemetry/state
           direction: publish
-        - attribute: $attr(target_speed_mpm)
+        - name: subscribe_target_speed_mpm
+          attribute: $attr(target_speed_mpm)
           topic: command/target_speed_mpm
           direction: subscribe
-        - attribute: $attr(running)
+        - name: subscribe_running
+          attribute: $attr(running)
           topic: command/running
           direction: subscribe
 
 scenarios:
   start_line:
     enabled: true
+    display_name: "Start Line"
     description: |
       Bring the line from stopped state to the nominal target speed and let the
       counter integrate pieces for a short window.
@@ -122,6 +178,7 @@ scenarios:
 
   line_jam:
     enabled: true
+    display_name: "Line Jam"
     description: |
       Simulate a temporary jam: the line remains commanded to run but the
       effective speed drops near zero, raising the jam_alarm for dashboards.

@@ -2,39 +2,106 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-# Stepper motor controller with homing, soft limits, and torque monitoring
+name: stepper_controller__modbus
+description: |
+  Stepper motor controller with homing, soft limits, and torque monitoring,
+  exposed through a compact Modbus register map for axis-control demos.
+
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5020
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
-  drive_enable: 1              # 1 = drive enabled
-  homing_request: 0            # 1 = start homing routine
-  homed: 0                     # 1 = reference complete
-  position_command: 120.0      # target position [mm]
-  position_feedback: 5.0       # actual position [mm]
-  velocity_command: 0.0        # internal velocity request [mm/s]
-  velocity_feedback: 0.0       # actual velocity estimate [mm/s]
-  torque_load: 40.0            # % of rated torque
-  torque_limit: 85.0           # % threshold for alarm
-  soft_limit_pos: 500.0        # mm
-  soft_limit_neg: -10.0        # mm
-  max_speed: 10.0             # mm/s limit for motion
-  max_accel: 0.25              # mm/s^2 limit for acceleration
-  max_decel: 0.5              # mm/s^2 limit for deceleration
-  motion_error: 0.0            # helper for control loop
-  velocity_goal: 0.0           # helper for control loop
-  pos_limit_switch: 0          # digital input (0/1)
-  neg_limit_switch: 0          # digital input (0/1)
-  alarm_limit: 0               # 0/1 soft or hard limit alarm
-  alarm_torque: 0              # torque overload alarm
-  alarm_drive_fault: 0         # general drive fault
-  step_mode: 16                # microstepping ratio (for display)
+  drive_enable:
+    type: int
+    default: 1
+  homing_request:
+    type: int
+    default: 0
+  homed:
+    type: int
+    default: 0
+  position_command:
+    type: float
+    default: 120.0
+    unit: mm
+  position_feedback:
+    type: float
+    default: 5.0
+    unit: mm
+  velocity_command:
+    type: float
+    default: 0.0
+    unit: mm/s
+  velocity_feedback:
+    type: float
+    default: 0.0
+    unit: mm/s
+  torque_load:
+    type: float
+    default: 40.0
+    unit: percent
+  torque_limit:
+    type: float
+    default: 85.0
+    unit: percent
+  soft_limit_pos:
+    type: float
+    default: 500.0
+    unit: mm
+  soft_limit_neg:
+    type: float
+    default: -10.0
+    unit: mm
+  max_speed:
+    type: float
+    default: 10.0
+    unit: mm/s
+  max_accel:
+    type: float
+    default: 0.25
+    unit: mm/s^2
+  max_decel:
+    type: float
+    default: 0.5
+    unit: mm/s^2
+  motion_error:
+    type: float
+    default: 0.0
+    unit: mm
+  velocity_goal:
+    type: float
+    default: 0.0
+    unit: mm/s
+  pos_limit_switch:
+    type: int
+    default: 0
+  neg_limit_switch:
+    type: int
+    default: 0
+  alarm_limit:
+    type: int
+    default: 0
+  alarm_torque:
+    type: int
+    default: 0
+  alarm_drive_fault:
+    type: int
+    default: 0
+  step_mode:
+    type: int
+    default: 16
 
 actions:
-  # Update tracking error.
   - function: $in(motion_error)
     name: update_motion_error_pre
     description: Compute the initial position tracking error before applying velocity corrections.
     call: $in(position_command) - $in(position_feedback)
 
-  # Compute velocity goal that respects braking distance.
   - function: $in(velocity_goal)
     name: compute_velocity_goal
     description: Derive the velocity setpoint given current error and braking distance limits.
@@ -52,7 +119,6 @@ actions:
             )
         )
 
-  # Ramp actual velocity toward the goal with independent accel/decel limits.
   - function: $in(velocity_command)
     name: slew_velocity_command
     description: Slew the internal velocity command toward the goal under accel/decel constraints.
@@ -68,7 +134,6 @@ actions:
             )
         )
 
-  # Integrate position with clamping to avoid overshoot.
   - function: $in(position_feedback)
     name: integrate_position_feedback
     description: Integrate velocity into position while honouring soft limits and settle ratio.
@@ -84,7 +149,6 @@ actions:
             )
         )
 
-  # Zero velocity when clamped by soft limits.
   - function: $in(velocity_command)
     name: clamp_velocity_on_limits
     description: Force velocity to zero once position feedback is clamped by soft limits.
@@ -94,13 +158,11 @@ actions:
              or ($in(position_feedback) >= $in(soft_limit_pos) and $in(velocity_command) > 0)
           else $in(velocity_command)
 
-  # Recalculate error after motion step.
   - function: $in(motion_error)
     name: update_motion_error_post
     description: Refresh the motion error after velocity and position updates.
     call: $in(position_command) - $in(position_feedback)
 
-  # Zero velocity when settled.
   - function: $in(velocity_command)
     name: freeze_velocity_when_settled
     description: Drop residual velocity once both error and commanded speed fall below thresholds.
@@ -174,8 +236,8 @@ polling:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5020
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         drive_enable:       { address: [0,0],   group: c_o, type: uint_16 }
@@ -202,6 +264,8 @@ communication:
 scenarios:
   homing_cycle:
     enabled: true
+    display_name: "Homing Cycle"
+    description: Run a nominal homing move back to the reference position.
     duration: 15.0
     overrides:
       $in(drive_enable): 1
@@ -213,6 +277,8 @@ scenarios:
 
   limit_overtravel:
     enabled: true
+    display_name: "Limit Overtravel"
+    description: Command travel past the positive soft limit to exercise limit alarms.
     duration: 12.0
     overrides:
       $in(drive_enable): 1
@@ -223,6 +289,8 @@ scenarios:
 
   torque_overload_test:
     enabled: true
+    display_name: "Torque Overload Test"
+    description: Lower the torque threshold while commanding a fast move.
     duration: 10.0
     overrides:
       $in(drive_enable): 1
