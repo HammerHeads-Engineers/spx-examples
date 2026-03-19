@@ -64,28 +64,52 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
-        "C1:VDIV?": "#out(k__channel_1_scale_v)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        "C1:VDIV?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
         "C1:VDIV {scale}":
+          name: set_channel_1_scale
           "#attr(k__channel_1_scale_v)": "scale"
           response: "OK"
-        "C1:OFST?": "#out(k__channel_1_offset_v)"
+        "C1:OFST?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
         "C1:OFST {offset}":
+          name: set_channel_1_offset
           "#attr(k__channel_1_offset_v)": "offset"
           response: "OK"
-        "TDIV?": "#out(k__timebase_scale_s)"
+        "TDIV?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
         "TDIV {scale}":
+          name: set_timebase_scale
           "#attr(k__timebase_scale_s)": "scale"
           response: "OK"
-        "TRLV?": "#out(k__trigger_level_v)"
+        "TRLV?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
         "TRLV {level}":
+          name: set_trigger_level
           "#attr(k__trigger_level_v)": "level"
           response: "OK"
-        "C1:PAVA? PKPK": "#out(channel1_vpp_v)"
-        "C1:PAVA? RMS": "#out(channel1_vrms_v)"
-        "C1:PAVA? MEAN": "#out(channel1_vavg_v)"
-        "C1:PAVA? FREQ": "#out(channel1_freq_hz)"
-        "C1:PAVA? PER": "#out(channel1_period_s)"
+        "C1:PAVA? PKPK":
+          name: query_channel_1_vpp
+          response: "#out(channel1_vpp_v)"
+        "C1:PAVA? RMS":
+          name: query_channel_1_vrms
+          response: "#out(channel1_vrms_v)"
+        "C1:PAVA? MEAN":
+          name: query_channel_1_vavg
+          response: "#out(channel1_vavg_v)"
+        "C1:PAVA? FREQ":
+          name: query_channel_1_frequency
+          response: "#out(channel1_freq_hz)"
+        "C1:PAVA? PER":
+          name: query_channel_1_period
+          response: "#out(channel1_period_s)"
 
 scenarios:
   amplitude_sweep:

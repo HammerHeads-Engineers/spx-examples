@@ -51,27 +51,54 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "KEYSIGHT TECHNOLOGIES,DSOX1000X,MY00000000,01.20.0000"
-        ":SYSTem:ERRor?": "#out(last_error)"
-        ":MEASure:VPP?": "#out(vpp_v)"
-        ":MEASure:VRMS?": "#out(vrms_v)"
-        ":MEASure:VAVerage?": "#out(vavg_v)"
-        ":MEASure:FREQuency?": "#out(frequency_hz)"
-        ":MEASure:SOURce?": "#out(k__measurement_source)"
+        "*IDN?":
+          name: query_idn
+          response: "KEYSIGHT TECHNOLOGIES,DSOX1000X,MY00000000,01.20.0000"
+        ":SYSTem:ERRor?":
+          name: query_system_error
+          response: "#out(last_error)"
+        ":MEASure:VPP?":
+          name: query_channel_1_vpp
+          response: "#out(vpp_v)"
+        ":MEASure:VRMS?":
+          name: query_channel_1_vrms
+          response: "#out(vrms_v)"
+        ":MEASure:VAVerage?":
+          name: query_channel_1_vavg
+          response: "#out(vavg_v)"
+        ":MEASure:FREQuency?":
+          name: query_channel_1_frequency
+          response: "#out(frequency_hz)"
+        ":MEASure:SOURce?":
+          name: query_measurement_source
+          response: "#out(k__measurement_source)"
         ":MEASure:SOURce {source}":
+          name: set_measurement_source
           "#attr(k__measurement_source)": "source"
           response: "OK"
-        ":CHANnel1:SCALe?": "#out(k__channel_1_scale_v)"
+        ":CHANnel1:SCALe?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
         ":CHANnel1:SCALe {scale}":
+          name: set_channel_1_scale
           "#attr(k__channel_1_scale_v)": "scale"
-        ":CHANnel1:OFFSet?": "#out(k__channel_1_offset_v)"
+        ":CHANnel1:OFFSet?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
         ":CHANnel1:OFFSet {offset}":
+          name: set_channel_1_offset
           "#attr(k__channel_1_offset_v)": "offset"
-        ":TIMebase:SCALe?": "#out(k__timebase_scale_s)"
+        ":TIMebase:SCALe?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
         ":TIMebase:SCALe {scale}":
+          name: set_timebase_scale
           "#attr(k__timebase_scale_s)": "scale"
-        ":TRIGger:LEVel?": "#out(k__trigger_level_v)"
+        ":TRIGger:LEVel?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
         ":TRIGger:LEVel {level}":
+          name: set_trigger_level
           "#attr(k__trigger_level_v)": "level"
 
 scenarios:

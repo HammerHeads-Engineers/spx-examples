@@ -90,33 +90,57 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
-        ":SYSTem:ERRor?": "#out(last_error)"
-        ":CHANnel1:SCAle?": "#out(k__channel_1_scale_v)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        ":SYSTem:ERRor?":
+          name: query_system_error
+          response: "#out(last_error)"
+        ":CHANnel1:SCAle?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
         ":CHANnel1:SCAle {scale}":
+          name: set_channel_1_scale
           "#attr(k__channel_1_scale_v)": "scale"
           response: "OK"
-        ":CHANnel1:OFFSet?": "#out(k__channel_1_offset_v)"
+        ":CHANnel1:OFFSet?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
         ":CHANnel1:OFFSet {offset}":
+          name: set_channel_1_offset
           "#attr(k__channel_1_offset_v)": "offset"
           response: "OK"
-        ":HORizontal:MAIn:SCAle?": "#out(k__timebase_scale_s)"
+        ":HORizontal:MAIn:SCAle?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
         ":HORizontal:MAIn:SCAle {scale}":
+          name: set_timebase_scale
           "#attr(k__timebase_scale_s)": "scale"
           response: "OK"
-        ":TRIGger:A:LEVel?": "#out(k__trigger_level_v)"
+        ":TRIGger:A:LEVel?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
         ":TRIGger:A:LEVel {level}":
+          name: set_trigger_level
           "#attr(k__trigger_level_v)": "level"
           response: "OK"
-        ":MEASUrement:IMMed:TYPe?": "#out(k__measurement_type)"
+        ":MEASUrement:IMMed:TYPe?":
+          name: query_measurement_type
+          response: "#out(k__measurement_type)"
         ":MEASUrement:IMMed:TYPe {mtype}":
+          name: set_measurement_type
           "#attr(k__measurement_type)": "mtype"
           response: "OK"
-        ":MEASUrement:IMMed:SOUrce?": "#out(k__measurement_source)"
+        ":MEASUrement:IMMed:SOUrce?":
+          name: query_measurement_source
+          response: "#out(k__measurement_source)"
         ":MEASUrement:IMMed:SOUrce {source}":
+          name: set_measurement_source
           "#attr(k__measurement_source)": "source"
           response: "OK"
-        ":MEASUrement:IMMed:VALue?": "#out(measurement_value)"
+        ":MEASUrement:IMMed:VALue?":
+          name: query_measurement_value
+          response: "#out(measurement_value)"
 
 scenarios:
   calibration_tone:
