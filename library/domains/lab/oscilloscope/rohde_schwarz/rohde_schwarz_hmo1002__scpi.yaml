@@ -5,36 +5,74 @@ description: |
   basic measurement queries for channel 1.
 
 attributes:
-  idn: "Rohde&Schwarz,HMO1002,0000000000,1.00"
+  idn:
+    type: str
+    default: "Rohde&Schwarz,HMO1002,0000000000,1.00"
 
-  k__channel_1_scale_v: 1.0
-  k__channel_1_offset_v: 0.0
-  k__timebase_scale_s: 0.001
-  k__trigger_level_v: 0.0
-  k__measurement_type: VPP
+  k__channel_1_scale_v:
+    type: float
+    default: 1.0
+    unit: V
+  k__channel_1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__timebase_scale_s:
+    type: float
+    default: 0.001
+    unit: s
+  k__trigger_level_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__measurement_type:
+    type: str
+    default: VPP
 
-  channel1_vpp_v: 2.0
-  channel1_vrms_v: 0.7071
-  channel1_vavg_v: 0.0
-  channel1_freq_hz: 1000.0
-  channel1_period_s: 0.001
+  channel1_vpp_v:
+    type: float
+    default: 2.0
+    unit: V
+  channel1_vrms_v:
+    type: float
+    default: 0.7071
+    unit: V
+  channel1_vavg_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_freq_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  channel1_period_s:
+    type: float
+    default: 0.001
+    unit: s
 
-  measurement_value: 2.0
-  error_status: "0,No error"
+  measurement_value:
+    type: float
+    default: 2.0
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(channel1_period_s)
     name: update_period
+    description: Recompute period from the current channel 1 frequency.
     params:
       min_freq_hz: 0.1
     call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
   - function: $in(channel1_vrms_v)
     name: update_vrms
+    description: Approximate RMS voltage from the configured channel 1 Vpp amplitude.
     params:
       scale: 0.353553
     call: $in(channel1_vpp_v) * scale
   - function: $in(measurement_value)
     name: update_measurement_value
+    description: Select the active measurement value according to the configured measurement type.
     call: |
       (
         $in(channel1_vpp_v) if $in(k__measurement_type) == "VPP" else

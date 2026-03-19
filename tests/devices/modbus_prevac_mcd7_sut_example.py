@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""SUT client for the multichannel Modbus vacuum gauge model used in integration tests."""
+"""SUT client for the Prevac MCD7 Modbus model used in integration tests."""
 from __future__ import annotations
 
 from typing import Dict, Optional, Sequence
@@ -41,8 +41,8 @@ def _decode_u32(registers: Sequence[int]) -> int:
     return ((high & 0xFFFF) << 16) | (low & 0xFFFF)
 
 
-class ModbusVacuumGaugeMultichannelSUTExample(ModbusSUTBase):
-    """Thin wrapper around pymodbus representing the multichannel vacuum gauge model."""
+class ModbusPrevacMCD7SUTExample(ModbusSUTBase):
+    """Thin wrapper around pymodbus representing the Prevac MCD7 detector model."""
 
     _DECODER_REGISTRY: Dict[str, RegisterDecoder] = {
         "u16": RegisterDecoder(count=1, fn=_decode_u16),
@@ -96,6 +96,6 @@ class ModbusVacuumGaugeMultichannelSUTExample(ModbusSUTBase):
 
 
 __all__ = [
-    "ModbusVacuumGaugeMultichannelSUTExample",
+    "ModbusPrevacMCD7SUTExample",
     "ModbusTcpClient",
 ]

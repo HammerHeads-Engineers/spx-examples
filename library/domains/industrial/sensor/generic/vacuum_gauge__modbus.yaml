@@ -2,47 +2,135 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-# Two-channel vacuum gauge simulation with roughing and high-vacuum readings.
+name: vacuum_gauge__modbus
+description: >
+  Two-channel vacuum gauge simulation with roughing and high-vacuum readings,
+  ionizer interlocks, relay thresholds, and discharge/leak disturbances exposed
+  over Modbus TCP.
+
 attributes:
-  rough_pressure: 1.0              # mbar, roughing gauge covering atmosphere to 1e-3
-  high_pressure: 5.0e-1            # mbar, high-vacuum gauge covering 1e-1 to 1e-9
+  # Measured pressures [mbar]
+  rough_pressure:
+    type: float
+    default: 1.0
+    unit: mbar
+  high_pressure:
+    type: float
+    default: 5.0e-1
+    unit: mbar
 
-  ionizer_enabled: 0               # operator request to energise hot cathode / ion gauge
-  ionizer_available: 0             # interlock indicating HV conditions met
-  ionizer_interlock: 0             # alarm when ionizer command violates interlock
+  # Ionizer state
+  ionizer_enabled:
+    type: int
+    default: 0
+  ionizer_available:
+    type: int
+    default: 0
+  ionizer_interlock:
+    type: int
+    default: 0
 
-  leak_event: 0                    # 0 = normal pump-down, 1 = sudden pressure rise
+  # Disturbance flags
+  leak_event:
+    type: int
+    default: 0
 
-  pumpdown_target: 3.0e-9          # desired base pressure during pump-down (mbar)
-  upset_target: 2.0e-2             # pressure reached during leak/upset (mbar)
+  # Pressure targets [mbar]
+  pumpdown_target:
+    type: float
+    default: 3.0e-9
+    unit: mbar
+  upset_target:
+    type: float
+    default: 2.0e-2
+    unit: mbar
 
-  rough_pump_gain: 0.12            # exponential approach factor during pump-down
-  rough_upset_gain: 0.5            # exponential approach factor during upset
-  hv_pump_gain: 0.08               # pump-down factor for high-vacuum gauge
-  hv_upset_gain: 0.55              # upset factor for high-vacuum gauge
+  # Dynamics gains
+  rough_pump_gain:
+    type: float
+    default: 0.12
+  rough_upset_gain:
+    type: float
+    default: 0.5
+  hv_pump_gain:
+    type: float
+    default: 0.08
+  hv_upset_gain:
+    type: float
+    default: 0.55
 
-  hv_threshold_enable: 5.0e-6      # pressure required to enable the ioniser
-  hv_threshold_disable: 5.0e-5     # pressure above which the ioniser trips off
+  # Interlock thresholds [mbar]
+  hv_threshold_enable:
+    type: float
+    default: 5.0e-6
+    unit: mbar
+  hv_threshold_disable:
+    type: float
+    default: 5.0e-5
+    unit: mbar
 
-  active_target_pressure: 5.0e-1   # helper storing the current target (mbar)
-  rough_target_pressure: 1.0e-3    # helper for the rough gauge target (mbar)
-  high_target_pressure: 5.0e-1     # helper for the high-vacuum target (mbar)
+  # Internal target helpers [mbar]
+  active_target_pressure:
+    type: float
+    default: 5.0e-1
+    unit: mbar
+  rough_target_pressure:
+    type: float
+    default: 1.0e-3
+    unit: mbar
+  high_target_pressure:
+    type: float
+    default: 5.0e-1
+    unit: mbar
 
-  discharge_event: 0               # 1 = trigger plasma discharge upset
-  discharge_decay: 0.95            # exponential decay factor applied post-discharge
-  discharge_active: 0              # internal latch to apply decay
+  discharge_event:
+    type: int
+    default: 0
+  discharge_decay:
+    type: float
+    default: 0.95
+  discharge_active:
+    type: int
+    default: 0
 
-  relay_setpoint_1: 5.0e-2         # mbar threshold for relay 1 (rough region)
-  relay_setpoint_2: 1.0e-3         # mbar threshold for relay 2
-  relay_setpoint_3: 1.0e-4         # mbar threshold for relay 3
-  relay_setpoint_4: 1.0e-5         # mbar threshold for relay 4
-  relay_setpoint_5: 1.0e-6         # mbar threshold for relay 5
+  # Relay thresholds [mbar]
+  relay_setpoint_1:
+    type: float
+    default: 5.0e-2
+    unit: mbar
+  relay_setpoint_2:
+    type: float
+    default: 1.0e-3
+    unit: mbar
+  relay_setpoint_3:
+    type: float
+    default: 1.0e-4
+    unit: mbar
+  relay_setpoint_4:
+    type: float
+    default: 1.0e-5
+    unit: mbar
+  relay_setpoint_5:
+    type: float
+    default: 1.0e-6
+    unit: mbar
 
-  relay_output_1: 0                # digital outputs for setpoint relays
-  relay_output_2: 0
-  relay_output_3: 0
-  relay_output_4: 0
-  relay_output_5: 0
+  # Relay outputs
+  relay_output_1:
+    type: int
+    default: 0
+  relay_output_2:
+    type: int
+    default: 0
+  relay_output_3:
+    type: int
+    default: 0
+  relay_output_4:
+    type: int
+    default: 0
+  relay_output_5:
+    type: int
+    default: 0
 
 actions:
   # Choose between pump-down or upset target pressures.
@@ -77,8 +165,8 @@ actions:
 
   # Clear the discharge trigger; decay happens in main loop when discharge_active is latched.
   - set: $in(discharge_event)
-    # name: Discharge Trigger Reset
-    # description: Clears the manual discharge trigger after processing.
+    name: Discharge Trigger Reset
+    description: Clears the manual discharge trigger after processing.
     value: 0
 
   # Clamp targets to instrument ranges.
@@ -212,8 +300,9 @@ communication:
 
 scenarios:
   discharge_spike:
-    # name: Discharge Spike
+    name: Discharge Spike
     enabled: true
+    description: Injects a brief discharge event that spikes both pressure channels.
     duration: 0.1
     overrides:
       $in(discharge_event): 1
@@ -258,10 +347,10 @@ scenarios:
       relay_setpoint_5: 5.0e-7
 
   sensor_drift:
-    # name: Sensor Drift
+    name: Sensor Drift
     enabled: true
     duration: 12.0
-    # description: Simulates slower sensor dynamics by reducing pump gains and adding decay.
+    description: Simulates slower sensor dynamics by reducing pump gains and adding decay.
     overrides:
       $in(discharge_decay): 0.9
       $in(rough_pump_gain): 0.02

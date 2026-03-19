@@ -16,11 +16,11 @@ meta_parameters:
     default: 1
 
 attributes:
-  # Remote controls
+  # Remote controls (uint16 registers and current limit [A])
   cmd__pause: 2
   k__max_charging_current_a: 16
 
-  # Electrical measurements
+  # Electrical measurements ([A], [V], power-factor ratio)
   k__current_l1_a: 8.0
   k__current_l2_a: 8.0
   k__current_l3_a: 8.0
@@ -31,6 +31,7 @@ attributes:
   k__power_factor_l2: 0.98
   k__power_factor_l3: 0.98
 
+  # Aggregate telemetry ([A], [V], [W], [VA], [var])
   current_phase_sum_a: 0.0
   voltage_phase_sum_v: 0.0
 
@@ -51,10 +52,10 @@ attributes:
 
   power_factor_sum: 0.0
 
-  # Energy
+  # Energy ([kWh])
   energy_consumed_kwh: 0.0
 
-  # Modbus-scaled registers
+  # Modbus-scaled raw registers (uint16/uint32 payloads)
   _modbus_current_l1_raw: 0
   _modbus_current_l2_raw: 0
   _modbus_current_l3_raw: 0
@@ -91,12 +92,12 @@ attributes:
 
 actions:
   - function: $in(current_phase_sum_a)
-    name: compute_current_phase_sum
+    name: compute_phase_current_sum_a
     description: Sum of per-phase charging current.
     call: $in(k__current_l1_a) + $in(k__current_l2_a) + $in(k__current_l3_a)
 
   - function: $in(voltage_phase_sum_v)
-    name: compute_voltage_phase_sum
+    name: compute_phase_voltage_sum_v
     description: Sum of per-phase line-to-neutral voltages.
     call: $in(k__voltage_l1_n_v) + $in(k__voltage_l2_n_v) + $in(k__voltage_l3_n_v)
 
@@ -116,7 +117,7 @@ actions:
     call: max(0.0, $in(k__voltage_l3_n_v) * $in(k__current_l3_a))
 
   - function: $in(apparent_power_sum_va)
-    name: compute_apparent_power_sum
+    name: compute_total_apparent_power_va
     description: Sum of apparent power across phases.
     call: $in(apparent_power_l1_va) + $in(apparent_power_l2_va) + $in(apparent_power_l3_va)
 
@@ -136,7 +137,7 @@ actions:
     call: max(0.0, $in(apparent_power_l3_va) * $in(k__power_factor_l3))
 
   - function: $in(active_power_sum_w)
-    name: compute_active_power_sum
+    name: compute_total_active_power_w
     description: Sum of active power across phases.
     call: $in(active_power_l1_w) + $in(active_power_l2_w) + $in(active_power_l3_w)
 
@@ -156,12 +157,12 @@ actions:
     call: max(0.0, ($in(apparent_power_l3_va) ** 2 - $in(active_power_l3_w) ** 2) ** 0.5)
 
   - function: $in(reactive_power_sum_var)
-    name: compute_reactive_power_sum
+    name: compute_total_reactive_power_var
     description: Sum of reactive power across phases.
     call: $in(reactive_power_l1_var) + $in(reactive_power_l2_var) + $in(reactive_power_l3_var)
 
   - function: $in(power_factor_sum)
-    name: compute_power_factor_sum
+    name: compute_total_power_factor
     description: Power factor based on total active vs apparent power.
     call: |
       (lambda apparent:
@@ -169,7 +170,7 @@ actions:
       )($in(apparent_power_sum_va))
 
   - function: $in(energy_consumed_kwh)
-    name: integrate_energy
+    name: integrate_energy_consumed_kwh
     description: Integrate consumed energy from total active power.
     call: $in(energy_consumed_kwh) + max(0.0, $in(active_power_sum_w)) * $in(_cycle_time_s) / 3600000.0
 
@@ -189,7 +190,7 @@ actions:
     call: int(round(max(0.0, $in(k__current_l3_a))))
 
   - function: $in(_modbus_current_sum_raw)
-    name: encode_current_sum
+    name: encode_phase_current_sum_raw
     description: Register 41651 (A).
     call: int(round(max(0.0, $in(current_phase_sum_a))))
 
@@ -209,7 +210,7 @@ actions:
     call: int(round(max(0.0, $in(k__voltage_l3_n_v))))
 
   - function: $in(_modbus_voltage_sum_raw)
-    name: encode_voltage_sum
+    name: encode_phase_voltage_sum_raw
     description: Register 41655 (sum, V).
     call: int(round(max(0.0, $in(voltage_phase_sum_v))))
 
@@ -229,7 +230,7 @@ actions:
     call: int(round(max(0.0, $in(active_power_l3_w))))
 
   - function: $in(_modbus_active_power_sum_raw)
-    name: encode_active_power_sum
+    name: encode_total_active_power_raw
     description: Register 41666 (0.1 W).
     call: int(round(max(0.0, $in(active_power_sum_w)) * 10.0))
 
@@ -249,7 +250,7 @@ actions:
     call: int(round(max(0.0, min(1.0, $in(k__power_factor_l3))) * 100.0))
 
   - function: $in(_modbus_power_factor_sum_raw)
-    name: encode_power_factor_sum
+    name: encode_total_power_factor_raw
     description: Register 41670 (0.01).
     call: int(round(max(0.0, min(1.0, $in(power_factor_sum))) * 100.0))
 
@@ -269,7 +270,7 @@ actions:
     call: int(round(max(0.0, $in(apparent_power_l3_va))))
 
   - function: $in(_modbus_apparent_power_sum_raw)
-    name: encode_apparent_power_sum
+    name: encode_total_apparent_power_raw
     description: Register 41674 (VA).
     call: int(round(max(0.0, $in(apparent_power_sum_va))))
 
@@ -289,12 +290,12 @@ actions:
     call: int(round(max(0.0, $in(reactive_power_l3_var))))
 
   - function: $in(_modbus_reactive_power_sum_raw)
-    name: encode_reactive_power_sum
+    name: encode_total_reactive_power_raw
     description: Register 41678 (var).
     call: int(round(max(0.0, $in(reactive_power_sum_var))))
 
   - function: $in(_modbus_energy_consumed_raw)
-    name: encode_energy_consumed
+    name: encode_energy_consumed_raw
     description: Register 41693-41694 (0.1 Wh).
     call: int(round(max(0.0, $in(energy_consumed_kwh)) * 10000.0))
 
@@ -342,6 +343,8 @@ communication:
 
 scenarios:
   fast_charge:
+    enabled: false
+    display_name: "Fast 24 A Charging"
     description: Higher current fast-charge profile.
     duration: 30.0
     overrides:
@@ -353,6 +356,8 @@ scenarios:
       $in(k__power_factor_l3): 0.99
 
   paused:
+    enabled: false
+    display_name: "Charging Paused"
     description: Pause charging with low current draw.
     duration: 20.0
     overrides:

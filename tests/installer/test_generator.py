@@ -194,7 +194,9 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     start_ps_content = start_ps_path.read_text(encoding="utf-8")
     stop_ps_content = stop_ps_path.read_text(encoding="utf-8")
     assert "Cleanup-OnFailure" in start_ps_content
-    assert 'Start-Process "spx-ble-adapter"' in start_ps_content
+    assert "btvirt_adapter' is not supported on Windows" in start_ps_content
+    assert "npm install -g '@simplephysx/spx-ble-adapter'" not in start_ps_content
+    assert 'Start-Process "spx-ble-adapter"' not in start_ps_content
     assert (
         'docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml")'
         in start_ps_content

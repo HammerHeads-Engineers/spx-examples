@@ -5,16 +5,44 @@ description: |
   queries for lab automation and CI harnesses.
 
 attributes:
-  k__channel_1_scale_v: 0.5
-  k__channel_1_offset_v: 0.0
-  k__timebase_scale_s: 0.001
-  k__trigger_level_v: 0.0
-  k__measurement_source: CHAN1
-  vpp_v: 1.0
-  vrms_v: 0.707
-  vavg_v: 0.0
-  frequency_hz: 1000.0
-  last_error: '0,"No error"'
+  k__channel_1_scale_v:
+    type: float
+    default: 0.5
+    unit: V
+  k__channel_1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__timebase_scale_s:
+    type: float
+    default: 0.001
+    unit: s
+  k__trigger_level_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__measurement_source:
+    type: str
+    default: CHAN1
+  vpp_v:
+    type: float
+    default: 1.0
+    unit: V
+  vrms_v:
+    type: float
+    default: 0.707
+    unit: V
+  vavg_v:
+    type: float
+    default: 0.0
+    unit: V
+  frequency_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  last_error:
+    type: str
+    default: '0,"No error"'
 
 communication:
   - ascii:

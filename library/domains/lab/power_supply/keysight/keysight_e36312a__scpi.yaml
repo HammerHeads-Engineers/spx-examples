@@ -5,48 +5,102 @@ description: |
   output state to support lab automation workflows.
 
 attributes:
-  idn: "KEYSIGHT TECHNOLOGIES,E36312A,MY00000000,1.0"
+  idn:
+    type: str
+    default: "KEYSIGHT TECHNOLOGIES,E36312A,MY00000000,1.0"
 
-  k__selected_output: 1
+  k__selected_output:
+    type: int
+    default: 1
 
-  k__ch1_voltage_set_v: 5.0
-  k__ch1_current_limit_a: 1.0
-  k__ch1_output_state: 0
-  ch1_voltage_readback_v: 0.0
-  ch1_current_readback_a: 0.0
+  k__ch1_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch1_current_limit_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch1_output_state:
+    type: int
+    default: 0
+  ch1_voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch1_current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
 
-  k__ch2_voltage_set_v: 12.0
-  k__ch2_current_limit_a: 0.5
-  k__ch2_output_state: 0
-  ch2_voltage_readback_v: 0.0
-  ch2_current_readback_a: 0.0
+  k__ch2_voltage_set_v:
+    type: float
+    default: 12.0
+    unit: V
+  k__ch2_current_limit_a:
+    type: float
+    default: 0.5
+    unit: A
+  k__ch2_output_state:
+    type: int
+    default: 0
+  ch2_voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch2_current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
 
-  k__ch3_voltage_set_v: 12.0
-  k__ch3_current_limit_a: 0.5
-  k__ch3_output_state: 0
-  ch3_voltage_readback_v: 0.0
-  ch3_current_readback_a: 0.0
+  k__ch3_voltage_set_v:
+    type: float
+    default: 12.0
+    unit: V
+  k__ch3_current_limit_a:
+    type: float
+    default: 0.5
+    unit: A
+  k__ch3_output_state:
+    type: int
+    default: 0
+  ch3_voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch3_current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
 
-  error_status: '0,"No error"'
+  error_status:
+    type: str
+    default: '0,"No error"'
 
 actions:
   - function: $in(ch1_voltage_readback_v)
     name: update_ch1_voltage
+    description: Mirror channel 1 set voltage when the output is enabled.
     call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
   - function: $in(ch1_current_readback_a)
     name: update_ch1_current
+    description: Mirror channel 1 current limit as measured current when enabled.
     call: ($in(k__ch1_current_limit_a) if $in(k__ch1_output_state) == 1 else 0.0)
   - function: $in(ch2_voltage_readback_v)
     name: update_ch2_voltage
+    description: Mirror channel 2 set voltage when the output is enabled.
     call: ($in(k__ch2_voltage_set_v) if $in(k__ch2_output_state) == 1 else 0.0)
   - function: $in(ch2_current_readback_a)
     name: update_ch2_current
+    description: Mirror channel 2 current limit as measured current when enabled.
     call: ($in(k__ch2_current_limit_a) if $in(k__ch2_output_state) == 1 else 0.0)
   - function: $in(ch3_voltage_readback_v)
     name: update_ch3_voltage
+    description: Mirror channel 3 set voltage when the output is enabled.
     call: ($in(k__ch3_voltage_set_v) if $in(k__ch3_output_state) == 1 else 0.0)
   - function: $in(ch3_current_readback_a)
     name: update_ch3_current
+    description: Mirror channel 3 current limit as measured current when enabled.
     call: ($in(k__ch3_current_limit_a) if $in(k__ch3_output_state) == 1 else 0.0)
 
 communication:

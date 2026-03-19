@@ -17,56 +17,168 @@ meta_parameters:
 
 attributes:
   # Zone 1 controls/status.
-  cmd__zone1_go_operate: 0
-  cmd__zone1_go_standby: 0
-  zone1_status_bits: 0
-  k__zone1_timer_direction: 0
-  zone1_remaining_reg_time_s: 0
-  k__zone1_reg_bakeout_time_s: 3600
-  zone1_remaining_cont_time_s: 0
-  k__zone1_cont_bakeout_time_s: 0
-  zone1_actual_temp_c: 25
-  k__zone1_temp_unit: 0
-  k__zone1_target_temp_c: 120
-  zone1_actual_target_temp_c: 120
-  k__zone1_fan_start_temp_c: 80
-  k__zone1_ramp_rate_c_per_unit: 5
-  k__zone1_ramp_rate_unit: 1
-  k__zone1_controlled_cooling: 1
-  k__zone1_autostart_interlock: 0
-  k__zone1_power_fail_signal: 0
+  cmd__zone1_go_operate:
+    type: int
+    default: 0
+  cmd__zone1_go_standby:
+    type: int
+    default: 0
+  zone1_status_bits:
+    type: int
+    default: 0
+  k__zone1_timer_direction:
+    type: int
+    default: 0
+  zone1_remaining_reg_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__zone1_reg_bakeout_time_s:
+    type: int
+    default: 3600
+    unit: s
+  zone1_remaining_cont_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__zone1_cont_bakeout_time_s:
+    type: int
+    default: 0
+    unit: s
+  zone1_actual_temp_c:
+    type: int
+    default: 25
+    unit: degC
+  k__zone1_temp_unit:
+    type: int
+    default: 0
+  k__zone1_target_temp_c:
+    type: int
+    default: 120
+    unit: degC
+  zone1_actual_target_temp_c:
+    type: int
+    default: 120
+    unit: degC
+  k__zone1_fan_start_temp_c:
+    type: int
+    default: 80
+    unit: degC
+  k__zone1_ramp_rate_c_per_unit:
+    type: int
+    default: 5
+    unit: degC_per_unit
+  k__zone1_ramp_rate_unit:
+    type: int
+    default: 1
+  k__zone1_controlled_cooling:
+    type: int
+    default: 1
+  k__zone1_autostart_interlock:
+    type: int
+    default: 0
+  k__zone1_power_fail_signal:
+    type: int
+    default: 0
 
   # Zone 2 controls/status.
-  cmd__zone2_go_operate: 0
-  cmd__zone2_go_standby: 0
-  zone2_status_bits: 0
-  k__zone2_timer_direction: 0
-  zone2_remaining_reg_time_s: 0
-  k__zone2_reg_bakeout_time_s: 3600
-  zone2_remaining_cont_time_s: 0
-  k__zone2_cont_bakeout_time_s: 0
-  zone2_actual_temp_c: 25
-  k__zone2_temp_unit: 0
-  k__zone2_target_temp_c: 120
-  zone2_actual_target_temp_c: 120
-  k__zone2_fan_start_temp_c: 80
-  k__zone2_ramp_rate_c_per_unit: 5
-  k__zone2_ramp_rate_unit: 1
-  k__zone2_controlled_cooling: 1
-  k__zone2_autostart_interlock: 0
-  k__zone2_power_fail_signal: 0
+  cmd__zone2_go_operate:
+    type: int
+    default: 0
+  cmd__zone2_go_standby:
+    type: int
+    default: 0
+  zone2_status_bits:
+    type: int
+    default: 0
+  k__zone2_timer_direction:
+    type: int
+    default: 0
+  zone2_remaining_reg_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__zone2_reg_bakeout_time_s:
+    type: int
+    default: 3600
+    unit: s
+  zone2_remaining_cont_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__zone2_cont_bakeout_time_s:
+    type: int
+    default: 0
+    unit: s
+  zone2_actual_temp_c:
+    type: int
+    default: 25
+    unit: degC
+  k__zone2_temp_unit:
+    type: int
+    default: 0
+  k__zone2_target_temp_c:
+    type: int
+    default: 120
+    unit: degC
+  zone2_actual_target_temp_c:
+    type: int
+    default: 120
+    unit: degC
+  k__zone2_fan_start_temp_c:
+    type: int
+    default: 80
+    unit: degC
+  k__zone2_ramp_rate_c_per_unit:
+    type: int
+    default: 5
+    unit: degC_per_unit
+  k__zone2_ramp_rate_unit:
+    type: int
+    default: 1
+  k__zone2_controlled_cooling:
+    type: int
+    default: 1
+  k__zone2_autostart_interlock:
+    type: int
+    default: 0
+  k__zone2_power_fail_signal:
+    type: int
+    default: 0
 
   # Global device settings.
-  cmd__release_remote_control: 0
-  remote_control_enabled: 0
+  cmd__release_remote_control:
+    type: int
+    default: 0
+  remote_control_enabled:
+    type: int
+    default: 0
 
   # Internal helpers.
-  _zone1_temp_min_c: 0
-  _zone1_temp_max_c: 1200
-  _zone1_temp_response_gain: 0.08
-  _zone2_temp_min_c: 0
-  _zone2_temp_max_c: 1200
-  _zone2_temp_response_gain: 0.08
+  _zone1_temp_min_c:
+    type: int
+    default: 0
+    unit: degC
+  _zone1_temp_max_c:
+    type: int
+    default: 1200
+    unit: degC
+  _zone1_temp_response_gain:
+    type: float
+    default: 0.08
+    unit: ratio
+  _zone2_temp_min_c:
+    type: int
+    default: 0
+    unit: degC
+  _zone2_temp_max_c:
+    type: int
+    default: 1200
+    unit: degC
+  _zone2_temp_response_gain:
+    type: float
+    default: 0.08
+    unit: ratio
 
 actions:
   - function: $in(zone1_actual_target_temp_c)
@@ -155,6 +267,7 @@ communication:
 
 scenarios:
   zone1_bakeout:
+    display_name: "Zone 1 Bakeout"
     description: Drive zone 1 to a higher bakeout target.
     duration: 20.0
     overrides:
@@ -162,6 +275,7 @@ scenarios:
       $in(k__zone1_fan_start_temp_c): 120
 
   zone2_bakeout:
+    display_name: "Zone 2 Bakeout"
     description: Drive zone 2 to a higher bakeout target.
     duration: 20.0
     overrides:

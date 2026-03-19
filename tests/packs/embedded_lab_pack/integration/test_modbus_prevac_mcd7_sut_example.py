@@ -3,22 +3,24 @@
 import os
 import unittest
 
-import tests.shared.integration.modbus_vacuum_gauge_done_reset_stress as shared_stress
+import tests.shared.integration.modbus_prevac_mcd7_sut_example as shared_vg
 
 from tests.common.spx_utils import require_existing_instance
 
 
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
-INSTANCE_KEY = "spx_vacuum_gauge_multichannel"
-MODEL_ID = "Process.VacuumGaugeMultichannel.Modbus"
+INSTANCE_KEY = "spx_prevac_mcd7"
+MODEL_ID = "Lab.Detector.PrevacMCD7.Modbus"
 
 
-class TestModbusVacuumGaugeDoneResetStress(shared_stress.TestModbusVacuumGaugeDoneResetStress):
-    """Run the shared done-reset stress test against the installer-created instance."""
+class TestModbusPrevacMCD7SUTExampleIntegration(
+    shared_vg.TestModbusPrevacMCD7SUTExampleIntegration
+):
+    """Run the shared Prevac MCD7 suite against installer-created instance."""
 
     @classmethod
     def setUpClass(cls):
-        if shared_stress.ModbusTcpClient is None:  # pragma: no cover - dependency missing
+        if shared_vg.ModbusTcpClient is None:  # pragma: no cover - dependency missing
             raise unittest.SkipTest(
                 "pymodbus is not available. Install pymodbus to run Modbus integration tests."
             )
@@ -32,6 +34,7 @@ class TestModbusVacuumGaugeDoneResetStress(shared_stress.TestModbusVacuumGaugeDo
         if not product_key:
             raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run integration tests.")
 
+        cls._spx = spx_python
         cls._client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
         cls._instance = require_existing_instance(
             cls._client,

@@ -1,7 +1,14 @@
-name: vacuum_gauge_multichannel__modbus
-description: Multichannel vacuum gauge / impulse counter exposed over Modbus with dwell-based measurement handoff.
+# SPDX-License-Identifier: MIT
+
+name: prevac_mcd7__modbus
+description: >
+  Prevac MCD7 multichanneltron detector exposed over Modbus with dwell-based
+  measurement handoff. The model simulates seven detector channels whose latched
+  impulse counts are updated after each acquisition window and scaled by
+  per-channel comparator thresholds.
 
 attributes:
+  # Acquisition state and control registers
   measure_done:
     type: int
     default: 1
@@ -9,7 +16,9 @@ attributes:
     type: int
     default: 0
   measure_config: 0
-  dwell_time: 100               # ms (1s default)
+  dwell_time: 100               # ms
+
+  # Latched channel impulse counts
   ch_1_impulse: 0
   ch_2_impulse: 0
   ch_3_impulse: 0
@@ -17,6 +26,8 @@ attributes:
   ch_5_impulse: 0
   ch_6_impulse: 0
   ch_7_impulse: 0
+
+  # Per-channel comparator thresholds
   ch_1_comparator: 0
   ch_2_comparator: 0
   ch_3_comparator: 0
@@ -24,12 +35,13 @@ attributes:
   ch_5_comparator: 0
   ch_6_comparator: 0
   ch_7_comparator: 0
-  _start_ms: 0
 
+  # Internal acquisition timing state
+  _start_ms: 0
   auto_trigger_enable: 0
 
 actions:
-  # channel impulses: hold during measurement, latch new value after measurement window
+  # Channel impulses: hold during measurement, latch new value after measurement window.
   - function: $in(ch_1_impulse)
     name: update_ch_1_impulse
     description: Simulate channel 1 impulse count with dwell-based latching.
@@ -187,7 +199,7 @@ conditions:
         value: 1
 
 polling:
-  interval: 0.002    # tighten responsiveness for fast start/done handoff
+  interval: 0.002
 
 communication:
   - modbus_slave:
@@ -217,7 +229,7 @@ communication:
 
 scenarios:
   modbus_disconnect:
-    name: Modbus Disconnect
+    display_name: "Modbus Disconnect"
     enabled: true
     duration: 2.0
     call:
@@ -225,10 +237,10 @@ scenarios:
       stop_path: communication.modbus_slave.attach
 
   channel_3_dropout:
-    name: Channel 3 Dropout
+    display_name: "Channel 3 Dropout"
     enabled: true
     duration: 20.0
-    description: Forces channel 3 impulse output to a fixed value during a short window.
+    description: Force channel 3 impulse output to a fixed value during a short window.
     actions:
       - function: $out(ch_3_impulse)
         params:

@@ -31,6 +31,7 @@ def test_tdk_lambda_genesys_plus_g100_50_model_loads() -> None:
     assert "attributes" in doc
     assert "actions" in doc
     assert "communication" in doc
+    assert "scenarios" in doc
 
     attributes = doc["attributes"]
     assert isinstance(attributes, dict)
@@ -49,6 +50,12 @@ def test_tdk_lambda_genesys_plus_g100_50_model_loads() -> None:
     assert "k__voltage_set_v" in mapping
     assert "k__current_limit_a" in mapping
     assert "power_actual_w" in mapping
+
+    scenarios = doc["scenarios"]
+    assert isinstance(scenarios, dict)
+    assert scenarios["nominal_48v_load"]["display_name"] == "Nominal 48 V CV Load"
+    assert scenarios["current_limit_transition"]["display_name"] == "Current-Limit Transition"
+    assert scenarios["remote_inhibit_demo"]["display_name"] == "Remote Inhibit Alarm"
 
 
 def test_tdk_lambda_genesys_plus_g100_50_model_in_catalog() -> None:

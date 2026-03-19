@@ -16,6 +16,7 @@ from typing import Iterable, List, Optional
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
 from .selection import (
+    apply_platform_compatibility,
     resolve_default_instances,
     resolve_model_ids,
     resolve_service_ids,
@@ -246,6 +247,16 @@ def _build_noninteractive_selection(
         allowed = set(start_instances)
         instances = [entry for entry in instances if entry.get("instance_key") in allowed]
 
+    compatibility = apply_platform_compatibility(
+        model_ids=model_ids,
+        service_ids=service_ids,
+        instances=instances,
+        start_instances=start_instances,
+        index=index,
+    )
+    for warning in compatibility.warnings:
+        print(f"[spx-installer] {warning}", file=sys.stderr)
+
     return WizardSelection(
         packages=packages,
         profiles=profile_ids,
@@ -254,10 +265,10 @@ def _build_noninteractive_selection(
         install_spx_ui=install_spx_ui,
         offline_bundle=True,
         license_key=product_key,
-        model_ids=model_ids,
-        service_ids=service_ids,
-        instances=instances,
-        start_instances=start_instances,
+        model_ids=compatibility.model_ids,
+        service_ids=compatibility.service_ids,
+        instances=compatibility.instances,
+        start_instances=compatibility.start_instances,
     )
 
 

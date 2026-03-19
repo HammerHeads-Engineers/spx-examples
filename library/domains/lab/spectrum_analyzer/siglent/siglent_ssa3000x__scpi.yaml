@@ -4,14 +4,30 @@ description: |
   SCPI (ASCII/TCP) command set for center frequency, span, reference level,
   and marker readback queries.
 attributes:
-  idn: "SIGLENT,SSA3000X,SSA3X0000000,1.0"
+  idn:
+    type: str
+    default: "SIGLENT,SSA3000X,SSA3X0000000,1.0"
 
-  k__center_frequency_hz: 1000000000.0
-  k__span_hz: 10000000.0
-  k__reference_level_dbm: -20.0
-  k__marker_1_enabled: 1
+  k__center_frequency_hz:
+    type: float
+    default: 1000000000.0
+    unit: Hz
+  k__span_hz:
+    type: float
+    default: 10000000.0
+    unit: Hz
+  k__reference_level_dbm:
+    type: float
+    default: -20.0
+    unit: dBm
+  k__marker_1_enabled:
+    type: int
+    default: 1
 
-  marker_1_level_dbm: -50.0
+  marker_1_level_dbm:
+    type: float
+    default: -50.0
+    unit: dBm
 
 communication:
   - ascii:

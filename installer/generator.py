@@ -279,19 +279,7 @@ try {
     }
 
     if ($hasBle) {
-        if (Get-Command npm -ErrorAction SilentlyContinue) {
-            if (Get-Command spx-ble-adapter -ErrorAction SilentlyContinue) {
-                Write-Host "[spx-start] Updating BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
-                npm update -g '@simplephysx/spx-ble-adapter' | Out-Null
-            } else {
-                Write-Host "[spx-start] Installing BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
-                npm install -g '@simplephysx/spx-ble-adapter' | Out-Null
-            }
-            Write-Host "[spx-start] Starting BLE adapter on port $BleAdapterPort"
-            $bleProcess = Start-Process "spx-ble-adapter" -ArgumentList "--port", "$BleAdapterPort" -NoNewWindow -PassThru
-        } else {
-            Write-Warning "[spx-start] npm not available; skipping BLE adapter start"
-        }
+        Write-Warning "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. Skipping npm install and BLE adapter startup. Use WSL2, macOS/Linux, or an external BLE bridge."
     }
 
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null

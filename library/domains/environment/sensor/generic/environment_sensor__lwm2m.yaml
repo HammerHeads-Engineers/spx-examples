@@ -2,9 +2,10 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-# LwM2M-driven environmental sensor that registers against a Leshan server and
-# exposes temperature, humidity, and HVAC control resources over CoAP.
-# name: generic_lwm2m_environment_sensor
+name: environment_sensor__lwm2m
+description: >
+  LwM2M-driven environmental sensor that registers against a Leshan server and
+  exposes temperature, humidity, comfort, and HVAC control resources over CoAP.
 
 meta_parameters:
   lwm2m_endpoint:
@@ -21,27 +22,91 @@ meta_parameters:
     default: leshan
 
 attributes:
-  k__temperature_c: 22.5
-  ambient_c: 20.5
-  k__target_c: 22.0
-  temperature_min_c: 21.0
-  temperature_max_c: 24.5
-  k__humidity_percent: 45.0
-  humidity_target: 47.0
-  humidity_min_percent: 40.0
-  humidity_max_percent: 55.0
-  k__comfort_index: 92.0
-  k__hvac_mode: auto
-  k__fan_speed_percent: 32.0
-  k__fan_speed_target: 35.0
-  fan_speed_adjusted_target: 35.0
-  fan_slew_rate: 4.0
-  k__occupancy_count: 3.0
-  k__occupancy_target: 3.0
-  k__status_text: "IDLE"
-  current_timestamp: "2025-01-01T12:00:00Z"
-  lwm2m_connected: 0
-  lwm2m_request_counter: 0
+  # Temperature state [degC]
+  k__temperature_c:
+    type: float
+    default: 22.5
+    unit: degC
+  ambient_c:
+    type: float
+    default: 20.5
+    unit: degC
+  k__target_c:
+    type: float
+    default: 22.0
+    unit: degC
+  temperature_min_c:
+    type: float
+    default: 21.0
+    unit: degC
+  temperature_max_c:
+    type: float
+    default: 24.5
+    unit: degC
+
+  # Humidity and comfort telemetry
+  k__humidity_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  humidity_target:
+    type: float
+    default: 47.0
+    unit: percent
+  humidity_min_percent:
+    type: float
+    default: 40.0
+    unit: percent
+  humidity_max_percent:
+    type: float
+    default: 55.0
+    unit: percent
+  k__comfort_index:
+    type: float
+    default: 92.0
+    unit: score
+
+  # HVAC state and occupancy
+  k__hvac_mode:
+    type: str
+    default: "auto"
+  k__fan_speed_percent:
+    type: float
+    default: 32.0
+    unit: percent
+  k__fan_speed_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_speed_adjusted_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_slew_rate:
+    type: float
+    default: 4.0
+  k__occupancy_count:
+    type: float
+    default: 3.0
+    unit: count
+  k__occupancy_target:
+    type: float
+    default: 3.0
+    unit: count
+
+  # Status helpers
+  k__status_text:
+    type: str
+    default: "IDLE"
+  current_timestamp:
+    type: str
+    default: "2025-01-01T12:00:00Z"
+  lwm2m_connected:
+    type: int
+    default: 0
+  lwm2m_request_counter:
+    type: int
+    default: 0
 
 actions:
   - function: $in(k__temperature_c)
@@ -220,6 +285,8 @@ communication:
 
 scenarios:
   lwm2m_reconnect:
+    name: LwM2M Reconnect
+    description: Temporarily detaches the LwM2M client to exercise reconnect handling.
     duration: 3.0
     call:
       path: communication.lwm2m_client.detach

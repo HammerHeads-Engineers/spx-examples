@@ -1,41 +1,144 @@
+# SPDX-License-Identifier: MIT
+
+name: vital_signs_monitor__ble_gatt
+description: >
+  Simulated BLE GATT vital-signs wearable exposing activity-driven temperature,
+  blood pressure, heart rate, oxygen saturation, respiration, and battery
+  telemetry for mobile and firmware validation.
+
 attributes:
-  activityIntensity: 0.15
-  activityFiltered: 0.15
-  activitySmoothing: 0.35
+  # Activity state and smoothing factors
+  activityIntensity:
+    type: float
+    default: 0.15
+    unit: ratio
+  activityFiltered:
+    type: float
+    default: 0.15
+    unit: ratio
+  activitySmoothing:
+    type: float
+    default: 0.35
+    unit: ratio
 
-  bodyTemperatureC: 36.6
-  temperatureBase: 36.4
-  temperaturePeak: 38.3
-  temperatureSmoothing: 0.08
+  # Body temperature [degC]
+  bodyTemperatureC:
+    type: float
+    default: 36.6
+    unit: degC
+  temperatureBase:
+    type: float
+    default: 36.4
+    unit: degC
+  temperaturePeak:
+    type: float
+    default: 38.3
+    unit: degC
+  temperatureSmoothing:
+    type: float
+    default: 0.08
+    unit: ratio
 
-  systolicPressureMmHg: 118.0
-  systolicBase: 110.0
-  systolicPeak: 152.0
-  systolicSmoothing: 0.20
+  # Arterial pressure [mmHg]
+  systolicPressureMmHg:
+    type: float
+    default: 118.0
+    unit: mmHg
+  systolicBase:
+    type: float
+    default: 110.0
+    unit: mmHg
+  systolicPeak:
+    type: float
+    default: 152.0
+    unit: mmHg
+  systolicSmoothing:
+    type: float
+    default: 0.20
+    unit: ratio
 
-  diastolicPressureMmHg: 76.0
-  diastolicBase: 68.0
-  diastolicPeak: 92.0
-  diastolicSmoothing: 0.18
+  diastolicPressureMmHg:
+    type: float
+    default: 76.0
+    unit: mmHg
+  diastolicBase:
+    type: float
+    default: 68.0
+    unit: mmHg
+  diastolicPeak:
+    type: float
+    default: 92.0
+    unit: mmHg
+  diastolicSmoothing:
+    type: float
+    default: 0.18
+    unit: ratio
 
-  heartRateBpm: 68.0
-  heartRateBase: 55.0
-  heartRatePeak: 185.0
-  heartRateSmoothing: 0.32
+  # Heart rate [bpm]
+  heartRateBpm:
+    type: float
+    default: 68.0
+    unit: bpm
+  heartRateBase:
+    type: float
+    default: 55.0
+    unit: bpm
+  heartRatePeak:
+    type: float
+    default: 185.0
+    unit: bpm
+  heartRateSmoothing:
+    type: float
+    default: 0.32
+    unit: ratio
 
-  bloodOxygenPercent: 98.5
-  spo2Base: 99.2
-  spo2Drop: 4.5
-  spo2Smoothing: 0.22
+  # Oxygen saturation [%]
+  bloodOxygenPercent:
+    type: float
+    default: 98.5
+    unit: percent
+  spo2Base:
+    type: float
+    default: 99.2
+    unit: percent
+  spo2Drop:
+    type: float
+    default: 4.5
+    unit: percent
+  spo2Smoothing:
+    type: float
+    default: 0.22
+    unit: ratio
 
-  respirationRate: 14.0
-  respirationBase: 12.0
-  respirationPeak: 34.0
-  respirationSmoothing: 0.24
+  # Respiration [breaths/min]
+  respirationRate:
+    type: float
+    default: 14.0
+    unit: breaths_per_min
+  respirationBase:
+    type: float
+    default: 12.0
+    unit: breaths_per_min
+  respirationPeak:
+    type: float
+    default: 34.0
+    unit: breaths_per_min
+  respirationSmoothing:
+    type: float
+    default: 0.24
+    unit: ratio
 
-  batteryLevelPercent: 87.0
-  batteryDrainBase: 0.015
-  batteryDrainIntensityGain: 0.035
+  # Battery state [%]
+  batteryLevelPercent:
+    type: float
+    default: 87.0
+    unit: percent
+  batteryDrainBase:
+    type: float
+    default: 0.015
+  batteryDrainIntensityGain:
+    type: float
+    default: 0.035
 
 actions:
   - function: $in(activityFiltered)
@@ -312,36 +415,48 @@ communication:
 
 scenarios:
   deep_sleep:
+    name: Deep Sleep
+    description: Drops activity intensity to resting levels for low-vitals simulation.
     enabled: true
     duration: 10.0
     overrides:
       activityIntensity: 0.05
 
   focused_work:
+    name: Focused Work
+    description: Simulates sustained desk work with moderate physiological load.
     enabled: true
     duration: 10.0
     overrides:
       activityIntensity: 0.35
 
   brisk_walk:
+    name: Brisk Walk
+    description: Raises vital signs to a light cardio level.
     enabled: true
     duration: 10.0
     overrides:
       activityIntensity: 0.6
 
   interval_training:
+    name: Interval Training
+    description: Pushes the wearable toward near-peak exercise telemetry.
     enabled: true
     duration: 10.0
     overrides:
       activityIntensity: 0.9
 
   acute_stress_event:
+    name: Acute Stress Event
+    description: Briefly spikes vitals without reaching full workout intensity.
     enabled: true
     duration: 10.0
     overrides:
       activityIntensity: 0.8
 
   cooldown_recovery:
+    name: Cooldown Recovery
+    description: Returns the wearer toward post-exercise recovery values.
     enabled: true
     duration: 10.0
     overrides:

@@ -4,25 +4,58 @@ description: |
   set for DC voltage/current, resistance, frequency, and period measurements.
 
 attributes:
-  idn: "SIGLENT,SDM3055,SDM3055S0000000,1.01"
+  idn:
+    type: str
+    default: "SIGLENT,SDM3055,SDM3055S0000000,1.01"
 
-  k__mode: "VOLT:DC"
-  k__range_v: 10.0
-  k__range_a: 1.0
-  k__range_ohm: 1000.0
+  k__mode:
+    type: str
+    default: "VOLT:DC"
+  k__range_v:
+    type: float
+    default: 10.0
+    unit: V
+  k__range_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__range_ohm:
+    type: float
+    default: 1000.0
+    unit: ohm
 
-  voltage_dc_v: 1.234
-  current_dc_a: 0.123
-  resistance_ohm: 1000.0
-  frequency_hz: 1000.0
-  period_s: 0.001
+  voltage_dc_v:
+    type: float
+    default: 1.234
+    unit: V
+  current_dc_a:
+    type: float
+    default: 0.123
+    unit: A
+  resistance_ohm:
+    type: float
+    default: 1000.0
+    unit: ohm
+  frequency_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  period_s:
+    type: float
+    default: 0.001
+    unit: s
 
-  readback_value: 1.234
-  error_status: "0,No error"
+  readback_value:
+    type: float
+    default: 1.234
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(readback_value)
     name: update_readback
+    description: Select the active measurement register based on the configured function.
     call: |
       (lambda mode, v, i, r, f, p:
         v if mode == "VOLT:DC"

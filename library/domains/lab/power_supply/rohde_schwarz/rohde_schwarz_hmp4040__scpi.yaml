@@ -5,50 +5,147 @@ description: |
   measurement readback.
 
 attributes:
-  idn: "Rohde&Schwarz,HMP4040,0000000000,1.00"
+  idn:
+    type: str
+    default: "Rohde&Schwarz,HMP4040,0000000000,1.00"
 
-  k__selected_channel: 1
-  k__selected_voltage_set_v: 5.0
-  k__selected_current_set_a: 1.0
-  k__selected_output_state: 0
+  k__selected_channel:
+    type: int
+    default: 1
+  k__selected_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__selected_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__selected_output_state:
+    type: int
+    default: 0
 
-  cmd__apply_voltage: 0
-  cmd__apply_current: 0
-  cmd__apply_output: 0
+  cmd__apply_voltage:
+    type: int
+    default: 0
+  cmd__apply_current:
+    type: int
+    default: 0
+  cmd__apply_output:
+    type: int
+    default: 0
 
-  k__ch1_voltage_set_v: 5.0
-  k__ch1_current_set_a: 1.0
-  k__ch1_output_state: 0
-  ch1_voltage_v: 0.0
-  ch1_current_a: 0.0
-  ch1_power_w: 0.0
+  k__ch1_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch1_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch1_output_state:
+    type: int
+    default: 0
+  ch1_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch1_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch1_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  k__ch2_voltage_set_v: 5.0
-  k__ch2_current_set_a: 1.0
-  k__ch2_output_state: 0
-  ch2_voltage_v: 0.0
-  ch2_current_a: 0.0
-  ch2_power_w: 0.0
+  k__ch2_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch2_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch2_output_state:
+    type: int
+    default: 0
+  ch2_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch2_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch2_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  k__ch3_voltage_set_v: 5.0
-  k__ch3_current_set_a: 1.0
-  k__ch3_output_state: 0
-  ch3_voltage_v: 0.0
-  ch3_current_a: 0.0
-  ch3_power_w: 0.0
+  k__ch3_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch3_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch3_output_state:
+    type: int
+    default: 0
+  ch3_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch3_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch3_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  k__ch4_voltage_set_v: 5.0
-  k__ch4_current_set_a: 1.0
-  k__ch4_output_state: 0
-  ch4_voltage_v: 0.0
-  ch4_current_a: 0.0
-  ch4_power_w: 0.0
+  k__ch4_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch4_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch4_output_state:
+    type: int
+    default: 0
+  ch4_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch4_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch4_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  selected_voltage_v: 0.0
-  selected_current_a: 0.0
-  selected_power_w: 0.0
+  selected_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  selected_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  selected_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  error_status: "0,No error"
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(k__selected_voltage_set_v)

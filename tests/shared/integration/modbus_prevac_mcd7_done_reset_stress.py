@@ -2,7 +2,7 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-"""Shared stress test mirroring spx-server case: start should clear measure_done on every cycle."""
+"""Shared stress test for the Prevac MCD7 model: start should clear measure_done on every cycle."""
 
 import os
 import unittest
@@ -10,9 +10,9 @@ import unittest
 from tests.common.modbus_utils import wait_for_modbus_endpoint
 from tests.common.spx_utils import bootstrap_model_instance, wait_for_condition, wait_seconds
 from tests.common.repo import repo_root
-from tests.devices.modbus_vacuum_gauge_multichannel_sut_example import (
+from tests.devices.modbus_prevac_mcd7_sut_example import (
     ModbusTcpClient,
-    ModbusVacuumGaugeMultichannelSUTExample,
+    ModbusPrevacMCD7SUTExample,
 )
 
 
@@ -21,16 +21,17 @@ MODEL_PATH = (
     ROOT
     / "library"
     / "domains"
-    / "vacuum_systems"
-    / "generic"
-    / "vacuum_gauge_multichannel__modbus.yaml"
+    / "lab"
+    / "detector"
+    / "prevac"
+    / "prevac_mcd7__modbus.yaml"
 )
-MODEL_KEY = "tests__vacuum_gauge_multichannel"
-INSTANCE_KEY = "generic_vacuum_gauge_multichannel"
+MODEL_KEY = "tests__prevac_mcd7"
+INSTANCE_KEY = "prevac_mcd7"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 
-class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
+class TestModbusPrevacMCD7DoneResetStress(unittest.TestCase):
     """Run 1000 short dwell cycles to mirror the spx-server regression test."""
 
     @classmethod
@@ -103,7 +104,7 @@ class TestModbusVacuumGaugeDoneResetStress(unittest.TestCase):
         except TimeoutError as exc:
             self.skipTest(str(exc))
 
-        self.sut = ModbusVacuumGaugeMultichannelSUTExample(
+        self.sut = ModbusPrevacMCD7SUTExample(
             host="127.0.0.1", port=port, unit_id=unit_id, timeout=1.0
         )
         if not wait_for_condition(lambda: self.sut.connect(), timeout=5.0, interval=0.2):

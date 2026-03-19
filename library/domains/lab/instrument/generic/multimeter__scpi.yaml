@@ -1,4 +1,4 @@
-name: generic_scpi_multimeter
+name: multimeter__scpi
 description: |
   Virtual SCPI multimeter providing a compact set of measurement and
   configuration commands for integration testing. The model exposes core
@@ -6,11 +6,25 @@ description: |
   ASCII protocol.
 
 attributes:
-  voltage: 0.0
-  current: 0.0
-  resistance: 1000.0
-  frequency: 50.0
-  measurement_mode: voltage
+  voltage:
+    type: float
+    default: 0.0
+    unit: V
+  current:
+    type: float
+    default: 0.0
+    unit: A
+  resistance:
+    type: float
+    default: 1000.0
+    unit: ohm
+  frequency:
+    type: float
+    default: 50.0
+    unit: Hz
+  measurement_mode:
+    type: str
+    default: "voltage"
 
 communication:
   ascii:
@@ -37,6 +51,7 @@ communication:
 
 scenarios:
   voltage_static:
+    name: Voltage Static
     enabled: true
     description: |
       Slews the measured voltage toward a target value using a bounded
@@ -51,6 +66,8 @@ scenarios:
         mode: proportional
 
   ascii_disconnect:
+    name: ASCII Disconnect
+    description: Temporarily detaches the ASCII transport to exercise reconnect handling.
     enabled: true
     duration: 2.0
     call:
@@ -58,12 +75,16 @@ scenarios:
       stop_path: communication.ascii.attach
 
   ascii_response_delay_spike:
+    name: ASCII Response Delay Spike
+    description: Increases response latency to emulate an overloaded instrument.
     enabled: true
     duration: 5.0
     overrides:
       communication.ascii.response_delay: 10.0
 
   discharge_spike:
+    name: Discharge Spike
+    description: Forces a one-shot voltage spike to emulate a transient event.
     enabled: true
     run_limit: 1
     overrides:

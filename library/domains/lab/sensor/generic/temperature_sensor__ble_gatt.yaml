@@ -1,6 +1,19 @@
+# SPDX-License-Identifier: MIT
+
+name: temperature_sensor__ble_gatt
+description: >
+  Minimal BLE GATT temperature sensor exposing a measured temperature together
+  with a writable setpoint characteristic for mobile-app or firmware tests.
+
 attributes:
-  temperature: 22.5
-  setpoint: 24.0
+  temperature:
+    type: float
+    default: 22.5
+    unit: degC
+  setpoint:
+    type: float
+    default: 24.0
+    unit: degC
 
 communication:
   - ble:

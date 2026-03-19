@@ -4,37 +4,82 @@ description: |
   exposing basic waveform and output SCPI commands over ASCII/TCP.
 
 attributes:
-  idn: "SIGLENT,SDG1032X,SDG1X00000000,1.01"
+  idn:
+    type: str
+    default: "SIGLENT,SDG1032X,SDG1X00000000,1.01"
 
-  k__ch1_waveform: "SINE"
-  k__ch1_frequency_hz: 1000.0
-  k__ch1_amplitude_vpp: 2.0
-  k__ch1_offset_v: 0.0
-  k__ch1_output_state: "OFF"
+  k__ch1_waveform:
+    type: str
+    default: "SINE"
+  k__ch1_frequency_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  k__ch1_amplitude_vpp:
+    type: float
+    default: 2.0
+    unit: Vpp
+  k__ch1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__ch1_output_state:
+    type: str
+    default: "OFF"
 
-  k__ch2_waveform: "SINE"
-  k__ch2_frequency_hz: 1000.0
-  k__ch2_amplitude_vpp: 2.0
-  k__ch2_offset_v: 0.0
-  k__ch2_output_state: "OFF"
+  k__ch2_waveform:
+    type: str
+    default: "SINE"
+  k__ch2_frequency_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  k__ch2_amplitude_vpp:
+    type: float
+    default: 2.0
+    unit: Vpp
+  k__ch2_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__ch2_output_state:
+    type: str
+    default: "OFF"
 
-  ch1_period_s: 0.001
-  ch2_period_s: 0.001
-  ch1_basic_wave_status: "C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,2V,OFST,0V"
-  ch2_basic_wave_status: "C2:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,2V,OFST,0V"
-  ch1_output_status: "C1:OUTP OFF,LOAD,HZ,PLRT,NOR"
-  ch2_output_status: "C2:OUTP OFF,LOAD,HZ,PLRT,NOR"
+  ch1_period_s:
+    type: float
+    default: 0.001
+    unit: s
+  ch2_period_s:
+    type: float
+    default: 0.001
+    unit: s
+  ch1_basic_wave_status:
+    type: str
+    default: "C1:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,2V,OFST,0V"
+  ch2_basic_wave_status:
+    type: str
+    default: "C2:BSWV WVTP,SINE,FRQ,1000HZ,PERI,0.001S,AMP,2V,OFST,0V"
+  ch1_output_status:
+    type: str
+    default: "C1:OUTP OFF,LOAD,HZ,PLRT,NOR"
+  ch2_output_status:
+    type: str
+    default: "C2:OUTP OFF,LOAD,HZ,PLRT,NOR"
 
 actions:
   - function: $in(ch1_period_s)
     name: update_ch1_period
+    description: Convert channel 1 frequency into period for status reporting.
     call: (1.0 / $in(k__ch1_frequency_hz) if $in(k__ch1_frequency_hz) > 0.0 else 0.0)
   - function: $in(ch2_period_s)
     name: update_ch2_period
+    description: Convert channel 2 frequency into period for status reporting.
     call: (1.0 / $in(k__ch2_frequency_hz) if $in(k__ch2_frequency_hz) > 0.0 else 0.0)
 
   - function: $in(ch1_basic_wave_status)
     name: update_ch1_basic_wave_status
+    description: Render the channel 1 waveform configuration into the SDG status string.
     call: |
       "C1:BSWV WVTP,{wave},FRQ,{freq}HZ,PERI,{period}S,AMP,{amp}V,OFST,{offset}V".format(
         wave=$in(k__ch1_waveform),
@@ -45,6 +90,7 @@ actions:
       )
   - function: $in(ch2_basic_wave_status)
     name: update_ch2_basic_wave_status
+    description: Render the channel 2 waveform configuration into the SDG status string.
     call: |
       "C2:BSWV WVTP,{wave},FRQ,{freq}HZ,PERI,{period}S,AMP,{amp}V,OFST,{offset}V".format(
         wave=$in(k__ch2_waveform),
@@ -56,10 +102,12 @@ actions:
 
   - function: $in(ch1_output_status)
     name: update_ch1_output_status
+    description: Mirror the channel 1 output state in the SCPI status response.
     call: |
       "C1:OUTP {state},LOAD,HZ,PLRT,NOR".format(state=$in(k__ch1_output_state))
   - function: $in(ch2_output_status)
     name: update_ch2_output_status
+    description: Mirror the channel 2 output state in the SCPI status response.
     call: |
       "C2:OUTP {state},LOAD,HZ,PLRT,NOR".format(state=$in(k__ch2_output_state))
 
