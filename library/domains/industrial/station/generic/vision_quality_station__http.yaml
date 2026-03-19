@@ -2,22 +2,56 @@
 
 name: vision_quality_station__http
 description: |
-  Simple vision/quality inspection station. Exposes HTTP endpoints for fetching
-  inspection statistics and simulating new inspection results. Useful for
-  Industry 4.0 quality dashboards and scrap analysis.
+  Simple vision and quality inspection station. Exposes HTTP endpoints for
+  fetching inspection statistics and simulating new inspection results for
+  Industry 4.0 dashboards and scrap analysis.
+
+meta_parameters:
+  http_host:
+    type: str
+    default: "0.0.0.0"
+  http_port:
+    type: int
+    default: 8093
 
 attributes:
-  ok_count: 0
-  nok_count: 0
-  last_result: ok          # ok / nok
-  last_defect_code: none
-  last_part_id: ""
-  sample_queued: 0
+  ok_count:
+    type: int
+    default: 0
+    unit: count
+  nok_count:
+    type: int
+    default: 0
+    unit: count
+  last_result:
+    type: str
+    default: "ok"
+  last_defect_code:
+    type: str
+    default: "none"
+  last_part_id:
+    type: str
+    default: ""
+  sample_queued:
+    type: int
+    default: 0
 
-  defect_count_none: 0
-  defect_count_scratch: 0
-  defect_count_dent: 0
-  defect_count_offset: 0
+  defect_count_none:
+    type: int
+    default: 0
+    unit: count
+  defect_count_scratch:
+    type: int
+    default: 0
+    unit: count
+  defect_count_dent:
+    type: int
+    default: 0
+    unit: count
+  defect_count_offset:
+    type: int
+    default: 0
+    unit: count
 
 actions:
   - function: $in(ok_count)
@@ -76,8 +110,8 @@ actions:
 
 communication:
   - http_endpoint:
-      host: 0.0.0.0
-      port: 8093
+      host: "$param(http_host)"
+      port: "$param(http_port)"
       endpoints:
         "/v1/inspection/stats":
           method: GET
@@ -109,6 +143,8 @@ communication:
 scenarios:
   steady_ok_run:
     enabled: true
+    display_name: "Steady OK Run"
+    description: Continuously queue accepted parts without defects.
     duration: 20.0
     overrides:
       $in(sample_queued): 1
@@ -117,6 +153,8 @@ scenarios:
 
   defect_burst:
     enabled: true
+    display_name: "Defect Burst"
+    description: Queue a burst of NOK parts with scratch defects.
     duration: 12.0
     overrides:
       $in(sample_queued): 1
@@ -126,6 +164,8 @@ scenarios:
 
   maintenance_pause:
     enabled: true
+    display_name: "Maintenance Pause"
+    description: Pause sample intake while clearing back to a nominal OK state.
     duration: 15.0
     overrides:
       $in(sample_queued): 0

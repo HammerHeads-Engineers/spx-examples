@@ -16,57 +16,169 @@ meta_parameters:
     default: 1
 
 attributes:
-  k__load_kw: 12.0
-  k__power_factor: 0.96
-  k__voltage_nominal_v: 230.0
-  k__frequency_nominal_hz: 50.0
-  power_factor_leading: 0
+  k__load_kw:
+    type: float
+    default: 12.0
+    unit: kW
+  k__power_factor:
+    type: float
+    default: 0.96
+    unit: ratio
+  k__voltage_nominal_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__frequency_nominal_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  power_factor_leading:
+    type: int
+    default: 0
 
-  voltage_drop_per_kw: 0.35
-  voltage_floor_v: 200.0
-  voltage_ceiling_v: 245.0
+  voltage_drop_per_kw:
+    type: float
+    default: 0.35
+    unit: V/kW
+  voltage_floor_v:
+    type: float
+    default: 200.0
+    unit: V
+  voltage_ceiling_v:
+    type: float
+    default: 245.0
+    unit: V
 
-  frequency_droop_per_kw: 0.02
-  frequency_floor_hz: 47.5
-  frequency_ceiling_hz: 52.0
+  frequency_droop_per_kw:
+    type: float
+    default: 0.02
+    unit: Hz/kW
+  frequency_floor_hz:
+    type: float
+    default: 47.5
+    unit: Hz
+  frequency_ceiling_hz:
+    type: float
+    default: 52.0
+    unit: Hz
 
-  voltage_system_v: 0.0
-  voltage_l1_v: 0.0
-  voltage_l2_v: 0.0
-  voltage_l3_v: 0.0
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
+  voltage_system_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l1_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l1_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_l1_v:
+    type: float
+    default: 0.0
+    unit: V
 
-  current_l1_a: 0.0
-  current_l2_a: 0.0
-  current_l3_a: 0.0
-  current_avg_a: 0.0
+  current_l1_a:
+    type: float
+    default: 0.0
+    unit: A
+  current_l2_a:
+    type: float
+    default: 0.0
+    unit: A
+  current_l3_a:
+    type: float
+    default: 0.0
+    unit: A
+  current_avg_a:
+    type: float
+    default: 0.0
+    unit: A
 
-  active_power_total_kw: 0.0
-  reactive_power_total_kvar: 0.0
-  apparent_power_total_kva: 0.0
-  frequency_hz: 0.0
-  power_factor_total: 0.0
+  active_power_total_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  reactive_power_total_kvar:
+    type: float
+    default: 0.0
+    unit: kVAR
+  apparent_power_total_kva:
+    type: float
+    default: 0.0
+    unit: kVA
+  frequency_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  power_factor_total:
+    type: float
+    default: 0.0
+    unit: ratio
 
-  voltage_system_raw: 0
-  voltage_l1_raw: 0
-  voltage_l2_raw: 0
-  voltage_l3_raw: 0
-  voltage_l1_l2_raw: 0
-  voltage_l2_l3_raw: 0
-  voltage_l3_l1_raw: 0
+  voltage_system_raw:
+    type: int
+    default: 0
+  voltage_l1_raw:
+    type: int
+    default: 0
+  voltage_l2_raw:
+    type: int
+    default: 0
+  voltage_l3_raw:
+    type: int
+    default: 0
+  voltage_l1_l2_raw:
+    type: int
+    default: 0
+  voltage_l2_l3_raw:
+    type: int
+    default: 0
+  voltage_l3_l1_raw:
+    type: int
+    default: 0
 
-  current_total_raw: 0
-  current_l1_raw: 0
-  current_l2_raw: 0
-  current_l3_raw: 0
+  current_total_raw:
+    type: int
+    default: 0
+  current_l1_raw:
+    type: int
+    default: 0
+  current_l2_raw:
+    type: int
+    default: 0
+  current_l3_raw:
+    type: int
+    default: 0
 
-  active_power_total_raw: 0
-  reactive_power_total_raw: 0
-  apparent_power_total_raw: 0
-  frequency_raw: 0
-  power_factor_total_raw: 0
+  active_power_total_raw:
+    type: int
+    default: 0
+  reactive_power_total_raw:
+    type: int
+    default: 0
+  apparent_power_total_raw:
+    type: int
+    default: 0
+  frequency_raw:
+    type: int
+    default: 0
+  power_factor_total_raw:
+    type: int
+    default: 0
 
 actions:
   - function: $in(voltage_system_v)
@@ -276,6 +388,7 @@ communication:
 
 scenarios:
   nominal_load:
+    display_name: "Nominal Load"
     description: Balanced nominal load at high power factor.
     duration: 30.0
     overrides:
@@ -283,6 +396,7 @@ scenarios:
       $in(k__power_factor): 0.98
 
   overload:
+    display_name: "Overload"
     description: Elevated load with voltage sag.
     duration: 25.0
     overrides:
@@ -291,6 +405,7 @@ scenarios:
       $in(voltage_drop_per_kw): 0.6
 
   low_power_factor:
+    display_name: "Low Power Factor"
     description: Inductive load with low power factor.
     duration: 30.0
     overrides:
@@ -299,6 +414,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   recovery:
+    display_name: "Recovery"
     description: Return to lighter load and nominal voltage.
     duration: 20.0
     overrides:

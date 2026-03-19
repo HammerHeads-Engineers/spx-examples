@@ -16,56 +16,157 @@ meta_parameters:
 
 attributes:
   # Phase measurements
-  k__phase_l1_current_a: 7.8
-  k__phase_l1_voltage_v: 230.0
-  k__phase_l1_power_kw: 1.8
-  k__phase_l1_apparent_power_kva: 1.95
+  k__phase_l1_current_a:
+    type: float
+    default: 7.8
+    unit: A
+  k__phase_l1_voltage_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__phase_l1_power_kw:
+    type: float
+    default: 1.8
+    unit: kW
+  k__phase_l1_apparent_power_kva:
+    type: float
+    default: 1.95
+    unit: kVA
 
-  k__phase_l2_current_a: 7.5
-  k__phase_l2_voltage_v: 229.0
-  k__phase_l2_power_kw: 1.7
-  k__phase_l2_apparent_power_kva: 1.9
+  k__phase_l2_current_a:
+    type: float
+    default: 7.5
+    unit: A
+  k__phase_l2_voltage_v:
+    type: float
+    default: 229.0
+    unit: V
+  k__phase_l2_power_kw:
+    type: float
+    default: 1.7
+    unit: kW
+  k__phase_l2_apparent_power_kva:
+    type: float
+    default: 1.9
+    unit: kVA
 
-  k__phase_l3_current_a: 7.7
-  k__phase_l3_voltage_v: 231.0
-  k__phase_l3_power_kw: 1.75
-  k__phase_l3_apparent_power_kva: 1.93
+  k__phase_l3_current_a:
+    type: float
+    default: 7.7
+    unit: A
+  k__phase_l3_voltage_v:
+    type: float
+    default: 231.0
+    unit: V
+  k__phase_l3_power_kw:
+    type: float
+    default: 1.75
+    unit: kW
+  k__phase_l3_apparent_power_kva:
+    type: float
+    default: 1.93
+    unit: kVA
 
   # Derived device totals
-  device_real_load_power_kw: 0.0
-  device_apparent_load_power_kva: 0.0
-  device_power_factor: 0.0
-  device_energy_kwh: 0.0
-  device_state: 2
-  device_peak_power_kw: 0.0
+  device_real_load_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  device_apparent_load_power_kva:
+    type: float
+    default: 0.0
+    unit: kVA
+  device_power_factor:
+    type: float
+    default: 0.0
+    unit: ratio
+  device_energy_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  device_state:
+    type: int
+    default: 2
+  device_peak_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
 
   # Register-scaled raw values
-  device_real_load_power_raw: 0
-  device_apparent_load_power_raw: 0
-  device_power_factor_raw: 0
-  device_energy_raw: 0
-  device_state_raw: 2
-  device_peak_power_raw: 0
+  device_real_load_power_raw:
+    type: int
+    default: 0
+  device_apparent_load_power_raw:
+    type: int
+    default: 0
+  device_power_factor_raw:
+    type: int
+    default: 0
+  device_energy_raw:
+    type: int
+    default: 0
+  device_state_raw:
+    type: int
+    default: 2
+  device_peak_power_raw:
+    type: int
+    default: 0
 
-  phase_l1_current_raw: 0
-  phase_l1_voltage_raw: 0
-  phase_l1_power_raw: 0
-  phase_l1_apparent_power_raw: 0
+  phase_l1_current_raw:
+    type: int
+    default: 0
+  phase_l1_voltage_raw:
+    type: int
+    default: 0
+  phase_l1_power_raw:
+    type: int
+    default: 0
+  phase_l1_apparent_power_raw:
+    type: int
+    default: 0
 
-  phase_l2_current_raw: 0
-  phase_l2_voltage_raw: 0
-  phase_l2_power_raw: 0
-  phase_l2_apparent_power_raw: 0
+  phase_l2_current_raw:
+    type: int
+    default: 0
+  phase_l2_voltage_raw:
+    type: int
+    default: 0
+  phase_l2_power_raw:
+    type: int
+    default: 0
+  phase_l2_apparent_power_raw:
+    type: int
+    default: 0
 
-  phase_l3_current_raw: 0
-  phase_l3_voltage_raw: 0
-  phase_l3_power_raw: 0
-  phase_l3_apparent_power_raw: 0
+  phase_l3_current_raw:
+    type: int
+    default: 0
+  phase_l3_voltage_raw:
+    type: int
+    default: 0
+  phase_l3_power_raw:
+    type: int
+    default: 0
+  phase_l3_apparent_power_raw:
+    type: int
+    default: 0
 
-  low_load_threshold_kw: 2.0
-  near_overload_threshold_kw: 7.0
-  overload_threshold_kw: 8.5
-  _cycle_time_s: 1.0
+  low_load_threshold_kw:
+    type: float
+    default: 2.0
+    unit: kW
+  near_overload_threshold_kw:
+    type: float
+    default: 7.0
+    unit: kW
+  overload_threshold_kw:
+    type: float
+    default: 8.5
+    unit: kW
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(device_real_load_power_kw)
@@ -213,6 +314,7 @@ communication:
 
 scenarios:
   balanced_load:
+    display_name: "Balanced Load"
     description: Balanced three-phase load at nominal voltage.
     duration: 30.0
     overrides:
@@ -227,6 +329,7 @@ scenarios:
       $in(k__phase_l3_apparent_power_kva): 1.85
 
   overload_event:
+    display_name: "Overload Event"
     description: High power draw that crosses overload threshold.
     duration: 20.0
     overrides:
@@ -241,6 +344,7 @@ scenarios:
       $in(k__phase_l3_apparent_power_kva): 3.1
 
   low_load:
+    display_name: "Low Load"
     description: Light load with power reduction on all phases.
     duration: 20.0
     overrides:

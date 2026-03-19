@@ -2,23 +2,47 @@
 
 name: io_module__modbus
 description: |
-  Simple remote I/O module exposing digital inputs/outputs and analog inputs
-  over Modbus. Useful for testing PLC mappings and edge gateways.
+  Simple remote I/O module exposing digital inputs, digital outputs, and analog
+  inputs over Modbus. Useful for testing PLC mappings and edge gateways.
 
 attributes:
-  di_1: 0
-  di_2: 0
-  di_3: 0
-  di_4: 0
-  do_1: 0
-  do_2: 0
-  do_3: 0
-  do_4: 0
+  di_1:
+    type: int
+    default: 0
+  di_2:
+    type: int
+    default: 0
+  di_3:
+    type: int
+    default: 0
+  di_4:
+    type: int
+    default: 0
+  do_1:
+    type: int
+    default: 0
+  do_2:
+    type: int
+    default: 0
+  do_3:
+    type: int
+    default: 0
+  do_4:
+    type: int
+    default: 0
 
-  ai_1: 0.0   # e.g., 4-20 mA scaled engineering value
-  ai_2: 0.0
-  ai_3: 0.0
-  ai_4: 0.0
+  ai_1:
+    type: float
+    default: 0.0
+  ai_2:
+    type: float
+    default: 0.0
+  ai_3:
+    type: float
+    default: 0.0
+  ai_4:
+    type: float
+    default: 0.0
 
 communication:
   - modbus_tcp:
@@ -40,6 +64,8 @@ communication:
 scenarios:
   all_clear:
     enabled: true
+    display_name: "All Clear"
+    description: Hold all digital channels low with low analog signal levels.
     duration: 15.0
     overrides:
       $in(di_1): 0
@@ -57,6 +83,8 @@ scenarios:
 
   alarm_trip:
     enabled: true
+    display_name: "Alarm Trip"
+    description: Assert alarm-style digital states and high analog inputs.
     duration: 8.0
     overrides:
       $in(di_1): 1
@@ -74,6 +102,8 @@ scenarios:
 
   analog_ramp_high:
     enabled: true
+    display_name: "Analog Ramp High"
+    description: Drive multiple analog inputs into a higher operating range.
     duration: 20.0
     overrides:
       $in(di_1): 0
@@ -91,6 +121,8 @@ scenarios:
 
   maintenance_loopback:
     enabled: true
+    display_name: "Maintenance Loopback"
+    description: Mirror alternating digital states for loopback and maintenance checks.
     duration: 25.0
     overrides:
       $in(di_1): 1

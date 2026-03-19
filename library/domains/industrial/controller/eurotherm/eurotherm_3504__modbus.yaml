@@ -17,43 +17,130 @@ description: |
     - 273 Loop.1.Main.AutoMan (0=Auto, 1=Manual)
     - 556 Loop.1.OP.ManualMode (0=track, 1=step, 2=lastMOP)
 
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5027
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
-  pressure_bar: 1.0
-  pressure_sp_bar: 1.5
-  pressure_sp_working_bar: 1.5
-  control_out_pct: 0.0
-  manual_out_pct: 0.0
-  ch1_out_pct: 0.0
-  auto_man: 0
-  manual_mode: 0
+  pressure_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressure_sp_bar:
+    type: float
+    default: 1.5
+    unit: bar
+  pressure_sp_working_bar:
+    type: float
+    default: 1.5
+    unit: bar
+  control_out_pct:
+    type: float
+    default: 0.0
+    unit: percent
+  manual_out_pct:
+    type: float
+    default: 0.0
+    unit: percent
+  ch1_out_pct:
+    type: float
+    default: 0.0
+    unit: percent
+  auto_man:
+    type: int
+    default: 0
+  manual_mode:
+    type: int
+    default: 0
 
-  ambient_pressure_bar: 1.0
-  pressurize_coeff: 0.25
-  leak_coeff: 0.03
-  power_gain: 1.5
-  power_integral: 0.0
-  power_integral_gain: 0.2
-  power_integral_leak: 0.05
-  power_derivative: 0.0
-  power_derivative_gain: 0.8
-  power_error_prev: 0.0
+  ambient_pressure_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressurize_coeff:
+    type: float
+    default: 0.25
+  leak_coeff:
+    type: float
+    default: 0.03
+  power_gain:
+    type: float
+    default: 1.5
+  power_integral:
+    type: float
+    default: 0.0
+  power_integral_gain:
+    type: float
+    default: 0.2
+  power_integral_leak:
+    type: float
+    default: 0.05
+  power_derivative:
+    type: float
+    default: 0.0
+  power_derivative_gain:
+    type: float
+    default: 0.8
+  power_error_prev:
+    type: float
+    default: 0.0
 
-  pressure_min_bar: 0.0
-  pressure_max_bar: 10.0
-  sp_min_bar: 0.0
-  sp_max_bar: 10.0
-  out_min: 0.0
-  out_max: 100.0
-  scale_0p1: 10.0
+  pressure_min_bar:
+    type: float
+    default: 0.0
+    unit: bar
+  pressure_max_bar:
+    type: float
+    default: 10.0
+    unit: bar
+  sp_min_bar:
+    type: float
+    default: 0.0
+    unit: bar
+  sp_max_bar:
+    type: float
+    default: 10.0
+    unit: bar
+  out_min:
+    type: float
+    default: 0.0
+    unit: percent
+  out_max:
+    type: float
+    default: 100.0
+    unit: percent
+  scale_0p1:
+    type: float
+    default: 10.0
 
-  pv_raw: 250
-  target_sp_raw: 300
-  working_sp_raw: 300
-  active_out_raw: 0
-  manual_out_raw: 0
-  ch1_out_raw: 0
-  auto_man_raw: 0
-  manual_mode_raw: 0
+  pv_raw:
+    type: int
+    default: 250
+  target_sp_raw:
+    type: int
+    default: 300
+  working_sp_raw:
+    type: int
+    default: 300
+  active_out_raw:
+    type: int
+    default: 0
+  manual_out_raw:
+    type: int
+    default: 0
+  ch1_out_raw:
+    type: int
+    default: 0
+  auto_man_raw:
+    type: int
+    default: 0
+  manual_mode_raw:
+    type: int
+    default: 0
 
 actions:
   - function: $in(auto_man)
@@ -184,8 +271,8 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5027
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         pv_raw:          { address: [1,1],   group: h_r, type: uint_16 }
@@ -200,6 +287,8 @@ communication:
 scenarios:
   auto_pressurize:
     enabled: true
+    display_name: "Auto Pressurize"
+    description: Run the loop in auto mode and step the pressure setpoint upward.
     duration: 20.0
     overrides:
       $in(auto_man_raw): 0
@@ -208,6 +297,8 @@ scenarios:
 
   auto_depressurize:
     enabled: true
+    display_name: "Auto Depressurize"
+    description: Run the loop in auto mode and lower the target pressure.
     duration: 18.0
     overrides:
       $in(auto_man_raw): 0
@@ -215,6 +306,8 @@ scenarios:
 
   manual_hold_40:
     enabled: true
+    display_name: "Manual Hold 40%"
+    description: Switch to manual mode and hold a fixed 40 percent output command.
     duration: 15.0
     overrides:
       $in(auto_man_raw): 1

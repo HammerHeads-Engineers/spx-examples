@@ -11,23 +11,66 @@ description: |
     - 40102  ZSW1 status word (basic bits)
     - 40103  Actual speed (Hz)
 
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5028
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
-  control_word_raw: 0
-  speed_setpoint_raw: 0
-  status_word_raw: 0
-  speed_actual_raw: 0
+  control_word_raw:
+    type: int
+    default: 0
+  speed_setpoint_raw:
+    type: int
+    default: 0
+  status_word_raw:
+    type: int
+    default: 0
+  speed_actual_raw:
+    type: int
+    default: 0
 
-  speed_setpoint_hz: 0.0
-  speed_actual_hz: 0.0
-  run_enable: 0
-  direction: 1
-  fault_active: 0
+  speed_setpoint_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  speed_actual_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  run_enable:
+    type: int
+    default: 0
+  direction:
+    type: int
+    default: 1
+  fault_active:
+    type: int
+    default: 0
 
-  speed_max_hz: 60.0
-  speed_dev_hz: 0.5
-  accel_ramp_s: 2.0
-  decel_ramp_s: 3.0
-  cycle_time_s: 0.1
+  speed_max_hz:
+    type: float
+    default: 60.0
+    unit: Hz
+  speed_dev_hz:
+    type: float
+    default: 0.5
+    unit: Hz
+  accel_ramp_s:
+    type: float
+    default: 2.0
+    unit: s
+  decel_ramp_s:
+    type: float
+    default: 3.0
+    unit: s
+  cycle_time_s:
+    type: float
+    default: 0.1
+    unit: s
 
 actions:
   - function: $in(speed_setpoint_hz)
@@ -100,8 +143,8 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5028
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         control_word_raw:     { address: [40100,40100], group: h_r, type: uint_16 }

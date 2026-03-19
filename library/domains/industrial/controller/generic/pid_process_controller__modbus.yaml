@@ -3,33 +3,74 @@
 name: pid_process_controller__modbus
 description: |
   Generic PID process controller for a single-loop process variable exposed
-  via Modbus. Represents typical industrial temperature/pressure/level loops.
+  via Modbus. Represents typical industrial temperature, pressure, or level loops.
 
 attributes:
-  pv: 0.0           # process variable
-  sp: 1.0           # setpoint
-  cv: 0.0           # controller output 0..100
+  pv:
+    type: float
+    default: 0.0
+  sp:
+    type: float
+    default: 1.0
+  cv:
+    type: float
+    default: 0.0
+    unit: percent
 
-  k_p: 2.0
-  k_i: 0.5
-  k_d: 0.0
+  k_p:
+    type: float
+    default: 2.0
+  k_i:
+    type: float
+    default: 0.5
+  k_d:
+    type: float
+    default: 0.0
 
-  i_term: 0.0
-  d_term: 0.0
-  error_prev: 0.0
+  i_term:
+    type: float
+    default: 0.0
+  d_term:
+    type: float
+    default: 0.0
+  error_prev:
+    type: float
+    default: 0.0
 
-  output_min: 0.0
-  output_max: 100.0
+  output_min:
+    type: float
+    default: 0.0
+    unit: percent
+  output_max:
+    type: float
+    default: 100.0
+    unit: percent
 
-  mode_auto: 1      # 1=auto, 0=manual
-  manual_cv: 0.0
+  mode_auto:
+    type: int
+    default: 1
+  manual_cv:
+    type: float
+    default: 0.0
+    unit: percent
 
-  alarm_high: 0
-  alarm_low: 0
-  alarm_high_limit: 1.2
-  alarm_low_limit: -0.2
+  alarm_high:
+    type: int
+    default: 0
+  alarm_low:
+    type: int
+    default: 0
+  alarm_high_limit:
+    type: float
+    default: 1.2
+  alarm_low_limit:
+    type: float
+    default: -0.2
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(i_term)
@@ -94,6 +135,8 @@ communication:
 scenarios:
   setpoint_step_up:
     enabled: true
+    display_name: "Setpoint Step Up"
+    description: Apply a positive setpoint step while staying in auto mode.
     duration: 12.0
     overrides:
       $in(sp): 3.0
@@ -101,6 +144,8 @@ scenarios:
 
   load_disturbance:
     enabled: true
+    display_name: "Load Disturbance"
+    description: Push the process variable away from the setpoint to test disturbance rejection.
     duration: 10.0
     overrides:
       $in(pv): 1.6
@@ -109,6 +154,8 @@ scenarios:
 
   manual_bump_test:
     enabled: true
+    display_name: "Manual Bump Test"
+    description: Switch to manual mode and hold a fixed controller output.
     duration: 8.0
     overrides:
       $in(mode_auto): 0

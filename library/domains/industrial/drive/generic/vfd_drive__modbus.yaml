@@ -7,20 +7,49 @@ description: |
   simple PLC integrations.
 
 attributes:
-  enable: 1                 # 1 = enabled
-  speed_set_rpm: 1500.0     # commanded speed [rpm]
-  speed_actual_rpm: 0.0     # feedback speed [rpm]
-  torque_percent: 0.0       # load torque [%]
-  torque_limit_percent: 120.0
+  enable:
+    type: int
+    default: 1
+  speed_set_rpm:
+    type: float
+    default: 1500.0
+    unit: rpm
+  speed_actual_rpm:
+    type: float
+    default: 0.0
+    unit: rpm
+  torque_percent:
+    type: float
+    default: 0.0
+    unit: percent
+  torque_limit_percent:
+    type: float
+    default: 120.0
+    unit: percent
 
-  accel_ramp_s: 2.0         # accel time from 0..100% [s]
-  decel_ramp_s: 3.0         # decel time [s]
+  accel_ramp_s:
+    type: float
+    default: 2.0
+    unit: s
+  decel_ramp_s:
+    type: float
+    default: 3.0
+    unit: s
 
-  alarm_overload: 0         # torque overload alarm
-  alarm_drive_fault: 0      # generic drive fault
-  status_word: 0            # encoded state bits
+  alarm_overload:
+    type: int
+    default: 0
+  alarm_drive_fault:
+    type: int
+    default: 0
+  status_word:
+    type: int
+    default: 0
 
-  cycle_time_s: 0.1         # integration step
+  cycle_time_s:
+    type: float
+    default: 0.1
+    unit: s
 
 actions:
   - function: $in(speed_actual_rpm)
@@ -86,6 +115,8 @@ communication:
 scenarios:
   speed_step_profile:
     enabled: true
+    display_name: "Speed Step Profile"
+    description: Apply a higher speed command with quicker ramps for commissioning checks.
     duration: 25.0
     overrides:
       $in(enable): 1
@@ -95,6 +126,8 @@ scenarios:
 
   torque_overload:
     enabled: true
+    display_name: "Torque Overload"
+    description: Increase speed while reducing torque headroom to trigger overload handling.
     duration: 15.0
     overrides:
       $in(enable): 1
@@ -103,6 +136,8 @@ scenarios:
 
   emergency_stop_fault:
     enabled: true
+    display_name: "Emergency Stop Fault"
+    description: Force a rapid deceleration that mimics an emergency-stop event.
     duration: 10.0
     overrides:
       $in(enable): 1

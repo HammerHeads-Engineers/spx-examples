@@ -1,69 +1,113 @@
 # SPDX-License-Identifier: MIT
-# Advanced thermal controller without protocol bindings.
-# Uses FunctionAction imports/params to reduce duplication and improve physics fidelity.
+
+name: thermal_controller_advanced
+description: |
+  Advanced thermal controller twin without protocol bindings. Uses reusable
+  action params and helper imports to model actuator lag, thermal inertia, and
+  overload behavior for richer process-control demos.
+
 attributes:
-  # core state
-  temperature: 25.0
-  setpoint: 30.0
-  ambient: 22.0
-  power_on: 1
+  temperature:
+    type: float
+    default: 25.0
+    unit: degC
+  setpoint:
+    type: float
+    default: 30.0
+    unit: degC
+  ambient:
+    type: float
+    default: 22.0
+    unit: degC
+  power_on:
+    type: int
+    default: 1
 
-  # actuator
-  heating_power_target: 0.0  # controller output [%]
-  heating_power: 0.0         # actuator output after lag [%]
-  actuator_tau: 0.75         # actuator inertia time constant [s]
+  heating_power_target:
+    type: float
+    default: 0.0
+    unit: percent
+  heating_power:
+    type: float
+    default: 0.0
+    unit: percent
+  actuator_tau:
+    type: float
+    default: 0.75
+    unit: s
 
-  # dynamics / environment
-  heat_coeff: 0.25
-  cool_coeff: 0.03
-  thermal_mass: 1.2
+  heat_coeff:
+    type: float
+    default: 0.25
+  cool_coeff:
+    type: float
+    default: 0.03
+  thermal_mass:
+    type: float
+    default: 1.2
 
-  # PID terms
-  power_gain: 1.7
-  power_integral: 0.0
-  power_integral_gain: 0.25
-  power_integral_leak: 0.05
-  power_derivative: 0.0
-  power_derivative_gain: 0.8
-  power_error_prev: 0.0
-  controller_enabled: true  # cached enable flag (power_on && !overload)
+  power_gain:
+    type: float
+    default: 1.7
+  power_integral:
+    type: float
+    default: 0.0
+  power_integral_gain:
+    type: float
+    default: 0.25
+  power_integral_leak:
+    type: float
+    default: 0.05
+  power_derivative:
+    type: float
+    default: 0.0
+  power_derivative_gain:
+    type: float
+    default: 0.8
+  power_error_prev:
+    type: float
+    default: 0.0
+  controller_enabled:
+    type: int
+    default: 1
 
-  # safety
-  overload: 0
-  overload_threshold: 100.0
-  overload_hyst: 2.0
+  overload:
+    type: int
+    default: 0
+  overload_threshold:
+    type: float
+    default: 100.0
+    unit: degC
+  overload_hyst:
+    type: float
+    default: 2.0
+    unit: degC
 
 conditions:
-  # 1) Overload ON when temperature >= threshold
   - if: $in(temperature) >= $in(overload_threshold)
     actions:
       - set: $in(overload)
         value: 1
 
-  # 2) Overload OFF when temperature <= threshold - hysteresis
   - if: $in(temperature) <= ($in(overload_threshold) - $in(overload_hyst))
     actions:
       - set: $in(overload)
         value: 0
 
-
 actions:
   - function: $in(controller_enabled)
     call: ($in(power_on) == 1) and ($in(overload) == 0)
 
-  # Derivative term with explicit enable/error params (no repeated expressions)
   - function: $in(power_derivative)
     params:
       error: "$in(setpoint) - $in(temperature)"
     call: 0.0 if not $in(controller_enabled) else $in(power_derivative_gain) * (error - $in(power_error_prev))
 
-  # Error memory for derivative
   - function: $in(power_error_prev)
     params:
       error: "$in(setpoint) - $in(temperature)"
     call: 0.0 if not $in(controller_enabled) else error
 
-  # Integrator with leak and clipping
   - function: $in(power_integral)
     imports: {np: numpy}
     params:
@@ -76,7 +120,6 @@ actions:
         else $in(power_integral) + $in(power_integral_gain) * error,
         integral_min, integral_max)
 
-  # PID blend for target power
   - function: $in(heating_power_target)
     imports: {np: numpy}
     params:
@@ -90,7 +133,6 @@ actions:
         + $in(power_derivative),
         power_min, power_max)
 
-  # Actuator lag (first-order) toward target power
   - function: $in(heating_power)
     imports: {first_order: "extensions.thermal_model.first_order_step"}
     params:
@@ -103,7 +145,6 @@ actions:
         $in(actuator_tau),
       )
 
-  # Thermal physics using closed-form solution for linear system
   - function: $in(temperature)
     imports: {thermal_step: "extensions.thermal_model.thermal_step"}
     params:
@@ -121,6 +162,8 @@ actions:
 
 scenarios:
   fast_heatup:
+    display_name: "Fast Heatup"
+    description: Increase setpoint and controller gain for a faster warm-up cycle.
     duration: 40.0
     overrides:
       $in(power_on): 1
@@ -129,6 +172,8 @@ scenarios:
       $in(power_gain): 1.9
 
   overload_trip_test:
+    display_name: "Overload Trip Test"
+    description: Drive the model into an overload trip with a high requested setpoint.
     duration: 20.0
     overrides:
       $in(power_on): 1
@@ -137,6 +182,8 @@ scenarios:
       $in(overload_hyst): 3.0
 
   powered_cooldown:
+    display_name: "Powered Cooldown"
+    description: Switch power off and let the process cool back toward ambient.
     duration: 25.0
     overrides:
       $in(power_on): 0
@@ -146,6 +193,8 @@ scenarios:
       $in(power_derivative_gain): 0.0
 
   ramped_heatup:
+    display_name: "Ramped Heatup"
+    description: Ramp the thermal setpoint upward over time while keeping power enabled.
     duration: 40.0
     actions:
       - function: $in(setpoint)
@@ -162,10 +211,11 @@ scenarios:
         call: ambient_target
 
   ambient_perturbation:
+    display_name: "Ambient Perturbation"
+    description: Alternate ambient temperature to exercise compensation behavior.
     duration: 30.0
     period: 5.0
     actions:
-      # Alternate ambient ±3°C every 5s to test controller compensation
       - function: $in(ambient)
         params:
           ambient_base: 22.0
@@ -175,6 +225,8 @@ scenarios:
           ambient_base + (ambient_amp if (int($attr(timer.time) / toggle_period) % 2 == 0) else -ambient_amp)
 
   noisy_temperature_output:
+    display_name: "Noisy Temperature Output"
+    description: Add proportional noise to the observed temperature output.
     actions:
       - noise: $out(temperature)
         name: Rough Gauge Noise
@@ -183,6 +235,8 @@ scenarios:
         mode: proportional
 
   ramped_cooldown:
+    display_name: "Ramped Cooldown"
+    description: Ramp the setpoint downward over time while holding power on.
     duration: 40.0
     actions:
       - function: $in(setpoint)
@@ -199,6 +253,8 @@ scenarios:
         call: ambient_target
 
   temperature_sensor_spike:
+    display_name: "Temperature Sensor Spike"
+    description: Inject a short measurement spike into the temperature output.
     duration: 35.0
     actions:
       - function: $out(temperature)
@@ -212,6 +268,8 @@ scenarios:
           )($attr(timer.time), $out(temperature))
 
   heat_treat_sequence_if:
+    display_name: "Heat Treat Sequence (If)"
+    description: Run a ramp-soak-cool heat-treatment profile using explicit scenario conditions.
     duration: 80.0
     conditions:
       - if: $attr(timer.time) < 20.0
@@ -238,6 +296,8 @@ scenarios:
             call: heat_target - (heat_target - cool_target) * min(1.0, max(0.0, ($attr(timer.time) - 40.0)) / cool_dur)
 
   heat_treat_sequence_profile:
+    display_name: "Heat Treat Sequence (Profile)"
+    description: Run a compact ramp-soak-cool heat-treatment profile from one expression.
     duration: 80.0
     actions:
       - function: $in(setpoint)
@@ -257,6 +317,8 @@ scenarios:
           )($attr(timer.time))
 
   power_cycle_recovery:
+    display_name: "Power Cycle Recovery"
+    description: Drop power briefly and verify the controller recovers after restart.
     duration: 60.0
     actions:
       - function: $in(setpoint)

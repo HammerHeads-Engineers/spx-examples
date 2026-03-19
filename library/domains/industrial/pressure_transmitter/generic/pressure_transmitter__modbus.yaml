@@ -6,16 +6,40 @@ description: |
   for testing analog input scaling and alarm handling.
 
 attributes:
-  pressure_bar: 1.0          # process pressure [bar]
-  pressure_min_bar: 0.0      # lower clamp of the transmitter span
-  pressure_max_bar: 10.0     # upper clamp of the transmitter span
-  pressure_target_bar: 1.0   # helper driven by scenarios to create ramps
-  pressure_slew_rate_bar: 0.35  # max bar change per simulation tick
+  pressure_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressure_min_bar:
+    type: float
+    default: 0.0
+    unit: bar
+  pressure_max_bar:
+    type: float
+    default: 10.0
+    unit: bar
+  pressure_target_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressure_slew_rate_bar:
+    type: float
+    default: 0.35
 
-  alarm_high: 0
-  alarm_low: 0
-  alarm_high_limit: 8.0
-  alarm_low_limit: 0.5
+  alarm_high:
+    type: int
+    default: 0
+  alarm_low:
+    type: int
+    default: 0
+  alarm_high_limit:
+    type: float
+    default: 8.0
+    unit: bar
+  alarm_low_limit:
+    type: float
+    default: 0.5
+    unit: bar
 
 actions:
   - function: $in(pressure_bar)
@@ -61,6 +85,8 @@ communication:
 scenarios:
   pressure_ramp_up:
     enabled: true
+    display_name: "Pressure Ramp Up"
+    description: Ramp the transmitter pressure toward the high alarm region.
     duration: 12.0
     overrides:
       $in(pressure_target_bar): 8.5
@@ -68,6 +94,8 @@ scenarios:
 
   pressure_ramp_down:
     enabled: true
+    display_name: "Pressure Ramp Down"
+    description: Drop the transmitter pressure toward the low alarm region.
     duration: 10.0
     overrides:
       $in(pressure_target_bar): 0.4
@@ -75,6 +103,8 @@ scenarios:
 
   pressure_spike:
     enabled: true
+    display_name: "Pressure Spike"
+    description: Inject a short high-pressure spike to exercise limit handling.
     duration: 2.0
     overrides:
       $in(pressure_target_bar): 9.8
@@ -82,6 +112,8 @@ scenarios:
 
   pressure_dropout:
     enabled: true
+    display_name: "Pressure Dropout"
+    description: Force a brief low-pressure dropout below the configured span.
     duration: 2.5
     overrides:
       $in(pressure_target_bar): 0.1
