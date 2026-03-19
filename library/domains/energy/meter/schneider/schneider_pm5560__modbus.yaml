@@ -16,41 +16,112 @@ meta_parameters:
 
 attributes:
   # Phase currents (A)
-  k__current_l1_a: 12.0
-  k__current_l2_a: 10.5
-  k__current_l3_a: 11.2
-  current_avg_a: 0.0
+  k__current_l1_a:
+    type: float
+    default: 12.0
+    unit: A
+  k__current_l2_a:
+    type: float
+    default: 10.5
+    unit: A
+  k__current_l3_a:
+    type: float
+    default: 11.2
+    unit: A
+  current_avg_a:
+    type: float
+    default: 0.0
+    unit: A
 
   # Phase-to-neutral voltages (V)
-  k__voltage_l1_n_v: 230.0
-  k__voltage_l2_n_v: 229.5
-  k__voltage_l3_n_v: 231.0
-  voltage_ln_avg_v: 0.0
+  k__voltage_l1_n_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__voltage_l2_n_v:
+    type: float
+    default: 229.5
+    unit: V
+  k__voltage_l3_n_v:
+    type: float
+    default: 231.0
+    unit: V
+  voltage_ln_avg_v:
+    type: float
+    default: 0.0
+    unit: V
 
   # Line-to-line voltages (V) (derived from L-N; balanced phasor assumption)
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
-  voltage_ll_avg_v: 0.0
+  voltage_l1_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_l1_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_ll_avg_v:
+    type: float
+    default: 0.0
+    unit: V
 
   # Power (kW/kVAR/kVA)
-  k__power_factor: 0.95
-  power_factor_leading: 0
-  active_power_l1_kw: 0.0
-  active_power_l2_kw: 0.0
-  active_power_l3_kw: 0.0
-  k__active_power_total_kw: 0.0
-  k__reactive_power_total_kvar: 0.0
-  k__apparent_power_total_kva: 0.0
+  k__power_factor:
+    type: float
+    default: 0.95
+    unit: ratio
+  power_factor_leading:
+    type: int
+    default: 0
+  active_power_l1_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  active_power_l2_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  active_power_l3_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  k__active_power_total_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  k__reactive_power_total_kvar:
+    type: float
+    default: 0.0
+    unit: kVAR
+  k__apparent_power_total_kva:
+    type: float
+    default: 0.0
+    unit: kVA
 
   # Frequency (Hz)
-  k__frequency_hz: 50.0
+  k__frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
 
   # Cumulative energy (kWh)
-  k__energy_import_total_kwh: 0.0
-  k__energy_export_total_kwh: 0.0
+  k__energy_import_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  k__energy_export_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
 
-  _cycle_time_s: 1.0
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(current_avg_a)
@@ -173,6 +244,7 @@ communication:
 
 scenarios:
   peak_demand:
+    display_name: "Peak Demand"
     description: High load with balanced phases and near-unity power factor.
     duration: 30.0
     overrides:
@@ -183,6 +255,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   pv_export:
+    display_name: "PV Export"
     description: Simulated PV export using negative phase currents.
     duration: 30.0
     overrides:
@@ -193,6 +266,7 @@ scenarios:
       $in(power_factor_leading): 1
 
   low_power_factor_lagging:
+    display_name: "Low Power Factor Lagging"
     description: Inductive load with low power factor.
     duration: 45.0
     overrides:

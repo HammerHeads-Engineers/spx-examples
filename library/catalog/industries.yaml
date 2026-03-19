@@ -76,10 +76,10 @@ industries:
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)
     description: >-
-      DER orchestration scaffold with OCPP 1.6 EVSE/CSMS twins and shared telemetry/controllers
-      while SunSpec device models land.
-    protocols: [mqtt, http, modbus, ocpp]
-    services: [mqtt_broker, modbus_tcp_gateway, http_gateway, ocpp_central_system]
+      Energy-native e-mobility and DER scaffold with OCPP 1.6 EVSE/CSMS twins,
+      Modbus EVSEs, and power-meter telemetry while SunSpec device models land.
+    protocols: [mqtt, modbus, ocpp]
+    services: [mqtt_broker, modbus_tcp_gateway, ocpp_central_system]
     profiles:
       - profiles/energy_pack/ev_csms_demo.yaml
     default_instances:
@@ -89,12 +89,6 @@ industries:
         instance: spx_evse_ocpp
       - model: Energy.EVSE.SiemensVersiChargeAc.Modbus
         instance: spx_evse_versicharge_ac_modbus
-      - model: Env.EnvSensor.Mqtt
-        instance: spx_env_sensor_mqtt
-      - model: Weather.WeatherFeed.Http
-        instance: spx_weather_feed
-      - model: Process.ThermalController.Modbus
-        instance: spx_process_heater
       - model: Energy.EnergyMeterDirisA10.Modbus
         instance: spx_energy_meter_diris_a10_modbus
       - model: Energy.EnergyMeterPm5560.Modbus

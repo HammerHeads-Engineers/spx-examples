@@ -9,33 +9,98 @@ description: |
   connector. Mirrors the BootNotification/Heartbeat flows covered by the spx-server
   integration tests while adding StatusNotification + MeterValues telemetry.
 
+meta_parameters:
+  ocpp_endpoint:
+    type: str
+    default: "ws://localhost:9000/ocpp"
+  ocpp_subprotocol:
+    type: str
+    default: "ocpp1.6"
+  ocpp_charge_point_id:
+    type: str
+    default: "spx-evse-01"
+
 attributes:
-  cp_vendor: "Hammerheads EV"
-  cp_model: "SPX-EVSE"
-  cp_serial: "SPX-EVSE-01"
-  firmware_version: "1.0.0"
-  boot_status: ""
-  heartbeat_interval_s: 30
-  last_heartbeat_time: "2025-01-01T00:00:00Z"
+  cp_vendor:
+    type: str
+    default: "Hammerheads EV"
+  cp_model:
+    type: str
+    default: "SPX-EVSE"
+  cp_serial:
+    type: str
+    default: "SPX-EVSE-01"
+  firmware_version:
+    type: str
+    default: "1.0.0"
+  boot_status:
+    type: str
+    default: ""
+  heartbeat_interval_s:
+    type: int
+    default: 30
+    unit: s
+  last_heartbeat_time:
+    type: str
+    default: "2025-01-01T00:00:00Z"
 
-  ocpp_status: "Available"
-  error_code: "NoError"
-  status_info: ""
-  status_text: "Available / idle"
-  active_connector: 1
-  session_active: 0
-  transaction_id: 9001
+  ocpp_status:
+    type: str
+    default: "Available"
+  error_code:
+    type: str
+    default: "NoError"
+  status_info:
+    type: str
+    default: ""
+  status_text:
+    type: str
+    default: "Available / idle"
+  active_connector:
+    type: int
+    default: 1
+  session_active:
+    type: int
+    default: 0
+  transaction_id:
+    type: int
+    default: 9001
 
-  commanded_current_a: 16.0
-  max_current_a: 32.0
-  current_a: 0.0
-  voltage_v: 400.0
-  power_kw: 0.0
+  commanded_current_a:
+    type: float
+    default: 16.0
+    unit: A
+  max_current_a:
+    type: float
+    default: 32.0
+    unit: A
+  current_a:
+    type: float
+    default: 0.0
+    unit: A
+  voltage_v:
+    type: float
+    default: 400.0
+    unit: V
+  power_kw:
+    type: float
+    default: 0.0
+    unit: kW
 
-  energy_wh: 1200.0
-  session_energy_wh: 0.0
-  meter_timestamp: "2025-01-01T00:00:00Z"
-  meter_values_payload: []
+  energy_wh:
+    type: float
+    default: 1200.0
+    unit: Wh
+  session_energy_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  meter_timestamp:
+    type: str
+    default: "2025-01-01T00:00:00Z"
+  meter_values_payload:
+    type: list
+    default: []
 
 actions:
   - function: $in(ocpp_status)
@@ -135,9 +200,9 @@ actions:
 communication:
   - ocpp:
       role: charge_point
-      endpoint: "ws://localhost:9000/ocpp"
-      subprotocol: "ocpp1.6"
-      charge_point_id: "spx-evse-01"
+      endpoint: "$param(ocpp_endpoint)"
+      subprotocol: "$param(ocpp_subprotocol)"
+      charge_point_id: "$param(ocpp_charge_point_id)"
       bindings:
         boot_notification:
           direction: outbound
@@ -202,6 +267,8 @@ communication:
 scenarios:
   idle_available:
     enabled: true
+    display_name: "Idle Available"
+    description: Keep the charge point available with no active EV session.
     duration: 15.0
     overrides:
       $in(session_active): 0
@@ -210,6 +277,8 @@ scenarios:
       $in(status_info): "waiting for EV"
   session_charging:
     enabled: true
+    display_name: "Session Charging"
+    description: Run a nominal charging session with a single active transaction.
     duration: 25.0
     overrides:
       $in(session_active): 1
@@ -218,6 +287,8 @@ scenarios:
       $in(status_info): "charging demo session"
   fault_ground:
     enabled: true
+    display_name: "Ground Fault"
+    description: Put the EVSE into a ground-fault state without an active charging session.
     duration: 10.0
     overrides:
       $in(session_active): 0

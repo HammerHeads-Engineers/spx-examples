@@ -8,27 +8,79 @@ description: |
   Implements BootNotification + Heartbeat responses per the spx-server integration
   tests and records StatusNotification/MeterValues telemetry for dashboards.
 
+meta_parameters:
+  ocpp_server_host:
+    type: str
+    default: "0.0.0.0"
+  ocpp_server_port:
+    type: int
+    default: 9000
+  ocpp_server_path:
+    type: str
+    default: "/ocpp"
+  ocpp_subprotocol:
+    type: str
+    default: "ocpp1.6"
+  ocpp_charge_point_id:
+    type: str
+    default: "spx-csms"
+
 attributes:
-  csms_current_time: "2025-01-01T00:00:00Z"
-  heartbeat_interval_s: 30
-  registration_status: "Accepted"
+  csms_current_time:
+    type: str
+    default: "2025-01-01T00:00:00Z"
+  heartbeat_interval_s:
+    type: int
+    default: 30
+    unit: s
+  registration_status:
+    type: str
+    default: "Accepted"
 
-  last_boot_vendor: ""
-  last_boot_model: ""
-  last_boot_serial: ""
+  last_boot_vendor:
+    type: str
+    default: ""
+  last_boot_model:
+    type: str
+    default: ""
+  last_boot_serial:
+    type: str
+    default: ""
 
-  last_connector_id: 1
-  last_connector_status: "Available"
-  last_error_code: "NoError"
-  last_status_info: ""
-  last_vendor_id: ""
-  last_transaction_id: 0
+  last_connector_id:
+    type: int
+    default: 1
+  last_connector_status:
+    type: str
+    default: "Available"
+  last_error_code:
+    type: str
+    default: "NoError"
+  last_status_info:
+    type: str
+    default: ""
+  last_vendor_id:
+    type: str
+    default: ""
+  last_transaction_id:
+    type: int
+    default: 0
 
-  last_meter_values: []
-  last_energy_wh: 0.0
-  last_power_w: 0.0
+  last_meter_values:
+    type: list
+    default: []
+  last_energy_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  last_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  status_text: "CSMS idle"
+  status_text:
+    type: str
+    default: "CSMS idle"
 
 actions:
   - function: $in(last_energy_wh)
@@ -82,12 +134,12 @@ actions:
 communication:
   - ocpp:
       role: central_system
-      charge_point_id: "spx-csms"
+      charge_point_id: "$param(ocpp_charge_point_id)"
       server:
-        host: "0.0.0.0"
-        port: 9000
-        path: "/ocpp"
-        subprotocol: "ocpp1.6"
+        host: "$param(ocpp_server_host)"
+        port: "$param(ocpp_server_port)"
+        path: "$param(ocpp_server_path)"
+        subprotocol: "$param(ocpp_subprotocol)"
       bindings:
         boot_request:
           direction: inbound
@@ -148,6 +200,8 @@ communication:
 scenarios:
   accept_evse:
     enabled: true
+    display_name: "Accept EVSE Registration"
+    description: Accept the charge-point boot request with the nominal heartbeat interval.
     duration: 15.0
     overrides:
       $in(registration_status): "Accepted"
@@ -155,12 +209,16 @@ scenarios:
       $in(csms_current_time): "2025-01-01T00:00:00Z"
   reject_evse:
     enabled: true
+    display_name: "Reject EVSE Registration"
+    description: Reject the boot request to exercise charge-point onboarding failure handling.
     duration: 10.0
     overrides:
       $in(registration_status): "Rejected"
       $in(heartbeat_interval_s): 0
   fast_heartbeat:
     enabled: true
+    display_name: "Fast Heartbeat"
+    description: Shorten the heartbeat interval for a more chatty demo session.
     duration: 20.0
     overrides:
       $in(heartbeat_interval_s): 10

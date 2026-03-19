@@ -6,39 +6,115 @@ description: |
   the behaviour of the MQTT variant but exposes measurements via Modbus.
 
 attributes:
-  voltage_l1: 400.0
-  voltage_l2: 400.0
-  voltage_l3: 400.0
-  voltage_nominal: 400.0
-  voltage_drop_per_amp: 1.5
-  voltage_unbalance_gain: 0.8
-  voltage_floor: 340.0
-  voltage_ceiling: 420.0
+  voltage_l1:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_l2:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_l3:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_nominal:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_drop_per_amp:
+    type: float
+    default: 1.5
+    unit: V/A
+  voltage_unbalance_gain:
+    type: float
+    default: 0.8
+    unit: V/A
+  voltage_floor:
+    type: float
+    default: 340.0
+    unit: V
+  voltage_ceiling:
+    type: float
+    default: 420.0
+    unit: V
 
-  current_l1: 12.0
-  current_l2: 10.5
-  current_l3: 11.2
-  current_nominal: 10.0
+  current_l1:
+    type: float
+    default: 12.0
+    unit: A
+  current_l2:
+    type: float
+    default: 10.5
+    unit: A
+  current_l3:
+    type: float
+    default: 11.2
+    unit: A
+  current_nominal:
+    type: float
+    default: 10.0
+    unit: A
 
-  frequency_hz: 50.0
-  frequency_nominal_hz: 50.0
-  frequency_droop_per_kw: 0.03
-  frequency_floor_hz: 47.5
-  frequency_ceiling_hz: 51.5
+  frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  frequency_nominal_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  frequency_droop_per_kw:
+    type: float
+    default: 0.03
+    unit: Hz/kW
+  frequency_floor_hz:
+    type: float
+    default: 47.5
+    unit: Hz
+  frequency_ceiling_hz:
+    type: float
+    default: 51.5
+    unit: Hz
 
-  power_factor: 0.95
-  power_factor_leading: 0
+  power_factor:
+    type: float
+    default: 0.95
+    unit: ratio
+  power_factor_leading:
+    type: int
+    default: 0
 
-  active_power_kw: 0.0
-  energy_import_kwh: 0.0
-  reactive_power_kvar: 0.0
+  active_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  energy_import_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  reactive_power_kvar:
+    type: float
+    default: 0.0
+    unit: kVAR
 
-  overload_threshold_kw: 45.0
-  overload_alarm: 0
+  overload_threshold_kw:
+    type: float
+    default: 45.0
+    unit: kW
+  overload_alarm:
+    type: int
+    default: 0
 
-  nominal_power_kw: 30.0
+  nominal_power_kw:
+    type: float
+    default: 30.0
+    unit: kW
 
-  cycle_time_s: 1.0
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(active_power_kw)
@@ -184,6 +260,8 @@ communication:
 scenarios:
   balanced_load_step:
     enabled: true
+    display_name: "Balanced Load Step"
+    description: Raise all three phase currents together for a balanced demand step.
     duration: 20.0
     overrides:
       $in(current_l1): 18.0
@@ -193,6 +271,8 @@ scenarios:
 
   unbalanced_phase_l2:
     enabled: true
+    display_name: "Unbalanced Phase L2"
+    description: Push most of the load onto phase L2 to exercise unbalance handling.
     duration: 15.0
     overrides:
       $in(current_l1): 9.0
@@ -202,6 +282,8 @@ scenarios:
 
   voltage_sag_event:
     enabled: true
+    display_name: "Voltage Sag Event"
+    description: Lower the nominal voltage and increase sag sensitivity under load.
     duration: 10.0
     overrides:
       $in(voltage_nominal): 390.0
@@ -210,6 +292,8 @@ scenarios:
 
   frequency_dip_under_overload:
     enabled: true
+    display_name: "Frequency Dip Under Overload"
+    description: Increase load enough to pull frequency down through the droop model.
     duration: 12.0
     overrides:
       $in(current_l1): 20.0
@@ -221,6 +305,8 @@ scenarios:
 
   pv_backfeed_disturbance:
     enabled: true
+    display_name: "PV Backfeed Disturbance"
+    description: Emulate export power with leading power factor and higher local voltage.
     duration: 18.0
     overrides:
       $in(current_l1): -14.0
