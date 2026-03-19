@@ -2,30 +2,64 @@
 
 name: thermostat__matter
 description: |
-  Virtual thermostat published over Matter clusters. Matches python-matter-server API surface
-  used by Home Assistant; values are scaled to the 0.01 °C resolution Matter expects.
+  Virtual thermostat published over Matter clusters. Matches the
+  python-matter-server API surface used by Home Assistant; values are scaled to
+  the 0.01 degC resolution Matter expects.
 
 attributes:
-  room_temperature_c: 22.5
-  room_setpoint_c: 22.0
-  room_command_raw: 2200           # 0.01 °C units written by Matter
-  room_command_c: 22.0
-  measured_value_raw: 2250         # TemperatureMeasurement.MeasuredValue (0.01 °C)
-  heating_setpoint_raw: 2200       # Thermostat.OccupiedHeatingSetpoint (0.01 °C)
-  hvac_mode: heat                  # heat/cool/auto/off
-  hvac_mode_code: 3                # Thermostat.SystemMode: 0=off,1=auto,2=cool,3=heat
-  hvac_active: 1
+  room_temperature_c:
+    type: float
+    default: 22.5
+    unit: degC
+  room_setpoint_c:
+    type: float
+    default: 22.0
+    unit: degC
+  room_command_raw:
+    type: int
+    default: 2200
+  room_command_c:
+    type: float
+    default: 22.0
+    unit: degC
+  measured_value_raw:
+    type: int
+    default: 2250
+  heating_setpoint_raw:
+    type: int
+    default: 2200
+  hvac_mode:
+    type: str
+    default: "heat"
+  hvac_mode_code:
+    type: int
+    default: 3
+  hvac_active:
+    type: int
+    default: 1
 
-  min_setpoint_c: 15.0
-  max_setpoint_c: 28.0
-  setpoint_step_k: 0.5
+  min_setpoint_c:
+    type: float
+    default: 15.0
+    unit: degC
+  max_setpoint_c:
+    type: float
+    default: 28.0
+    unit: degC
+  setpoint_step_k:
+    type: float
+    default: 0.5
+    unit: K
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(room_command_c)
     name: convert_command_raw_to_c
-    description: Convert inbound Matter raw setpoint to °C.
+    description: Convert inbound Matter raw setpoint to degC.
     call: $in(room_command_raw) / 100.0
 
   - function: $in(room_setpoint_c)
@@ -56,12 +90,12 @@ actions:
 
   - function: $in(measured_value_raw)
     name: encode_measured_value
-    description: Matter TemperatureMeasurement encodes 0.01 °C units.
+    description: Matter TemperatureMeasurement encodes 0.01 degC units.
     call: int(round($in(room_temperature_c) * 100.0))
 
   - function: $in(heating_setpoint_raw)
     name: encode_heating_setpoint
-    description: Matter Thermostat setpoint in 0.01 °C units.
+    description: Matter Thermostat setpoint in 0.01 degC units.
     call: int(round($in(room_setpoint_c) * 100.0))
 
   - function: $in(hvac_mode_code)

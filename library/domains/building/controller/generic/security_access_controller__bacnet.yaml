@@ -8,16 +8,32 @@ description: |
   lock command and partition mode via BACnet/IP.
 
 attributes:
-  entry_door_contact: 0   # 1 when door open
-  server_room_contact: 0  # 1 when door open
-  motion_zone: 0          # 1 when movement detected
+  entry_door_contact:
+    type: int
+    default: 0
+  server_room_contact:
+    type: int
+    default: 0
+  motion_zone:
+    type: int
+    default: 0
 
-  lock_command: 1         # 1=locked, 0=unlocked
-  siren_command: 0
-  alarm_active: 0
+  lock_command:
+    type: int
+    default: 1
+  siren_command:
+    type: int
+    default: 0
+  alarm_active:
+    type: int
+    default: 0
 
-  access_mode: 1          # 1=disarmed, 2=armed-stay, 3=armed-away, 4=alarm
-  alarm_text: "DISARMED"
+  access_mode:
+    type: int
+    default: 1
+  alarm_text:
+    type: str
+    default: "DISARMED"
 
 conditions:
   # Trigger alarm when armed and intrusion detected.

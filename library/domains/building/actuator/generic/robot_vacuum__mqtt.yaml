@@ -9,34 +9,96 @@ description: |
 
 attributes:
   # Command latches and discrete state (int 0/1 flags)
-  desired_cleaning: 0
-  dock_request: 0
-  cleaning_active: 0
-  returning_home: 0
-  docked: 1
+  desired_cleaning:
+    type: int
+    default: 0
+  dock_request:
+    type: int
+    default: 0
+  cleaning_active:
+    type: int
+    default: 0
+  returning_home:
+    type: int
+    default: 0
+  docked:
+    type: int
+    default: 1
 
   # Telemetry ([%], [m2], [min], [W])
-  battery_percent: 100.0
-  bin_fill_percent: 5.0
-  area_cleaned_m2: 0.0
-  runtime_min: 0.0
-  suction_level_percent: 70.0
-  active_power_w: 0.0
+  battery_percent:
+    type: float
+    default: 100.0
+    unit: percent
+  bin_fill_percent:
+    type: float
+    default: 5.0
+    unit: percent
+  area_cleaned_m2:
+    type: float
+    default: 0.0
+    unit: m2
+  runtime_min:
+    type: float
+    default: 0.0
+    unit: min
+  suction_level_percent:
+    type: float
+    default: 70.0
+    unit: percent
+  active_power_w:
+    type: float
+    default: 0.0
+    unit: W
 
   # Timing and behavior tuning ([s], [%], [m2/min], [%/min])
-  return_timer_s: 0.0
-  return_duration_s: 15.0
-  low_battery_threshold_percent: 15.0
-  bin_full_threshold_percent: 95.0
-  cleaning_rate_m2_per_min: 1.1
-  bin_fill_rate_percent_per_min: 1.8
-  discharge_clean_percent_per_min: 5.0
-  discharge_return_percent_per_min: 2.0
-  charge_rate_percent_per_min: 10.0
-  cycle_time_s: 1.0
+  return_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  return_duration_s:
+    type: float
+    default: 15.0
+    unit: s
+  low_battery_threshold_percent:
+    type: float
+    default: 15.0
+    unit: percent
+  bin_full_threshold_percent:
+    type: float
+    default: 95.0
+    unit: percent
+  cleaning_rate_m2_per_min:
+    type: float
+    default: 1.1
+    unit: m2/min
+  bin_fill_rate_percent_per_min:
+    type: float
+    default: 1.8
+    unit: percent/min
+  discharge_clean_percent_per_min:
+    type: float
+    default: 5.0
+    unit: percent/min
+  discharge_return_percent_per_min:
+    type: float
+    default: 2.0
+    unit: percent/min
+  charge_rate_percent_per_min:
+    type: float
+    default: 10.0
+    unit: percent/min
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
-  error_code: 0
-  status_text: "DOCKED"
+  error_code:
+    type: int
+    default: 0
+  status_text:
+    type: str
+    default: "DOCKED"
 
 actions:
   - function: $in(desired_cleaning)

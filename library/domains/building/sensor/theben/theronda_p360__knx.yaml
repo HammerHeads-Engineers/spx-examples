@@ -26,93 +26,214 @@ meta_parameters:
 
 attributes:
   # --- Environment inputs ---
-  k__motion_detected: 0               # 0/1 - simulate PIR detection
-  k__brightness_ceiling_lux: 280.0    # lux - "internal" sensor measurement (pre room-correction)
-  brightness_external_lux: 280.0   # lux - provided via KNX object 10 when external measurement is used
-
-  # --- General parameters (ETS-like) ---
-  k__operating_mode: master           # master|slave
-  k__master_operating_mode: individual_switching  # individual_switching|parallel_switching
-  parallel_switching_cycle_s: 60.0 # 30,60,120,180,240 (manual)
-
-  k__brightness_measurement_source: internal  # internal|external
-  room_correction_factor: 0.3      # 0.05..2.0 (manual)
-
-  lighting_channel_c1_function: switching  # switching|constant_light|constant_light_no_presence|inactive
-  lighting_channel_c2_function: switching  # switching|constant_light|constant_light_no_presence|inactive
-  lighting_configuration_type: fully_automatic  # fully_automatic|semi_automatic
-
-  k__brightness_setpoint_lux: 500.0
-  k__brightness_alt_setpoint_lux: 400.0
-  lighting_time_delay_s: 600.0     # 30..3600 (manual)
-  lighting_standby_enabled_param: 1          # 0/1 - standby time feature enabled in parameters
-  lighting_standby_duration_s: 1800.0        # 30..3600 (manual)
-  lighting_standby_value_percent: 10.0       # 1..25 (manual)
-
-  # --- Presence channels parameters (C4/C5) ---
-  presence_c4_enabled: 1
-  presence_c4_switch_on_delay_s: 0.0         # 0..1800 (manual)
-  presence_c4_time_delay_s: 900.0            # 10..7200 (manual)
-  presence_c4_send_second_telegram: 0        # 0/1 -> enables C4.2 in addition to C4.1
-
-  presence_c5_enabled: 1
-  presence_c5_switch_on_delay_s: 0.0
-  presence_c5_time_delay_s: 900.0
-  presence_c5_send_second_telegram: 0
-
-  # --- KNX objects (inputs / configuration via bus) ---
-  obj10_external_brightness_lux_in: 280.0
-  obj22_select_alt_setpoint_in: 0
-  obj25_standby_enable_in: 1
-  obj27_lighting_time_delay_in_s: 600.0
-  obj28_lighting_block_in: 0
-  obj29_central_command_in: 0
-  obj33_presence_c4_block_in: 0
-  obj36_presence_c5_block_in: 0
-
-  # Push button overrides share the same group address as outputs. We model them as inbound commands
-  # feeding internal override state, while outputs are sent on separate attributes.
-  obj0_c1_switch_cmd_in: 0
-  obj11_c2_switch_cmd_in: 0
-
-  # --- Internal state/timers ---
-  lighting_timer_s: 0.0
-  standby_timer_s: 0.0
-
-  c1_cmd_prev: 0
-  c2_cmd_prev: 0
-  central_cmd_prev: 0
-
-  c1_manual_on_timer_s: 0.0
-  c2_manual_on_timer_s: 0.0
-  c1_manual_force_off: 0
-  c2_manual_force_off: 0
-
-  presence_c4_on_delay_timer_s: 0.0
-  presence_c4_timer_s: 0.0
-  presence_c5_on_delay_timer_s: 0.0
-  presence_c5_timer_s: 0.0
-
-  trigger_timer_s: 0.0
-  motion_prev: 0
-
-  # --- Derived values / outputs (KNX objects) ---
-  brightness_lux: 280.0
-  active_setpoint_lux: 500.0
-
-  obj9_brightness_out_lux: 280.0
-  obj8_room_correction_factor_out_scaled: 30.0   # factor * 100, reported as 2-byte float
-
-  obj0_c1_switch_out: 0
-  obj11_c2_switch_out: 0
-
-  obj31_presence_c4_1_out: 0
-  obj32_presence_c4_2_out: 0
-  obj34_presence_c5_1_out: 0
-  obj35_presence_c5_2_out: 0
-
-  obj41_parallel_trigger_out: 0
-
+  k__motion_detected:
+    type: int
+    default: 0
+  k__brightness_ceiling_lux:
+    type: float
+    default: 280.0
+    unit: lux
+  brightness_external_lux:
+    type: float
+    default: 280.0
+    unit: lux
+  k__operating_mode:
+    type: str
+    default: master
+  k__master_operating_mode:
+    type: str
+    default: individual_switching
+  parallel_switching_cycle_s:
+    type: float
+    default: 60.0
+    unit: s
+  k__brightness_measurement_source:
+    type: str
+    default: internal
+  room_correction_factor:
+    type: float
+    default: 0.3
+  lighting_channel_c1_function:
+    type: str
+    default: switching
+  lighting_channel_c2_function:
+    type: str
+    default: switching
+  lighting_configuration_type:
+    type: str
+    default: fully_automatic
+  k__brightness_setpoint_lux:
+    type: float
+    default: 500.0
+    unit: lux
+  k__brightness_alt_setpoint_lux:
+    type: float
+    default: 400.0
+    unit: lux
+  lighting_time_delay_s:
+    type: float
+    default: 600.0
+    unit: s
+  lighting_standby_enabled_param:
+    type: int
+    default: 1
+  lighting_standby_duration_s:
+    type: float
+    default: 1800.0
+    unit: s
+  lighting_standby_value_percent:
+    type: float
+    default: 10.0
+    unit: '%'
+  presence_c4_enabled:
+    type: int
+    default: 1
+  presence_c4_switch_on_delay_s:
+    type: float
+    default: 0.0
+    unit: s
+  presence_c4_time_delay_s:
+    type: float
+    default: 900.0
+    unit: s
+  presence_c4_send_second_telegram:
+    type: int
+    default: 0
+  presence_c5_enabled:
+    type: int
+    default: 1
+  presence_c5_switch_on_delay_s:
+    type: float
+    default: 0.0
+    unit: s
+  presence_c5_time_delay_s:
+    type: float
+    default: 900.0
+    unit: s
+  presence_c5_send_second_telegram:
+    type: int
+    default: 0
+  obj10_external_brightness_lux_in:
+    type: float
+    default: 280.0
+  obj22_select_alt_setpoint_in:
+    type: int
+    default: 0
+  obj25_standby_enable_in:
+    type: int
+    default: 1
+  obj27_lighting_time_delay_in_s:
+    type: float
+    default: 600.0
+    unit: s
+  obj28_lighting_block_in:
+    type: int
+    default: 0
+  obj29_central_command_in:
+    type: int
+    default: 0
+  obj33_presence_c4_block_in:
+    type: int
+    default: 0
+  obj36_presence_c5_block_in:
+    type: int
+    default: 0
+  obj0_c1_switch_cmd_in:
+    type: int
+    default: 0
+  obj11_c2_switch_cmd_in:
+    type: int
+    default: 0
+  lighting_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  standby_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  c1_cmd_prev:
+    type: int
+    default: 0
+  c2_cmd_prev:
+    type: int
+    default: 0
+  central_cmd_prev:
+    type: int
+    default: 0
+  c1_manual_on_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  c2_manual_on_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  c1_manual_force_off:
+    type: int
+    default: 0
+  c2_manual_force_off:
+    type: int
+    default: 0
+  presence_c4_on_delay_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  presence_c4_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  presence_c5_on_delay_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  presence_c5_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  trigger_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  motion_prev:
+    type: int
+    default: 0
+  brightness_lux:
+    type: float
+    default: 280.0
+    unit: lux
+  active_setpoint_lux:
+    type: float
+    default: 500.0
+    unit: lux
+  obj9_brightness_out_lux:
+    type: float
+    default: 280.0
+    unit: lux
+  obj8_room_correction_factor_out_scaled:
+    type: float
+    default: 30.0
+  obj0_c1_switch_out:
+    type: int
+    default: 0
+  obj11_c2_switch_out:
+    type: int
+    default: 0
+  obj31_presence_c4_1_out:
+    type: int
+    default: 0
+  obj32_presence_c4_2_out:
+    type: int
+    default: 0
+  obj34_presence_c5_1_out:
+    type: int
+    default: 0
+  obj35_presence_c5_2_out:
+    type: int
+    default: 0
+  obj41_parallel_trigger_out:
+    type: int
+    default: 0
 actions:
   - function: $in(room_correction_factor)
     call: max(0.05, min(2.0, $in(room_correction_factor)))
@@ -127,11 +248,7 @@ actions:
     call: ($in(k__brightness_alt_setpoint_lux) if $in(obj22_select_alt_setpoint_in) == 1 else $in(k__brightness_setpoint_lux))
 
   - function: $in(brightness_lux)
-    call: (
-          max(0.0, $in(brightness_external_lux))
-          if $in(k__brightness_measurement_source) == "external"
-          else max(0.0, $in(k__brightness_ceiling_lux) / $in(room_correction_factor))
-        )
+    call: ( max(0.0, $in(brightness_external_lux)) if $in(k__brightness_measurement_source) == "external" else max(0.0, $in(k__brightness_ceiling_lux) / $in(room_correction_factor)) )
 
   - function: $in(obj9_brightness_out_lux)
     call: $in(brightness_lux)
@@ -145,42 +262,26 @@ actions:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       rise: "(($in(obj0_c1_switch_cmd_in) == 1) and ($in(c1_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
       fall: "(($in(obj0_c1_switch_cmd_in) == 0) and ($in(c1_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
-    call: (
-          1800.0 if rise
-          else 0.0 if fall
-          else max(0.0, $in(c1_manual_on_timer_s) - dt)
-        )
+    call: ( 1800.0 if rise else 0.0 if fall else max(0.0, $in(c1_manual_on_timer_s) - dt) )
 
   - function: $in(c2_manual_on_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       rise: "(($in(obj11_c2_switch_cmd_in) == 1) and ($in(c2_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
       fall: "(($in(obj11_c2_switch_cmd_in) == 0) and ($in(c2_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
-    call: (
-          1800.0 if rise
-          else 0.0 if fall
-          else max(0.0, $in(c2_manual_on_timer_s) - dt)
-        )
+    call: ( 1800.0 if rise else 0.0 if fall else max(0.0, $in(c2_manual_on_timer_s) - dt) )
 
   - function: $in(c1_manual_force_off)
     params:
       fall: "(($in(obj0_c1_switch_cmd_in) == 0) and ($in(c1_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
       rise: "(($in(obj0_c1_switch_cmd_in) == 1) and ($in(c1_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
-    call: (
-          1 if fall
-          else 0 if rise
-          else (0 if ($in(c1_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c1_manual_force_off))
-        )
+    call: ( 1 if fall else 0 if rise else (0 if ($in(c1_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c1_manual_force_off)) )
 
   - function: $in(c2_manual_force_off)
     params:
       fall: "(($in(obj11_c2_switch_cmd_in) == 0) and ($in(c2_cmd_prev) == 1)) or (($in(obj29_central_command_in) == 0) and ($in(central_cmd_prev) == 1))"
       rise: "(($in(obj11_c2_switch_cmd_in) == 1) and ($in(c2_cmd_prev) == 0)) or (($in(obj29_central_command_in) == 1) and ($in(central_cmd_prev) == 0))"
-    call: (
-          1 if fall
-          else 0 if rise
-          else (0 if ($in(c2_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c2_manual_force_off))
-        )
+    call: ( 1 if fall else 0 if rise else (0 if ($in(c2_manual_force_off) == 1 and $in(lighting_timer_s) == 0) else $in(c2_manual_force_off)) )
 
   - function: $in(c1_cmd_prev)
     call: $in(obj0_c1_switch_cmd_in)
@@ -196,24 +297,12 @@ actions:
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       any_lighting: "($in(lighting_channel_c1_function) != \"inactive\") or ($in(lighting_channel_c2_function) != \"inactive\")"
-    call: (
-          0.0
-          if ($in(k__operating_mode) == "slave") or (not any_lighting)
-          else (
-            $in(lighting_time_delay_s)
-            if $in(k__motion_detected) == 1
-            else max(0.0, $in(lighting_timer_s) - dt)
-          )
-        )
+    call: ( 0.0 if ($in(k__operating_mode) == "slave") or (not any_lighting) else ( $in(lighting_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(lighting_timer_s) - dt) ) )
 
   - function: $in(standby_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
-    call: (
-          $in(lighting_standby_duration_s)
-          if $in(lighting_timer_s) > 0
-          else max(0.0, $in(standby_timer_s) - dt)
-        )
+    call: ( $in(lighting_standby_duration_s) if $in(lighting_timer_s) > 0 else max(0.0, $in(standby_timer_s) - dt) )
 
   - function: $in(obj0_c1_switch_out)
     params:
@@ -222,22 +311,7 @@ actions:
       standby_active: "($in(lighting_standby_enabled_param) == 1) and ($in(obj25_standby_enable_in) == 1) and ($in(lighting_timer_s) == 0) and ($in(standby_timer_s) > 0)"
       should_auto_on: "($in(lighting_timer_s) > 0) and (measurement_off or ($in(c1_manual_on_timer_s) > 0) or ($in(brightness_lux) < $in(active_setpoint_lux)))"
       should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c1_manual_on_timer_s) > 0)"
-    call: (
-          0
-          if ($in(k__operating_mode) == "slave")
-             or ($in(lighting_channel_c1_function) == "inactive")
-             or blocked
-          else (
-            0 if $in(c1_manual_force_off) == 1
-            else (
-              1 if standby_active
-              else (
-                1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on)
-                else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0)
-              )
-            )
-          )
-        )
+    call: ( 0 if ($in(k__operating_mode) == "slave") or ($in(lighting_channel_c1_function) == "inactive") or blocked else ( 0 if $in(c1_manual_force_off) == 1 else ( 1 if standby_active else ( 1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on) else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0) ) ) ) )
 
   - function: $in(obj11_c2_switch_out)
     params:
@@ -246,93 +320,42 @@ actions:
       standby_active: "($in(lighting_standby_enabled_param) == 1) and ($in(obj25_standby_enable_in) == 1) and ($in(lighting_timer_s) == 0) and ($in(standby_timer_s) > 0)"
       should_auto_on: "($in(lighting_timer_s) > 0) and (measurement_off or ($in(c2_manual_on_timer_s) > 0) or ($in(brightness_lux) < $in(active_setpoint_lux)))"
       should_semi_on: "($in(lighting_timer_s) > 0) and ($in(c2_manual_on_timer_s) > 0)"
-    call: (
-          0
-          if ($in(k__operating_mode) == "slave")
-             or ($in(lighting_channel_c2_function) == "inactive")
-             or blocked
-          else (
-            0 if $in(c2_manual_force_off) == 1
-            else (
-              1 if standby_active
-              else (
-                1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on)
-                else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0)
-              )
-            )
-          )
-        )
+    call: ( 0 if ($in(k__operating_mode) == "slave") or ($in(lighting_channel_c2_function) == "inactive") or blocked else ( 0 if $in(c2_manual_force_off) == 1 else ( 1 if standby_active else ( 1 if ($in(lighting_configuration_type) == "semi_automatic" and should_semi_on) else (1 if ($in(lighting_configuration_type) != "semi_automatic" and should_auto_on) else 0) ) ) ) )
 
   # --- Presence channels C4/C5 (basic ON/OFF behavior, switch command style) ---
   - function: $in(presence_c4_on_delay_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
-    call: (
-          0.0
-          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c4_timer_s) == 0)
-          else (
-            min($in(presence_c4_switch_on_delay_s), $in(presence_c4_on_delay_timer_s) + dt)
-            if $in(k__motion_detected) == 1
-            else $in(presence_c4_on_delay_timer_s)
-          )
-        )
+    call: ( 0.0 if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c4_timer_s) == 0) else ( min($in(presence_c4_switch_on_delay_s), $in(presence_c4_on_delay_timer_s) + dt) if $in(k__motion_detected) == 1 else $in(presence_c4_on_delay_timer_s) ) )
 
   - function: $in(presence_c4_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       delay_ok: "$in(presence_c4_on_delay_timer_s) >= $in(presence_c4_switch_on_delay_s)"
-    call: (
-          0.0
-          if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or (not delay_ok)
-          else (
-            $in(presence_c4_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c4_timer_s) - dt)
-          )
-        )
+    call: ( 0.0 if ($in(presence_c4_enabled) == 0) or ($in(obj33_presence_c4_block_in) == 1) or (not delay_ok) else ( $in(presence_c4_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c4_timer_s) - dt) ) )
 
   - function: $in(obj31_presence_c4_1_out)
     call: 1 if ($in(presence_c4_enabled) == 1 and $in(obj33_presence_c4_block_in) == 0 and $in(presence_c4_timer_s) > 0) else 0
 
   - function: $in(obj32_presence_c4_2_out)
-    call: (
-          $in(obj31_presence_c4_1_out)
-          if $in(presence_c4_send_second_telegram) == 1
-          else 0
-        )
+    call: ( $in(obj31_presence_c4_1_out) if $in(presence_c4_send_second_telegram) == 1 else 0 )
 
   - function: $in(presence_c5_on_delay_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
-    call: (
-          0.0
-          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c5_timer_s) == 0)
-          else (
-            min($in(presence_c5_switch_on_delay_s), $in(presence_c5_on_delay_timer_s) + dt)
-            if $in(k__motion_detected) == 1
-            else $in(presence_c5_on_delay_timer_s)
-          )
-        )
+    call: ( 0.0 if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or ($in(k__motion_detected) == 0 and $in(presence_c5_timer_s) == 0) else ( min($in(presence_c5_switch_on_delay_s), $in(presence_c5_on_delay_timer_s) + dt) if $in(k__motion_detected) == 1 else $in(presence_c5_on_delay_timer_s) ) )
 
   - function: $in(presence_c5_timer_s)
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       delay_ok: "$in(presence_c5_on_delay_timer_s) >= $in(presence_c5_switch_on_delay_s)"
-    call: (
-          0.0
-          if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or (not delay_ok)
-          else (
-            $in(presence_c5_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c5_timer_s) - dt)
-          )
-        )
+    call: ( 0.0 if ($in(presence_c5_enabled) == 0) or ($in(obj36_presence_c5_block_in) == 1) or (not delay_ok) else ( $in(presence_c5_time_delay_s) if $in(k__motion_detected) == 1 else max(0.0, $in(presence_c5_timer_s) - dt) ) )
 
   - function: $in(obj34_presence_c5_1_out)
     call: 1 if ($in(presence_c5_enabled) == 1 and $in(obj36_presence_c5_block_in) == 0 and $in(presence_c5_timer_s) > 0) else 0
 
   - function: $in(obj35_presence_c5_2_out)
-    call: (
-          $in(obj34_presence_c5_1_out)
-          if $in(presence_c5_send_second_telegram) == 1
-          else 0
-        )
+    call: ( $in(obj34_presence_c5_1_out) if $in(presence_c5_send_second_telegram) == 1 else 0 )
 
   # --- Parallel switching trigger (pulse/toggle) ---
   - function: $in(obj41_parallel_trigger_out)
@@ -344,14 +367,7 @@ actions:
     params:
       dt: "$(~.timer.default_step) or $(~.polling.interval) or 0.25"
       enabled: "($in(k__operating_mode) == \"slave\") or ($in(k__master_operating_mode) == \"parallel_switching\")"
-    call: (
-          0.0
-          if (not enabled) or ($in(k__motion_detected) == 0)
-          else (
-            0.0 if $in(trigger_timer_s) >= $in(parallel_switching_cycle_s)
-            else min($in(parallel_switching_cycle_s), $in(trigger_timer_s) + dt)
-          )
-        )
+    call: ( 0.0 if (not enabled) or ($in(k__motion_detected) == 0) else ( 0.0 if $in(trigger_timer_s) >= $in(parallel_switching_cycle_s) else min($in(parallel_switching_cycle_s), $in(trigger_timer_s) + dt) ) )
 
   - function: $in(motion_prev)
     call: $in(k__motion_detected)
@@ -476,6 +492,7 @@ communication:
 scenarios:
   motion_detected:
     duration: 20.0
+    display_name: "Motion Detected"
     description: "Presence detected with low ambient light."
     overrides:
       $in(k__motion_detected): 1
@@ -484,6 +501,7 @@ scenarios:
 
   manual_switch_c1:
     duration: 10.0
+    display_name: "Manual Switch C1"
     description: "Manual toggle of channel C1 via KNX."
     overrides:
       $in(obj0_c1_switch_cmd_in): 1
@@ -491,6 +509,7 @@ scenarios:
 
   parallel_switching_pulse:
     duration: 12.0
+    display_name: "Parallel Switching Pulse"
     description: "Parallel switching trigger based on motion."
     overrides:
       $in(k__master_operating_mode): parallel_switching

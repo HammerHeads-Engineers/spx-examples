@@ -6,32 +6,83 @@ description: |
   Useful for showcasing BMS/BAS OPC UA integrations focused on lighting and occupancy.
 
 attributes:
-  panel_state: automatic        # automatic/manual/off
-  active_scene: daylight
-  schedule_state: workday
+  panel_state:
+    type: str
+    default: "automatic"
+  active_scene:
+    type: str
+    default: "daylight"
+  schedule_state:
+    type: str
+    default: "workday"
 
-  zone1_level_percent: 65.0
-  zone1_target_percent: 70.0
-  zone2_level_percent: 40.0
-  zone2_target_percent: 45.0
-  zone3_level_percent: 15.0
-  zone3_target_percent: 20.0
+  zone1_level_percent:
+    type: float
+    default: 65.0
+    unit: percent
+  zone1_target_percent:
+    type: float
+    default: 70.0
+    unit: percent
+  zone2_level_percent:
+    type: float
+    default: 40.0
+    unit: percent
+  zone2_target_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  zone3_level_percent:
+    type: float
+    default: 15.0
+    unit: percent
+  zone3_target_percent:
+    type: float
+    default: 20.0
+    unit: percent
 
-  daylight_lux: 320.0
-  daylight_setpoint_lux: 350.0
+  daylight_lux:
+    type: float
+    default: 320.0
+    unit: lx
+  daylight_setpoint_lux:
+    type: float
+    default: 350.0
+    unit: lx
 
-  occupancy_zone1: 1
-  occupancy_zone2: 0
-  occupancy_zone3: 0
+  occupancy_zone1:
+    type: int
+    default: 1
+  occupancy_zone2:
+    type: int
+    default: 0
+  occupancy_zone3:
+    type: int
+    default: 0
 
-  energy_today_kwh: 12.5
-  energy_week_kwh: 86.0
+  energy_today_kwh:
+    type: float
+    default: 12.5
+    unit: kWh
+  energy_week_kwh:
+    type: float
+    default: 86.0
+    unit: kWh
 
-  emergency_test_active: 0
-  alarm_emergency: 0
-  alarm_power: 0
+  emergency_test_active:
+    type: int
+    default: 0
+  alarm_emergency:
+    type: int
+    default: 0
+  alarm_power:
+    type: int
+    default: 0
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(zone1_level_percent)
@@ -245,6 +296,8 @@ communication:
 scenarios:
   evening_scene:
     enabled: true
+    display_name: "Evening Scene"
+    description: Switch the panel to a lower evening lighting scene.
     duration: 20.0
     overrides:
       $in(active_scene): evening
@@ -254,6 +307,8 @@ scenarios:
 
   night_shutdown:
     enabled: true
+    display_name: "Night Shutdown"
+    description: Turn the lighting panel off for night schedule operation.
     duration: 25.0
     overrides:
       $in(panel_state): off
@@ -264,6 +319,8 @@ scenarios:
 
   emergency_test:
     enabled: true
+    display_name: "Emergency Test"
+    description: Run an emergency-lighting test while the panel stays in manual mode.
     duration: 10.0
     overrides:
       $in(emergency_test_active): 1

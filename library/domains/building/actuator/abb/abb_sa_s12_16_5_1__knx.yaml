@@ -27,22 +27,51 @@ meta_parameters:
     default: "1"
 
 attributes:
-  _cycle_time_s: 0.2
+  _cycle_time_s:
+    type: float
+    default: 0.2
+    unit: s
 
-  all_off_cmd: 0
+  all_off_cmd:
+    type: int
+    default: 0
 
-  k__ch01: 0
-  k__ch02: 0
-  k__ch03: 0
-  k__ch04: 0
-  k__ch05: 0
-  k__ch06: 0
-  k__ch07: 0
-  k__ch08: 0
-  k__ch09: 0
-  k__ch10: 0
-  k__ch11: 0
-  k__ch12: 0
+  k__ch01:
+    type: int
+    default: 0
+  k__ch02:
+    type: int
+    default: 0
+  k__ch03:
+    type: int
+    default: 0
+  k__ch04:
+    type: int
+    default: 0
+  k__ch05:
+    type: int
+    default: 0
+  k__ch06:
+    type: int
+    default: 0
+  k__ch07:
+    type: int
+    default: 0
+  k__ch08:
+    type: int
+    default: 0
+  k__ch09:
+    type: int
+    default: 0
+  k__ch10:
+    type: int
+    default: 0
+  k__ch11:
+    type: int
+    default: 0
+  k__ch12:
+    type: int
+    default: 0
 
 conditions:
   - if: $attr(all_off_cmd) == 1

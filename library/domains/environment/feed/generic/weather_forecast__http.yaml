@@ -17,75 +17,117 @@ meta_parameters:
     default: 8091
 
 attributes:
-  k__latitude: 52.2297
-  k__longitude: 21.0122
-  elevation_m: 100.0
-  k__timezone: Europe/Warsaw
-  generation_time_ms: 18.5
-  forecast_horizon_hours: 48
-
-  k__active_profile: clear
-
+  k__latitude:
+    type: float
+    default: 52.2297
+    unit: deg
+  k__longitude:
+    type: float
+    default: 21.0122
+    unit: deg
+  elevation_m:
+    type: float
+    default: 100.0
+    unit: m
+  k__timezone:
+    type: str
+    default: Europe/Warsaw
+  generation_time_ms:
+    type: float
+    default: 18.5
+    unit: ms
+  forecast_horizon_hours:
+    type: int
+    default: 48
+    unit: h
+  k__active_profile:
+    type: str
+    default: clear
   hourly_time:
-    - "2025-01-01T00:00"
-    - "2025-01-01T03:00"
-    - "2025-01-01T06:00"
-    - "2025-01-01T09:00"
-    - "2025-01-01T12:00"
-    - "2025-01-01T15:00"
-    - "2025-01-01T18:00"
-    - "2025-01-01T21:00"
-
+    type: list
+    default:
+      - "2025-01-01T00:00"
+      - "2025-01-01T03:00"
+      - "2025-01-01T06:00"
+      - "2025-01-01T09:00"
+      - "2025-01-01T12:00"
+      - "2025-01-01T15:00"
+      - "2025-01-01T18:00"
+      - "2025-01-01T21:00"
   hourly_temperature_2m:
-    - -3.1
-    - -1.5
-    - 0.2
-    - 2.8
-    - 5.6
-    - 4.9
-    - 1.7
-    - -0.8
-
+    type: list
+    default:
+      - -3.1
+      - -1.5
+      - 0.2
+      - 2.8
+      - 5.6
+      - 4.9
+      - 1.7
+      - -0.8
+    unit: degC
   hourly_precipitation_probability:
-    - 10
-    - 15
-    - 20
-    - 25
-    - 30
-    - 20
-    - 15
-    - 10
-
+    type: list
+    default:
+      - 10
+      - 15
+      - 20
+      - 25
+      - 30
+      - 20
+      - 15
+      - 10
+    unit: "%"
   hourly_wind_speed_10m:
-    - 8.0
-    - 10.4
-    - 12.8
-    - 14.2
-    - 16.7
-    - 12.1
-    - 9.5
-    - 7.3
-
+    type: list
+    default:
+      - 8.0
+      - 10.4
+      - 12.8
+      - 14.2
+      - 16.7
+      - 12.1
+      - 9.5
+      - 7.3
+    unit: km/h
   daily_time:
-    - "2025-01-01"
-    - "2025-01-02"
-
+    type: list
+    default:
+      - "2025-01-01"
+      - "2025-01-02"
   daily_temp_max:
-    - 5.8
-    - 3.2
-
+    type: list
+    default:
+      - 5.8
+      - 3.2
+    unit: degC
   daily_temp_min:
-    - -3.4
-    - -6.1
-
+    type: list
+    default:
+      - -3.4
+      - -6.1
+    unit: degC
   daily_precip_sum:
-    - 2.6
-    - 0.8
-
-  k__current_temperature: 4.2
-  k__current_wind_speed: 14.3
-  k__current_wind_direction: 245
-  k__current_weather_code: 2
+    type: list
+    default:
+      - 2.6
+      - 0.8
+    unit: mm
+  k__current_temperature:
+    type: float
+    default: 4.2
+    unit: degC
+  k__current_wind_speed:
+    type: float
+    default: 14.3
+    unit: km/h
+  k__current_wind_direction:
+    type: int
+    default: 245
+    unit: deg
+  k__current_weather_code:
+    type: int
+    default: 2
 
 communication:
   - http_endpoint:
@@ -107,7 +149,7 @@ communication:
             forecast_horizon_hours: "#attr(forecast_horizon_hours)"
             hourly_units:
               time: "iso8601"
-              temperature_2m: "°C"
+              temperature_2m: "\u00b0C"
               precipitation_probability: "%"
               wind_speed_10m: "km/h"
             hourly:
@@ -117,8 +159,8 @@ communication:
               wind_speed_10m: "#attr(hourly_wind_speed_10m)"
             daily_units:
               time: "iso8601"
-              temperature_2m_max: "°C"
-              temperature_2m_min: "°C"
+              temperature_2m_max: "\u00b0C"
+              temperature_2m_min: "\u00b0C"
               precipitation_sum: "mm"
             daily:
               time: "#attr(daily_time)"

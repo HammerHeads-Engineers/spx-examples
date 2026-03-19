@@ -17,24 +17,52 @@ meta_parameters:
 
 attributes:
   # Averaged electrical measurements
-  k__current_avg_a: 12.0
-  k__voltage_ll_avg_v: 400.0
-  k__voltage_ln_avg_v: 230.0
-  k__power_factor: 0.97
-  power_factor_leading: 0
-  k__frequency_hz: 50.0
-
-  # Derived totals (W/VAR/VA)
-  active_power_total_w: 0.0
-  reactive_power_total_var: 0.0
-  apparent_power_total_va: 0.0
-
-  # Cumulative energy (kWh)
-  energy_import_total_kwh: 0.0
-  energy_export_total_kwh: 0.0
-
-  _cycle_time_s: 1.0
-
+  k__current_avg_a:
+    type: float
+    default: 12.0
+    unit: A
+  k__voltage_ll_avg_v:
+    type: float
+    default: 400.0
+    unit: V
+  k__voltage_ln_avg_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__power_factor:
+    type: float
+    default: 0.97
+  power_factor_leading:
+    type: int
+    default: 0
+  k__frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  active_power_total_w:
+    type: float
+    default: 0.0
+    unit: W
+  reactive_power_total_var:
+    type: float
+    default: 0.0
+    unit: var
+  apparent_power_total_va:
+    type: float
+    default: 0.0
+    unit: VA
+  energy_import_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  energy_export_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 actions:
   - function: $in(apparent_power_total_va)
     name: compute_apparent_power
@@ -82,25 +110,26 @@ communication:
       zero_fill: true
       mapping:
         # Averages (Float32 input registers)
-        k__current_avg_a:     { address: [3010, 3011], group: i_r, type: float }
-        k__voltage_ll_avg_v:  { address: [3026, 3027], group: i_r, type: float }
-        k__voltage_ln_avg_v:  { address: [3036, 3037], group: i_r, type: float }
+        k__current_avg_a: {address: [3010, 3011], group: i_r, type: float}
+        k__voltage_ll_avg_v: {address: [3026, 3027], group: i_r, type: float}
+        k__voltage_ln_avg_v: {address: [3036, 3037], group: i_r, type: float}
 
         # Power totals (Float32 input registers)
-        active_power_total_w:    { address: [3060, 3061], group: i_r, type: float }
-        reactive_power_total_var: { address: [3068, 3069], group: i_r, type: float }
-        apparent_power_total_va: { address: [3076, 3077], group: i_r, type: float }
+        active_power_total_w: {address: [3060, 3061], group: i_r, type: float}
+        reactive_power_total_var: {address: [3068, 3069], group: i_r, type: float}
+        apparent_power_total_va: {address: [3076, 3077], group: i_r, type: float}
 
         # Power factor + frequency (Float32 input registers)
-        k__power_factor:      { address: [3150, 3151], group: i_r, type: float }
-        k__frequency_hz:      { address: [3110, 3111], group: i_r, type: float }
+        k__power_factor: {address: [3150, 3151], group: i_r, type: float}
+        k__frequency_hz: {address: [3110, 3111], group: i_r, type: float}
 
         # Energy totals (Float32 input registers)
-        energy_import_total_kwh: { address: [2700, 2701], group: i_r, type: float }
-        energy_export_total_kwh: { address: [2702, 2703], group: i_r, type: float }
+        energy_import_total_kwh: {address: [2700, 2701], group: i_r, type: float}
+        energy_export_total_kwh: {address: [2702, 2703], group: i_r, type: float}
 
 scenarios:
   peak_demand:
+    display_name: Peak Demand
     description: High load, lagging power factor.
     duration: 30.0
     overrides:
@@ -109,6 +138,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   pv_export:
+    display_name: PV Export
     description: Simulated PV export with leading power factor.
     duration: 30.0
     overrides:
