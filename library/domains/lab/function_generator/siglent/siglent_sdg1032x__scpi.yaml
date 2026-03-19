@@ -4,6 +4,11 @@ description: |
   Virtual Siglent SDG1000X series function generator (modeled after SDG1032X)
   exposing basic waveform and output SCPI commands over ASCII/TCP.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -114,7 +119,8 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0

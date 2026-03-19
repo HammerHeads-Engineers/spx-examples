@@ -6,6 +6,11 @@ description: |
   electrical quantities as attributes and maps common SCPI verbs via the
   ASCII protocol.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   voltage:
     type: float

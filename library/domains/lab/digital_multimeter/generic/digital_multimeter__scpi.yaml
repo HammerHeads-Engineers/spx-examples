@@ -4,6 +4,11 @@ description: |
   Generic SCPI digital multimeter with DC voltage and resistance measurements,
   plus simple configuration commands for ASCII-over-TCP demos.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -44,21 +49,34 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         "CONF:VOLT:DC":
+          name: configure_voltage_dc
           "#attr(k__mode)": "VOLT:DC"
         "CONF:VOLT:DC {range}":
+          name: configure_voltage_dc_range
           "#attr(k__mode)": "VOLT:DC"
           "#attr(k__range_v)": "range"
 
-        "MEAS:VOLT:DC?": "#out(voltage_readback_v)"
-        "MEAS:RES?": "#out(resistance_readback_ohm)"
-        "READ?": "#out(readback_value)"
+        "MEAS:VOLT:DC?":
+          name: query_measurement_voltage_dc
+          response: "#out(voltage_readback_v)"
+        "MEAS:RES?":
+          name: query_measurement_resistance
+          response: "#out(resistance_readback_ohm)"
+        "READ?":
+          name: query_readback
+          response: "#out(readback_value)"
 
-        "SYST:ERR?": "#out(error_status)"
+        "SYST:ERR?":
+          name: query_system_error
+          response: "#out(error_status)"

@@ -6,6 +6,14 @@ description: >
   blood pressure, heart rate, oxygen saturation, respiration, and battery
   telemetry for mobile and firmware validation.
 
+meta_parameters:
+  ble_adapter_base_url:
+    type: str
+    default: http://host.docker.internal:8085
+  ble_device_name:
+    type: str
+    default: "SPX-Sim"
+
 attributes:
   # Activity state and smoothing factors
   activityIntensity:
@@ -282,9 +290,9 @@ actions:
 communication:
   - ble:
       adapter:
-        baseUrl: http://host.docker.internal:8085
+        baseUrl: "$param(ble_adapter_base_url)"
       device:
-        name: SPX-Sim
+        name: "$param(ble_device_name)"
       codecs:
         celsius:
           format: utf8

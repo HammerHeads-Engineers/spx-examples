@@ -5,6 +5,14 @@ description: >
   Minimal BLE GATT temperature sensor exposing a measured temperature together
   with a writable setpoint characteristic for mobile-app or firmware tests.
 
+meta_parameters:
+  ble_adapter_base_url:
+    type: str
+    default: http://host.docker.internal:8085
+  ble_device_name:
+    type: str
+    default: "SpX Temperature Sensor"
+
 attributes:
   temperature:
     type: float
@@ -18,9 +26,9 @@ attributes:
 communication:
   - ble:
       adapter:
-        baseUrl: http://host.docker.internal:8085
+        baseUrl: "$param(ble_adapter_base_url)"
       device:
-        name: SpX Temperature Sensor
+        name: "$param(ble_device_name)"
       codecs:
         celsius:
           format: utf8
