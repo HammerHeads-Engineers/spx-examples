@@ -48,12 +48,24 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
-        ":MEASure:ITEM? VPP,CHANnel1": "#out(channel1_vpp_v)"
-        ":MEASure:ITEM? VRMS,CHANnel1": "#out(channel1_vrms_v)"
-        ":MEASure:ITEM? VAVG,CHANnel1": "#out(channel1_vavg_v)"
-        ":MEASure:ITEM? FREQuency,CHANnel1": "#out(channel1_freq_hz)"
-        ":MEASure:ITEM? PERiod,CHANnel1": "#out(channel1_period_s)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        ":MEASure:ITEM? VPP,CHANnel1":
+          name: query_channel_1_vpp
+          response: "#out(channel1_vpp_v)"
+        ":MEASure:ITEM? VRMS,CHANnel1":
+          name: query_channel_1_vrms
+          response: "#out(channel1_vrms_v)"
+        ":MEASure:ITEM? VAVG,CHANnel1":
+          name: query_channel_1_vavg
+          response: "#out(channel1_vavg_v)"
+        ":MEASure:ITEM? FREQuency,CHANnel1":
+          name: query_channel_1_frequency
+          response: "#out(channel1_freq_hz)"
+        ":MEASure:ITEM? PERiod,CHANnel1":
+          name: query_channel_1_period
+          response: "#out(channel1_period_s)"
 
 scenarios:
   amplitude_sweep:

@@ -90,40 +90,71 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
-        "CHANnel1:SCALe?": "#out(k__channel_1_scale_v)"
+        "CHANnel1:SCALe?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
         "CHANnel1:SCALe {scale}":
+          name: set_channel_1_scale
           "#attr(k__channel_1_scale_v)": "scale"
           response: "OK"
-        "CHANnel1:OFFSet?": "#out(k__channel_1_offset_v)"
+        "CHANnel1:OFFSet?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
         "CHANnel1:OFFSet {offset}":
+          name: set_channel_1_offset
           "#attr(k__channel_1_offset_v)": "offset"
           response: "OK"
 
-        "TIMebase:SCALe?": "#out(k__timebase_scale_s)"
+        "TIMebase:SCALe?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
         "TIMebase:SCALe {scale}":
+          name: set_timebase_scale
           "#attr(k__timebase_scale_s)": "scale"
           response: "OK"
 
-        "TRIGger:A:LEVel1?": "#out(k__trigger_level_v)"
+        "TRIGger:A:LEVel1?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
         "TRIGger:A:LEVel1 {level}":
+          name: set_trigger_level
           "#attr(k__trigger_level_v)": "level"
           response: "OK"
 
-        "MEASurement1:MAIN?": "#out(k__measurement_type)"
+        "MEASurement1:MAIN?":
+          name: query_measurement_type
+          response: "#out(k__measurement_type)"
         "MEASurement1:MAIN {mtype}":
+          name: set_measurement_type
           "#attr(k__measurement_type)": "mtype"
           response: "OK"
-        "MEASurement1:RESult?": "#out(measurement_value)"
+        "MEASurement1:RESult?":
+          name: query_measurement_value
+          response: "#out(measurement_value)"
 
-        "SYSTem:ERRor:ALL?": "#out(error_status)"
+        "SYSTem:ERRor:ALL?":
+          name: query_system_error
+          response: "#out(error_status)"
 
-        ":MEASure:ITEM? VPP,CHANnel1": "#out(channel1_vpp_v)"
-        ":MEASure:ITEM? VRMS,CHANnel1": "#out(channel1_vrms_v)"
-        ":MEASure:ITEM? VAVG,CHANnel1": "#out(channel1_vavg_v)"
-        ":MEASure:ITEM? FREQuency,CHANnel1": "#out(channel1_freq_hz)"
-        ":MEASure:ITEM? PERiod,CHANnel1": "#out(channel1_period_s)"
+        ":MEASure:ITEM? VPP,CHANnel1":
+          name: query_channel_1_vpp
+          response: "#out(channel1_vpp_v)"
+        ":MEASure:ITEM? VRMS,CHANnel1":
+          name: query_channel_1_vrms
+          response: "#out(channel1_vrms_v)"
+        ":MEASure:ITEM? VAVG,CHANnel1":
+          name: query_channel_1_vavg
+          response: "#out(channel1_vavg_v)"
+        ":MEASure:ITEM? FREQuency,CHANnel1":
+          name: query_channel_1_frequency
+          response: "#out(channel1_freq_hz)"
+        ":MEASure:ITEM? PERiod,CHANnel1":
+          name: query_channel_1_period
+          response: "#out(channel1_period_s)"
 
 scenarios:
   calibration_tone:
