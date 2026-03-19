@@ -286,6 +286,7 @@ communication:
 scenarios:
   lwm2m_reconnect:
     name: LwM2M Reconnect
+    display_name: "LwM2M Reconnect"
     description: Temporarily detaches the LwM2M client to exercise reconnect handling.
     duration: 3.0
     call:

@@ -7,6 +7,14 @@ description: >
   impulse counts are updated after each acquisition window and scaled by
   per-channel comparator thresholds.
 
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5022
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
   # Acquisition state and control registers
   measure_done:
@@ -15,30 +23,75 @@ attributes:
   measure_start:
     type: int
     default: 0
-  measure_config: 0
-  dwell_time: 100               # ms
+  measure_config:
+    type: int
+    default: 0
+  dwell_time:
+    type: int
+    default: 100
+    unit: ms
 
   # Latched channel impulse counts
-  ch_1_impulse: 0
-  ch_2_impulse: 0
-  ch_3_impulse: 0
-  ch_4_impulse: 0
-  ch_5_impulse: 0
-  ch_6_impulse: 0
-  ch_7_impulse: 0
+  ch_1_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_2_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_3_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_4_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_5_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_6_impulse:
+    type: int
+    default: 0
+    unit: count
+  ch_7_impulse:
+    type: int
+    default: 0
+    unit: count
 
   # Per-channel comparator thresholds
-  ch_1_comparator: 0
-  ch_2_comparator: 0
-  ch_3_comparator: 0
-  ch_4_comparator: 0
-  ch_5_comparator: 0
-  ch_6_comparator: 0
-  ch_7_comparator: 0
+  ch_1_comparator:
+    type: int
+    default: 0
+  ch_2_comparator:
+    type: int
+    default: 0
+  ch_3_comparator:
+    type: int
+    default: 0
+  ch_4_comparator:
+    type: int
+    default: 0
+  ch_5_comparator:
+    type: int
+    default: 0
+  ch_6_comparator:
+    type: int
+    default: 0
+  ch_7_comparator:
+    type: int
+    default: 0
 
   # Internal acquisition timing state
-  _start_ms: 0
-  auto_trigger_enable: 0
+  _start_ms:
+    type: float
+    default: 0.0
+    unit: ms
+  auto_trigger_enable:
+    type: int
+    default: 0
 
 actions:
   # Channel impulses: hold during measurement, latch new value after measurement window.
@@ -204,8 +257,8 @@ polling:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5022
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       mapping:
         measure_done:          { address: [0,0],    group: h_r, type: uint_16 }
@@ -232,6 +285,7 @@ scenarios:
     display_name: "Modbus Disconnect"
     enabled: true
     duration: 2.0
+    description: Temporarily detaches the Modbus slave endpoint to exercise reconnect handling.
     call:
       path: communication.modbus_slave.detach
       stop_path: communication.modbus_slave.attach

@@ -31,16 +31,28 @@ def test_prevac_mcd7_modbus_model_loads() -> None:
     assert "prevac mcd7" in description
     assert "multichanneltron detector" in description
 
+    meta_parameters = doc.get("meta_parameters")
+    assert isinstance(meta_parameters, dict)
+    assert meta_parameters["modbus_port"]["default"] == 5022
+    assert meta_parameters["modbus_unit_id"]["default"] == 1
+
     attributes = doc.get("attributes")
     assert isinstance(attributes, dict)
     assert attributes["measure_done"]["default"] == 1
     assert attributes["measure_start"]["default"] == 0
-    assert attributes["dwell_time"] == 100
+    assert attributes["measure_config"]["type"] == "int"
+    assert attributes["dwell_time"]["default"] == 100
+    assert attributes["dwell_time"]["unit"] == "ms"
+    assert attributes["ch_1_impulse"]["unit"] == "count"
+    assert attributes["ch_7_impulse"]["type"] == "int"
+    assert attributes["_start_ms"]["unit"] == "ms"
 
     communication = doc.get("communication")
     assert isinstance(communication, list) and communication
     modbus = communication[0].get("modbus_slave")
     assert isinstance(modbus, dict)
+    assert modbus["port"] == "$param(modbus_port)"
+    assert modbus["unit_id"] == "$param(modbus_unit_id)"
 
     mapping = modbus.get("mapping")
     assert isinstance(mapping, dict)
@@ -51,6 +63,7 @@ def test_prevac_mcd7_modbus_model_loads() -> None:
     scenarios = doc.get("scenarios")
     assert isinstance(scenarios, dict)
     assert scenarios["modbus_disconnect"]["display_name"] == "Modbus Disconnect"
+    assert "reconnect handling" in scenarios["modbus_disconnect"]["description"].lower()
     assert scenarios["channel_3_dropout"]["display_name"] == "Channel 3 Dropout"
 
 

@@ -8,6 +8,14 @@ description: >
   ionizer interlocks, relay thresholds, and discharge/leak disturbances exposed
   over Modbus TCP.
 
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 5021
+  modbus_unit_id:
+    type: int
+    default: 1
+
 attributes:
   # Measured pressures [mbar]
   rough_pressure:
@@ -272,8 +280,8 @@ actions:
 communication:
   - modbus_slave:
       host: 0.0.0.0
-      port: 5021
-      unit_id: 1
+      port: "$param(modbus_port)"
+      unit_id: "$param(modbus_unit_id)"
       zero_fill: true
       # poll_interval: 0.2
       mapping:
@@ -301,6 +309,7 @@ communication:
 scenarios:
   discharge_spike:
     name: Discharge Spike
+    display_name: "Discharge Spike"
     enabled: true
     description: Injects a brief discharge event that spikes both pressure channels.
     duration: 0.1
@@ -309,6 +318,7 @@ scenarios:
 
   slow_leak:
     name: Slow Leak
+    display_name: "Slow Leak"
     enabled: true
     description: Holds the leak flag active long enough to raise pressures gradually.
     duration: 15.0
@@ -319,6 +329,7 @@ scenarios:
 
   ionizer_trip:
     name: Ionizer Trip
+    display_name: "Ionizer Trip"
     enabled: true
     description: Requests the ioniser while nudging thresholds so the interlock triggers.
     duration: 5.0
@@ -328,14 +339,17 @@ scenarios:
 
   modbus_disconnect:
     name: Modbus Disconnect
+    display_name: "Modbus Disconnect"
     enabled: true
     duration: 2.0
+    description: Temporarily detaches the Modbus slave endpoint to exercise reconnect handling.
     call:
       path: communication.modbus_slave.detach
       stop_path: communication.modbus_slave.attach
 
   relay_sweep:
     name: Relay Sweep
+    display_name: "Relay Sweep"
     enabled: true
     duration: 6.0
     description: Sweeps relay setpoints to exercise output transitions.
@@ -348,6 +362,7 @@ scenarios:
 
   sensor_drift:
     name: Sensor Drift
+    display_name: "Sensor Drift"
     enabled: true
     duration: 12.0
     description: Simulates slower sensor dynamics by reducing pump gains and adding decay.

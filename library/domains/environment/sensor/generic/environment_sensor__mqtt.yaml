@@ -247,10 +247,10 @@ actions:
           )
         )
 
-  # Evolve CO₂ concentration based on ventilation and occupancy respiration.
+  # Evolve CO2 concentration based on ventilation and occupancy respiration.
   - function: $in(k__co2_ppm)
     name: update_co2_ppm
-    description: Estimate indoor CO₂ with a low-order balance between emissions and ventilation.
+    description: Estimate indoor CO2 with a low-order balance between emissions and ventilation.
     outdoor_ppm: 420.0
     call: max(
           outdoor_ppm,
@@ -362,64 +362,83 @@ communication:
       default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
-        - attribute: $ext(k__temperature_c)
+        - name: publish_temperature_c
+          attribute: $ext(k__temperature_c)
           topic: telemetry/temperature_c
           direction: publish
-        - attribute: $ext(k__target_c)
+        - name: publish_target_c
+          attribute: $ext(k__target_c)
           topic: telemetry/target_c
           direction: publish
-        - attribute: $ext(k__humidity_percent)
+        - name: publish_humidity_percent
+          attribute: $ext(k__humidity_percent)
           topic: telemetry/humidity_percent
           direction: publish
-        - attribute: $ext(k__co2_ppm)
+        - name: publish_co2_ppm
+          attribute: $ext(k__co2_ppm)
           topic: telemetry/co2_ppm
           direction: publish
-        - attribute: $ext(k__comfort_index)
+        - name: publish_comfort_index
+          attribute: $ext(k__comfort_index)
           topic: telemetry/comfort_index
           direction: publish
-        - attribute: $ext(k__hvac_mode)
+        - name: publish_hvac_mode
+          attribute: $ext(k__hvac_mode)
           topic: telemetry/hvac_mode
           direction: publish
-        - attribute: $ext(k__fan_speed_percent)
+        - name: publish_fan_speed_percent
+          attribute: $ext(k__fan_speed_percent)
           topic: telemetry/fan_speed_percent
           direction: publish
-        - attribute: $ext(k__occupancy_count)
+        - name: publish_occupancy_count
+          attribute: $ext(k__occupancy_count)
           topic: telemetry/occupancy_count
           direction: publish
-        - attribute: $ext(k__status_text)
+        - name: publish_status_text
+          attribute: $ext(k__status_text)
           topic: telemetry/status
           direction: publish
-        - attribute: $ext(k__alarm_high_temp)
+        - name: publish_alarm_high_temp
+          attribute: $ext(k__alarm_high_temp)
           topic: telemetry/alarms/high_temp
           direction: publish
-        - attribute: $ext(k__alarm_co2)
+        - name: publish_alarm_co2
+          attribute: $ext(k__alarm_co2)
           topic: telemetry/alarms/co2
           direction: publish
-        - attribute: $ext(k__alarm_stale_data)
+        - name: publish_alarm_stale_data
+          attribute: $ext(k__alarm_stale_data)
           topic: telemetry/alarms/stale
           direction: publish
-        - attribute: $ext(k__mqtt_connected)
+        - name: publish_mqtt_connected
+          attribute: $ext(k__mqtt_connected)
           topic: telemetry/health/mqtt_connected
           direction: publish
-        - attribute: $attr(k__target_c)
+        - name: subscribe_target_c
+          attribute: $attr(k__target_c)
           topic: command/setpoint_c
           direction: subscribe
-        - attribute: $attr(k__hvac_mode)
+        - name: subscribe_hvac_mode
+          attribute: $attr(k__hvac_mode)
           topic: command/hvac_mode
           direction: subscribe
-        - attribute: $attr(k__fan_speed_target)
+        - name: subscribe_fan_speed_target
+          attribute: $attr(k__fan_speed_target)
           topic: command/fan_speed
           direction: subscribe
-        - attribute: $attr(k__occupancy_target)
+        - name: subscribe_occupancy_target
+          attribute: $attr(k__occupancy_target)
           topic: command/occupancy
           direction: subscribe
-        - attribute: $attr(command_source)
+        - name: subscribe_command_source
+          attribute: $attr(command_source)
           topic: command/source
           direction: subscribe
 
 scenarios:
   occupancy_spike:
     name: Occupancy Spike
+    display_name: "Occupancy Spike"
     description: Temporarily raises occupancy to exercise HVAC response under crowding.
     duration: 15.0
     overrides:
@@ -427,6 +446,7 @@ scenarios:
 
   night_setback:
     name: Night Setback
+    display_name: "Night Setback"
     description: Lowers temperature and fan demand to simulate night operation.
     duration: 30.0
     overrides:
@@ -435,6 +455,7 @@ scenarios:
 
   mqtt_disconnect:
     name: MQTT Disconnect
+    display_name: "MQTT Disconnect"
     description: Detaches the MQTT transport long enough to trigger stale-data handling.
     duration: 4.0
     call:
