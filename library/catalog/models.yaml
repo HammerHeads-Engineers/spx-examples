@@ -12,12 +12,10 @@ models:
   - id: mqtt_broker
   packages:
   - smart_building_pack
-  - energy_pack
   - embedded_lab_pack
   - industrial_iiot_pack
   profiles:
   - bms_quickstart
-  - ev_csms_demo
   - iiot_monitoring
 - id: Env.EnvSensor.Lwm2m
   name: LwM2M Environment Sensor
@@ -260,10 +258,8 @@ models:
   - id: http_gateway
   packages:
   - smart_building_pack
-  - energy_pack
   profiles:
   - bms_quickstart
-  - ev_csms_demo
 - id: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
   name: Weather Gateway (WAGO PFC200 + Vaisala WXT530, MQTT Discovery)
   path: library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
@@ -292,11 +288,9 @@ models:
   - id: modbus_tcp_gateway
   packages:
   - smart_building_pack
-  - energy_pack
   - industrial_iiot_pack
   profiles:
   - bms_quickstart
-  - ev_csms_demo
   - process_cell_quickstart
 - id: Process.PressureController.Eurotherm3504.Modbus
   name: Eurotherm 3504 Pressure Controller (Modbus TCP)
@@ -352,11 +346,9 @@ models:
   services: []
   packages:
   - smart_building_pack
-  - energy_pack
   - industrial_iiot_pack
   profiles:
   - bms_quickstart
-  - ev_csms_demo
   - process_cell_quickstart
 - id: Motion.StepperController.Modbus
   name: Stepper Controller (Modbus)

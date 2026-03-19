@@ -1,6 +1,6 @@
 # Energy Pack (e-Mobility & DER) SPEC
 
-Purpose: DER / e-mobility demo pack with OCPP charge point + CSMS handshake and shared telemetry/controllers.
+Purpose: energy-native DER / e-mobility demo pack with OCPP charge point + CSMS handshake, Modbus EVSEs, and power-meter telemetry.
 
 ## Scope
 - Profiles: `profiles/energy_pack/ev_csms_demo.yaml`

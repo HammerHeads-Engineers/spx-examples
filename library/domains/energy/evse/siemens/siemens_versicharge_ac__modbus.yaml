@@ -17,78 +17,211 @@ meta_parameters:
 
 attributes:
   # Remote controls (uint16 registers and current limit [A])
-  cmd__pause: 2
-  k__max_charging_current_a: 16
+  cmd__pause:
+    type: int
+    default: 2
+  k__max_charging_current_a:
+    type: int
+    default: 16
+    unit: A
 
   # Electrical measurements ([A], [V], power-factor ratio)
-  k__current_l1_a: 8.0
-  k__current_l2_a: 8.0
-  k__current_l3_a: 8.0
-  k__voltage_l1_n_v: 230.0
-  k__voltage_l2_n_v: 229.0
-  k__voltage_l3_n_v: 231.0
-  k__power_factor_l1: 0.98
-  k__power_factor_l2: 0.98
-  k__power_factor_l3: 0.98
+  k__current_l1_a:
+    type: float
+    default: 8.0
+    unit: A
+  k__current_l2_a:
+    type: float
+    default: 8.0
+    unit: A
+  k__current_l3_a:
+    type: float
+    default: 8.0
+    unit: A
+  k__voltage_l1_n_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__voltage_l2_n_v:
+    type: float
+    default: 229.0
+    unit: V
+  k__voltage_l3_n_v:
+    type: float
+    default: 231.0
+    unit: V
+  k__power_factor_l1:
+    type: float
+    default: 0.98
+    unit: ratio
+  k__power_factor_l2:
+    type: float
+    default: 0.98
+    unit: ratio
+  k__power_factor_l3:
+    type: float
+    default: 0.98
+    unit: ratio
 
   # Aggregate telemetry ([A], [V], [W], [VA], [var])
-  current_phase_sum_a: 0.0
-  voltage_phase_sum_v: 0.0
+  current_phase_sum_a:
+    type: float
+    default: 0.0
+    unit: A
+  voltage_phase_sum_v:
+    type: float
+    default: 0.0
+    unit: V
 
-  active_power_l1_w: 0.0
-  active_power_l2_w: 0.0
-  active_power_l3_w: 0.0
-  active_power_sum_w: 0.0
+  active_power_l1_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l2_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l3_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_sum_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  apparent_power_l1_va: 0.0
-  apparent_power_l2_va: 0.0
-  apparent_power_l3_va: 0.0
-  apparent_power_sum_va: 0.0
+  apparent_power_l1_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l2_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l3_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_sum_va:
+    type: float
+    default: 0.0
+    unit: VA
 
-  reactive_power_l1_var: 0.0
-  reactive_power_l2_var: 0.0
-  reactive_power_l3_var: 0.0
-  reactive_power_sum_var: 0.0
+  reactive_power_l1_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l2_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l3_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_sum_var:
+    type: float
+    default: 0.0
+    unit: var
 
-  power_factor_sum: 0.0
+  power_factor_sum:
+    type: float
+    default: 0.0
+    unit: ratio
 
   # Energy ([kWh])
-  energy_consumed_kwh: 0.0
+  energy_consumed_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
 
   # Modbus-scaled raw registers (uint16/uint32 payloads)
-  _modbus_current_l1_raw: 0
-  _modbus_current_l2_raw: 0
-  _modbus_current_l3_raw: 0
-  _modbus_current_sum_raw: 0
+  _modbus_current_l1_raw:
+    type: int
+    default: 0
+  _modbus_current_l2_raw:
+    type: int
+    default: 0
+  _modbus_current_l3_raw:
+    type: int
+    default: 0
+  _modbus_current_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_voltage_l1_raw: 0
-  _modbus_voltage_l2_raw: 0
-  _modbus_voltage_l3_raw: 0
-  _modbus_voltage_sum_raw: 0
+  _modbus_voltage_l1_raw:
+    type: int
+    default: 0
+  _modbus_voltage_l2_raw:
+    type: int
+    default: 0
+  _modbus_voltage_l3_raw:
+    type: int
+    default: 0
+  _modbus_voltage_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_active_power_l1_raw: 0
-  _modbus_active_power_l2_raw: 0
-  _modbus_active_power_l3_raw: 0
-  _modbus_active_power_sum_raw: 0
+  _modbus_active_power_l1_raw:
+    type: int
+    default: 0
+  _modbus_active_power_l2_raw:
+    type: int
+    default: 0
+  _modbus_active_power_l3_raw:
+    type: int
+    default: 0
+  _modbus_active_power_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_power_factor_l1_raw: 0
-  _modbus_power_factor_l2_raw: 0
-  _modbus_power_factor_l3_raw: 0
-  _modbus_power_factor_sum_raw: 0
+  _modbus_power_factor_l1_raw:
+    type: int
+    default: 0
+  _modbus_power_factor_l2_raw:
+    type: int
+    default: 0
+  _modbus_power_factor_l3_raw:
+    type: int
+    default: 0
+  _modbus_power_factor_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_apparent_power_l1_raw: 0
-  _modbus_apparent_power_l2_raw: 0
-  _modbus_apparent_power_l3_raw: 0
-  _modbus_apparent_power_sum_raw: 0
+  _modbus_apparent_power_l1_raw:
+    type: int
+    default: 0
+  _modbus_apparent_power_l2_raw:
+    type: int
+    default: 0
+  _modbus_apparent_power_l3_raw:
+    type: int
+    default: 0
+  _modbus_apparent_power_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_reactive_power_l1_raw: 0
-  _modbus_reactive_power_l2_raw: 0
-  _modbus_reactive_power_l3_raw: 0
-  _modbus_reactive_power_sum_raw: 0
+  _modbus_reactive_power_l1_raw:
+    type: int
+    default: 0
+  _modbus_reactive_power_l2_raw:
+    type: int
+    default: 0
+  _modbus_reactive_power_l3_raw:
+    type: int
+    default: 0
+  _modbus_reactive_power_sum_raw:
+    type: int
+    default: 0
 
-  _modbus_energy_consumed_raw: 0
+  _modbus_energy_consumed_raw:
+    type: int
+    default: 0
 
-  _cycle_time_s: 1.0
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(current_phase_sum_a)

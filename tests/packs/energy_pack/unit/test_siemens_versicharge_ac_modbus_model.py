@@ -33,8 +33,11 @@ def test_siemens_versicharge_ac_modbus_model_loads() -> None:
 
     attributes = doc.get("attributes")
     assert isinstance(attributes, dict)
-    assert attributes["k__max_charging_current_a"] == 16
-    assert attributes["energy_consumed_kwh"] == 0.0
+    assert attributes["k__max_charging_current_a"]["default"] == 16
+    assert attributes["k__max_charging_current_a"]["unit"] == "A"
+    assert attributes["energy_consumed_kwh"]["default"] == 0.0
+    assert attributes["energy_consumed_kwh"]["unit"] == "kWh"
+    assert attributes["_modbus_active_power_sum_raw"]["type"] == "int"
 
     communication = doc.get("communication")
     assert isinstance(communication, list) and communication
