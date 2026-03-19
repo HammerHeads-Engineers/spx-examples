@@ -22,6 +22,15 @@ def _pack_models() -> list[tuple[str, str]]:
     return [(entry["id"], entry["path"]) for entry in pack_index["models"]]
 
 
+def _communication_blocks(model: dict) -> list[dict]:
+    communication = model.get("communication") or []
+    if isinstance(communication, dict):
+        return [communication]
+    if isinstance(communication, list):
+        return [block for block in communication if isinstance(block, dict)]
+    return []
+
+
 def test_embedded_lab_pack_communication_endpoints_use_meta_parameters() -> None:
     missing: list[str] = []
 
@@ -29,10 +38,7 @@ def test_embedded_lab_pack_communication_endpoints_use_meta_parameters() -> None
         model = _load_yaml(relative_path)
         meta_parameters = model.get("meta_parameters") or {}
 
-        for block in model.get("communication") or []:
-            if not isinstance(block, dict):
-                continue
-
+        for block in _communication_blocks(model):
             if "ascii" in block:
                 ascii_cfg = block["ascii"]
                 if (

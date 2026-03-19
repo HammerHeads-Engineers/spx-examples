@@ -34,7 +34,8 @@ attributes:
 
 communication:
   ascii:
-    # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+    # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+    port: "$param(ascii_port)"
     terminator: "\n"
     response_delay: 0.01
     response_jitter: 0.0
