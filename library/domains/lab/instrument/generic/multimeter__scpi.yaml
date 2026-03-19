@@ -52,6 +52,7 @@ communication:
 scenarios:
   voltage_static:
     name: Voltage Static
+    display_name: "Voltage Static"
     enabled: true
     description: |
       Slews the measured voltage toward a target value using a bounded
@@ -67,6 +68,7 @@ scenarios:
 
   ascii_disconnect:
     name: ASCII Disconnect
+    display_name: "ASCII Disconnect"
     description: Temporarily detaches the ASCII transport to exercise reconnect handling.
     enabled: true
     duration: 2.0
@@ -76,6 +78,7 @@ scenarios:
 
   ascii_response_delay_spike:
     name: ASCII Response Delay Spike
+    display_name: "ASCII Response Delay Spike"
     description: Increases response latency to emulate an overloaded instrument.
     enabled: true
     duration: 5.0
@@ -84,6 +87,7 @@ scenarios:
 
   discharge_spike:
     name: Discharge Spike
+    display_name: "Discharge Spike"
     description: Forces a one-shot voltage spike to emulate a transient event.
     enabled: true
     run_limit: 1

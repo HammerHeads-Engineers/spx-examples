@@ -416,6 +416,7 @@ communication:
 scenarios:
   deep_sleep:
     name: Deep Sleep
+    display_name: "Deep Sleep"
     description: Drops activity intensity to resting levels for low-vitals simulation.
     enabled: true
     duration: 10.0
@@ -424,6 +425,7 @@ scenarios:
 
   focused_work:
     name: Focused Work
+    display_name: "Focused Work"
     description: Simulates sustained desk work with moderate physiological load.
     enabled: true
     duration: 10.0
@@ -432,6 +434,7 @@ scenarios:
 
   brisk_walk:
     name: Brisk Walk
+    display_name: "Brisk Walk"
     description: Raises vital signs to a light cardio level.
     enabled: true
     duration: 10.0
@@ -440,6 +443,7 @@ scenarios:
 
   interval_training:
     name: Interval Training
+    display_name: "Interval Training"
     description: Pushes the wearable toward near-peak exercise telemetry.
     enabled: true
     duration: 10.0
@@ -448,6 +452,7 @@ scenarios:
 
   acute_stress_event:
     name: Acute Stress Event
+    display_name: "Acute Stress Event"
     description: Briefly spikes vitals without reaching full workout intensity.
     enabled: true
     duration: 10.0
@@ -456,6 +461,7 @@ scenarios:
 
   cooldown_recovery:
     name: Cooldown Recovery
+    display_name: "Cooldown Recovery"
     description: Returns the wearer toward post-exercise recovery values.
     enabled: true
     duration: 10.0
