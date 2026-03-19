@@ -14,6 +14,39 @@ Catalog taxonomy is the source of truth for pack membership and higher-level gro
 - `device_class`: lower_snake_case functional class such as `sensor`, `controller`, `meter`
 - `vendor`: lower_snake_case vendor slug or `generic`
 
+## Attribute naming standard
+Apply this standard to every new or updated model YAML. Legacy models may still deviate, but cleanup work should move them toward this shape.
+
+- Use `lower_snake_case` for all attribute names.
+- Split attributes into four semantic groups:
+  - `k__*`: primary control inputs and simulation-critical state written by users, protocols, or higher-level control logic. Use for setpoints, targets, modes, enable/disable flags, and other values that directly drive behavior.
+  - `cmd__*`: command/trigger inputs. Use for one-shot actions, trigger flags, start/stop requests, open/close requests, pause/resume commands, and similar control edges.
+  - plain attributes without prefix: normal telemetry, measurements, derived values, diagnostics, counters, status readbacks, and other ordinary runtime state.
+  - `_helper` / leading `_`: internal helper attributes that support model logic and should not be treated as public-facing state.
+- Do not use `k__` for derived/calculated values, pure telemetry, diagnostics, or helper state.
+- There is no separate dedicated prefix for "ordinary" attributes. If an attribute is neither key control state nor command/trigger input nor hidden helper state, keep it as plain `lower_snake_case`.
+- Prefer explicit units in attribute names via suffixes when the quantity is dimensional, for example:
+  - `_c`, `_pct`, `_ms`, `_s`, `_hz`, `_khz`, `_v`, `_a`, `_ma`, `_w`, `_kw`, `_wh`, `_kwh`, `_va`, `_kva`, `_var`, `_bar`, `_mbar`, `_ppm`, `_nm`, `_nm_s`, `_sccm`
+- For new or updated typed attributes, prefer the structured form:
+  - `type`
+  - `default`
+  - `unit` when applicable
+- Keep the unit suffix in the attribute name and the explicit `unit:` field aligned when both are present, for example `pressure_mbar` with `unit: mbar`, `temperature_c` with `unit: degC`, `energy_total_kwh` with `unit: kWh` or repo-consistent equivalent.
+- When deciding between `k__*` and `cmd__*`:
+  - use `k__*` for persistent control state that can be read back as the current target or mode
+  - use `cmd__*` for command-style inputs that represent an action or trigger rather than steady state
+- For compatibility work on existing models, preserve legacy public names only when backward compatibility is required; otherwise prefer this standard.
+- Reference docs for deeper rationale: `docs/LLM_SPEC.md` and `docs/MODEL_LANGUAGE.md`.
+
+## Model docs to read first
+`AGENTS.md` contains the minimum mandatory operating rules, but it is not the full modeling spec.
+
+- When creating, renaming, or substantially updating model YAML files, always read `docs/LLM_SPEC.md` and `docs/MODEL_LANGUAGE.md` before editing.
+- Treat `docs/LLM_SPEC.md` as the repo-level modeling playbook for naming, `k__` vs `cmd__` decisions, golden/reference models, and expected PR summary context.
+- Treat `docs/MODEL_LANGUAGE.md` as the source of truth for the YAML modeling language structure and supported constructs.
+- If there is any conflict between an older model example and these docs, prefer the docs for new work, unless backward compatibility requires preserving the legacy shape.
+- Do not assume that examples alone define the standard; check the docs explicitly.
+
 ## How to add a model
 1. Copy the closest existing model YAML in `library/domains/...`.
 2. Review the pack spec in `library/industries/<pack>/SPEC.md` if the model belongs to a pack.
