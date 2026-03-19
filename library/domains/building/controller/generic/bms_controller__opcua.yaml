@@ -6,40 +6,115 @@ description: |
   Ideal for testing BAS integrations that read/write setpoints, schedules and alarm states.
 
 attributes:
-  hvac_mode: auto
-  schedule_override: none
-  occupancy_percent: 35.0
-  occupancy_target_percent: 50.0
+  hvac_mode:
+    type: str
+    default: "auto"
+  schedule_override:
+    type: str
+    default: "none"
+  occupancy_percent:
+    type: float
+    default: 35.0
+    unit: percent
+  occupancy_target_percent:
+    type: float
+    default: 50.0
+    unit: percent
 
-  supply_air_temp_c: 16.5
-  supply_air_setpoint_c: 16.0
-  supply_air_command_c: 16.0
-  return_air_temp_c: 24.0
-  zone_temp_average_c: 22.2
+  supply_air_temp_c:
+    type: float
+    default: 16.5
+    unit: degC
+  supply_air_setpoint_c:
+    type: float
+    default: 16.0
+    unit: degC
+  supply_air_command_c:
+    type: float
+    default: 16.0
+    unit: degC
+  return_air_temp_c:
+    type: float
+    default: 24.0
+    unit: degC
+  zone_temp_average_c:
+    type: float
+    default: 22.2
+    unit: degC
 
-  fan_speed_percent: 55.0
-  fan_command_percent: 55.0
-  fan_status_text: "RUN"
+  fan_speed_percent:
+    type: float
+    default: 55.0
+    unit: percent
+  fan_command_percent:
+    type: float
+    default: 55.0
+    unit: percent
+  fan_status_text:
+    type: str
+    default: "RUN"
 
-  filter_dp_pa: 120.0
-  filter_dp_limit_pa: 250.0
+  filter_dp_pa:
+    type: float
+    default: 120.0
+    unit: Pa
+  filter_dp_limit_pa:
+    type: float
+    default: 250.0
+    unit: Pa
 
-  chilled_supply_temp_c: 6.5
-  chilled_return_temp_c: 11.2
-  chilled_setpoint_c: 6.0
-  pump_speed_percent: 60.0
-  pump_command_percent: 60.0
-  valve_position_percent: 45.0
+  chilled_supply_temp_c:
+    type: float
+    default: 6.5
+    unit: degC
+  chilled_return_temp_c:
+    type: float
+    default: 11.2
+    unit: degC
+  chilled_setpoint_c:
+    type: float
+    default: 6.0
+    unit: degC
+  pump_speed_percent:
+    type: float
+    default: 60.0
+    unit: percent
+  pump_command_percent:
+    type: float
+    default: 60.0
+    unit: percent
+  valve_position_percent:
+    type: float
+    default: 45.0
+    unit: percent
 
-  energy_consumption_kwh: 1280.0
-  demand_limit_kw: 90.0
-  power_draw_kw: 78.0
+  energy_consumption_kwh:
+    type: float
+    default: 1280.0
+    unit: kWh
+  demand_limit_kw:
+    type: float
+    default: 90.0
+    unit: kW
+  power_draw_kw:
+    type: float
+    default: 78.0
+    unit: kW
 
-  alarm_chiller: 0
-  alarm_fan: 0
-  alarm_filter: 0
+  alarm_chiller:
+    type: int
+    default: 0
+  alarm_fan:
+    type: int
+    default: 0
+  alarm_filter:
+    type: int
+    default: 0
 
-  cycle_time_s: 1.0
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 
 actions:
   - function: $in(occupancy_percent)
@@ -345,6 +420,8 @@ communication:
 scenarios:
   morning_warmup:
     enabled: true
+    display_name: "Morning Warmup"
+    description: Raise occupancy and chiller demand for a morning startup sequence.
     duration: 20.0
     overrides:
       $in(schedule_override): occupied
@@ -353,6 +430,8 @@ scenarios:
 
   demand_response:
     enabled: true
+    display_name: "Demand Response"
+    description: Reduce fan and pump demand to stay below the power cap.
     duration: 25.0
     overrides:
       $in(demand_limit_kw): 60.0
@@ -361,6 +440,8 @@ scenarios:
 
   maintenance_stop:
     enabled: true
+    display_name: "Maintenance Stop"
+    description: Switch the HVAC plant to an off state for maintenance.
     duration: 15.0
     overrides:
       $in(hvac_mode): off

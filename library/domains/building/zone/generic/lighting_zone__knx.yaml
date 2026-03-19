@@ -20,22 +20,55 @@ meta_parameters:
     default: "1"
 
 attributes:
-  k__zone_state: automatic        # automatic/manual/off
-  k__scene_active: default
-  k__occupancy_detected: 1
-  k__daylight_lux: 280.0
+  k__zone_state:
+    type: str
+    default: "automatic"
+  k__scene_active:
+    type: str
+    default: "default"
+  k__occupancy_detected:
+    type: int
+    default: 1
+  k__daylight_lux:
+    type: float
+    default: 280.0
+    unit: lx
 
-  circuit_a_level_percent: 65.0
-  k__circuit_a_target_percent: 70.0
-  circuit_b_level_percent: 25.0
-  k__circuit_b_target_percent: 30.0
+  circuit_a_level_percent:
+    type: float
+    default: 65.0
+    unit: percent
+  k__circuit_a_target_percent:
+    type: float
+    default: 70.0
+    unit: percent
+  circuit_b_level_percent:
+    type: float
+    default: 25.0
+    unit: percent
+  k__circuit_b_target_percent:
+    type: float
+    default: 30.0
+    unit: percent
 
-  k__emergency_override: 0
-  alarm_emergency: 0
-  alarm_failure: 0
+  k__emergency_override:
+    type: int
+    default: 0
+  alarm_emergency:
+    type: int
+    default: 0
+  alarm_failure:
+    type: int
+    default: 0
 
-  energy_today_kwh: 4.2
-  cycle_time_s: 0.5
+  energy_today_kwh:
+    type: float
+    default: 4.2
+    unit: kWh
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(circuit_a_level_percent)
@@ -155,6 +188,8 @@ communication:
 
 scenarios:
   workday_scene:
+    display_name: "Workday Scene"
+    description: Apply normal automatic workday lighting targets.
     duration: 15.0
     overrides:
       $in(k__zone_state): automatic
@@ -163,6 +198,8 @@ scenarios:
       $in(k__circuit_b_target_percent): 40.0
 
   cleaning_scene:
+    display_name: "Cleaning Scene"
+    description: Override the zone into a brighter manual cleaning scene.
     duration: 10.0
     overrides:
       $in(k__zone_state): manual
@@ -171,6 +208,8 @@ scenarios:
       $in(k__circuit_b_target_percent): 80.0
 
   night_shutdown:
+    display_name: "Night Shutdown"
+    description: Turn the zone off and clear occupancy for night operation.
     duration: 25.0
     overrides:
       $in(k__zone_state): off

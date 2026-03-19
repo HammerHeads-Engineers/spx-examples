@@ -17,38 +17,83 @@ meta_parameters:
 
 attributes:
   # Phase currents (A)
-  k__current_l1_a: 12.0
-  k__current_l2_a: 10.5
-  k__current_l3_a: 11.2
-  current_avg_a: 0.0
-
-  # Phase-to-neutral voltages (V)
-  k__voltage_l1_n_v: 230.0
-  k__voltage_l2_n_v: 229.5
-  k__voltage_l3_n_v: 231.0
-  voltage_ln_avg_v: 0.0
-
-  # Line-to-line voltages (V) (derived from L-N; suitable for demo dashboards)
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
-  voltage_ll_avg_v: 0.0
-
-  # Power (kW/kVAR/kVA)
-  k__power_factor: 0.96
-  power_factor_leading: 0
-  k__active_power_total_kw: 0.0
-  k__reactive_power_total_kvar: 0.0
-  k__apparent_power_total_kva: 0.0
-
-  # Frequency (Hz)
-  k__frequency_hz: 50.0
-
-  # Cumulative energy (kWh)
-  k__energy_total_kwh: 0.0
-
-  _cycle_time_s: 1.0
-
+  k__current_l1_a:
+    type: float
+    default: 12.0
+    unit: A
+  k__current_l2_a:
+    type: float
+    default: 10.5
+    unit: A
+  k__current_l3_a:
+    type: float
+    default: 11.2
+    unit: A
+  current_avg_a:
+    type: float
+    default: 0.0
+    unit: A
+  k__voltage_l1_n_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__voltage_l2_n_v:
+    type: float
+    default: 229.5
+    unit: V
+  k__voltage_l3_n_v:
+    type: float
+    default: 231.0
+    unit: V
+  voltage_ln_avg_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l1_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_l1_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_ll_avg_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__power_factor:
+    type: float
+    default: 0.96
+  power_factor_leading:
+    type: int
+    default: 0
+  k__active_power_total_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  k__reactive_power_total_kvar:
+    type: float
+    default: 0.0
+  k__apparent_power_total_kva:
+    type: float
+    default: 0.0
+    unit: kVA
+  k__frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  k__energy_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 actions:
   - function: $in(current_avg_a)
     name: compute_current_avg
@@ -83,12 +128,7 @@ actions:
   - function: $in(k__apparent_power_total_kva)
     name: compute_apparent_power
     description: Total apparent power (sum of per-phase V*I).
-    call: 1e-3
-         * (
-             $in(k__voltage_l1_n_v) * $in(k__current_l1_a)
-             + $in(k__voltage_l2_n_v) * $in(k__current_l2_a)
-             + $in(k__voltage_l3_n_v) * $in(k__current_l3_a)
-           )
+    call: 1e-3 * ( $in(k__voltage_l1_n_v) * $in(k__current_l1_a) + $in(k__voltage_l2_n_v) * $in(k__current_l2_a) + $in(k__voltage_l3_n_v) * $in(k__current_l3_a) )
 
   - function: $in(k__active_power_total_kw)
     name: compute_active_power_total
@@ -98,9 +138,7 @@ actions:
   - function: $in(k__reactive_power_total_kvar)
     name: compute_reactive_power_total
     description: Approximate total reactive power magnitude from active/apparent power.
-    call: (
-          max(0.0, ($in(k__apparent_power_total_kva) ** 2) - ($in(k__active_power_total_kw) ** 2)) ** 0.5
-        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+    call: ( max(0.0, ($in(k__apparent_power_total_kva) ** 2) - ($in(k__active_power_total_kw) ** 2)) ** 0.5 ) * (-1.0 if $in(power_factor_leading) else 1.0)
 
   - function: $in(k__energy_total_kwh)
     name: integrate_energy_total
@@ -115,39 +153,40 @@ communication:
       zero_fill: true
       mapping:
         # Energy totals (kWh) Float32
-        k__energy_total_kwh:     { address: [257,258], group: h_r, type: float }
+        k__energy_total_kwh: {address: [257, 258], group: h_r, type: float}
 
         # Power totals (kW/kVAR/kVA) Float32
-        k__active_power_total_kw:    { address: [261,262], group: i_r, type: float }
-        k__reactive_power_total_kvar: { address: [263,264], group: i_r, type: float }
-        k__apparent_power_total_kva:  { address: [265,266], group: i_r, type: float }
-        k__power_factor:             { address: [267,268], group: i_r, type: float }
+        k__active_power_total_kw: {address: [261, 262], group: i_r, type: float}
+        k__reactive_power_total_kvar: {address: [263, 264], group: i_r, type: float}
+        k__apparent_power_total_kva: {address: [265, 266], group: i_r, type: float}
+        k__power_factor: {address: [267, 268], group: i_r, type: float}
 
         # Voltage + current averages Float32
-        voltage_ll_avg_v:        { address: [269,270], group: i_r, type: float }
-        voltage_ln_avg_v:        { address: [271,272], group: i_r, type: float }
-        current_avg_a:           { address: [273,274], group: i_r, type: float }
+        voltage_ll_avg_v: {address: [269, 270], group: i_r, type: float}
+        voltage_ln_avg_v: {address: [271, 272], group: i_r, type: float}
+        current_avg_a: {address: [273, 274], group: i_r, type: float}
 
         # Line-line voltages (V) Float32
-        voltage_l1_l2_v:         { address: [287,288], group: i_r, type: float }
-        voltage_l2_l3_v:         { address: [289,290], group: i_r, type: float }
-        voltage_l3_l1_v:         { address: [291,292], group: i_r, type: float }
+        voltage_l1_l2_v: {address: [287, 288], group: i_r, type: float}
+        voltage_l2_l3_v: {address: [289, 290], group: i_r, type: float}
+        voltage_l3_l1_v: {address: [291, 292], group: i_r, type: float}
 
         # Phase-to-neutral voltages (V) Float32
-        k__voltage_l1_n_v:       { address: [293,294], group: i_r, type: float }
-        k__voltage_l2_n_v:       { address: [295,296], group: i_r, type: float }
-        k__voltage_l3_n_v:       { address: [297,298], group: i_r, type: float }
+        k__voltage_l1_n_v: {address: [293, 294], group: i_r, type: float}
+        k__voltage_l2_n_v: {address: [295, 296], group: i_r, type: float}
+        k__voltage_l3_n_v: {address: [297, 298], group: i_r, type: float}
 
         # Frequency (Hz) Float32
-        k__frequency_hz:         { address: [1557,1558], group: i_r, type: float }
+        k__frequency_hz: {address: [1557, 1558], group: i_r, type: float}
 
         # Phase currents (A) Float32
-        k__current_l1_a:         { address: [2705,2706], group: i_r, type: float }
-        k__current_l2_a:         { address: [2707,2708], group: i_r, type: float }
-        k__current_l3_a:         { address: [2709,2710], group: i_r, type: float }
+        k__current_l1_a: {address: [2705, 2706], group: i_r, type: float}
+        k__current_l2_a: {address: [2707, 2708], group: i_r, type: float}
+        k__current_l3_a: {address: [2709, 2710], group: i_r, type: float}
 
 scenarios:
   peak_demand:
+    display_name: Peak Demand
     description: High load with balanced phases and near-unity power factor.
     duration: 30.0
     overrides:
@@ -158,6 +197,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   pv_export:
+    display_name: PV Export
     description: Simulated PV export using negative phase currents.
     duration: 30.0
     overrides:
@@ -168,6 +208,7 @@ scenarios:
       $in(power_factor_leading): 1
 
   low_power_factor_lagging:
+    display_name: Low Power Factor Lagging
     description: Inductive load with low power factor.
     duration: 45.0
     overrides:

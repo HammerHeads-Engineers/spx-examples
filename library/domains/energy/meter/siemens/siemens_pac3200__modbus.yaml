@@ -17,51 +17,133 @@ meta_parameters:
 
 attributes:
   # Phase currents (A)
-  k__current_l1_a: 12.0
-  k__current_l2_a: 10.5
-  k__current_l3_a: 11.2
-  current_avg_a: 0.0
-
-  # Phase-to-neutral voltages (V)
-  k__voltage_l1_n_v: 230.0
-  k__voltage_l2_n_v: 229.5
-  k__voltage_l3_n_v: 231.0
-  voltage_ln_avg_v: 0.0
-
-  # Line-to-line voltages (V)
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
-  voltage_ll_avg_v: 0.0
-
-  # Power
-  k__power_factor: 0.95
-  power_factor_leading: 0
-  power_factor_l1: 0.0
-  power_factor_l2: 0.0
-  power_factor_l3: 0.0
-  apparent_power_l1_va: 0.0
-  apparent_power_l2_va: 0.0
-  apparent_power_l3_va: 0.0
-  active_power_l1_w: 0.0
-  active_power_l2_w: 0.0
-  active_power_l3_w: 0.0
-  reactive_power_l1_var: 0.0
-  reactive_power_l2_var: 0.0
-  reactive_power_l3_var: 0.0
-  active_power_total_w: 0.0
-  reactive_power_total_var: 0.0
-  apparent_power_total_va: 0.0
-
-  # Frequency (Hz)
-  k__frequency_hz: 50.0
-
-  # Cumulative energy (Wh)
-  energy_import_total_wh: 0.0
-  energy_export_total_wh: 0.0
-
-  _cycle_time_s: 1.0
-
+  k__current_l1_a:
+    type: float
+    default: 12.0
+    unit: A
+  k__current_l2_a:
+    type: float
+    default: 10.5
+    unit: A
+  k__current_l3_a:
+    type: float
+    default: 11.2
+    unit: A
+  current_avg_a:
+    type: float
+    default: 0.0
+    unit: A
+  k__voltage_l1_n_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__voltage_l2_n_v:
+    type: float
+    default: 229.5
+    unit: V
+  k__voltage_l3_n_v:
+    type: float
+    default: 231.0
+    unit: V
+  voltage_ln_avg_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l1_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_l1_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_ll_avg_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__power_factor:
+    type: float
+    default: 0.95
+  power_factor_leading:
+    type: int
+    default: 0
+  power_factor_l1:
+    type: float
+    default: 0.0
+  power_factor_l2:
+    type: float
+    default: 0.0
+  power_factor_l3:
+    type: float
+    default: 0.0
+  apparent_power_l1_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l2_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l3_va:
+    type: float
+    default: 0.0
+    unit: VA
+  active_power_l1_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l2_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l3_w:
+    type: float
+    default: 0.0
+    unit: W
+  reactive_power_l1_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l2_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l3_var:
+    type: float
+    default: 0.0
+    unit: var
+  active_power_total_w:
+    type: float
+    default: 0.0
+    unit: W
+  reactive_power_total_var:
+    type: float
+    default: 0.0
+    unit: var
+  apparent_power_total_va:
+    type: float
+    default: 0.0
+    unit: VA
+  k__frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  energy_import_total_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  energy_export_total_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
 actions:
   - function: $in(current_avg_a)
     name: compute_current_avg
@@ -141,23 +223,17 @@ actions:
   - function: $in(reactive_power_l1_var)
     name: compute_reactive_power_l1
     description: Phase L1 reactive power.
-    call: (
-          max(0.0, ($in(apparent_power_l1_va) ** 2) - ($in(active_power_l1_w) ** 2)) ** 0.5
-        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+    call: ( max(0.0, ($in(apparent_power_l1_va) ** 2) - ($in(active_power_l1_w) ** 2)) ** 0.5 ) * (-1.0 if $in(power_factor_leading) else 1.0)
 
   - function: $in(reactive_power_l2_var)
     name: compute_reactive_power_l2
     description: Phase L2 reactive power.
-    call: (
-          max(0.0, ($in(apparent_power_l2_va) ** 2) - ($in(active_power_l2_w) ** 2)) ** 0.5
-        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+    call: ( max(0.0, ($in(apparent_power_l2_va) ** 2) - ($in(active_power_l2_w) ** 2)) ** 0.5 ) * (-1.0 if $in(power_factor_leading) else 1.0)
 
   - function: $in(reactive_power_l3_var)
     name: compute_reactive_power_l3
     description: Phase L3 reactive power.
-    call: (
-          max(0.0, ($in(apparent_power_l3_va) ** 2) - ($in(active_power_l3_w) ** 2)) ** 0.5
-        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+    call: ( max(0.0, ($in(apparent_power_l3_va) ** 2) - ($in(active_power_l3_w) ** 2)) ** 0.5 ) * (-1.0 if $in(power_factor_leading) else 1.0)
 
   - function: $in(apparent_power_total_va)
     name: compute_apparent_power_total
@@ -192,44 +268,45 @@ communication:
       zero_fill: true
       mapping:
         # Voltages (V) Float32
-        k__voltage_l1_n_v:   { address: [1,2], group: h_r, type: float }
-        k__voltage_l2_n_v:   { address: [3,4], group: h_r, type: float }
-        k__voltage_l3_n_v:   { address: [5,6], group: h_r, type: float }
-        voltage_l1_l2_v:     { address: [7,8], group: h_r, type: float }
-        voltage_l2_l3_v:     { address: [9,10], group: h_r, type: float }
-        voltage_l3_l1_v:     { address: [11,12], group: h_r, type: float }
-        voltage_ln_avg_v:    { address: [57,58], group: h_r, type: float }
-        voltage_ll_avg_v:    { address: [59,60], group: h_r, type: float }
+        k__voltage_l1_n_v: {address: [1, 2], group: h_r, type: float}
+        k__voltage_l2_n_v: {address: [3, 4], group: h_r, type: float}
+        k__voltage_l3_n_v: {address: [5, 6], group: h_r, type: float}
+        voltage_l1_l2_v: {address: [7, 8], group: h_r, type: float}
+        voltage_l2_l3_v: {address: [9, 10], group: h_r, type: float}
+        voltage_l3_l1_v: {address: [11, 12], group: h_r, type: float}
+        voltage_ln_avg_v: {address: [57, 58], group: h_r, type: float}
+        voltage_ll_avg_v: {address: [59, 60], group: h_r, type: float}
 
         # Currents (A) Float32
-        k__current_l1_a:     { address: [13,14], group: h_r, type: float }
-        k__current_l2_a:     { address: [15,16], group: h_r, type: float }
-        k__current_l3_a:     { address: [17,18], group: h_r, type: float }
-        current_avg_a:       { address: [61,62], group: h_r, type: float }
+        k__current_l1_a: {address: [13, 14], group: h_r, type: float}
+        k__current_l2_a: {address: [15, 16], group: h_r, type: float}
+        k__current_l3_a: {address: [17, 18], group: h_r, type: float}
+        current_avg_a: {address: [61, 62], group: h_r, type: float}
 
         # Frequency (Hz) Float32
-        k__frequency_hz:     { address: [55,56], group: h_r, type: float }
+        k__frequency_hz: {address: [55, 56], group: h_r, type: float}
 
         # Power (W/var/VA) Float32
-        apparent_power_l1_va:    { address: [19,20], group: h_r, type: float }
-        apparent_power_l2_va:    { address: [21,22], group: h_r, type: float }
-        apparent_power_l3_va:    { address: [23,24], group: h_r, type: float }
-        active_power_l1_w:       { address: [25,26], group: h_r, type: float }
-        active_power_l2_w:       { address: [27,28], group: h_r, type: float }
-        active_power_l3_w:       { address: [29,30], group: h_r, type: float }
-        reactive_power_l1_var:   { address: [31,32], group: h_r, type: float }
-        reactive_power_l2_var:   { address: [33,34], group: h_r, type: float }
-        reactive_power_l3_var:   { address: [35,36], group: h_r, type: float }
-        power_factor_l1:         { address: [37,38], group: h_r, type: float }
-        power_factor_l2:         { address: [39,40], group: h_r, type: float }
-        power_factor_l3:         { address: [41,42], group: h_r, type: float }
-        apparent_power_total_va: { address: [63,64], group: h_r, type: float }
-        active_power_total_w:    { address: [65,66], group: h_r, type: float }
-        reactive_power_total_var: { address: [67,68], group: h_r, type: float }
-        k__power_factor:         { address: [69,70], group: h_r, type: float }
+        apparent_power_l1_va: {address: [19, 20], group: h_r, type: float}
+        apparent_power_l2_va: {address: [21, 22], group: h_r, type: float}
+        apparent_power_l3_va: {address: [23, 24], group: h_r, type: float}
+        active_power_l1_w: {address: [25, 26], group: h_r, type: float}
+        active_power_l2_w: {address: [27, 28], group: h_r, type: float}
+        active_power_l3_w: {address: [29, 30], group: h_r, type: float}
+        reactive_power_l1_var: {address: [31, 32], group: h_r, type: float}
+        reactive_power_l2_var: {address: [33, 34], group: h_r, type: float}
+        reactive_power_l3_var: {address: [35, 36], group: h_r, type: float}
+        power_factor_l1: {address: [37, 38], group: h_r, type: float}
+        power_factor_l2: {address: [39, 40], group: h_r, type: float}
+        power_factor_l3: {address: [41, 42], group: h_r, type: float}
+        apparent_power_total_va: {address: [63, 64], group: h_r, type: float}
+        active_power_total_w: {address: [65, 66], group: h_r, type: float}
+        reactive_power_total_var: {address: [67, 68], group: h_r, type: float}
+        k__power_factor: {address: [69, 70], group: h_r, type: float}
 
 scenarios:
   peak_demand:
+    display_name: Peak Demand
     description: High load with balanced phases and near-unity power factor.
     duration: 30.0
     overrides:
@@ -240,6 +317,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   pv_export:
+    display_name: PV Export
     description: Simulated PV export using negative phase currents.
     duration: 30.0
     overrides:
@@ -250,6 +328,7 @@ scenarios:
       $in(power_factor_leading): 1
 
   low_power_factor_lagging:
+    display_name: Low Power Factor Lagging
     description: Inductive load with low power factor.
     duration: 45.0
     overrides:
@@ -257,6 +336,7 @@ scenarios:
       $in(power_factor_leading): 0
 
   voltage_sag:
+    display_name: Voltage Sag
     description: Phase-to-neutral voltage sag across all phases.
     duration: 30.0
     overrides:
@@ -265,6 +345,7 @@ scenarios:
       $in(k__voltage_l3_n_v): 210.0
 
   frequency_drift:
+    display_name: Frequency Drift
     description: Off-nominal grid frequency condition.
     duration: 20.0
     overrides:

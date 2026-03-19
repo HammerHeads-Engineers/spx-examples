@@ -21,30 +21,87 @@ meta_parameters:
     default: "2"
 
 attributes:
-  k__room_temperature_c: 22.5
-  k__room_setpoint_c: 22.0
-  k__room_command_c: 22.0
-  min_setpoint_c: 7.0
-  max_setpoint_c: 28.0
-  setpoint_step_k: 0.1
-  k__hvac_mode_code: 1         # DPT 20.102: 0 auto, 1 comfort, 2 standby, 3 economy, 4 building protection
-  hvac_mode: comfort        # derived from k__hvac_mode_code and hvac_on
-  hvac_on: 1
-  hvac_active: 1
-  fan_speed_percent: 35.0
-  k__fan_command_percent: 35.0
-  k__valve_position_percent: 40.0
-  cooling_mode: 0
-  relative_humidity_percent: 45.0
-  k__occupancy_present: 1
-  k__window_open: 0
-  alarm_window: 0
-  comfort_mode_request: 0
-  economy_mode_request: 0
-  standby_mode_request: 0
-  building_protection_request: 0
+  k__room_temperature_c:
+    type: float
+    default: 22.5
+    unit: degC
+  k__room_setpoint_c:
+    type: float
+    default: 22.0
+    unit: degC
+  k__room_command_c:
+    type: float
+    default: 22.0
+    unit: degC
+  min_setpoint_c:
+    type: float
+    default: 7.0
+    unit: degC
+  max_setpoint_c:
+    type: float
+    default: 28.0
+    unit: degC
+  setpoint_step_k:
+    type: float
+    default: 0.1
+    unit: K
+  k__hvac_mode_code:
+    type: int
+    default: 1
+  hvac_mode:
+    type: str
+    default: "comfort"
+  hvac_on:
+    type: int
+    default: 1
+  hvac_active:
+    type: int
+    default: 1
+  fan_speed_percent:
+    type: float
+    default: 35.0
+    unit: percent
+  k__fan_command_percent:
+    type: float
+    default: 35.0
+    unit: percent
+  k__valve_position_percent:
+    type: float
+    default: 40.0
+    unit: percent
+  cooling_mode:
+    type: int
+    default: 0
+  relative_humidity_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  k__occupancy_present:
+    type: int
+    default: 1
+  k__window_open:
+    type: int
+    default: 0
+  alarm_window:
+    type: int
+    default: 0
+  comfort_mode_request:
+    type: int
+    default: 0
+  economy_mode_request:
+    type: int
+    default: 0
+  standby_mode_request:
+    type: int
+    default: 0
+  building_protection_request:
+    type: int
+    default: 0
 
-  cycle_time_s: 0.5
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
 
 actions:
   - function: $in(k__room_setpoint_c)
@@ -259,6 +316,8 @@ communication:
 
 scenarios:
   comfort_mode:
+    display_name: "Comfort Mode"
+    description: Keep the room occupied and comfortable with a higher setpoint.
     duration: 20.0
     overrides:
       $in(k__hvac_mode_code): 1
@@ -268,6 +327,8 @@ scenarios:
       $in(k__window_open): 0
 
   energy_saver:
+    display_name: "Energy Saver"
+    description: Lower fan and occupancy demand for a reduced-energy operating mode.
     duration: 15.0
     overrides:
       $in(k__hvac_mode_code): 2

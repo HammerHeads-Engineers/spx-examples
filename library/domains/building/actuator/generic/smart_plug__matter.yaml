@@ -8,17 +8,44 @@ description: |
   Uses command counters to emit On/Off commands and subscribes to the OnOff attribute for feedback.
 
 attributes:
-  switch_state: 0           # 0/1, live state from the Matter device (OnOff attribute)
-  desired_state: 0          # 0/1, target state driven by BMS logic or scenarios
-  command_issued_state: 0   # remembers the last target we already dispatched
-  command_on_counter: 0     # monotonically increasing trigger for On commands
-  command_off_counter: 0    # monotonically increasing trigger for Off commands
-  retry_timer_s: 0.0        # accumulates time while device state mismatches the target
-  retry_interval_s: 8.0     # resend command if mismatch persists beyond this interval
-  load_power_w: 45.0        # nominal load when ON (used for synthetic telemetry)
-  active_power_w: 0.0       # derived power reading
-  energy_wh: 0.0            # synthetic energy accumulator
-  status_text: "OFF"
+  switch_state:
+    type: int
+    default: 0
+  desired_state:
+    type: int
+    default: 0
+  command_issued_state:
+    type: int
+    default: 0
+  command_on_counter:
+    type: int
+    default: 0
+  command_off_counter:
+    type: int
+    default: 0
+  retry_timer_s:
+    type: float
+    default: 0.0
+    unit: s
+  retry_interval_s:
+    type: float
+    default: 8.0
+    unit: s
+  load_power_w:
+    type: float
+    default: 45.0
+    unit: W
+  active_power_w:
+    type: float
+    default: 0.0
+    unit: W
+  energy_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  status_text:
+    type: str
+    default: "OFF"
 
 actions:
   - function: $in(command_on_counter)
@@ -144,12 +171,16 @@ communication:
 scenarios:
   plug_on:
     enabled: true
+    display_name: "Plug On"
+    description: Request the plug to switch on.
     duration: 20.0
     overrides:
       $in(desired_state): 1
 
   plug_off:
     enabled: true
+    display_name: "Plug Off"
+    description: Request the plug to switch off.
     duration: 20.0
     overrides:
       $in(desired_state): 0

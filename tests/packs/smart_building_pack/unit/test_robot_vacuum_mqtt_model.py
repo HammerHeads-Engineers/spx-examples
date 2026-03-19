@@ -32,9 +32,11 @@ def test_robot_vacuum_mqtt_model_loads() -> None:
 
     attributes = doc["attributes"]
     assert isinstance(attributes, dict)
-    assert attributes.get("docked") == 1
-    assert attributes.get("battery_percent") == 100.0
-    assert attributes.get("suction_level_percent") == 70.0
+    assert attributes["docked"]["type"] == "int"
+    assert attributes["docked"]["default"] == 1
+    assert attributes["battery_percent"]["type"] == "float"
+    assert attributes["battery_percent"]["default"] == 100.0
+    assert attributes["suction_level_percent"]["default"] == 70.0
 
     comm = doc["communication"]
     assert isinstance(comm, list) and comm

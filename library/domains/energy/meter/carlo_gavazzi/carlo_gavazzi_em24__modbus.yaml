@@ -17,90 +17,222 @@ meta_parameters:
 
 attributes:
   # Phase-to-neutral voltages (V)
-  k__voltage_l1_n_v: 230.0
-  k__voltage_l2_n_v: 231.0
-  k__voltage_l3_n_v: 229.5
-
-  # Phase currents (A)
-  k__current_l1_a: 8.5
-  k__current_l2_a: 8.1
-  k__current_l3_a: 8.3
-
-  # Per-phase power factor inputs
-  k__power_factor_l1: 0.96
-  k__power_factor_l2: 0.95
-  k__power_factor_l3: 0.97
-
-  # Frequency (Hz)
-  k__frequency_hz: 50.0
-
-  # Derived line-to-line voltages (V)
-  voltage_l1_l2_v: 0.0
-  voltage_l2_l3_v: 0.0
-  voltage_l3_l1_v: 0.0
-  voltage_ln_sum_v: 0.0
-  voltage_ll_sum_v: 0.0
-
-  # Power (W/VA/VAR)
-  active_power_l1_w: 0.0
-  active_power_l2_w: 0.0
-  active_power_l3_w: 0.0
-  active_power_total_w: 0.0
-
-  apparent_power_l1_va: 0.0
-  apparent_power_l2_va: 0.0
-  apparent_power_l3_va: 0.0
-  apparent_power_total_va: 0.0
-
-  reactive_power_l1_var: 0.0
-  reactive_power_l2_var: 0.0
-  reactive_power_l3_var: 0.0
-  reactive_power_total_var: 0.0
-
-  power_factor_total: 0.0
-
-  # Energy totals (kWh)
-  energy_import_total_kwh: 0.0
-  energy_export_total_kwh: 0.0
-
-  # Phase sequence (123 for L1-L2-L3, 132 for L1-L3-L2)
-  phase_sequence: 123
-
-  _cycle_time_s: 1.0
-
-  # Raw Modbus register payloads (scaled integer values)
-  _v_l1_n_raw: 0
-  _v_l2_n_raw: 0
-  _v_l3_n_raw: 0
-  _v_l1_l2_raw: 0
-  _v_l2_l3_raw: 0
-  _v_l3_l1_raw: 0
-  _a_l1_raw: 0
-  _a_l2_raw: 0
-  _a_l3_raw: 0
-  _w_l1_raw: 0
-  _w_l2_raw: 0
-  _w_l3_raw: 0
-  _va_l1_raw: 0
-  _va_l2_raw: 0
-  _va_l3_raw: 0
-  _var_l1_raw: 0
-  _var_l2_raw: 0
-  _var_l3_raw: 0
-  _v_ln_sum_raw: 0
-  _v_ll_sum_raw: 0
-  _w_sum_raw: 0
-  _va_sum_raw: 0
-  _var_sum_raw: 0
-  _pf_l1_raw: 0
-  _pf_l2_raw: 0
-  _pf_l3_raw: 0
-  _pf_sum_raw: 0
-  _phase_sequence_raw: 123
-  _hz_raw: 0
-  _kwh_import_raw: 0
-  _kwh_export_raw: 0
-
+  k__voltage_l1_n_v:
+    type: float
+    default: 230.0
+    unit: V
+  k__voltage_l2_n_v:
+    type: float
+    default: 231.0
+    unit: V
+  k__voltage_l3_n_v:
+    type: float
+    default: 229.5
+    unit: V
+  k__current_l1_a:
+    type: float
+    default: 8.5
+    unit: A
+  k__current_l2_a:
+    type: float
+    default: 8.1
+    unit: A
+  k__current_l3_a:
+    type: float
+    default: 8.3
+    unit: A
+  k__power_factor_l1:
+    type: float
+    default: 0.96
+  k__power_factor_l2:
+    type: float
+    default: 0.95
+  k__power_factor_l3:
+    type: float
+    default: 0.97
+  k__frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  voltage_l1_l2_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l2_l3_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_l3_l1_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_ln_sum_v:
+    type: float
+    default: 0.0
+    unit: V
+  voltage_ll_sum_v:
+    type: float
+    default: 0.0
+    unit: V
+  active_power_l1_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l2_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_l3_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_power_total_w:
+    type: float
+    default: 0.0
+    unit: W
+  apparent_power_l1_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l2_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_l3_va:
+    type: float
+    default: 0.0
+    unit: VA
+  apparent_power_total_va:
+    type: float
+    default: 0.0
+    unit: VA
+  reactive_power_l1_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l2_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_l3_var:
+    type: float
+    default: 0.0
+    unit: var
+  reactive_power_total_var:
+    type: float
+    default: 0.0
+    unit: var
+  power_factor_total:
+    type: float
+    default: 0.0
+  energy_import_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  energy_export_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  phase_sequence:
+    type: int
+    default: 123
+  _cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
+  _v_l1_n_raw:
+    type: int
+    default: 0
+  _v_l2_n_raw:
+    type: int
+    default: 0
+  _v_l3_n_raw:
+    type: int
+    default: 0
+  _v_l1_l2_raw:
+    type: int
+    default: 0
+  _v_l2_l3_raw:
+    type: int
+    default: 0
+  _v_l3_l1_raw:
+    type: int
+    default: 0
+  _a_l1_raw:
+    type: int
+    default: 0
+  _a_l2_raw:
+    type: int
+    default: 0
+  _a_l3_raw:
+    type: int
+    default: 0
+  _w_l1_raw:
+    type: int
+    default: 0
+  _w_l2_raw:
+    type: int
+    default: 0
+  _w_l3_raw:
+    type: int
+    default: 0
+  _va_l1_raw:
+    type: int
+    default: 0
+  _va_l2_raw:
+    type: int
+    default: 0
+  _va_l3_raw:
+    type: int
+    default: 0
+  _var_l1_raw:
+    type: int
+    default: 0
+  _var_l2_raw:
+    type: int
+    default: 0
+  _var_l3_raw:
+    type: int
+    default: 0
+  _v_ln_sum_raw:
+    type: int
+    default: 0
+  _v_ll_sum_raw:
+    type: int
+    default: 0
+  _w_sum_raw:
+    type: int
+    default: 0
+  _va_sum_raw:
+    type: int
+    default: 0
+  _var_sum_raw:
+    type: int
+    default: 0
+  _pf_l1_raw:
+    type: int
+    default: 0
+  _pf_l2_raw:
+    type: int
+    default: 0
+  _pf_l3_raw:
+    type: int
+    default: 0
+  _pf_sum_raw:
+    type: int
+    default: 0
+  _phase_sequence_raw:
+    type: int
+    default: 123
+  _hz_raw:
+    type: int
+    default: 0
+  _kwh_import_raw:
+    type: int
+    default: 0
+  _kwh_export_raw:
+    type: int
+    default: 0
 actions:
   - function: $in(voltage_l1_l2_v)
     name: compute_voltage_l1_l2
@@ -316,50 +448,51 @@ communication:
       zero_fill: true
       mapping:
         # Voltages (V) -> scaled by 10
-        _v_l1_n_raw:   { address: [0,1],   group: i_r, type: uint_32 }
-        _v_l2_n_raw:   { address: [2,3],   group: i_r, type: uint_32 }
-        _v_l3_n_raw:   { address: [4,5],   group: i_r, type: uint_32 }
-        _v_l1_l2_raw:  { address: [6,7],   group: i_r, type: uint_32 }
-        _v_l2_l3_raw:  { address: [8,9],   group: i_r, type: uint_32 }
-        _v_l3_l1_raw:  { address: [10,11], group: i_r, type: uint_32 }
+        _v_l1_n_raw: {address: [0, 1], group: i_r, type: uint_32}
+        _v_l2_n_raw: {address: [2, 3], group: i_r, type: uint_32}
+        _v_l3_n_raw: {address: [4, 5], group: i_r, type: uint_32}
+        _v_l1_l2_raw: {address: [6, 7], group: i_r, type: uint_32}
+        _v_l2_l3_raw: {address: [8, 9], group: i_r, type: uint_32}
+        _v_l3_l1_raw: {address: [10, 11], group: i_r, type: uint_32}
 
         # Currents (A) -> scaled by 1000
-        _a_l1_raw:     { address: [12,13], group: i_r, type: uint_32 }
-        _a_l2_raw:     { address: [14,15], group: i_r, type: uint_32 }
-        _a_l3_raw:     { address: [16,17], group: i_r, type: uint_32 }
+        _a_l1_raw: {address: [12, 13], group: i_r, type: uint_32}
+        _a_l2_raw: {address: [14, 15], group: i_r, type: uint_32}
+        _a_l3_raw: {address: [16, 17], group: i_r, type: uint_32}
 
         # Power (W/VA/VAR) -> scaled by 10
-        _w_l1_raw:     { address: [18,19], group: i_r, type: uint_32 }
-        _w_l2_raw:     { address: [20,21], group: i_r, type: uint_32 }
-        _w_l3_raw:     { address: [22,23], group: i_r, type: uint_32 }
-        _va_l1_raw:    { address: [24,25], group: i_r, type: uint_32 }
-        _va_l2_raw:    { address: [26,27], group: i_r, type: uint_32 }
-        _va_l3_raw:    { address: [28,29], group: i_r, type: uint_32 }
-        _var_l1_raw:   { address: [30,31], group: i_r, type: uint_32 }
-        _var_l2_raw:   { address: [32,33], group: i_r, type: uint_32 }
-        _var_l3_raw:   { address: [34,35], group: i_r, type: uint_32 }
+        _w_l1_raw: {address: [18, 19], group: i_r, type: uint_32}
+        _w_l2_raw: {address: [20, 21], group: i_r, type: uint_32}
+        _w_l3_raw: {address: [22, 23], group: i_r, type: uint_32}
+        _va_l1_raw: {address: [24, 25], group: i_r, type: uint_32}
+        _va_l2_raw: {address: [26, 27], group: i_r, type: uint_32}
+        _va_l3_raw: {address: [28, 29], group: i_r, type: uint_32}
+        _var_l1_raw: {address: [30, 31], group: i_r, type: uint_32}
+        _var_l2_raw: {address: [32, 33], group: i_r, type: uint_32}
+        _var_l3_raw: {address: [34, 35], group: i_r, type: uint_32}
 
         # Sums
-        _v_ln_sum_raw: { address: [36,37], group: i_r, type: uint_32 }
-        _v_ll_sum_raw: { address: [38,39], group: i_r, type: uint_32 }
-        _w_sum_raw:    { address: [40,41], group: i_r, type: uint_32 }
-        _va_sum_raw:   { address: [42,43], group: i_r, type: uint_32 }
-        _var_sum_raw:  { address: [44,45], group: i_r, type: uint_32 }
+        _v_ln_sum_raw: {address: [36, 37], group: i_r, type: uint_32}
+        _v_ll_sum_raw: {address: [38, 39], group: i_r, type: uint_32}
+        _w_sum_raw: {address: [40, 41], group: i_r, type: uint_32}
+        _va_sum_raw: {address: [42, 43], group: i_r, type: uint_32}
+        _var_sum_raw: {address: [44, 45], group: i_r, type: uint_32}
 
         # Power factor + phase sequence + frequency
-        _pf_l1_raw:         { address: [46,46], group: i_r, type: uint_16 }
-        _pf_l2_raw:         { address: [47,47], group: i_r, type: uint_16 }
-        _pf_l3_raw:         { address: [48,48], group: i_r, type: uint_16 }
-        _pf_sum_raw:        { address: [49,49], group: i_r, type: uint_16 }
-        _phase_sequence_raw: { address: [50,50], group: i_r, type: uint_16 }
-        _hz_raw:            { address: [51,51], group: i_r, type: uint_16 }
+        _pf_l1_raw: {address: [46, 46], group: i_r, type: uint_16}
+        _pf_l2_raw: {address: [47, 47], group: i_r, type: uint_16}
+        _pf_l3_raw: {address: [48, 48], group: i_r, type: uint_16}
+        _pf_sum_raw: {address: [49, 49], group: i_r, type: uint_16}
+        _phase_sequence_raw: {address: [50, 50], group: i_r, type: uint_16}
+        _hz_raw: {address: [51, 51], group: i_r, type: uint_16}
 
         # Energy totals (kWh) -> scaled by 10
-        _kwh_import_raw: { address: [52,53], group: i_r, type: uint_32 }
-        _kwh_export_raw: { address: [78,79], group: i_r, type: uint_32 }
+        _kwh_import_raw: {address: [52, 53], group: i_r, type: uint_32}
+        _kwh_export_raw: {address: [78, 79], group: i_r, type: uint_32}
 
 scenarios:
   balanced_load:
+    display_name: Balanced Load
     description: Balanced three-phase load near nominal voltage.
     duration: 30.0
     overrides:
@@ -374,6 +507,7 @@ scenarios:
       $in(k__power_factor_l3): 0.98
 
   inductive_load:
+    display_name: Inductive Load
     description: Lower power factor across all phases to mimic inductive loads.
     duration: 30.0
     overrides:
@@ -382,6 +516,7 @@ scenarios:
       $in(k__power_factor_l3): 0.72
 
   pv_export:
+    display_name: PV Export
     description: Negative phase currents to simulate PV export.
     duration: 30.0
     overrides:
