@@ -2,12 +2,12 @@
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # See the accompanying LICENSE file for terms.
 
-# Multi-sensor environmental node exposing MQTT telemetry and accepting remote setpoints.
-# name: generic_mqtt_environment_sensor
-# description: |
-#   Virtual HVAC zone sensor that publishes environmental telemetry over MQTT while reacting
-#   to remote control commands. The model captures typical smart-building data such as
-#   temperature, humidity, and indoor air quality while surfacing health alarms.
+name: environment_sensor__mqtt
+description: |
+  Virtual HVAC zone sensor that publishes environmental telemetry over MQTT while
+  reacting to remote control commands. The model captures typical smart-building
+  data such as temperature, humidity, and indoor air quality while surfacing
+  connectivity and threshold alarms.
 
 meta_parameters:
   mqtt_broker_host:
@@ -27,55 +27,170 @@ meta_parameters:
     default: 1
 
 attributes:
-  k__temperature_c: 22.5          # °C, current measured temperature
-  ambient_c: 20.5              # °C, surrounding ambient temperature
-  k__target_c: 22.0               # °C, commanded comfort setpoint from MQTT
-  k__humidity_percent: 45.0       # %RH, instantaneous humidity
-  humidity_target: 47.0        # %RH, preferred humidity band target
-  humidity_ambient: 42.0       # %RH, ambient humidity influencing drift
-  k__co2_ppm: 560.0               # ppm, indoor CO₂ level estimate
-  co2_target: 650.0            # ppm, acceptable CO₂ band upper bound
-  k__hvac_mode: auto              # HVAC operating mode (auto/heat/cool/off)
-  k__fan_speed_percent: 32.0      # %, current fan command applied by local controller
-  k__fan_speed_target: 35.0       # %, desired fan speed from remote command
-  fan_speed_adjusted_target: 35.0  # %, target after automatic biasing
-  fan_slew_rate: 4.0           # % per cycle, slew rate limiter for fan updates
-  fan_temp_gain: 2.5           # gain converting temperature error into additional fan demand
-  k__occupancy_count: 3.0         # people, inferred occupancy
-  k__occupancy_target: 3.0        # people, scenario override target
+  k__temperature_c:
+    type: float
+    default: 22.5
+    unit: degC
+  ambient_c:
+    type: float
+    default: 20.5
+    unit: degC
+  k__target_c:
+    type: float
+    default: 22.0
+    unit: degC
 
-  k__comfort_index: 92.0          # 0-100 composite comfort score
-  comfort_weight_temp: 0.55    # weighting factor for temperature error
-  comfort_weight_humidity: 0.25  # weighting factor for humidity error
-  comfort_weight_co2: 0.20     # weighting factor for CO₂ excess
+  k__humidity_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  humidity_target:
+    type: float
+    default: 47.0
+    unit: percent
+  humidity_ambient:
+    type: float
+    default: 42.0
+    unit: percent
 
-  temperature_integral: 0.0    # helper removing steady-state error in temperature loop
-  temperature_integral_gain: 0.08  # gain for integrating temperature error
-  temperature_integral_leak: 0.02  # leak factor preventing integral wind-up
-  temperature_integral_clamp: 40.0 # absolute clamp for integral contribution
+  k__co2_ppm:
+    type: float
+    default: 560.0
+    unit: ppm
+  co2_target:
+    type: float
+    default: 650.0
+    unit: ppm
+  k__hvac_mode:
+    type: str
+    default: auto
 
-  humidity_temp_gain: 0.015    # rate at which higher temps dry the air
-  co2_temp_gain: 1.5           # ppm contribution per degree of positive temp error
+  k__fan_speed_percent:
+    type: float
+    default: 32.0
+    unit: percent
+  k__fan_speed_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_speed_adjusted_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_slew_rate:
+    type: float
+    default: 4.0
+    unit: percent
+  fan_temp_gain:
+    type: float
+    default: 2.5
+    unit: ratio
 
-  k__alarm_high_temp: 0           # 0/1, over-temperature alarm flag
-  k__alarm_co2: 0                 # 0/1, elevated CO₂ alarm flag
-  k__alarm_stale_data: 0          # 0/1, MQTT stale-data alarm flag
-  high_temp_threshold: 28.0    # °C, alarm threshold
-  co2_threshold: 1200.0        # ppm, alarm threshold
-  stale_counter: 0.0           # s, accumulator tracking offline duration
-  stale_timeout: 60.0          # s, threshold before stale data alarm
+  k__occupancy_count:
+    type: float
+    default: 3.0
+    unit: count
+  k__occupancy_target:
+    type: float
+    default: 3.0
+    unit: count
 
-  ventilation_rate: 0.18       # fractional fresh-air replacement per cycle
-  occupancy_emission: 25.0     # ppm contribution per occupant per cycle
-  occupancy_decay: 0.45        # fractional decay toward occupancy target
+  k__comfort_index:
+    type: float
+    default: 92.0
+    unit: score
+  comfort_weight_temp:
+    type: float
+    default: 0.55
+    unit: ratio
+  comfort_weight_humidity:
+    type: float
+    default: 0.25
+    unit: ratio
+  comfort_weight_co2:
+    type: float
+    default: 0.20
+    unit: ratio
 
-  k__mqtt_connected: 1            # 0/1, communication health flag
-  k__status_text: "IDLE"          # textual summary of current mode
-  command_source: ""           # helper storing last command origin label
+  temperature_integral:
+    type: float
+    default: 0.0
+    unit: degC
+  temperature_integral_gain:
+    type: float
+    default: 0.08
+    unit: ratio
+  temperature_integral_leak:
+    type: float
+    default: 0.02
+    unit: ratio
+  temperature_integral_clamp:
+    type: float
+    default: 40.0
+    unit: degC
+
+  humidity_temp_gain:
+    type: float
+    default: 0.015
+    unit: ratio
+  co2_temp_gain:
+    type: float
+    default: 1.5
+    unit: ratio
+
+  k__alarm_high_temp:
+    type: int
+    default: 0
+  k__alarm_co2:
+    type: int
+    default: 0
+  k__alarm_stale_data:
+    type: int
+    default: 0
+  high_temp_threshold:
+    type: float
+    default: 28.0
+    unit: degC
+  co2_threshold:
+    type: float
+    default: 1200.0
+    unit: ppm
+  stale_counter:
+    type: float
+    default: 0.0
+    unit: s
+  stale_timeout:
+    type: float
+    default: 60.0
+    unit: s
+
+  ventilation_rate:
+    type: float
+    default: 0.18
+    unit: ratio
+  occupancy_emission:
+    type: float
+    default: 25.0
+    unit: ratio
+  occupancy_decay:
+    type: float
+    default: 0.45
+    unit: ratio
+
+  k__mqtt_connected:
+    type: int
+    default: 1
+  k__status_text:
+    type: str
+    default: "IDLE"
+  command_source:
+    type: str
+    default: ""
 
 actions:
   # Slew the inferred occupancy toward the target (used by scenarios).
   - function: $in(k__occupancy_count)
+    name: update_occupancy_count
     description: Smoothly blend occupancy toward scenario target to avoid impulsive spikes.
     slew_rate: 0.6
     call: (
@@ -87,6 +202,7 @@ actions:
 
   # Update process temperature using a simple ambient/load/PI blend.
   - function: $in(temperature_integral)
+    name: update_temperature_integral
     description: Integrate temperature error to remove steady-state offset.
     call: max(
           -$in(temperature_integral_clamp),
@@ -98,6 +214,7 @@ actions:
         )
 
   - function: $in(k__temperature_c)
+    name: update_temperature
     description: Combine ambient drift, occupant heat load, and setpoint tracking consistent with HVAC models.
     heating_gain: 0.12
     cooling_gain: 0.09
@@ -114,6 +231,7 @@ actions:
 
   # Blend humidity toward the target while respecting physical limits.
   - function: $in(k__humidity_percent)
+    name: update_humidity
     description: Approach humidity target with ambient influence and occupant moisture load.
     recovery_gain: 0.06
     occupant_gain: 0.025
@@ -131,6 +249,7 @@ actions:
 
   # Evolve CO₂ concentration based on ventilation and occupancy respiration.
   - function: $in(k__co2_ppm)
+    name: update_co2_ppm
     description: Estimate indoor CO₂ with a low-order balance between emissions and ventilation.
     outdoor_ppm: 420.0
     call: max(
@@ -145,6 +264,7 @@ actions:
 
   # Blend manual fan target with automatic bias based on temperature error.
   - function: $in(fan_speed_adjusted_target)
+    name: compute_adjusted_fan_speed_target
     description: Increase fan demand when temperature exceeds the setpoint.
     call: max(
           0.0,
@@ -157,6 +277,7 @@ actions:
 
   # Slew the applied fan speed toward the target command with rate limiting.
   - function: $in(k__fan_speed_percent)
+    name: update_fan_speed_percent
     description: Rate-limit fan speed adjustments derived from MQTT commands or automation.
     call: max(
           0.0,
@@ -179,6 +300,7 @@ actions:
 
   # Compute a composite comfort index based on temperature, humidity, and CO₂ deviation.
   - function: $in(k__comfort_index)
+    name: compute_comfort_index
     description: Collapse deviations into a 0-100 score (100 = best comfort).
     call: max(
           0.0,
@@ -193,6 +315,7 @@ actions:
 
   # Derive a readable status string for telemetry dashboards.
   - function: $in(k__status_text)
+    name: update_status_text
     description: Provide a textual status reflecting target tracking and connectivity.
     call: (
           "DISCONNECTED" if $in(k__mqtt_connected) == 0
@@ -204,6 +327,7 @@ actions:
 
   # Track stale counter based on connectivity status.
   - function: $in(stale_counter)
+    name: update_stale_counter
     description: Integrate offline time to drive stale-data alarms.
     increment: 1.0
     decay: 1.2
@@ -215,12 +339,18 @@ actions:
 
   # Raise alarms based on environmental thresholds or stale communications.
   - function: $in(k__alarm_high_temp)
+    name: raise_high_temperature_alarm
+    description: Assert when temperature exceeds the configured threshold.
     call: 1 if $in(k__temperature_c) >= $in(high_temp_threshold) else 0
 
   - function: $in(k__alarm_co2)
+    name: raise_co2_alarm
+    description: Assert when indoor CO2 exceeds the configured threshold.
     call: 1 if $in(k__co2_ppm) >= $in(co2_threshold) else 0
 
   - function: $in(k__alarm_stale_data)
+    name: raise_stale_data_alarm
+    description: Assert when MQTT telemetry is stale for longer than the timeout.
     call: 1 if $in(stale_counter) >= $in(stale_timeout) else 0
 
 communication:
@@ -289,17 +419,23 @@ communication:
 
 scenarios:
   occupancy_spike:
+    name: Occupancy Spike
+    description: Temporarily raises occupancy to exercise HVAC response under crowding.
     duration: 15.0
     overrides:
       $in(k__occupancy_target): 18.0
 
   night_setback:
+    name: Night Setback
+    description: Lowers temperature and fan demand to simulate night operation.
     duration: 30.0
     overrides:
       $in(k__target_c): 18.5
       $in(k__fan_speed_target): 20.0
 
   mqtt_disconnect:
+    name: MQTT Disconnect
+    description: Detaches the MQTT transport long enough to trigger stale-data handling.
     duration: 4.0
     call:
       path: communication.mqtt.detach

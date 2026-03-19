@@ -14,69 +14,219 @@ meta_parameters:
     default: 12
 
 attributes:
-  cmd__pump1_operate_on: 0
-  cmd__pump1_operate_off: 0
-  k__pump1_work_mode: 0
-  k__pump1_output_current_set_a: 0
-  pump1_output_current_a: 0
-  pump1_output_voltage_v: 0.0
-  pump1_actual_cycle_number: 0
-  pump1_actual_work_time_s: 0
-  pump1_status_word: 0
-  pump1_filament_1_status: 0
-  pump1_filament_2_status: 0
-  pump1_filament_3_status: 0
-  k__pump1_filament_runtime_s: 0
-  k__pump1_filament_off_time_s: 0
-  cmd__pump1_filament_1_on: 0
-  cmd__pump1_filament_2_on: 0
-  cmd__pump1_filament_3_on: 0
-  k__pump1_filament_runtime_degas_s: 0
-  k__pump1_filament_off_time_degas_s: 0
-  cmd__pump1_filament_1_on_degas: 0
-  cmd__pump1_filament_2_on_degas: 0
-  cmd__pump1_filament_3_on_degas: 0
-  pump1_filament_1_total_work_time_s: 0
-  pump1_filament_2_total_work_time_s: 0
-  pump1_filament_3_total_work_time_s: 0
-  k__pump1_timer_direction: 0
-  pump1_actual_operate_time_s: 0
-  k__pump1_operate_time_setpoint_s: 0
-  k__device_setup: 0
-  k__pump1_connector_cable_length: 0
+  cmd__pump1_operate_on:
+    type: int
+    default: 0
+  cmd__pump1_operate_off:
+    type: int
+    default: 0
+  k__pump1_work_mode:
+    type: int
+    default: 0
+  k__pump1_output_current_set_a:
+    type: int
+    default: 0
+    unit: A
+  pump1_output_current_a:
+    type: int
+    default: 0
+    unit: A
+  pump1_output_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  pump1_actual_cycle_number:
+    type: int
+    default: 0
+    unit: count
+  pump1_actual_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump1_status_word:
+    type: int
+    default: 0
+  pump1_filament_1_status:
+    type: int
+    default: 0
+  pump1_filament_2_status:
+    type: int
+    default: 0
+  pump1_filament_3_status:
+    type: int
+    default: 0
+  k__pump1_filament_runtime_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump1_filament_off_time_s:
+    type: int
+    default: 0
+    unit: s
+  cmd__pump1_filament_1_on:
+    type: int
+    default: 0
+  cmd__pump1_filament_2_on:
+    type: int
+    default: 0
+  cmd__pump1_filament_3_on:
+    type: int
+    default: 0
+  k__pump1_filament_runtime_degas_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump1_filament_off_time_degas_s:
+    type: int
+    default: 0
+    unit: s
+  cmd__pump1_filament_1_on_degas:
+    type: int
+    default: 0
+  cmd__pump1_filament_2_on_degas:
+    type: int
+    default: 0
+  cmd__pump1_filament_3_on_degas:
+    type: int
+    default: 0
+  pump1_filament_1_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump1_filament_2_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump1_filament_3_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump1_timer_direction:
+    type: int
+    default: 0
+  pump1_actual_operate_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump1_operate_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
+  k__device_setup:
+    type: int
+    default: 0
+  k__pump1_connector_cable_length:
+    type: int
+    default: 0
 
-  cmd__pump2_operate_on: 0
-  cmd__pump2_operate_off: 0
-  k__pump2_work_mode: 0
-  k__pump2_output_current_set_a: 0
-  pump2_output_current_a: 0
-  pump2_output_voltage_v: 0.0
-  pump2_actual_cycle_number: 0
-  pump2_actual_work_time_s: 0
-  pump2_filament_1_status: 0
-  pump2_filament_2_status: 0
-  pump2_filament_3_status: 0
-  k__pump2_filament_runtime_s: 0
-  k__pump2_filament_off_time_s: 0
-  cmd__pump2_filament_1_on: 0
-  cmd__pump2_filament_2_on: 0
-  cmd__pump2_filament_3_on: 0
-  k__pump2_filament_runtime_degas_s: 0
-  k__pump2_filament_off_time_degas_s: 0
-  cmd__pump2_filament_1_on_degas: 0
-  cmd__pump2_filament_2_on_degas: 0
-  cmd__pump2_filament_3_on_degas: 0
-  pump2_filament_1_total_work_time_s: 0
-  pump2_filament_2_total_work_time_s: 0
-  pump2_filament_3_total_work_time_s: 0
-  k__pump2_timer_direction: 0
-  pump2_actual_operate_time_s: 0
-  k__pump2_operate_time_setpoint_s: 0
-  k__pump2_connector_cable_length: 0
+  cmd__pump2_operate_on:
+    type: int
+    default: 0
+  cmd__pump2_operate_off:
+    type: int
+    default: 0
+  k__pump2_work_mode:
+    type: int
+    default: 0
+  k__pump2_output_current_set_a:
+    type: int
+    default: 0
+    unit: A
+  pump2_output_current_a:
+    type: int
+    default: 0
+    unit: A
+  pump2_output_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  pump2_actual_cycle_number:
+    type: int
+    default: 0
+    unit: count
+  pump2_actual_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump2_filament_1_status:
+    type: int
+    default: 0
+  pump2_filament_2_status:
+    type: int
+    default: 0
+  pump2_filament_3_status:
+    type: int
+    default: 0
+  k__pump2_filament_runtime_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump2_filament_off_time_s:
+    type: int
+    default: 0
+    unit: s
+  cmd__pump2_filament_1_on:
+    type: int
+    default: 0
+  cmd__pump2_filament_2_on:
+    type: int
+    default: 0
+  cmd__pump2_filament_3_on:
+    type: int
+    default: 0
+  k__pump2_filament_runtime_degas_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump2_filament_off_time_degas_s:
+    type: int
+    default: 0
+    unit: s
+  cmd__pump2_filament_1_on_degas:
+    type: int
+    default: 0
+  cmd__pump2_filament_2_on_degas:
+    type: int
+    default: 0
+  cmd__pump2_filament_3_on_degas:
+    type: int
+    default: 0
+  pump2_filament_1_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump2_filament_2_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  pump2_filament_3_total_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump2_timer_direction:
+    type: int
+    default: 0
+  pump2_actual_operate_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump2_operate_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
+  k__pump2_connector_cable_length:
+    type: int
+    default: 0
 
-  cmd__release_remote_control: 0
-  k__touchscreen_auto_lock: 0
-  remote_control_enabled: 0
+  cmd__release_remote_control:
+    type: int
+    default: 0
+  k__touchscreen_auto_lock:
+    type: int
+    default: 0
+  remote_control_enabled:
+    type: int
+    default: 0
 
 communication:
   - modbus_slave:

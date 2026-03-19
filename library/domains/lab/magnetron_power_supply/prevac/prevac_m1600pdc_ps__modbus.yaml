@@ -14,89 +14,273 @@ meta_parameters:
     default: 11
 
 attributes:
-  device_state: 0
-  status_word_1: 0
-  status_word_2: 0
-  switch_to_operate_allowed: 17
+  device_state:
+    type: int
+    default: 0
+  status_word_1:
+    type: int
+    default: 0
+  status_word_2:
+    type: int
+    default: 0
+  switch_to_operate_allowed:
+    type: int
+    default: 17
 
-  magnetron_power_w: 0.0
-  magnetron_voltage_v: 0.0
-  magnetron_current_ma: 0.0
-  thickness_nm: 0.0
-  rate_nm_s: 0.0
-  flow_sccm: 0.0
+  magnetron_power_w:
+    type: float
+    default: 0.0
+    unit: W
+  magnetron_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  magnetron_current_ma:
+    type: float
+    default: 0.0
+    unit: mA
+  thickness_nm:
+    type: float
+    default: 0.0
+    unit: nm
+  rate_nm_s:
+    type: float
+    default: 0.0
+    unit: nm/s
+  flow_sccm:
+    type: float
+    default: 0.0
+    unit: sccm
 
-  k__working_mode: 0
-  cmd__go_to_operate: 0
-  cmd__go_to_standby: 0
+  k__working_mode:
+    type: int
+    default: 0
+  cmd__go_to_operate:
+    type: int
+    default: 0
+  cmd__go_to_standby:
+    type: int
+    default: 0
 
-  k__power_set_w: 200.0
-  k__voltage_set_v: 500.0
-  k__current_set_ma: 500.0
-  k__frequency_khz: 100.0
-  k__pulse_duration_us: 2.0
-  k__flow_set_sccm: 10.0
+  k__power_set_w:
+    type: float
+    default: 200.0
+    unit: W
+  k__voltage_set_v:
+    type: float
+    default: 500.0
+    unit: V
+  k__current_set_ma:
+    type: float
+    default: 500.0
+    unit: mA
+  k__frequency_khz:
+    type: float
+    default: 100.0
+    unit: kHz
+  k__pulse_duration_us:
+    type: float
+    default: 2.0
+    unit: us
+  k__flow_set_sccm:
+    type: float
+    default: 10.0
+    unit: sccm
 
-  cmd__shutter_1_open: 0
-  cmd__shutter_1_close: 0
-  cmd__shutter_2_open: 0
-  cmd__shutter_2_close: 0
-  cmd__shutter_3_open: 0
-  cmd__shutter_3_close: 0
+  cmd__shutter_1_open:
+    type: int
+    default: 0
+  cmd__shutter_1_close:
+    type: int
+    default: 0
+  cmd__shutter_2_open:
+    type: int
+    default: 0
+  cmd__shutter_2_close:
+    type: int
+    default: 0
+  cmd__shutter_3_open:
+    type: int
+    default: 0
+  cmd__shutter_3_close:
+    type: int
+    default: 0
 
-  cmd__valve_open: 0
-  cmd__valve_close: 0
-  cmd__clear_thickness: 0
+  cmd__valve_open:
+    type: int
+    default: 0
+  cmd__valve_close:
+    type: int
+    default: 0
+  cmd__clear_thickness:
+    type: int
+    default: 0
 
-  k__power_limit_output_1_w: 600
-  k__power_limit_output_2_w: 600
-  k__power_limit_output_3_w: 600
-  k__voltage_limit_output_1_v: 1200
-  k__voltage_limit_output_2_v: 1200
-  k__voltage_limit_output_3_v: 1200
-  k__current_limit_output_1_ma: 3000
-  k__current_limit_output_2_ma: 3000
-  k__current_limit_output_3_ma: 3000
+  k__power_limit_output_1_w:
+    type: int
+    default: 600
+    unit: W
+  k__power_limit_output_2_w:
+    type: int
+    default: 600
+    unit: W
+  k__power_limit_output_3_w:
+    type: int
+    default: 600
+    unit: W
+  k__voltage_limit_output_1_v:
+    type: int
+    default: 1200
+    unit: V
+  k__voltage_limit_output_2_v:
+    type: int
+    default: 1200
+    unit: V
+  k__voltage_limit_output_3_v:
+    type: int
+    default: 1200
+    unit: V
+  k__current_limit_output_1_ma:
+    type: int
+    default: 3000
+    unit: mA
+  k__current_limit_output_2_ma:
+    type: int
+    default: 3000
+    unit: mA
+  k__current_limit_output_3_ma:
+    type: int
+    default: 3000
+    unit: mA
 
-  k__power_ramp_w_s: 200
-  k__voltage_ramp_v_s: 200
-  k__current_ramp_ma_s: 200
+  k__power_ramp_w_s:
+    type: int
+    default: 200
+    unit: W/s
+  k__voltage_ramp_v_s:
+    type: int
+    default: 200
+    unit: V/s
+  k__current_ramp_ma_s:
+    type: int
+    default: 200
+    unit: mA/s
 
-  k__vacuum_interlock_mode: 0
-  k__arc_detect_enabled: 1
-  k__arc_detect_time_us: 50
-  k__arc_off_time_ms: 100
-  k__arc_limit_enabled: 0
-  k__arc_limit_value: 1000
+  k__vacuum_interlock_mode:
+    type: int
+    default: 0
+  k__arc_detect_enabled:
+    type: int
+    default: 1
+  k__arc_detect_time_us:
+    type: int
+    default: 50
+    unit: us
+  k__arc_off_time_ms:
+    type: int
+    default: 100
+    unit: ms
+  k__arc_limit_enabled:
+    type: int
+    default: 0
+  k__arc_limit_value:
+    type: int
+    default: 1000
 
-  k__shutter_control_internal: 1
-  k__shutter_1_mode: 1
-  k__shutter_1_thickness_setpoint_nm: 0.0
-  k__shutter_1_time_setpoint_s: 0
-  shutter_1_remaining_time_s: 0
-  k__shutter_2_mode: 1
-  k__shutter_2_thickness_setpoint_nm: 0.0
-  k__shutter_2_time_setpoint_s: 0
-  shutter_2_remaining_time_s: 0
-  k__shutter_3_mode: 1
-  k__shutter_3_thickness_setpoint_nm: 0.0
-  k__shutter_3_time_setpoint_s: 0
-  shutter_3_remaining_time_s: 0
+  k__shutter_control_internal:
+    type: int
+    default: 1
+  k__shutter_1_mode:
+    type: int
+    default: 1
+  k__shutter_1_thickness_setpoint_nm:
+    type: float
+    default: 0.0
+    unit: nm
+  k__shutter_1_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
+  shutter_1_remaining_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__shutter_2_mode:
+    type: int
+    default: 1
+  k__shutter_2_thickness_setpoint_nm:
+    type: float
+    default: 0.0
+    unit: nm
+  k__shutter_2_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
+  shutter_2_remaining_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__shutter_3_mode:
+    type: int
+    default: 1
+  k__shutter_3_thickness_setpoint_nm:
+    type: float
+    default: 0.0
+    unit: nm
+  k__shutter_3_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
+  shutter_3_remaining_time_s:
+    type: int
+    default: 0
+    unit: s
 
-  k__flow_sensor_enabled: 1
-  k__flow_sensor_range: 3
-  flow_controller_temp_raw: 0
-  flow_controller_drive_level_raw: 0
-  k__flow_controller_operate_range: 0
+  k__flow_sensor_enabled:
+    type: int
+    default: 1
+  k__flow_sensor_range:
+    type: int
+    default: 3
+  flow_controller_temp_raw:
+    type: int
+    default: 0
+  flow_controller_drive_level_raw:
+    type: int
+    default: 0
+  k__flow_controller_operate_range:
+    type: int
+    default: 0
 
-  output_1_work_time_s: 0
-  output_2_work_time_s: 0
-  output_3_work_time_s: 0
-  k__active_output: 1
-  active_output: 1
-  k__timer_direction: 1
-  operate_time_s: 0
-  k__operate_time_setpoint_s: 0
+  output_1_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  output_2_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  output_3_work_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__active_output:
+    type: int
+    default: 1
+  active_output:
+    type: int
+    default: 1
+  k__timer_direction:
+    type: int
+    default: 1
+  operate_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__operate_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
 
 communication:
   - modbus_slave:

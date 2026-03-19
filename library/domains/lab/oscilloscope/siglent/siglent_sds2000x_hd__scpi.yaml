@@ -3,25 +3,56 @@ description: |
   Virtual Siglent SDS2000X HD series oscilloscope exposing a subset of the
   SCPI (ASCII/TCP) command set for channel setup and measurement queries.
 attributes:
-  k__channel_1_scale_v: 1.0
-  k__channel_1_offset_v: 0.0
-  k__timebase_scale_s: 0.001
-  k__trigger_level_v: 0.0
-  channel1_vpp_v: 2.0
-  channel1_vrms_v: 0.7071
-  channel1_vavg_v: 0.0
-  channel1_freq_hz: 1000.0
-  channel1_period_s: 0.001
-  idn: "SIGLENT,SDS2000X HD,SDS2HD0000000,1.0"
+  k__channel_1_scale_v:
+    type: float
+    default: 1.0
+    unit: V
+  k__channel_1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__timebase_scale_s:
+    type: float
+    default: 0.001
+    unit: s
+  k__trigger_level_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_vpp_v:
+    type: float
+    default: 2.0
+    unit: V
+  channel1_vrms_v:
+    type: float
+    default: 0.7071
+    unit: V
+  channel1_vavg_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_freq_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  channel1_period_s:
+    type: float
+    default: 0.001
+    unit: s
+  idn:
+    type: str
+    default: "SIGLENT,SDS2000X HD,SDS2HD0000000,1.0"
 
 actions:
   - function: $in(channel1_period_s)
     name: update_period
+    description: Recompute period from the current channel 1 frequency.
     params:
       min_freq_hz: 0.1
     call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
   - function: $in(channel1_vrms_v)
     name: update_vrms
+    description: Approximate RMS voltage from the configured channel 1 Vpp amplitude.
     params:
       scale: 0.353553
     call: $in(channel1_vpp_v) * scale
@@ -58,6 +89,7 @@ communication:
 
 scenarios:
   amplitude_sweep:
+    display_name: "Amplitude Sweep"
     description: "Slowly ramp channel 1 amplitude for lab demos."
     period: 0.2
     actions:

@@ -4,33 +4,71 @@ description: |
   RMS voltage/current plus active/reactive/apparent power metrics.
 
 attributes:
-  idn: "Rohde&Schwarz,HMC8015,0000000000,1.00"
+  idn:
+    type: str
+    default: "Rohde&Schwarz,HMC8015,0000000000,1.00"
 
-  k__measurement_functions: "URMS,IRMS,P,S,Q,LAMB,PHI,EPS,ETA"
+  k__measurement_functions:
+    type: str
+    default: "URMS,IRMS,P,S,Q,LAMB,PHI,EPS,ETA"
 
-  voltage_rms_v: 230.0
-  current_rms_a: 1.25
-  lambda_pf: 0.98
-  phase_deg: 11.5
+  voltage_rms_v:
+    type: float
+    default: 230.0
+    unit: V
+  current_rms_a:
+    type: float
+    default: 1.25
+    unit: A
+  lambda_pf:
+    type: float
+    default: 0.98
+    unit: ratio
+  phase_deg:
+    type: float
+    default: 11.5
+    unit: deg
 
-  apparent_power_va: 287.5
-  active_power_w: 281.75
-  reactive_power_var: 57.2
-  energy_wh: 0.5
-  efficiency_pct: 96.5
+  apparent_power_va:
+    type: float
+    default: 287.5
+    unit: VA
+  active_power_w:
+    type: float
+    default: 281.75
+    unit: W
+  reactive_power_var:
+    type: float
+    default: 57.2
+    unit: var
+  energy_wh:
+    type: float
+    default: 0.5
+    unit: Wh
+  efficiency_pct:
+    type: float
+    default: 96.5
+    unit: percent
 
-  measurement_data: "230.0,1.25,281.75,287.5,57.2,0.98,11.5,0.5,96.5"
-  error_status: "0,No error"
+  measurement_data:
+    type: str
+    default: "230.0,1.25,281.75,287.5,57.2,0.98,11.5,0.5,96.5"
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(apparent_power_va)
     name: update_apparent_power
+    description: Compute apparent power from RMS voltage and RMS current.
     call: $in(voltage_rms_v) * $in(current_rms_a)
   - function: $in(active_power_w)
     name: update_active_power
+    description: Derive active power from apparent power and the power factor.
     call: $in(apparent_power_va) * $in(lambda_pf)
   - function: $in(reactive_power_var)
     name: update_reactive_power
+    description: Derive reactive power from apparent and active power components.
     imports: {math: math}
     call: |
       (lambda s, p:
@@ -38,6 +76,7 @@ actions:
       )($in(apparent_power_va), $in(active_power_w))
   - function: $in(measurement_data)
     name: update_measurement_data
+    description: Render the configured measurement function list into a CSV-style SCPI reply.
     params:
       default_functions: "URMS,IRMS,P,S,Q,LAMB,PHI,EPS,ETA"
     call: |

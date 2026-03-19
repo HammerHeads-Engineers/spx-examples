@@ -4,23 +4,43 @@ description: |
   ASCII-over-TCP integration tests and demos.
 
 attributes:
-  idn: "SPX,BENCH_PSU,PSU0001,1.0"
+  idn:
+    type: str
+    default: "SPX,BENCH_PSU,PSU0001,1.0"
 
-  k__voltage_set_v: 5.0
-  k__current_set_a: 1.0
-  k__output_state: "OFF"
+  k__voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__output_state:
+    type: str
+    default: "OFF"
 
-  voltage_readback_v: 0.0
-  current_readback_a: 0.0
+  voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
 
-  error_status: "0,No error"
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(voltage_readback_v)
     name: update_voltage_readback
+    description: Mirror the programmed voltage when output is enabled, else clamp to zero.
     call: ($in(k__voltage_set_v) if $in(k__output_state) == "ON" else 0.0)
   - function: $in(current_readback_a)
     name: update_current_readback
+    description: Mirror the programmed current limit when output is enabled, else clamp to zero.
     call: ($in(k__current_set_a) if $in(k__output_state) == "ON" else 0.0)
 
 communication:

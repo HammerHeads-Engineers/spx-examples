@@ -4,20 +4,38 @@ description: |
   plus simple configuration commands for ASCII-over-TCP demos.
 
 attributes:
-  idn: "SPX,DMM,DMM0001,1.0"
+  idn:
+    type: str
+    default: "SPX,DMM,DMM0001,1.0"
 
-  k__mode: "VOLT:DC"
-  k__range_v: 10.0
+  k__mode:
+    type: str
+    default: "VOLT:DC"
+  k__range_v:
+    type: float
+    default: 10.0
+    unit: V
 
-  voltage_readback_v: 1.234
-  resistance_readback_ohm: 1000.0
-  readback_value: 1.234
+  voltage_readback_v:
+    type: float
+    default: 1.234
+    unit: V
+  resistance_readback_ohm:
+    type: float
+    default: 1000.0
+    unit: ohm
+  readback_value:
+    type: float
+    default: 1.234
 
-  error_status: "0,No error"
+  error_status:
+    type: str
+    default: "0,No error"
 
 actions:
   - function: $in(readback_value)
     name: update_readback
+    description: Select the active readback based on the configured DMM mode.
     call: |
       ($in(voltage_readback_v)
        if $in(k__mode) == "VOLT:DC"

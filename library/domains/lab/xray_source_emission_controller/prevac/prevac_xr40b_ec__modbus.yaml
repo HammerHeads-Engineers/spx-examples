@@ -14,39 +14,127 @@ meta_parameters:
     default: 13
 
 attributes:
-  status_word_1: 0
-  status_word_2: 0
-  status_word_3: 0
-  supported_source_count: 0
-  emission_voltage_v: 0
-  emission_current_ma: 0.0
-  cathode_current_a: 0.0
-  cooling_water_temperature_c: 0.0
-  cooling_water_pressure_bar: 0.0
-  cooling_water_flow_l_min: 0.0
-  leak_current_ma: 0.0
-  anode_power_dissipation_w: 0
-  crystal_temperature_c: 0.0
-  cmd__go_operate: 0
-  cmd__go_standby: 0
-  cmd__crystal_heating_on: 0
-  cmd__crystal_heating_off: 0
-  k__emission_voltage_set_v: 0
-  k__emission_current_set_ma: 0.0
-  k__active_source: 0
-  k__emission_voltage_ramp_rate_v_s_source1: 0
-  k__emission_voltage_ramp_rate_v_s_source2: 0
-  k__emission_current_ramp_rate_ma_s_source1: 0.0
-  k__emission_current_ramp_rate_ma_s_source2: 0.0
-  k__source1_anode_selection: 0
-  k__source2_anode_selection: 0
-  k__focus_voltage_1_v: 0
-  k__focus_voltage_2_v: 0
-  k__focus_voltage_3_v: 0
-  k__focus_voltage_4_v: 0
-  k__timer_direction: 0
-  operate_time_s: 0
-  k__operate_time_setpoint_s: 0
+  status_word_1:
+    type: int
+    default: 0
+  status_word_2:
+    type: int
+    default: 0
+  status_word_3:
+    type: int
+    default: 0
+  supported_source_count:
+    type: int
+    default: 0
+    unit: count
+  emission_voltage_v:
+    type: int
+    default: 0
+    unit: V
+  emission_current_ma:
+    type: float
+    default: 0.0
+    unit: mA
+  cathode_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  cooling_water_temperature_c:
+    type: float
+    default: 0.0
+    unit: degC
+  cooling_water_pressure_bar:
+    type: float
+    default: 0.0
+    unit: bar
+  cooling_water_flow_l_min:
+    type: float
+    default: 0.0
+    unit: L/min
+  leak_current_ma:
+    type: float
+    default: 0.0
+    unit: mA
+  anode_power_dissipation_w:
+    type: int
+    default: 0
+    unit: W
+  crystal_temperature_c:
+    type: float
+    default: 0.0
+    unit: degC
+  cmd__go_operate:
+    type: int
+    default: 0
+  cmd__go_standby:
+    type: int
+    default: 0
+  cmd__crystal_heating_on:
+    type: int
+    default: 0
+  cmd__crystal_heating_off:
+    type: int
+    default: 0
+  k__emission_voltage_set_v:
+    type: int
+    default: 0
+    unit: V
+  k__emission_current_set_ma:
+    type: float
+    default: 0.0
+    unit: mA
+  k__active_source:
+    type: int
+    default: 0
+  k__emission_voltage_ramp_rate_v_s_source1:
+    type: int
+    default: 0
+    unit: V/s
+  k__emission_voltage_ramp_rate_v_s_source2:
+    type: int
+    default: 0
+    unit: V/s
+  k__emission_current_ramp_rate_ma_s_source1:
+    type: float
+    default: 0.0
+    unit: mA/s
+  k__emission_current_ramp_rate_ma_s_source2:
+    type: float
+    default: 0.0
+    unit: mA/s
+  k__source1_anode_selection:
+    type: int
+    default: 0
+  k__source2_anode_selection:
+    type: int
+    default: 0
+  k__focus_voltage_1_v:
+    type: int
+    default: 0
+    unit: V
+  k__focus_voltage_2_v:
+    type: int
+    default: 0
+    unit: V
+  k__focus_voltage_3_v:
+    type: int
+    default: 0
+    unit: V
+  k__focus_voltage_4_v:
+    type: int
+    default: 0
+    unit: V
+  k__timer_direction:
+    type: int
+    default: 0
+  operate_time_s:
+    type: int
+    default: 0
+    unit: s
+  k__operate_time_setpoint_s:
+    type: int
+    default: 0
+    unit: s
 
 communication:
   - modbus_slave:

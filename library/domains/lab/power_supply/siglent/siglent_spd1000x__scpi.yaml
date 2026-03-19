@@ -5,34 +5,65 @@ description: |
   measurements for lab automation workflows.
 
 attributes:
-  idn: "SIGLENT,SPD1000X,SPD1000X0000000,1.01"
+  idn:
+    type: str
+    default: "SIGLENT,SPD1000X,SPD1000X0000000,1.01"
 
-  k__selected_output: "CH1"
+  k__selected_output:
+    type: str
+    default: "CH1"
 
-  k__ch1_voltage_set_v: 5.0
-  k__ch1_current_limit_a: 1.0
-  k__ch1_output_state: 0
+  k__ch1_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch1_current_limit_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch1_output_state:
+    type: int
+    default: 0
 
-  ch1_voltage_readback_v: 0.0
-  ch1_current_readback_a: 0.0
-  ch1_power_readback_w: 0.0
+  ch1_voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch1_current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch1_power_readback_w:
+    type: float
+    default: 0.0
+    unit: W
 
-  system_status: 0
-  system_version: "1.00"
-  error_status: '0,"No error"'
+  system_status:
+    type: int
+    default: 0
+  system_version:
+    type: str
+    default: "1.00"
+  error_status:
+    type: str
+    default: '0,"No error"'
 
 actions:
   - function: $in(ch1_voltage_readback_v)
     name: update_ch1_voltage
+    description: Mirror channel 1 set voltage when the output is enabled.
     call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
   - function: $in(ch1_current_readback_a)
     name: update_ch1_current
+    description: Mirror channel 1 current limit as measured current when enabled.
     call: ($in(k__ch1_current_limit_a) if $in(k__ch1_output_state) == 1 else 0.0)
   - function: $in(ch1_power_readback_w)
     name: update_ch1_power
+    description: Compute instantaneous output power from the measured voltage and current.
     call: ($in(ch1_voltage_readback_v) * $in(ch1_current_readback_a))
   - function: $in(system_status)
     name: update_system_status
+    description: Publish a simple system status bit reflecting output enable state.
     call: (1 if $in(k__ch1_output_state) == 1 else 0)
 
 communication:
