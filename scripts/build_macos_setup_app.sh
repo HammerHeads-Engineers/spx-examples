@@ -17,6 +17,7 @@ Options:
   --app-name NAME     App bundle name without extension (default: SPX Setup)
   --bundle-id ID      CFBundleIdentifier for the app (default: com.hammerheadsengineers.spx.setup)
   --script-source P   AppleScript source used to build the app (default: installer/macos/spx_setup_launcher.applescript)
+  --icon-source P     PNG or ICNS used as the app icon (default: packaging/windows/assets/spx.png)
   --skip-payload      Build the launcher without embedding the installer payload
   --version VERSION   App version (default: pyproject.toml version or dev)
   --sign IDENTITY     Sign with this Developer ID Application identity
@@ -41,11 +42,65 @@ resolve_version() {
   printf 'dev\n'
 }
 
+install_app_icon() {
+  local source_path="$1"
+  local app_path="$2"
+  local staging_root="$3"
+  local resources_dir="${app_path}/Contents/Resources"
+  local icon_target="${resources_dir}/spx.icns"
+  local legacy_applet_icon="${resources_dir}/applet.icns"
+  local icon_ext
+
+  icon_ext="$(printf '%s' "${source_path##*.}" | tr '[:upper:]' '[:lower:]')"
+
+  case "${icon_ext}" in
+    icns)
+      cp "${source_path}" "${icon_target}"
+      ;;
+    png)
+      local app_stem
+      local iconset_dir
+
+      app_stem="$(basename "${app_path}" ".app" | tr ' /' '__')"
+      iconset_dir="${staging_root}/${app_stem}.iconset"
+      rm -rf "${iconset_dir}"
+      mkdir -p "${iconset_dir}"
+
+      while IFS=':' read -r icon_name icon_size; do
+        sips -z "${icon_size}" "${icon_size}" "${source_path}" \
+          --out "${iconset_dir}/${icon_name}" >/dev/null
+      done <<'EOF'
+icon_16x16.png:16
+icon_16x16@2x.png:32
+icon_32x32.png:32
+icon_32x32@2x.png:64
+icon_128x128.png:128
+icon_128x128@2x.png:256
+icon_256x256.png:256
+icon_256x256@2x.png:512
+icon_512x512.png:512
+icon_512x512@2x.png:1024
+EOF
+
+      iconutil -c icns "${iconset_dir}" -o "${icon_target}"
+      ;;
+    *)
+      echo "Unsupported icon format: ${source_path}" >&2
+      exit 1
+      ;;
+  esac
+
+  # AppleScript applets ship with a default applet.icns; replace it as well so
+  # Finder and LaunchServices cannot fall back to the generic Script Editor icon.
+  cp "${icon_target}" "${legacy_applet_icon}"
+}
+
 OUTPUT_DIR="dist"
 STAGING_DIR="build/macos-app"
 APP_NAME="SPX Setup"
 BUNDLE_ID="com.hammerheadsengineers.spx.setup"
 SCRIPT_SOURCE_REL="installer/macos/spx_setup_launcher.applescript"
+ICON_SOURCE_INPUT="packaging/windows/assets/spx.png"
 SKIP_PAYLOAD=0
 VERSION=""
 SIGN_IDENTITY=""
@@ -71,6 +126,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --script-source)
       SCRIPT_SOURCE_REL="$2"
+      shift 2
+      ;;
+    --icon-source)
+      ICON_SOURCE_INPUT="$2"
       shift 2
       ;;
     --skip-payload)
@@ -108,16 +167,33 @@ STAGING_ROOT="${REPO_ROOT}/${STAGING_DIR}"
 PAYLOAD_DIR="${STAGING_ROOT}/${PAYLOAD_NAME}"
 SCRIPT_SOURCE="${REPO_ROOT}/${SCRIPT_SOURCE_REL}"
 APP_PATH="${DEST_DIR}/${APP_NAME}.app"
+if [[ "${ICON_SOURCE_INPUT}" = /* ]]; then
+  ICON_SOURCE="${ICON_SOURCE_INPUT}"
+else
+  ICON_SOURCE="${REPO_ROOT}/${ICON_SOURCE_INPUT}"
+fi
 
 if [[ -z "${VERSION}" ]]; then
   VERSION="$(resolve_version)"
 fi
 
 require_command xcrun
+require_command iconutil
 require_command rsync
 require_command sed
+require_command sips
 require_command /usr/libexec/PlistBuddy
 require_command codesign
+
+if [[ ! -f "${SCRIPT_SOURCE}" ]]; then
+  echo "AppleScript source not found: ${SCRIPT_SOURCE}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${ICON_SOURCE}" ]]; then
+  echo "Icon source not found: ${ICON_SOURCE}" >&2
+  exit 1
+fi
 
 mkdir -p "${DEST_DIR}"
 mkdir -p "${STAGING_ROOT}"
@@ -130,6 +206,7 @@ if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
 fi
 
 xcrun osacompile -o "${APP_PATH}" "${SCRIPT_SOURCE}"
+install_app_icon "${ICON_SOURCE}" "${APP_PATH}" "${STAGING_ROOT}"
 
 if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
   RESOURCE_PAYLOAD_DIR="${APP_PATH}/Contents/Resources/${PAYLOAD_NAME}"
@@ -143,6 +220,9 @@ plist="${APP_PATH}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName '${APP_NAME}'" "${plist}"
 /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string '${APP_NAME}'" "${plist}" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '${APP_NAME}'" "${plist}"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string 'spx.icns'" "${plist}" 2>/dev/null || \
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile 'spx.icns'" "${plist}"
+/usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "${plist}" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string '${VERSION}'" "${plist}" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString '${VERSION}'" "${plist}"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string '${VERSION}'" "${plist}" 2>/dev/null || \

@@ -7,10 +7,11 @@ usage() {
 Usage: scripts/build_macos_pkg.sh [options]
 
  Builds a macOS flat installer package (.pkg) that installs SPX Setup.app,
- SPX MCP Setup.app, SPX Start.app, SPX Stop.app, and SPX Cleanup.app into
- /Applications. SPX Setup.app contains the full installer payload; the other
- launchers operate on the generated environment in the user's Application
- Support directory or bootstrap a managed Codex MCP workspace.
+ SPX MCP Setup.app, SPX Start.app, SPX Stop.app, SPX Cleanup.app, and
+ SPX Uninstall.app into /Applications/SPX Tools. SPX Setup.app contains the
+ full installer payload; the other launchers operate on the generated
+ environment in the user's Application Support directory, bootstrap a managed
+ Codex MCP workspace, or remove the installed SPX tools.
 
 Options:
   --output-dir DIR              Directory for the final .pkg (default: dist)
@@ -18,7 +19,7 @@ Options:
   --pkg-name NAME               Output package stem without version/ext (default: spx-installer-macos)
   --identifier ID               macOS package identifier (default: com.hammerheadsengineers.spx.installer)
   --version VERSION             Package version (default: pyproject.toml version or dev)
-  --install-location PATH       Install destination on macOS (default: /Applications)
+  --install-location PATH       Parent install destination on macOS (default: /Applications)
   --app-name NAME               Installed launcher app name without extension (default: SPX Setup)
   --app-bundle-id ID            CFBundleIdentifier for the launcher app (default: com.hammerheadsengineers.spx.setup)
   --app-sign IDENTITY           Sign the launcher app with this Developer ID Application identity
@@ -46,6 +47,51 @@ resolve_version() {
   printf 'dev\n'
 }
 
+apply_folder_icon() {
+  local folder_path="$1"
+  local icon_source="$2"
+  local icon_path="${folder_path}/Icon"$'\r'
+
+  cp "${icon_source}" "${icon_path}"
+  chflags hidden "${icon_path}"
+  xattr -wx com.apple.FinderInfo \
+    0000000000000000040000000000000000000000000000000000000000000000 \
+    "${folder_path}"
+  xattr -wx com.apple.FinderInfo \
+    0000000000000000400000000000000000000000000000000000000000000000 \
+    "${icon_path}"
+}
+
+write_pkg_scripts() {
+  local scripts_dir="$1"
+  local install_root="$2"
+  local tools_dir_name="$3"
+
+  mkdir -p "${scripts_dir}"
+
+  cat > "${scripts_dir}/postinstall" <<EOF
+#!/bin/bash
+set -euo pipefail
+
+tools_dir="${install_root}/${tools_dir_name}"
+setup_icon="\${tools_dir}/SPX Setup.app/Contents/Resources/spx.icns"
+folder_icon="\${tools_dir}/Icon"$'\r'
+
+if [[ -d "\${tools_dir}" && -f "\${setup_icon}" ]]; then
+  cp "\${setup_icon}" "\${folder_icon}"
+  chflags hidden "\${folder_icon}" || true
+  xattr -wx com.apple.FinderInfo \
+    0000000000000000040000000000000000000000000000000000000000000000 \
+    "\${tools_dir}" || true
+  xattr -wx com.apple.FinderInfo \
+    0000000000000000400000000000000000000000000000000000000000000000 \
+    "\${folder_icon}" || true
+fi
+EOF
+
+  chmod +x "${scripts_dir}/postinstall"
+}
+
 OUTPUT_DIR="dist"
 STAGING_DIR="build/macos-pkg"
 PKG_NAME="spx-installer-macos"
@@ -62,6 +108,9 @@ STOP_APP_NAME="SPX Stop"
 STOP_APP_BUNDLE_ID="com.hammerheadsengineers.spx.stop"
 CLEANUP_APP_NAME="SPX Cleanup"
 CLEANUP_APP_BUNDLE_ID="com.hammerheadsengineers.spx.cleanup"
+UNINSTALL_APP_NAME="SPX Uninstall"
+UNINSTALL_APP_BUNDLE_ID="com.hammerheadsengineers.spx.uninstall"
+TOOLS_DIR_NAME="SPX Tools"
 APP_SIGN_IDENTITY=""
 SIGN_IDENTITY=""
 KEYCHAIN_PATH=""
@@ -138,6 +187,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
 STAGING_ROOT="${REPO_ROOT}/${STAGING_DIR}"
 APP_ROOT="${STAGING_ROOT}/root"
+APP_OUTPUT_DIR="${STAGING_DIR}/root/${TOOLS_DIR_NAME}"
+APP_INSTALL_ROOT="${APP_ROOT}/${TOOLS_DIR_NAME}"
+PKG_SCRIPTS_DIR="${STAGING_ROOT}/pkg-scripts"
 
 if [[ -z "${VERSION}" ]]; then
   VERSION="$(resolve_version)"
@@ -161,13 +213,16 @@ require_command pkgbuild
 require_command pkgutil
 require_command sed
 require_command /usr/libexec/PlistBuddy
+require_command chflags
+require_command xattr
 
 mkdir -p "${DEST_DIR}"
 rm -rf "${APP_ROOT}"
-mkdir -p "${APP_ROOT}"
+rm -rf "${PKG_SCRIPTS_DIR}"
+mkdir -p "${APP_INSTALL_ROOT}"
 
 build_app_args=(
-  --output-dir "${STAGING_DIR}/root"
+  --output-dir "${APP_OUTPUT_DIR}"
   --staging-dir "${STAGING_DIR}/payload"
   --app-name "${APP_NAME}"
   --bundle-id "${APP_BUNDLE_ID}"
@@ -181,7 +236,7 @@ fi
 "${REPO_ROOT}/scripts/build_macos_setup_app.sh" "${build_app_args[@]}"
 
 build_mcp_setup_app_args=(
-  --output-dir "${STAGING_DIR}/root"
+  --output-dir "${APP_OUTPUT_DIR}"
   --app-name "${MCP_SETUP_APP_NAME}"
   --bundle-id "${MCP_SETUP_APP_BUNDLE_ID}"
   --version "${VERSION}"
@@ -194,7 +249,7 @@ fi
 "${REPO_ROOT}/scripts/build_macos_mcp_setup_app.sh" "${build_mcp_setup_app_args[@]}"
 
 build_start_app_args=(
-  --output-dir "${STAGING_DIR}/root"
+  --output-dir "${APP_OUTPUT_DIR}"
   --app-name "${START_APP_NAME}"
   --bundle-id "${START_APP_BUNDLE_ID}"
   --version "${VERSION}"
@@ -207,7 +262,7 @@ fi
 "${REPO_ROOT}/scripts/build_macos_start_app.sh" "${build_start_app_args[@]}"
 
 build_stop_app_args=(
-  --output-dir "${STAGING_DIR}/root"
+  --output-dir "${APP_OUTPUT_DIR}"
   --app-name "${STOP_APP_NAME}"
   --bundle-id "${STOP_APP_BUNDLE_ID}"
   --version "${VERSION}"
@@ -220,7 +275,7 @@ fi
 "${REPO_ROOT}/scripts/build_macos_stop_app.sh" "${build_stop_app_args[@]}"
 
 build_cleanup_app_args=(
-  --output-dir "${STAGING_DIR}/root"
+  --output-dir "${APP_OUTPUT_DIR}"
   --app-name "${CLEANUP_APP_NAME}"
   --bundle-id "${CLEANUP_APP_BUNDLE_ID}"
   --version "${VERSION}"
@@ -232,16 +287,40 @@ fi
 
 "${REPO_ROOT}/scripts/build_macos_cleanup_app.sh" "${build_cleanup_app_args[@]}"
 
+build_uninstall_app_args=(
+  --output-dir "${APP_OUTPUT_DIR}"
+  --app-name "${UNINSTALL_APP_NAME}"
+  --bundle-id "${UNINSTALL_APP_BUNDLE_ID}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+  build_uninstall_app_args+=(--sign "${APP_SIGN_IDENTITY}")
+fi
+
+"${REPO_ROOT}/scripts/build_macos_uninstall_app.sh" "${build_uninstall_app_args[@]}"
+
+apply_folder_icon \
+  "${APP_INSTALL_ROOT}" \
+  "${APP_INSTALL_ROOT}/${APP_NAME}.app/Contents/Resources/spx.icns"
+write_pkg_scripts "${PKG_SCRIPTS_DIR}" "${INSTALL_LOCATION}" "${TOOLS_DIR_NAME}"
+
 PKG_PATH="${DEST_DIR}/${PKG_NAME}-${VERSION}.pkg"
 COMPONENT_PLIST="${STAGING_ROOT}/component.plist"
 rm -f "${PKG_PATH}"
 rm -f "${COMPONENT_PLIST}"
 
 pkgbuild --analyze --root "${APP_ROOT}" "${COMPONENT_PLIST}"
-/usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" "${COMPONENT_PLIST}"
+
+component_index=0
+while /usr/libexec/PlistBuddy -c "Print :${component_index}" "${COMPONENT_PLIST}" >/dev/null 2>&1; do
+  /usr/libexec/PlistBuddy -c "Set :${component_index}:BundleIsRelocatable false" "${COMPONENT_PLIST}" >/dev/null 2>&1 || true
+  component_index=$((component_index + 1))
+done
 
 pkgbuild_args=(
   --root "${APP_ROOT}"
+  --scripts "${PKG_SCRIPTS_DIR}"
   --component-plist "${COMPONENT_PLIST}"
   --identifier "${IDENTIFIER}"
   --version "${VERSION}"
