@@ -48,11 +48,11 @@ Linux or macOS:
 sh tools/setup_codex_mcp.sh
 ```
 
-If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app`.
-That companion app creates an installer-managed workspace at
-`~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and writes
-`.codex/config.toml` for that folder in read-only mode. Open Codex in the
-generated workspace and start a fresh thread to pick up the config.
+If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app` from
+`/Applications/SPX Tools/`. That companion app creates an installer-managed
+workspace at `~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and
+writes `.codex/config.toml` for that folder in read-only mode. Open Codex in
+the generated workspace and start a fresh thread to pick up the config.
 
 Optional flags:
 
