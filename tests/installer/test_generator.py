@@ -142,6 +142,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "spx-ui" not in services
     assert "mqtt_broker" in services
     assert "8000:8000" in services["spx-server"]["ports"]
+    assert "healthcheck" not in services["spx-server"]
     assert "host.docker.internal:host-gateway" in services["spx-server"].get(
         "extra_hosts", []
     )
@@ -235,7 +236,7 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
     assert ui_service["image"] == SPX_UI_IMAGE
     assert ui_service["ports"] == ["3000:3000"]
     assert ui_service["environment"]["SPX_PRODUCT_KEY"] == "${SPX_PRODUCT_KEY}"
-    assert ui_service["command"] == ["--product-key", "${SPX_PRODUCT_KEY}"]
+    assert "command" not in ui_service
     assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
 
 
