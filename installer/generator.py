@@ -18,11 +18,11 @@ from . import paths
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.54"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.54"
+SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.60"
 # SPX_SERVER_IMAGE = "spx-server:trial"
 SPX_UI_SERVICE_NAME = "spx-ui"
-SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.55"
+SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.61"
+# SPX_UI_IMAGE = "spx-ui:trial"
 
 
 class DeploymentGenerator:
@@ -436,12 +436,6 @@ exit /b %EXITCODE%
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
             },
-            "healthcheck": {
-                "test": ["CMD-SHELL", "curl -f http://localhost:8000 || exit 1"],
-                "interval": "10s",
-                "timeout": "5s",
-                "retries": 5,
-            },
             "volumes": volumes,
             "command": [
                 "--address",
@@ -467,10 +461,6 @@ exit /b %EXITCODE%
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
             },
-            "command": [
-                "--product-key",
-                "${SPX_PRODUCT_KEY}",
-            ],
         }
 
     def _build_docker_service(self, manifest: ServiceManifest, assets_root: Path) -> Dict:
