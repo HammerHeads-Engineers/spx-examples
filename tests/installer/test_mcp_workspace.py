@@ -84,6 +84,37 @@ def test_sync_payload_replaces_managed_entries_and_keeps_local_state(tmp_path: P
     assert (workspace / "local.txt").read_text(encoding="utf-8") == "keep me\n"
 
 
+def test_sync_payload_skips_unreadable_files(tmp_path: Path, monkeypatch, capsys) -> None:
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    library_dir = source_root / "library" / "assets" / "matter" / "data"
+    library_dir.mkdir(parents=True)
+    readable_file = library_dir / "chip.json"
+    blocked_file = library_dir / "chip_config.ini"
+    readable_file.write_text('{"ok": true}\n', encoding="utf-8")
+    blocked_file.write_text("secret\n", encoding="utf-8")
+
+    original_copy2 = mcp_workspace.shutil.copy2
+
+    def flaky_copy2(src, dest, *args, **kwargs):
+        if Path(src).name == blocked_file.name:
+            raise PermissionError("permission denied")
+        return original_copy2(src, dest, *args, **kwargs)
+
+    monkeypatch.setattr(mcp_workspace.shutil, "copy2", flaky_copy2)
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    mcp_workspace.sync_payload(source_root, workspace)
+
+    assert (workspace / "library" / "assets" / "matter" / "data" / "chip.json").exists()
+    assert not (workspace / "library" / "assets" / "matter" / "data" / "chip_config.ini").exists()
+    stderr = capsys.readouterr().err
+    assert "Skipping unreadable payload file" in stderr
+    assert str(blocked_file) in stderr
+
+
 def test_bootstrap_runtime_installs_workspace_editably(tmp_path: Path, monkeypatch) -> None:
     source_root = tmp_path / "source"
     runtime_helper = source_root / "installer" / "runtime_bootstrap.py"

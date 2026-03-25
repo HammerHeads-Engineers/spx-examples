@@ -182,6 +182,19 @@ def remove_path(path: Path) -> None:
         shutil.rmtree(path)
 
 
+def copy_file(src: str | Path, dest: str | Path) -> None:
+    src_path = Path(src)
+    dest_path = Path(dest)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copy2(src_path, dest_path)
+    except PermissionError:
+        print(
+            f"[spx-mcp-setup] Skipping unreadable payload file: {src_path}",
+            file=sys.stderr,
+        )
+
+
 def copy_path(src: Path, dest: Path) -> None:
     if src.is_dir():
         shutil.copytree(
@@ -189,10 +202,10 @@ def copy_path(src: Path, dest: Path) -> None:
             dest,
             symlinks=True,
             ignore=shutil.ignore_patterns(*sorted(SKIP_ENTRY_NAMES)),
+            copy_function=copy_file,
         )
         return
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dest)
+    copy_file(src, dest)
 
 
 def sync_payload(source_root: Path, workspace_dir: Path) -> None:
