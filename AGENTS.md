@@ -57,6 +57,37 @@ Apply this standard to every new or updated model YAML. Legacy models may still 
 7. If the model belongs to a pack, update `library/catalog/industries.yaml`, relevant `profiles/<pack>/*.yaml`, the pack README in `library/industries/<pack>/README.md`, and regenerate `library/industries/<pack>/MODELS.yaml` via `poetry run python tools/render_pack_indexes.py`.
 8. Add or update tests under `tests/` (use existing pack tests as templates).
 
+## Fast path for MCP-only models
+Use this path when the model is being created only for local MCP usage and live `spx-server` runtime validation, with no request for repo hardening or automated test coverage.
+
+1. Start from the closest existing runtime model and preserve its physics, actions, scenarios, and attribute structure unless the new device strictly requires a different behavior model.
+2. Prefer vendor adaptation over full re-modeling:
+   - keep the nearest behavioral twin as-is
+   - change only metadata, naming, descriptions, protocol mapping, register map, and the minimum vendor-specific attributes needed for communication
+3. For Modbus devices, treat the manual as a source for the minimal useful register subset first:
+   - PV / measured value
+   - SP / target setpoint
+   - MV / output or manual output
+   - mode / run-stop / auto-manual when available
+   - the smallest extra subset needed for the requested scenario or demo
+4. Do not add unit tests or pytest coverage by default for this fast path.
+5. After editing the YAML, register the model on the local SPX server, recreate the instance from the updated model, and verify the live behavior.
+6. Minimum live validation for this fast path:
+   - model registers successfully
+   - instance starts successfully
+   - the main control path works live, for example setpoint write updates the runtime state
+   - if a scenario was added or edited, start it once and confirm it changes runtime state as intended
+7. If live MCP validation passes, stop there unless the user explicitly asks for tests, broader pack integration, or release-grade hardening.
+
+Preferred order of work for this fast path:
+- inspect the closest existing model
+- extract only the needed register table rows from the vendor manual
+- clone and minimally adapt the model YAML
+- update catalog and pack metadata only if needed for MCP discovery
+- register model, recreate instance, start instance, verify live
+
+For thermal controllers and similar single-loop devices, prefer using an existing controller twin such as Eurotherm as the behavioral template and swapping only the communication layer unless the user explicitly asks for vendor-specific control physics.
+
 ## How to add a pack
 1. Create `library/industries/<pack>/README.md` and `profiles/<pack>/`.
 2. Add the pack to `library/catalog/industries.yaml`.
@@ -102,6 +133,14 @@ poetry run pytest tests/packs/<pack>
 - [ ] Tests added or updated
 - [ ] `tools/validate_models.py` passes
 - [ ] `pytest` passes
+
+### MCP-only Definition of Done
+- [ ] Model YAML added or updated
+- [ ] Catalog updated if MCP discovery requires it
+- [ ] `tools/validate_models.py` passes
+- [ ] Model registers on the local SPX server
+- [ ] Instance is recreated from the updated model and starts successfully
+- [ ] Live control path works, for example setpoint write or protocol write updates runtime state
 
 ## Rules
 - Backward compatibility: avoid renaming or removing existing model IDs, paths, or public APIs.

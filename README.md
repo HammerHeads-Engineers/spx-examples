@@ -25,10 +25,13 @@ Claude Code and is aware of the repository catalog, profiles, packs, model
 validation rules, runtime logs, `communication`, and protocol bindings.
 
 If you install the macOS `.pkg`, the companion `SPX MCP Setup.app` in
-`/Applications/SPX Tools/` can create an installer-managed Codex workspace with
-`.codex/config.toml` preconfigured for the local `spx-mcp` server. That managed
-workspace defaults to read-only MCP mode; for Git-backed write workflows,
-continue to use a normal repository clone.
+`/Applications/SPX Tools/` can create a Codex workspace with
+`.codex/config.toml` preconfigured for the local `spx-mcp` server. During setup
+you can choose either an installer-managed MCP workspace copy or a full
+Git-backed clone of `spx-examples` on `develop`, depending on whether you only
+need local runtime tooling or also want normal branch/commit/push workflows.
+The generated MCP config still defaults to read-only mode unless you
+re-bootstrap it manually with write tools enabled.
 
 For attribute-heavy runtime workflows, prefer the batch MCP tools
 `server_get_attrs` and `server_set_attrs` to reduce round trips. For time-based
@@ -259,7 +262,11 @@ launchers in the same folder:
 
 - `SPX MCP Setup.app` creates `~/Documents/SPX Codex Workspace`, prepares a
   local `.venv`, writes `.codex/config.toml`, and opens that folder for Codex.
-  The generated MCP config defaults to read-only mode.
+  During setup the user can choose either:
+  - an installer-managed MCP workspace copy
+  - a full Git clone of `spx-examples` on `develop` for branch/commit/push
+    workflows
+  The generated MCP config defaults to read-only mode in both cases.
 - `SPX Start.app` opens the generated `spx-start.command`.
 - `SPX Stop.app` opens the generated `spx-stop.command`.
 - `SPX Cleanup.app` stops the generated stack, asks Docker to remove the

@@ -6,6 +6,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from installer import mcp_workspace
 
 
@@ -115,6 +117,100 @@ def test_sync_payload_skips_unreadable_files(tmp_path: Path, monkeypatch, capsys
     assert str(blocked_file) in stderr
 
 
+def test_prepare_git_workspace_clones_missing_workspace(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    calls: list[list[str]] = []
+
+    def fake_run(argv, *, cwd=None, capture_output=False):
+        calls.append(argv)
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(mcp_workspace, "run_command", fake_run)
+
+    mcp_workspace.prepare_git_workspace(
+        workspace,
+        git_remote_url="https://example.com/spx-examples.git",
+        git_branch="develop",
+        replace_existing=False,
+    )
+
+    assert calls == [[
+        "git",
+        "clone",
+        "--branch",
+        "develop",
+        "--single-branch",
+        "https://example.com/spx-examples.git",
+        str(workspace),
+    ]]
+
+
+def test_prepare_git_workspace_reuses_existing_git_checkout(tmp_path: Path, monkeypatch) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / ".git").mkdir(parents=True)
+
+    def fail_run(argv, *, cwd=None, capture_output=False):
+        raise AssertionError(f"unexpected command: {argv}")
+
+    monkeypatch.setattr(mcp_workspace, "run_command", fail_run)
+
+    mcp_workspace.prepare_git_workspace(
+        workspace,
+        git_remote_url="https://example.com/spx-examples.git",
+        git_branch="develop",
+        replace_existing=False,
+    )
+
+
+def test_prepare_git_workspace_requires_replace_for_existing_non_git_dir(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "README.md").write_text("old\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="replace-existing-workspace"):
+        mcp_workspace.prepare_git_workspace(
+            workspace,
+            git_remote_url="https://example.com/spx-examples.git",
+            git_branch="develop",
+            replace_existing=False,
+        )
+
+
+def test_prepare_git_workspace_replaces_existing_non_git_dir(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    stale_file = workspace / "README.md"
+    stale_file.write_text("old\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def fake_run(argv, *, cwd=None, capture_output=False):
+        calls.append(argv)
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(mcp_workspace, "run_command", fake_run)
+
+    mcp_workspace.prepare_git_workspace(
+        workspace,
+        git_remote_url="https://example.com/spx-examples.git",
+        git_branch="develop",
+        replace_existing=True,
+    )
+
+    assert not stale_file.exists()
+    assert calls == [[
+        "git",
+        "clone",
+        "--branch",
+        "develop",
+        "--single-branch",
+        "https://example.com/spx-examples.git",
+        str(workspace),
+    ]]
+
+
 def test_bootstrap_runtime_installs_workspace_editably(tmp_path: Path, monkeypatch) -> None:
     source_root = tmp_path / "source"
     runtime_helper = source_root / "installer" / "runtime_bootstrap.py"
@@ -172,6 +268,7 @@ def test_bootstrap_codex_uses_read_only_by_default(tmp_path: Path, monkeypatch) 
         "python3.11",
         server_name="spx",
         allow_write=False,
+        update_git_exclude=False,
     )
 
     assert calls == [[
@@ -184,3 +281,57 @@ def test_bootstrap_codex_uses_read_only_by_default(tmp_path: Path, monkeypatch) 
         "--skip-git-exclude",
         "--read-only",
     ]]
+
+
+def test_bootstrap_codex_updates_git_exclude_for_git_workspaces(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    tools_dir = workspace / "tools"
+    tools_dir.mkdir(parents=True)
+    (tools_dir / "codex_mcp_bootstrap.py").write_text("", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def fake_run(argv, *, cwd=None, capture_output=False):
+        calls.append(argv)
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(mcp_workspace, "run_command", fake_run)
+
+    mcp_workspace.bootstrap_codex(
+        workspace,
+        "python3.11",
+        server_name="spx",
+        allow_write=False,
+        update_git_exclude=True,
+    )
+
+    assert calls == [[
+        "python3.11",
+        str(workspace / "tools" / "codex_mcp_bootstrap.py"),
+        "--repo-root",
+        str(workspace),
+        "--server-name",
+        "spx",
+        "--read-only",
+    ]]
+
+
+def test_write_workspace_readme_describes_git_mode(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+
+    mcp_workspace.write_workspace_readme(
+        workspace,
+        server_name="spx",
+        allow_write=False,
+        workspace_mode=mcp_workspace.WORKSPACE_MODE_GIT,
+        git_remote_url="https://example.com/spx-examples.git",
+        git_branch="develop",
+    )
+
+    readme = (workspace / mcp_workspace.WORKSPACE_README_NAME).read_text(encoding="utf-8")
+    assert "full Git clone" in readme
+    assert "https://example.com/spx-examples.git" in readme
+    assert "`develop`" in readme

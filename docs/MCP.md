@@ -49,10 +49,18 @@ sh tools/setup_codex_mcp.sh
 ```
 
 If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app` from
-`/Applications/SPX Tools/`. That companion app creates an installer-managed
-workspace at `~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and
-writes `.codex/config.toml` for that folder in read-only mode. Open Codex in
-the generated workspace and start a fresh thread to pick up the config.
+`/Applications/SPX Tools/`. That companion app creates a workspace at
+`~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and writes
+`.codex/config.toml` for that folder in read-only mode. During setup you can
+choose either:
+
+- an installer-managed MCP workspace copy
+- a full Git clone of `spx-examples` on `develop` for normal branch/commit/push workflows
+
+If you choose the Git-backed option, the setup flow reuses an existing clone in
+that folder when possible and updates the local git exclude file so
+`.codex/config.toml` does not show up in normal commits. Open Codex in the
+generated workspace and start a fresh thread to pick up the config.
 
 Optional flags:
 
