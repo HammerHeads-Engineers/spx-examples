@@ -359,7 +359,7 @@ def bootstrap_codex(
         argv.append("--skip-git-exclude")
     if not allow_write:
         argv.append("--read-only")
-    run_command(argv)
+    run_command(argv, cwd=workspace_dir)
 
 
 def verify_workspace(venv_python: Path, workspace_dir: Path) -> None:

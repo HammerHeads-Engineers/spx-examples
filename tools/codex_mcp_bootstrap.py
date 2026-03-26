@@ -184,6 +184,7 @@ def ensure_exclude_pattern(exclude_text: str, pattern: str) -> Tuple[str, bool]:
 
 def resolve_git_exclude_path(repo_root: Path) -> Optional[Path]:
     """Return the effective .git/info/exclude path for this worktree."""
+    repo_root = repo_root.resolve()
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-path", "info/exclude"],
@@ -198,7 +199,10 @@ def resolve_git_exclude_path(repo_root: Path) -> Optional[Path]:
     candidate = result.stdout.strip()
     if not candidate:
         return None
-    return Path(candidate).resolve()
+    candidate_path = Path(candidate)
+    if not candidate_path.is_absolute():
+        candidate_path = repo_root / candidate_path
+    return candidate_path.resolve()
 
 
 def bootstrap_codex_mcp(
