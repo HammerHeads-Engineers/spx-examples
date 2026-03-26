@@ -30,6 +30,30 @@ Single source of truth for LLM and agent contributions.
 - Add helper tooling in `tools/` if it does not change runtime behavior.
 - Add new packs or profiles with matching catalog updates.
 
+## MCP-only / local-runtime model fast path
+Use this path for agent-driven model work whose goal is local runtime validation on `spx-server`, not release hardening.
+
+- If the user asks for a new local SPX model from a vendor manual and does not explicitly ask for release hardening, automated tests, or pack-wide integration, default to the MCP-only fast path immediately.
+- Do not spend time debating between the full repo flow and the MCP-only flow when the task is clearly local runtime validation.
+- Start from the closest existing behavioral twin and preserve its runtime physics, actions, and scenarios unless the manual clearly requires different behavior. For single-loop thermal controllers and similar devices, adaptation is preferred over re-modeling.
+- For vendor manuals and PDFs, extract only the minimum register subset needed for a useful live model:
+  - PV / measured value
+  - SP / target setpoint
+  - MV / output or manual output
+  - auto/manual or run/stop if available
+  - minimal status only if needed for live validation
+- Avoid broad PDF exploration and avoid implementing a full register map unless explicitly requested.
+- If the protocol exposes command semantics that the SPX runtime does not support 1:1, implement the smallest runtime-compatible bridge that keeps the live control path working, and note that tradeoff in the model description.
+- For local live validation, prefer the simplest reliable registration/bootstrap path. If high-level helpers fail because of optional modules or environment issues, fall back quickly to direct client/API registration instead of debugging helper internals.
+- Validate early, in this order:
+  1. `python tools/validate_models.py`
+  2. register model on the local SPX server
+  3. recreate/start the instance
+  4. verify protocol read of key telemetry
+  5. verify protocol write of the main control input
+  6. verify any implemented mode/command path
+- Do not assume runtime tree shape blindly during live checks. If the object layout is unclear, inspect the live instance document or validate through protocol reads/writes instead of relying on guessed paths.
+
 ## Operational flow for new-device-model generation automations
 Use this flow only for automations whose primary objective is creating a new
 device model YAML (plus required integration updates such as catalog/profile/tests).

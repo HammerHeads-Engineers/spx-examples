@@ -59,8 +59,11 @@ Apply this standard to every new or updated model YAML. Legacy models may still 
 
 ## Fast path for MCP-only models
 Use this path when the model is being created only for local MCP usage and live `spx-server` runtime validation, with no request for repo hardening or automated test coverage.
+If the user asks for a new local SPX model from a vendor manual and does not explicitly ask for release hardening, automated tests, or pack-wide integration, default to this path immediately.
+Do not spend time debating between the full repo flow and the MCP-only flow when the task is clearly local runtime validation.
 
 1. Start from the closest existing runtime model and preserve its physics, actions, scenarios, and attribute structure unless the new device strictly requires a different behavior model.
+   For single-loop thermal controllers and similar devices, start from the nearest existing controller twin and adapt it instead of re-modeling behavior from scratch.
 2. Prefer vendor adaptation over full re-modeling:
    - keep the nearest behavioral twin as-is
    - change only metadata, naming, descriptions, protocol mapping, register map, and the minimum vendor-specific attributes needed for communication
@@ -69,22 +72,31 @@ Use this path when the model is being created only for local MCP usage and live 
    - SP / target setpoint
    - MV / output or manual output
    - mode / run-stop / auto-manual when available
+   - minimal status only if needed for live validation
    - the smallest extra subset needed for the requested scenario or demo
-4. Do not add unit tests or pytest coverage by default for this fast path.
-5. After editing the YAML, register the model on the local SPX server, recreate the instance from the updated model, and verify the live behavior.
-6. Minimum live validation for this fast path:
-   - model registers successfully
-   - instance starts successfully
-   - the main control path works live, for example setpoint write updates the runtime state
-   - if a scenario was added or edited, start it once and confirm it changes runtime state as intended
-7. If live MCP validation passes, stop there unless the user explicitly asks for tests, broader pack integration, or release-grade hardening.
+   Avoid broad PDF exploration and avoid implementing a full register map unless the user explicitly asks for it.
+4. If the real protocol exposes command semantics that the SPX runtime does not support 1:1, implement the smallest runtime-compatible bridge that preserves the live control path and document that choice in the model description.
+5. Do not add unit tests or pytest coverage by default for this fast path.
+6. For local live validation, prefer the simplest reliable registration/bootstrap path.
+   If high-level helpers depend on optional modules or fail due to environment issues, fall back quickly to direct client or API registration instead of debugging helper internals.
+7. Run live validation early, in this order:
+   1. `tools/validate_models.py`
+   2. register the model on the local SPX server
+   3. recreate and start the instance
+   4. verify protocol read of key telemetry
+   5. verify protocol write of the main control input
+   6. verify the mode or command path if it was implemented
+8. When checking live instances, do not assume runtime tree shape blindly.
+   If the runtime object layout is unclear, inspect the live instance document or validate through protocol reads and writes instead of spending time on guessed attribute paths.
+9. If live MCP validation passes, stop there unless the user explicitly asks for tests, broader pack integration, or release-grade hardening.
 
 Preferred order of work for this fast path:
 - inspect the closest existing model
 - extract only the needed register table rows from the vendor manual
 - clone and minimally adapt the model YAML
 - update catalog and pack metadata only if needed for MCP discovery
-- register model, recreate instance, start instance, verify live
+- validate and register early instead of doing long speculative refinement
+- recreate instance, start instance, verify protocol read/write, then verify any mode or command path
 
 For thermal controllers and similar single-loop devices, prefer using an existing controller twin such as Eurotherm as the behavioral template and swapping only the communication layer unless the user explicitly asks for vendor-specific control physics.
 
@@ -140,6 +152,7 @@ poetry run pytest tests/packs/<pack>
 - [ ] `tools/validate_models.py` passes
 - [ ] Model registers on the local SPX server
 - [ ] Instance is recreated from the updated model and starts successfully
+- [ ] Key telemetry is verified by protocol read
 - [ ] Live control path works, for example setpoint write or protocol write updates runtime state
 
 ## Rules

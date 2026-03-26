@@ -79,7 +79,31 @@ resolve_mcp_python() {
 }
 
 is_interactive() {
-  [[ -t 0 && -t 1 ]]
+  [[ -t 0 || -r /dev/tty ]]
+}
+
+can_prompt_on_tty() {
+  [[ -r /dev/tty ]]
+}
+
+tty_echo() {
+  local message="$1"
+  if can_prompt_on_tty; then
+    printf '%s\n' "${message}" > /dev/tty
+    return 0
+  fi
+  printf '%s\n' "${message}"
+}
+
+tty_read() {
+  local prompt="$1"
+  local variable_name="$2"
+  if can_prompt_on_tty; then
+    printf '%s' "${prompt}" > /dev/tty
+    IFS= read -r "${variable_name}" < /dev/tty
+    return 0
+  fi
+  read -r -p "${prompt}" "${variable_name}"
 }
 
 workspace_is_git_repo() {
@@ -123,12 +147,16 @@ normalize_workspace_mode() {
 
 prompt_workspace_mode() {
   local choice=""
+  local default_selection="2"
+  if workspace_is_git_repo "${WORKSPACE_DIR}"; then
+    default_selection="1"
+  fi
   while true; do
-    echo "[spx-mcp-setup] Choose workspace type:"
-    echo "  1. Full git clone of spx-examples (recommended for model contribution and PR flow)"
-    echo "  2. Installer-managed MCP workspace copy"
-    read -r -p "Selection [1/2, default 2]: " choice
-    case "${choice:-2}" in
+    tty_echo "[spx-mcp-setup] Choose workspace type:"
+    tty_echo "  1. Full git clone of spx-examples (recommended for model contribution and PR flow)"
+    tty_echo "  2. Installer-managed MCP workspace copy"
+    tty_read "Selection [1/2, default ${default_selection}]: " choice
+    case "${choice:-${default_selection}}" in
       1)
         printf '%s\n' "git"
         return 0
@@ -138,17 +166,17 @@ prompt_workspace_mode() {
         return 0
         ;;
     esac
-    echo "[spx-mcp-setup] Invalid selection. Choose 1 or 2." >&2
+    tty_echo "[spx-mcp-setup] Invalid selection. Choose 1 or 2."
   done
 }
 
 confirm_replace_workspace() {
   local workspace_dir="$1"
   local answer=""
-  echo "[spx-mcp-setup] The workspace directory already exists and is not a git checkout:"
-  echo "  ${workspace_dir}"
-  echo "[spx-mcp-setup] Replacing it will delete its current contents before cloning."
-  read -r -p "Replace it with a fresh git clone? [y/N]: " answer
+  tty_echo "[spx-mcp-setup] The workspace directory already exists and is not a git checkout:"
+  tty_echo "  ${workspace_dir}"
+  tty_echo "[spx-mcp-setup] Replacing it will delete its current contents before cloning."
+  tty_read "Replace it with a fresh git clone? [y/N]: " answer
   case "${answer}" in
     y|Y|yes|YES)
       return 0
@@ -168,13 +196,12 @@ resolve_workspace_mode() {
     return 0
   fi
 
-  if workspace_is_git_repo "${WORKSPACE_DIR}"; then
-    echo "[spx-mcp-setup] Reusing existing git-backed MCP workspace." >&2
-    printf '%s\n' "git"
-    return 0
-  fi
-
   if ! is_interactive; then
+    if workspace_is_git_repo "${WORKSPACE_DIR}"; then
+      echo "[spx-mcp-setup] Reusing existing git-backed MCP workspace." >&2
+      printf '%s\n' "git"
+      return 0
+    fi
     printf '%s\n' "managed"
     return 0
   fi
@@ -201,6 +228,11 @@ if [[ -z "${MCP_PYTHON}" ]]; then
 fi
 
 WORKSPACE_MODE="$(resolve_workspace_mode)"
+if [[ "${WORKSPACE_MODE}" == "managed" ]] && workspace_is_git_repo "${WORKSPACE_DIR}"; then
+  echo "[spx-mcp-setup] ${WORKSPACE_DIR} is already a git-backed MCP workspace." >&2
+  echo "[spx-mcp-setup] Set SPX_MCP_WORKSPACE_DIR to a different path if you want a managed copy." >&2
+  exit 1
+fi
 if [[ "${WORKSPACE_MODE}" == "git" ]]; then
   if ! command -v git >/dev/null 2>&1; then
     echo "[spx-mcp-setup] Git is required for git-backed workspace mode." >&2
