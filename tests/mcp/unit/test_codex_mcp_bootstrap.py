@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: MIT
 
 from pathlib import Path
+from types import SimpleNamespace
 
 from tools.codex_mcp_bootstrap import (
+    LOCAL_GIT_EXCLUDE_PATTERNS,
     detect_server_invocation,
     ensure_exclude_pattern,
+    resolve_git_exclude_path,
     render_mcp_server_block,
     upsert_named_mcp_server,
 )
@@ -105,3 +108,24 @@ def test_ensure_exclude_pattern_is_idempotent() -> None:
 
     assert changed_again is False
     assert updated_again == ".codex/config.toml\n"
+
+
+def test_local_git_exclude_patterns_include_workspace_mode_file() -> None:
+    assert LOCAL_GIT_EXCLUDE_PATTERNS == (
+        ".codex/config.toml",
+        ".codex/workspace_mode.toml",
+    )
+
+
+def test_resolve_git_exclude_path_resolves_relative_git_path(tmp_path, monkeypatch) -> None:
+    repo_root = tmp_path / "workspace"
+    repo_root.mkdir()
+
+    def fake_run(*args, **kwargs):
+        return SimpleNamespace(stdout=".git/info/exclude\n")
+
+    monkeypatch.setattr("tools.codex_mcp_bootstrap.subprocess.run", fake_run)
+
+    result = resolve_git_exclude_path(repo_root)
+
+    assert result == (repo_root / ".git" / "info" / "exclude").resolve()

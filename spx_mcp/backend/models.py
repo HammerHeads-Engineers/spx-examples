@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 import yaml
 
 from tools.validate_models import (
@@ -138,20 +139,106 @@ def register_model_from_catalog(
     validate: bool = True,
 ) -> Dict[str, Any]:
     """Load, validate, and register a model using the repo catalog entry."""
-    from spx_python.helpers import ensure_model, load_model_definition
-
     model_path = catalog.get_model_path(model_id)
     validation = validate_model_path(model_path)
     if validate and not validation["ok"]:
         raise ModelValidationError(validation["errors"])
 
     definition = load_model_definition(model_path)
-    changed = ensure_model(client, model_id, definition)
+    changed = ensure_model_registered(client, model_id, definition)
     return {
         "model_id": model_id,
         "model_path": str(model_path),
         "changed": changed,
         "validation": validation,
+    }
+
+
+def load_model_definition(model_path: Path) -> Dict[str, Any]:
+    """Load one model definition from local YAML/JSON without helper dependencies."""
+    with Path(model_path).open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Model definition at {model_path} must load as a mapping")
+    return payload
+
+
+def ensure_model_registered(client, model_id: str, definition: Dict[str, Any]) -> bool:
+    """Ensure a model definition is registered on the SPX server."""
+    models_client = client["models"]
+    current_definition = get_registered_model_definition(models_client, model_id)
+    local_fingerprint = fingerprint_model(definition)
+    remote_fingerprint = fingerprint_model(current_definition)
+
+    if local_fingerprint is not None and local_fingerprint == remote_fingerprint:
+        return False
+
+    models_client[model_id] = definition
+    return True
+
+
+def get_registered_model_definition(models_client, model_id: str) -> Optional[Dict[str, Any]]:
+    """Return the current remote model definition when it can be resolved safely."""
+    try:
+        current_node = models_client[model_id]
+    except Exception:
+        return None
+
+    for candidate in (
+        getattr(current_node, "definition", None),
+        current_node,
+    ):
+        current_definition = extract_model_definition(candidate)
+        if current_definition is not None:
+            return current_definition
+
+    get_fn = getattr(current_node, "get", None)
+    if callable(get_fn):
+        try:
+            current_doc = get_fn()
+        except Exception:
+            current_doc = None
+        current_definition = extract_model_definition(current_doc)
+        if current_definition is not None:
+            return current_definition
+
+    return None
+
+
+def extract_model_definition(model_doc: Any) -> Optional[Dict[str, Any]]:
+    """Normalize the model payload shape returned by the SPX client."""
+    if isinstance(model_doc, dict):
+        for key in ("definition", "model", "data"):
+            candidate = model_doc.get(key)
+            if isinstance(candidate, dict):
+                return candidate
+        return model_doc
+    return None
+
+
+def fingerprint_model(model_definition: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Return a stable fingerprint for comparison, or None when not serializable."""
+    if model_definition is None:
+        return None
+    try:
+        serialized = json.dumps(
+            model_definition,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except TypeError:
+        return None
+    return serialized
+
+
+def runtime_model_backend_report() -> Dict[str, Any]:
+    """Return a shallow diagnostics report for the runtime model registration path."""
+    return {
+        "ok": True,
+        "checks": [
+            "local model definitions load from YAML/JSON without spx_python.helpers",
+            "model registration uses direct client['models'][model_id] writes",
+        ],
     }
 
 

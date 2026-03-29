@@ -55,7 +55,7 @@ internal static class Program
         Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup] [--pause-on-error]");
         Console.WriteLine();
         Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
-        Console.WriteLine("  mcp-setup  Create the installer-managed Codex MCP workspace.");
+        Console.WriteLine("  mcp-setup  Create or refresh the Codex MCP workspace (defaults to runtime_mcp).");
         Console.WriteLine("  start      Run the generated SPX start script.");
         Console.WriteLine("  stop       Run the generated SPX stop script.");
         Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");
@@ -119,6 +119,18 @@ internal static class Program
         var pythonExecutable = ResolvePythonExecutable();
         var scriptPath = Path.Combine(installRoot, "installer", "mcp_workspace.py");
         EnsureFileExists(scriptPath, "Missing installed script 'installer\\mcp_workspace.py'. Reinstall SPX.");
+        var hasWorkspaceKind = extraArgs.Any(
+            argument => string.Equals(argument, "--workspace-kind", StringComparison.OrdinalIgnoreCase)
+        );
+        var hasWorkMode = extraArgs.Any(
+            argument => string.Equals(argument, "--work-mode", StringComparison.OrdinalIgnoreCase)
+        );
+        var hasAllowWrite = extraArgs.Any(
+            argument => string.Equals(argument, "--allow-write", StringComparison.OrdinalIgnoreCase)
+        );
+        var hasReadOnly = extraArgs.Any(
+            argument => string.Equals(argument, "--read-only", StringComparison.OrdinalIgnoreCase)
+        );
 
         var arguments = new List<string>
         {
@@ -132,6 +144,20 @@ internal static class Program
             "--server-name",
             "spx",
         };
+        if (!hasWorkspaceKind)
+        {
+            arguments.Add("--workspace-kind");
+            arguments.Add("managed");
+        }
+        if (!hasWorkMode)
+        {
+            arguments.Add("--work-mode");
+            arguments.Add("runtime_mcp");
+        }
+        if (!hasAllowWrite && !hasReadOnly)
+        {
+            arguments.Add("--allow-write");
+        }
         arguments.AddRange(extraArgs);
 
         return RunCommand(pythonExecutable, arguments, installRoot);

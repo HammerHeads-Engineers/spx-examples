@@ -18,6 +18,10 @@ from typing import Callable, Optional, Sequence, Tuple
 DEFAULT_SERVER_NAME = "spx"
 DEFAULT_STARTUP_TIMEOUT_SEC = 20
 DEFAULT_TOOL_TIMEOUT_SEC = 120
+LOCAL_GIT_EXCLUDE_PATTERNS = (
+    ".codex/config.toml",
+    ".codex/workspace_mode.toml",
+)
 
 
 @dataclass(frozen=True)
@@ -184,6 +188,7 @@ def ensure_exclude_pattern(exclude_text: str, pattern: str) -> Tuple[str, bool]:
 
 def resolve_git_exclude_path(repo_root: Path) -> Optional[Path]:
     """Return the effective .git/info/exclude path for this worktree."""
+    repo_root = repo_root.resolve()
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-path", "info/exclude"],
@@ -198,7 +203,10 @@ def resolve_git_exclude_path(repo_root: Path) -> Optional[Path]:
     candidate = result.stdout.strip()
     if not candidate:
         return None
-    return Path(candidate).resolve()
+    candidate_path = Path(candidate)
+    if not candidate_path.is_absolute():
+        candidate_path = repo_root / candidate_path
+    return candidate_path.resolve()
 
 
 def bootstrap_codex_mcp(
@@ -241,10 +249,13 @@ def bootstrap_codex_mcp(
                 if exclude_path.exists()
                 else ""
             )
-            updated_exclude, exclude_changed = ensure_exclude_pattern(
-                existing_exclude,
-                ".codex/config.toml",
-            )
+            updated_exclude = existing_exclude
+            for pattern in LOCAL_GIT_EXCLUDE_PATTERNS:
+                updated_exclude, pattern_changed = ensure_exclude_pattern(
+                    updated_exclude,
+                    pattern,
+                )
+                exclude_changed = exclude_changed or pattern_changed
             if updated_exclude != existing_exclude:
                 exclude_path.write_text(updated_exclude, encoding="utf-8")
 

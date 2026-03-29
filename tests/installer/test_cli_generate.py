@@ -142,7 +142,7 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
             "--packages",
             "test_pack",
             "--product-key",
-            "SECRET-KEY",
+            "TEST-SECRET-KEY",
             "--print-selection",
             "json",
             "--no-start",
@@ -160,13 +160,13 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     ]
     assert selection["start_instances"] == []
     assert selection["product_key_present"] is True
-    assert "SECRET-KEY" not in captured.out
-    assert "SECRET-KEY" not in captured.err
+    assert "TEST-SECRET-KEY" not in captured.out
+    assert "TEST-SECRET-KEY" not in captured.err
 
     assert (output_dir / "docker-compose.generated.yml").exists()
     assert (output_dir / ".env").read_text(
         encoding="utf-8"
-    ).strip() == "SPX_PRODUCT_KEY=SECRET-KEY"
+    ).strip() == "SPX_PRODUCT_KEY=TEST-SECRET-KEY"
     assert (output_dir / "bundle.json").exists()
     assert (output_dir / "spx-start.sh").exists()
     assert (output_dir / "spx-stop.sh").exists()

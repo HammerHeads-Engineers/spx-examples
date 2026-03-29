@@ -14,6 +14,8 @@ import anyio
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
+from spx_mcp.config import SpxMcpConfig
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL_ID = "Env.AirQualityStation.Http"
@@ -53,22 +55,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_product_key(explicit: Optional[str]) -> str:
-    if explicit:
-        return explicit
-
-    env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
-    if env_value:
-        return env_value
-
-    env_path = ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            if line.startswith("SPX_PRODUCT_KEY="):
-                value = line.split("=", 1)[1].strip()
-                if value:
-                    return value
-
-    raise SystemExit("SPX_PRODUCT_KEY not found in arguments, environment, or .env")
+    config = SpxMcpConfig.from_sources(
+        repo_root=str(ROOT),
+        product_key=explicit,
+    )
+    if config.has_valid_product_key and config.product_key:
+        return config.product_key
+    raise SystemExit(config.product_key_error_message())
 
 
 def server_command_args(

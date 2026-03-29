@@ -9,12 +9,16 @@ import spx_python
 from spx_python.client import SpxClient
 
 from spx_mcp.config import SpxMcpConfig
+from spx_mcp.errors import ProductKeyConfigError
 
 
 def create_spx_client(config: SpxMcpConfig) -> SpxClient:
     """Instantiate an SPX client using the current MCP configuration."""
-    if not config.product_key:
-        raise RuntimeError("SPX_PRODUCT_KEY is required to connect to the SPX server.")
+    if not config.has_valid_product_key:
+        raise ProductKeyConfigError(
+            config.product_key_error_message(),
+            details=config.product_key_error_details(),
+        )
     return spx_python.init(
         address=config.spx_base_url,
         product_key=config.product_key,
