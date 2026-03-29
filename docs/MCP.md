@@ -15,6 +15,30 @@ The current MCP server is designed for local `stdio` workflows:
 - optionally perform write operations such as model registration, instance lifecycle
   control, and attribute writes
 
+## Work modes
+
+The repository distinguishes two semantic work modes for Codex/LLM agents:
+
+- `runtime_mcp`: shortest reliable path to a live result on a local
+  `spx-server`. Prefer MCP-first flows, avoid repo-wide hardening by default,
+  and treat runtime changes as local unless the user explicitly asks to persist
+  them.
+- `repo_dev`: full repository development. Update models, tests, catalogs,
+  docs, packs, and installer code as needed for durable repo changes.
+
+These work modes are separate from the technical workspace shape:
+
+- installer-managed MCP workspaces are bootstrapped as `runtime_mcp`
+- full git checkouts are bootstrapped as `repo_dev`
+- a manual repo checkout still defaults to `repo_dev`, even if MCP is available
+
+Agents should resolve work mode in this order:
+
+1. explicit user intent
+2. `.codex/workspace_mode.toml`
+3. `.spx-mcp-workspace.json`
+4. `repo_dev`
+
 ## Runtime requirements
 
 - Python 3.10+ for the official `mcp` SDK
@@ -51,16 +75,66 @@ sh tools/setup_codex_mcp.sh
 If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app` from
 `/Applications/SPX Tools/`. That companion app creates a workspace at
 `~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and writes
-`.codex/config.toml` for that folder in read-only mode. During setup you can
-choose either:
+`.codex/config.toml` for that folder in read/write mode by default. During setup
+you choose the work mode first:
 
-- an installer-managed MCP workspace copy
-- a full Git clone of `spx-examples` on `develop` for normal branch/commit/push workflows
+- `runtime_mcp`: installer-managed MCP workspace copy
+- `repo_dev`: full Git clone of `spx-examples` on `develop`
 
-If you choose the Git-backed option, the setup flow reuses an existing clone in
-that folder when possible and updates the local git exclude file so
-`.codex/config.toml` does not show up in normal commits. Open Codex in the
-generated workspace and start a fresh thread to pick up the config.
+The setup flow also writes `.codex/workspace_mode.toml` so the workspace keeps a
+local record of the intended mode. In git-backed workspaces, the setup updates
+the local git exclude file so `.codex/config.toml` and
+`.codex/workspace_mode.toml` do not show up in normal commits. Open Codex in
+the generated workspace and start a fresh thread to pick up the config. That
+fresh-thread reload is currently a host-app limitation, not a repo bootstrap
+problem.
+
+## Runtime-first MCP workflow
+
+Use this flow when the active work mode is `runtime_mcp`:
+
+1. validate the touched model or payload with the smallest relevant repo check
+2. register the model on the local SPX server early
+3. create or recreate the runtime instance
+4. start the instance and stop once it is `RUNNING`
+5. report the minimal runtime result: model id, instance key, state, and any
+   endpoint details relevant to the task
+6. only then decide whether deeper protocol verification is needed
+
+Do not spend time on broad repo cleanup, catalog work, pack integration, or
+pytest coverage by default in `runtime_mcp`. Move to `repo_dev` only when the
+user asks for a durable repository change.
+
+For live runtime work, `server_*` tools are the default path. Use them for:
+
+- model registration and instance lifecycle
+- live telemetry reads and control writes
+- diagnostics, communication inspection, and runtime scenarios
+
+Treat `repo_*` tools as the persistence path when the user explicitly wants to
+save a runtime-proven change back into the repository.
+
+Protocol smoke tests are opt-in or failure-driven in `runtime_mcp`. Do not add
+default Modbus, MQTT, OPC UA, or similar communication checks after an instance
+already reached `RUNNING`, unless:
+
+- the user explicitly asked for protocol proof
+- the task is about register maps, bindings, or endpoints
+- the instance failed to start and diagnostics are required
+
+## Repository development workflow
+
+Use this flow when the active work mode is `repo_dev`:
+
+1. inspect and edit the repo as a normal development checkout
+2. use `repo_*` tools and direct file edits for durable changes
+3. update tests, catalogs, docs, packs, or installer assets when the change
+   needs them
+4. use MCP runtime tools only as supporting validation, not as a substitute for
+   the repo change itself
+
+`repo_dev` remains the default for ordinary manual clones, even if MCP is
+available and a local `spx-server` is running.
 
 Optional flags:
 

@@ -1,14 +1,22 @@
 # SPDX-License-Identifier: MIT
 
 from pathlib import Path
+import builtins
+from dataclasses import dataclass
+from typing import Any, Dict
 
 import pytest
 
 from spx_mcp.backend.catalog import RepoCatalog
 from spx_mcp.backend.models import (
     delete_model_scenario,
+    ensure_model_registered,
+    extract_model_definition,
+    get_registered_model_definition,
     get_model_scenario,
     list_model_scenarios,
+    load_model_definition,
+    register_model_from_catalog,
     upsert_model_scenario,
     validate_model_path,
 )
@@ -99,6 +107,86 @@ def test_get_model_scenario_rejects_missing_name(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="not found"):
         get_model_scenario(catalog, "sensor", "missing")
+
+
+@dataclass
+class _FakeModelNode:
+    definition: Dict[str, Any]
+
+
+class _FakeModels:
+    def __init__(self) -> None:
+        self._store: Dict[str, _FakeModelNode] = {}
+
+    def __getitem__(self, key: str) -> _FakeModelNode:
+        return self._store[key]
+
+    def __setitem__(self, key: str, value: Dict[str, Any]) -> None:
+        self._store[key] = _FakeModelNode(definition=value)
+
+
+class _FakeClient(dict):
+    def __init__(self) -> None:
+        super().__init__()
+        self["models"] = _FakeModels()
+
+
+def test_load_model_definition_loads_mapping_from_yaml(tmp_path: Path) -> None:
+    model_path = tmp_path / "model.yaml"
+    model_path.write_text("name: demo\nattributes:\n  value: 1\n", encoding="utf-8")
+
+    payload = load_model_definition(model_path)
+
+    assert payload["name"] == "demo"
+
+
+def test_ensure_model_registered_is_idempotent_for_same_definition() -> None:
+    client = _FakeClient()
+    definition = {"name": "demo", "attributes": {"value": 1}}
+
+    changed_first = ensure_model_registered(client, "demo", definition)
+    changed_second = ensure_model_registered(client, "demo", definition)
+
+    assert changed_first is True
+    assert changed_second is False
+
+
+def test_register_model_from_catalog_does_not_require_spx_python_helpers(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    catalog = _make_catalog(tmp_path)
+    client = _FakeClient()
+    original_import = builtins.__import__
+
+    def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "spx_python.helpers" or name.startswith("spx_python.helpers."):
+            raise AssertionError("spx_python.helpers should not be imported by runtime MCP")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+    payload = register_model_from_catalog(client, catalog, "sensor")
+
+    assert payload["changed"] is True
+    assert client["models"]._store["sensor"].definition["name"] == "sensor"
+
+
+def test_get_registered_model_definition_reads_definition_attribute() -> None:
+    client = _FakeClient()
+    client["models"]["demo"] = {"name": "demo", "attributes": {"value": 1}}
+
+    definition = get_registered_model_definition(client["models"], "demo")
+
+    assert definition == {"name": "demo", "attributes": {"value": 1}}
+
+
+def test_extract_model_definition_reads_nested_definition_mapping() -> None:
+    definition = extract_model_definition(
+        {"definition": {"name": "demo", "attributes": {"value": 1}}}
+    )
+
+    assert definition == {"name": "demo", "attributes": {"value": 1}}
 
 
 def _make_catalog(tmp_path: Path) -> RepoCatalog:

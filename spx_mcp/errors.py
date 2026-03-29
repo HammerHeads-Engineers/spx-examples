@@ -12,6 +12,17 @@ class WriteAccessError(RuntimeError):
 
 
 @dataclass
+class ProductKeyConfigError(RuntimeError):
+    """Raised when the MCP runtime cannot resolve a usable SPX product key."""
+
+    message: str
+    details: Dict[str, Any]
+
+    def __str__(self) -> str:
+        return self.message
+
+
+@dataclass
 class ModelValidationError(RuntimeError):
     """Raised when a model fails local repository validation."""
 
@@ -51,6 +62,13 @@ def exception_to_response(exc: Exception) -> Dict[str, Any]:
     """Map known exception types into a structured MCP tool error payload."""
     if isinstance(exc, WriteAccessError):
         return error_response(str(exc), code="write_disabled")
+
+    if isinstance(exc, ProductKeyConfigError):
+        return error_response(
+            str(exc),
+            code="product_key_config_error",
+            details=dict(exc.details),
+        )
 
     if isinstance(exc, ModelValidationError):
         return error_response(

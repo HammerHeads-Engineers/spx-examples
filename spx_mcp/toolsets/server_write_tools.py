@@ -10,6 +10,7 @@ from spx_mcp.backend.bootstrap import (
     bootstrap_profile,
     ensure_instance,
     register_model_and_ensure_instance,
+    summarize_runtime_instance,
 )
 from spx_mcp.backend.instances import (
     delete_instance_scenario,
@@ -26,8 +27,8 @@ from spx_mcp.errors import exception_to_response, success_response
 
 SERVER_WRITE_TOOL_SPECS: List[Dict[str, Any]] = [
     {"name": "server_register_model_from_catalog", "description": "Validate and register one model from the repo catalog.", "write": True},
-    {"name": "server_register_model_and_ensure_instance", "description": "Register one catalog model and ensure one instance exists from it.", "write": True},
-    {"name": "server_ensure_instance", "description": "Ensure an instance exists, creating it from the given model if needed.", "write": True},
+    {"name": "server_register_model_and_ensure_instance", "description": "Minimal runtime flow: register one catalog model, ensure one instance exists, and stop once it is RUNNING.", "write": True},
+    {"name": "server_ensure_instance", "description": "Ensure an instance exists, creating it from the given model if needed, and return its minimal runtime summary.", "write": True},
     {"name": "server_start_instance", "description": "Start one instance.", "write": True},
     {"name": "server_stop_instance", "description": "Stop one instance.", "write": True},
     {"name": "server_reset_instance", "description": "Reset one instance.", "write": True},
@@ -62,7 +63,7 @@ def register_server_write_tools(server, runtime) -> None:
 
     @server.tool(
         name="server_register_model_and_ensure_instance",
-        description="Register one catalog model and ensure one instance exists from it.",
+        description="Minimal runtime flow: register one catalog model, ensure one instance exists, and stop once it is RUNNING.",
     )
     def server_register_model_and_ensure_instance(
         model_id: str,
@@ -92,7 +93,7 @@ def register_server_write_tools(server, runtime) -> None:
 
     @server.tool(
         name="server_ensure_instance",
-        description="Ensure an instance exists, creating it from the given model if needed.",
+        description="Ensure an instance exists, creating it from the given model if needed, and return its minimal runtime summary.",
     )
     def server_ensure_instance(
         model_id: str,
@@ -117,9 +118,11 @@ def register_server_write_tools(server, runtime) -> None:
                 start_on_create=start,
             )
             return success_response(
-                instance_key=instance_key,
-                model_id=model_id,
-                state=getattr(instance, "state", None),
+                **summarize_runtime_instance(
+                    instance,
+                    model_id=model_id,
+                    instance_key=instance_key,
+                )
             )
         except Exception as exc:
             return exception_to_response(exc)

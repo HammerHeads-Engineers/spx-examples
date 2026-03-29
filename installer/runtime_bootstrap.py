@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from typing import Any
@@ -53,6 +54,35 @@ def run_command(argv: list[str]) -> None:
     subprocess.run(argv, check=True, stdout=sys.stderr, stderr=sys.stderr)
 
 
+def is_healthy_virtualenv(venv_dir: Path) -> bool:
+    python_bin = venv_python_path(venv_dir)
+    if not python_bin.exists():
+        return False
+    if not (venv_dir / "pyvenv.cfg").exists():
+        return False
+
+    try:
+        subprocess.run(
+            [
+                str(python_bin),
+                "-c",
+                (
+                    "import pathlib, sys; "
+                    "prefix = pathlib.Path(sys.prefix); "
+                    "raise SystemExit(0 if sys.prefix != sys.base_prefix and "
+                    "prefix.joinpath('pyvenv.cfg').exists() else 1)"
+                ),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+
+    return True
+
+
 def normalize_packages(packages: list[str]) -> list[str]:
     seen: set[str] = set()
     normalized: list[str] = []
@@ -74,12 +104,20 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
         "python_version": sys.version,
     }
 
-    if not python_bin.exists():
+    if not is_healthy_virtualenv(venv_dir):
+        if any(venv_dir.iterdir()):
+            print(
+                f"[runtime] Recreating broken Python virtual environment at {venv_dir}",
+                file=sys.stderr,
+            )
+            shutil.rmtree(venv_dir)
+            venv_dir.mkdir(parents=True, exist_ok=True)
         print(
             f"[runtime] Creating Python virtual environment at {venv_dir}",
             file=sys.stderr,
         )
         run_command([sys.executable, "-m", "venv", str(venv_dir)])
+        python_bin = venv_python_path(venv_dir)
 
     current_state = read_stamp(stamp_path)
     if current_state != desired_state:

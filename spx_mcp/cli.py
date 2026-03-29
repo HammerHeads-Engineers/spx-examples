@@ -94,8 +94,8 @@ def doctor_report(config: SpxMcpConfig):
     problems = []
     if not python_supports_mcp():
         problems.append(runtime_requirement_message())
-    if not config.product_key:
-        problems.append("SPX_PRODUCT_KEY is not set.")
+    if not config.has_valid_product_key:
+        problems.append(config.product_key_error_message())
     if not (config.repo_root / "library" / "catalog" / "models.yaml").exists():
         problems.append("Repository catalog file library/catalog/models.yaml is missing.")
 
@@ -105,22 +105,28 @@ def doctor_report(config: SpxMcpConfig):
             "Optional dependency 'mcp' is unavailable. "
             f"Use Python {MIN_MCP_PYTHON[0]}.{MIN_MCP_PYTHON[1]}+ and install project dependencies there."
         )
-    spx_python_available = find_spec("spx_python") is not None
-    if not spx_python_available:
+    runtime_backend = runtime_backend_report()
+    if not runtime_backend["spx_python_available"]:
         problems.append(
             "Dependency 'spx-python' is unavailable. "
             "Install project dependencies with 'poetry install --with dev'."
         )
+    problems.extend(runtime_backend["problems"])
 
     return {
         "ok": not problems,
         "python_version": ".".join(str(part) for part in sys.version_info[:3]),
         "repo_root": str(config.repo_root),
         "spx_base_url": config.spx_base_url,
-        "product_key_present": bool(config.product_key),
+        "product_key_present": bool(config.has_valid_product_key),
+        "product_key_status": config.product_key_status,
+        "product_key_source": config.product_key_source,
         "allow_write": config.allow_write,
         "mcp_sdk_available": mcp_available,
-        "spx_python_available": spx_python_available,
+        "spx_python_available": runtime_backend["spx_python_available"],
+        "spx_python_importable": runtime_backend["spx_python_importable"],
+        "runtime_backend_usable": runtime_backend["ok"],
+        "runtime_backend_checks": runtime_backend["checks"],
         "problems": problems,
     }
 
@@ -130,9 +136,16 @@ def _print_doctor_report(report) -> None:
     print(f"repo_root: {report['repo_root']}")
     print(f"spx_base_url: {report['spx_base_url']}")
     print(f"product_key_present: {report['product_key_present']}")
+    print(f"product_key_status: {report['product_key_status']}")
+    print(f"product_key_source: {report['product_key_source']}")
     print(f"allow_write: {report['allow_write']}")
     print(f"mcp_sdk_available: {report['mcp_sdk_available']}")
     print(f"spx_python_available: {report['spx_python_available']}")
+    print(f"spx_python_importable: {report['spx_python_importable']}")
+    print(f"runtime_backend_usable: {report['runtime_backend_usable']}")
+    print("runtime_backend_checks:")
+    for check in report["runtime_backend_checks"]:
+        print(f"- {check}")
     if report["problems"]:
         print("problems:")
         for problem in report["problems"]:
@@ -171,3 +184,46 @@ def _config_from_args(args: argparse.Namespace) -> SpxMcpConfig:
         product_key=getattr(args, "product_key", None),
         allow_write=bool(getattr(args, "allow_write", False)),
     )
+
+
+def runtime_backend_report() -> dict[str, object]:
+    """Return diagnostics for the actual runtime bootstrap path used by MCP."""
+    checks: list[str] = []
+    problems: list[str] = []
+    spx_python_available = find_spec("spx_python") is not None
+    spx_python_importable = False
+
+    if spx_python_available:
+        try:
+            import spx_python  # noqa: F401
+            from spx_python.client import SpxClient  # noqa: F401
+
+            spx_python_importable = True
+            checks.append("spx_python and spx_python.client import successfully")
+        except Exception as exc:
+            problems.append(
+                "Dependency 'spx-python' is present but failed to import: "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+    try:
+        from spx_mcp.backend.bootstrap import runtime_bootstrap_backend_report
+        from spx_mcp.backend.models import runtime_model_backend_report
+
+        model_report = runtime_model_backend_report()
+        bootstrap_report = runtime_bootstrap_backend_report()
+        checks.extend(model_report.get("checks", []))
+        checks.extend(bootstrap_report.get("checks", []))
+    except Exception as exc:
+        problems.append(
+            "The MCP runtime bootstrap path is not importable: "
+            f"{type(exc).__name__}: {exc}"
+        )
+
+    return {
+        "ok": not problems,
+        "checks": checks,
+        "problems": problems,
+        "spx_python_available": spx_python_available,
+        "spx_python_importable": spx_python_importable,
+    }

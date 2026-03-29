@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from tools.codex_mcp_bootstrap import (
+    LOCAL_GIT_EXCLUDE_PATTERNS,
     detect_server_invocation,
     ensure_exclude_pattern,
     resolve_git_exclude_path,
@@ -107,6 +108,13 @@ def test_ensure_exclude_pattern_is_idempotent() -> None:
 
     assert changed_again is False
     assert updated_again == ".codex/config.toml\n"
+
+
+def test_local_git_exclude_patterns_include_workspace_mode_file() -> None:
+    assert LOCAL_GIT_EXCLUDE_PATTERNS == (
+        ".codex/config.toml",
+        ".codex/workspace_mode.toml",
+    )
 
 
 def test_resolve_git_exclude_path_resolves_relative_git_path(tmp_path, monkeypatch) -> None:
