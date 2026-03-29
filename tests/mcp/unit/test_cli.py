@@ -68,6 +68,7 @@ def test_doctor_reports_runtime_backend_status(tmp_path: Path, monkeypatch) -> N
         "find_spec",
         lambda name: object() if name == "mcp" else original_find_spec(name),
     )
+    monkeypatch.setattr(cli, "python_supports_mcp", lambda: True)
 
     monkeypatch.setattr(
         cli,
@@ -87,7 +88,7 @@ def test_doctor_reports_runtime_backend_status(tmp_path: Path, monkeypatch) -> N
     report = cli.doctor_report(
         cli.SpxMcpConfig.from_sources(
             repo_root=str(tmp_path),
-            product_key="KEY-123",
+            product_key="TEST-CLI-KEY",
             allow_write=True,
         )
     )
@@ -110,6 +111,7 @@ def test_doctor_json_reports_runtime_backend_failures(tmp_path: Path, monkeypatc
         "find_spec",
         lambda name: object() if name == "mcp" else original_find_spec(name),
     )
+    monkeypatch.setattr(cli, "python_supports_mcp", lambda: True)
 
     monkeypatch.setattr(
         cli,
@@ -129,7 +131,7 @@ def test_doctor_json_reports_runtime_backend_failures(tmp_path: Path, monkeypatc
             "--repo-root",
             str(tmp_path),
             "--product-key",
-            "KEY-123",
+            "TEST-CLI-KEY",
             "--json",
         ]
     )

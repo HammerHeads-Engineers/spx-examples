@@ -57,12 +57,12 @@ def test_build_workspace_env_prefers_seed_and_defaults() -> None:
     values = mcp_workspace.build_workspace_env(
         existing={"CUSTOM_FLAG": "1"},
         seeded={
-            "SPX_PRODUCT_KEY": "REAL-KEY",
+            "SPX_PRODUCT_KEY": "TEST-PRODUCT-KEY",
             "SPX_BASE_URL": "http://localhost:8000/",
         },
     )
 
-    assert values["SPX_PRODUCT_KEY"] == "REAL-KEY"
+    assert values["SPX_PRODUCT_KEY"] == "TEST-PRODUCT-KEY"
     assert values["SPX_BASE_URL"] == "http://localhost:8000"
     assert values["CUSTOM_FLAG"] == "1"
 
@@ -80,10 +80,10 @@ def test_build_workspace_env_preserves_existing_base_url_when_seed_missing() -> 
 def test_build_workspace_env_treats_placeholder_as_missing() -> None:
     values = mcp_workspace.build_workspace_env(
         existing={"SPX_PRODUCT_KEY": "REPLACE_ME"},
-        seeded={"SPX_PRODUCT_KEY": "REAL-KEY"},
+        seeded={"SPX_PRODUCT_KEY": "TEST-PRODUCT-KEY"},
     )
 
-    assert values["SPX_PRODUCT_KEY"] == "REAL-KEY"
+    assert values["SPX_PRODUCT_KEY"] == "TEST-PRODUCT-KEY"
 
 
 def test_resolve_allow_write_defaults_to_true() -> None:
@@ -99,7 +99,7 @@ def test_read_seeded_workspace_env_falls_back_to_source_env_when_primary_has_pla
     fallback_env = tmp_path / "fallback.env"
     primary_env.write_text("SPX_PRODUCT_KEY=REPLACE_ME\n", encoding="utf-8")
     fallback_env.write_text(
-        "SPX_PRODUCT_KEY=REAL-KEY\nSPX_BASE_URL=http://fallback:8000\n",
+        "SPX_PRODUCT_KEY=TEST-PRODUCT-KEY\nSPX_BASE_URL=http://fallback:8000\n",
         encoding="utf-8",
     )
 
@@ -108,18 +108,18 @@ def test_read_seeded_workspace_env_falls_back_to_source_env_when_primary_has_pla
         fallback_seed_env_path=fallback_env,
     )
 
-    assert values["SPX_PRODUCT_KEY"] == "REAL-KEY"
+    assert values["SPX_PRODUCT_KEY"] == "TEST-PRODUCT-KEY"
     assert values["SPX_BASE_URL"] == "http://fallback:8000"
 
 
 def test_read_process_seed_env_prefers_valid_shell_values(monkeypatch) -> None:
-    monkeypatch.setenv("SPX_PRODUCT_KEY", "REAL-KEY")
+    monkeypatch.setenv("SPX_PRODUCT_KEY", "TEST-PRODUCT-KEY")
     monkeypatch.setenv("SPX_BASE_URL", "http://shell-host:8000/")
 
     values = mcp_workspace.read_process_seed_env()
 
     assert values == {
-        "SPX_PRODUCT_KEY": "REAL-KEY",
+        "SPX_PRODUCT_KEY": "TEST-PRODUCT-KEY",
         "SPX_BASE_URL": "http://shell-host:8000",
     }
 
@@ -601,7 +601,9 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_git_workspac
 
 def test_main_managed_bootstrap_is_idempotent(tmp_path: Path, monkeypatch) -> None:
     source_root = build_minimal_workspace_source(tmp_path / "source")
-    (source_root / ".env").write_text("SPX_PRODUCT_KEY=REAL-KEY\n", encoding="utf-8")
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+    monkeypatch.delenv("SPX_BASE_URL", raising=False)
+    (source_root / ".env").write_text("SPX_PRODUCT_KEY=TEST-PRODUCT-KEY\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
     expected_python = workspace / ".venv" / "bin" / "python"
 
@@ -659,7 +661,7 @@ def test_main_managed_bootstrap_is_idempotent(tmp_path: Path, monkeypatch) -> No
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_MANAGED
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_RUNTIME_MCP
-    assert mcp_workspace.read_dotenv(workspace / ".env")["SPX_PRODUCT_KEY"] == "REAL-KEY"
+    assert mcp_workspace.read_dotenv(workspace / ".env")["SPX_PRODUCT_KEY"] == "TEST-PRODUCT-KEY"
     assert bootstrap_codex_calls == [True, True]
 
 
