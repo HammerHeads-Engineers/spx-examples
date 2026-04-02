@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -205,6 +206,54 @@ def test_resolve_workspace_contract_defaults_to_repo_dev(tmp_path: Path) -> None
 
     assert workspace_kind == mcp_workspace.WORKSPACE_KIND_GIT
     assert work_mode == mcp_workspace.WORK_MODE_REPO_DEV
+
+
+def test_resolve_workspace_selection_prompts_and_can_override_suggested_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    prompted_defaults: list[str] = []
+
+    monkeypatch.setattr(mcp_workspace, "is_interactive_session", lambda: True)
+    monkeypatch.setattr(
+        mcp_workspace,
+        "prompt_work_mode",
+        lambda default_mode: prompted_defaults.append(default_mode) or mcp_workspace.WORK_MODE_RUNTIME_MCP,
+    )
+
+    workspace_kind, work_mode = mcp_workspace.resolve_workspace_selection(
+        workspace_dir=workspace,
+        explicit_workspace_kind=None,
+        explicit_work_mode=None,
+    )
+
+    assert prompted_defaults == [mcp_workspace.WORK_MODE_REPO_DEV]
+    assert workspace_kind == mcp_workspace.WORKSPACE_KIND_MANAGED
+    assert work_mode == mcp_workspace.WORK_MODE_RUNTIME_MCP
+
+
+def test_resolve_workspace_selection_skips_prompt_for_explicit_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    monkeypatch.setattr(mcp_workspace, "is_interactive_session", lambda: True)
+    monkeypatch.setattr(
+        mcp_workspace,
+        "prompt_work_mode",
+        lambda default_mode: (_ for _ in ()).throw(AssertionError("prompt should not run")),
+    )
+
+    workspace_kind, work_mode = mcp_workspace.resolve_workspace_selection(
+        workspace_dir=workspace,
+        explicit_workspace_kind=None,
+        explicit_work_mode=mcp_workspace.WORK_MODE_RUNTIME_MCP,
+    )
+
+    assert workspace_kind == mcp_workspace.WORKSPACE_KIND_MANAGED
+    assert work_mode == mcp_workspace.WORK_MODE_RUNTIME_MCP
 
 
 def test_resolve_workspace_contract_prefers_local_mode_file_over_metadata(tmp_path: Path) -> None:
@@ -891,6 +940,46 @@ def test_verify_workspace_fails_when_required_runtime_write_tools_are_missing(
     monkeypatch.setattr(mcp_workspace, "run_command", fake_run)
 
     with pytest.raises(RuntimeError, match="server_register_model_and_ensure_instance"):
+        mcp_workspace.verify_workspace(
+            tmp_path / ".venv" / "bin" / "python",
+            workspace,
+            server_name="spx",
+            allow_write=True,
+        )
+
+
+def test_verify_workspace_reports_doctor_problems_from_nonzero_json(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    codex_dir = workspace / ".codex"
+    codex_dir.mkdir(parents=True)
+    (codex_dir / "config.toml").write_text(
+        "[mcp_servers.spx]\n"
+        'command = "python3.11"\n'
+        'args = ["-m", "spx_mcp", "stdio", "--allow-write"]\n',
+        encoding="utf-8",
+    )
+
+    def fake_run(argv, *, cwd=None, capture_output=False):
+        if "doctor" in argv:
+            raise subprocess.CalledProcessError(
+                1,
+                argv,
+                output=json.dumps(
+                    {
+                        "ok": False,
+                        "problems": ["SPX_PRODUCT_KEY is missing or invalid for this MCP workspace."],
+                    }
+                ),
+                stderr="",
+            )
+        raise AssertionError(f"unexpected command: {argv}")
+
+    monkeypatch.setattr(mcp_workspace, "run_command", fake_run)
+
+    with pytest.raises(RuntimeError, match="SPX_PRODUCT_KEY is missing or invalid"):
         mcp_workspace.verify_workspace(
             tmp_path / ".venv" / "bin" / "python",
             workspace,
