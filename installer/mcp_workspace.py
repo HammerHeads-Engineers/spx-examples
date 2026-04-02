@@ -601,6 +601,53 @@ def resolve_workspace_contract(
     return WORKSPACE_KIND_GIT, WORK_MODE_REPO_DEV
 
 
+def is_interactive_session() -> bool:
+    try:
+        return bool(sys.stdin.isatty())
+    except Exception:
+        return False
+
+
+def prompt_work_mode(default_mode: str) -> str:
+    default_selection = "1" if default_mode == WORK_MODE_RUNTIME_MCP else "2"
+
+    while True:
+        print("[spx-mcp-setup] Choose workspace work mode:")
+        print("  1. runtime_mcp  Fast MCP-first workspace for live spx-server work")
+        print("  2. repo_dev     Full git checkout for models, tests, docs, and PRs")
+        choice = input(f"Selection [1/2, default {default_selection}]: ").strip()
+        selected = choice or default_selection
+        if selected == "1":
+            return WORK_MODE_RUNTIME_MCP
+        if selected == "2":
+            return WORK_MODE_REPO_DEV
+        print("[spx-mcp-setup] Invalid selection. Choose 1 or 2.")
+
+
+def resolve_workspace_selection(
+    *,
+    workspace_dir: Path,
+    explicit_workspace_kind: Optional[str],
+    explicit_work_mode: Optional[str],
+) -> tuple[str, str]:
+    if explicit_workspace_kind is not None or explicit_work_mode is not None:
+        return resolve_workspace_contract(
+            workspace_dir=workspace_dir,
+            explicit_workspace_kind=explicit_workspace_kind,
+            explicit_work_mode=explicit_work_mode,
+        )
+
+    workspace_kind, work_mode = resolve_workspace_contract(
+        workspace_dir=workspace_dir,
+        explicit_workspace_kind=None,
+        explicit_work_mode=None,
+    )
+    if is_interactive_session():
+        selected_mode = prompt_work_mode(work_mode)
+        return workspace_kind_for_work_mode(selected_mode), selected_mode
+    return workspace_kind, work_mode
+
+
 def assert_workspace_ready_for_managed_bootstrap(workspace_dir: Path) -> None:
     assert_no_duplicate_workspace_entries(workspace_dir)
     assert_workspace_marker_consistency(workspace_dir)
@@ -805,13 +852,15 @@ def verify_workspace(
     ]
     if allow_write:
         doctor_argv.append("--allow-write")
-    doctor_result = run_command(doctor_argv, capture_output=True)
-    try:
-        doctor_report = json.loads(doctor_result.stdout)
-    except json.JSONDecodeError as exc:
+    doctor_report = run_json_command(
+        doctor_argv,
+        command_label="spx_mcp doctor --json",
+        allow_nonzero_json=True,
+    )
+    if not isinstance(doctor_report, dict):
         raise RuntimeError(
-            "Workspace bootstrap could not parse `spx_mcp doctor --json` output."
-        ) from exc
+            "Workspace bootstrap expected `spx_mcp doctor --json` to return an object."
+        )
     if not bool(doctor_report.get("ok")):
         problems = doctor_report.get("problems") or []
         details = "\n".join(f"- {problem}" for problem in problems) or "- unknown doctor failure"
@@ -829,13 +878,10 @@ def verify_workspace(
     ]
     if allow_write:
         list_tools_argv.append("--allow-write")
-    list_tools_result = run_command(list_tools_argv, capture_output=True)
-    try:
-        tool_specs = json.loads(list_tools_result.stdout)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(
-            "Workspace bootstrap could not parse `spx_mcp list-tools --json` output."
-        ) from exc
+    tool_specs = run_json_command(
+        list_tools_argv,
+        command_label="spx_mcp list-tools --json",
+    )
     if not isinstance(tool_specs, list):
         raise RuntimeError(
             "Workspace bootstrap expected `spx_mcp list-tools --json` to return a list."
@@ -869,6 +915,37 @@ def verify_workspace(
                 "are still exposed:\n- "
                 + "\n- ".join(unexpected_tools)
             )
+
+
+def run_json_command(
+    argv: Sequence[str],
+    *,
+    command_label: str,
+    allow_nonzero_json: bool = False,
+) -> object:
+    try:
+        result = run_command(argv, capture_output=True)
+        stdout = result.stdout
+    except subprocess.CalledProcessError as exc:
+        stdout = exc.stdout or ""
+        if allow_nonzero_json and stdout.strip():
+            try:
+                return json.loads(stdout)
+            except json.JSONDecodeError:
+                pass
+        details = (exc.stderr or "").strip() or stdout.strip() or (
+            f"{command_label} exited with status {exc.returncode}."
+        )
+        raise RuntimeError(
+            f"Workspace bootstrap could not complete `{command_label}`:\n{details}"
+        ) from exc
+
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"Workspace bootstrap could not parse `{command_label}` output."
+        ) from exc
 
 
 def write_workspace_readme(
@@ -1012,7 +1089,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         else None
     )
 
-    workspace_kind, work_mode = resolve_workspace_contract(
+    workspace_kind, work_mode = resolve_workspace_selection(
         workspace_dir=workspace_dir,
         explicit_workspace_kind=args.workspace_kind,
         explicit_work_mode=args.work_mode,
