@@ -263,7 +263,7 @@ def _build_noninteractive_selection(
         protocols=protocols,
         install_examples=install_examples,
         install_spx_ui=install_spx_ui,
-        offline_bundle=True,
+        offline_bundle=not bool(getattr(args, "start", False)),
         license_key=product_key,
         model_ids=compatibility.model_ids,
         service_ids=compatibility.service_ids,
@@ -354,8 +354,7 @@ def run(args: argparse.Namespace) -> int:
         if noninteractive or getattr(args, "no_start", False):
             return 0
 
-        launch = input("\nStart the stack now? [Y/n]: ").strip().lower()
-        if launch in {"", "y", "yes"}:
+        if not selection.offline_bundle:
             _launch_stack(output_dir, stream=info_stream)
         return 0
     if args.command == "bootstrap":

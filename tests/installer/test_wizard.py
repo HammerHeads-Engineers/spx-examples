@@ -98,7 +98,7 @@ def test_wizard_with_inputs(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -110,7 +110,7 @@ def test_wizard_with_inputs(
     assert selection.instances == []
     assert selection.start_instances == []
     assert selection.install_spx_ui is False
-    assert selection.offline_bundle is False
+    assert selection.offline_bundle is True
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == ["sensor"]
     assert selection.service_ids == ["mqtt_broker"]
@@ -125,7 +125,7 @@ def test_wizard_can_opt_in_to_default_instances(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "y", "", "n", "n"])
+    inputs = iter(["1", "", "", "y", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -134,6 +134,29 @@ def test_wizard_can_opt_in_to_default_instances(
     assert selection.install_examples is True
     assert selection.instances == [{"model_id": "sensor", "instance_key": "pack_a_sensor_01"}]
     assert selection.start_instances == ["pack_a_sensor_01"]
+    assert selection.offline_bundle is True
+
+
+def test_wizard_can_select_quickstart_profiles(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+
+    inputs = iter(["1", "1", "", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    selection = wizard.run()
+
+    assert selection.packages == ["pack_a"]
+    assert selection.profiles == ["profile_a"]
+    assert selection.install_examples is True
+    assert selection.model_ids == ["sensor"]
+    assert selection.service_ids == ["mqtt_broker"]
+    assert selection.offline_bundle is True
 
 
 def test_wizard_protocol_selection(
@@ -144,7 +167,7 @@ def test_wizard_protocol_selection(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["0", "1", "", "y", ""])
+    inputs = iter(["0", "1", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -169,7 +192,7 @@ def test_wizard_masks_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr(
         "getpass.getpass",
@@ -194,7 +217,7 @@ def test_wizard_masks_env_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -204,3 +227,23 @@ def test_wizard_masks_env_product_key_in_output(
     assert "Detected SPX_PRODUCT_KEY in environment:" in captured.out
     assert "TEST-KEY" not in captured.out
     assert "****-KEY" in captured.out
+
+
+def test_wizard_prints_runtime_notices(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+    inputs = iter(["1", "", "", "", "n", "n"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("installer.wizard.current_platform_name", lambda: "windows")
+
+    wizard.run()
+    captured = capsys.readouterr()
+
+    assert "Runtime & third-party notices:" in captured.out
+    assert "Docker Desktop is required on this platform" in captured.out
+    assert "Eclipse Mosquitto" in captured.out

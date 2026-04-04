@@ -11,12 +11,22 @@ from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
-from .selection import apply_platform_compatibility
+from .selection import apply_platform_compatibility, current_platform_name
 from . import ui
 
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
 PROTOCOL_ALIASES = {"ascii": "scpi"}
 PROTOCOL_LABELS = {"scpi": "scpi (ASCII)"}
+THIRD_PARTY_SERVICE_NOTICES = {
+    "mqtt_broker": "MQTT Broker pulls Eclipse Mosquitto under separate open-source license terms.",
+    "lwm2m_server": "LwM2M Server pulls Eclipse Leshan under separate open-source license terms.",
+    "knx_gateway": (
+        "KNX Gateway pulls knxd-based container images under separate open-source license terms; "
+        "review redistribution obligations before mirroring or bundling them."
+    ),
+    "homeassistant_bridge": "Home Assistant Bridge pulls Home Assistant under separate open-source license terms.",
+    "matter_server": "Matter Server pulls python-matter-server under separate open-source license terms.",
+}
 
 
 @dataclass(frozen=True)
@@ -53,8 +63,10 @@ class InstallerWizard:
         install_instances = False
         start_instances: List[str] = []
         if not protocol_only:
+            profiles = self._prompt_profiles(packages, index)
+            selection_label = "selected packages and profiles" if profiles else "selected packages"
             install_models = self._prompt_yes_no(
-                "\nAdd models from selected packages? [Y/n]: ",
+                f"\nAdd models from {selection_label}? [Y/n]: ",
                 default=True,
             )
             if install_models:
@@ -65,10 +77,11 @@ class InstallerWizard:
                 if install_instances:
                     start_instances = self._prompt_start_instances(packages, index)
         install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
-        offline_bundle = self._prompt_yes_no(
-            "Prepare offline installation bundle instead of immediate launch? [y/N]: ",
+        start_now = self._prompt_yes_no(
+            "Start the stack immediately after generation? [y/N]: ",
             default=False,
         )
+        offline_bundle = not start_now
         license_key = self._prompt_license_key()
 
         if protocol_only:
@@ -106,6 +119,16 @@ class InstallerWizard:
             for warning in compatibility.warnings:
                 print(f"  - {warning}")
 
+        runtime_notices = self._build_runtime_notices(
+            service_ids=service_ids,
+            install_spx_ui=install_spx_ui,
+            index=index,
+        )
+        if runtime_notices:
+            print(ui.warn("\nRuntime & third-party notices:"))
+            for notice in runtime_notices:
+                print(f"  - {notice}")
+
         self._print_summary(
             packages,
             profiles,
@@ -113,7 +136,7 @@ class InstallerWizard:
             install_models,
             install_instances,
             install_spx_ui,
-            offline_bundle,
+            start_now,
             license_key,
             model_ids,
             service_ids,
@@ -442,6 +465,57 @@ class InstallerWizard:
                 continue
             return sorted(set(values))
 
+    def _build_runtime_notices(
+        self,
+        *,
+        service_ids: Sequence[str],
+        install_spx_ui: bool,
+        index: ManifestIndex,
+    ) -> List[str]:
+        notices: List[str] = []
+        seen: set[str] = set()
+        normalized_platform = current_platform_name()
+
+        if normalized_platform in {"windows", "macos"}:
+            notices.append(
+                "SPX runs as a Docker-based stack. Docker Desktop is required on this platform and "
+                "is licensed separately by Docker; some organizations need a paid subscription."
+            )
+        else:
+            notices.append(
+                "SPX runs as a Docker-based stack. Make sure Docker Engine and Compose are installed "
+                "before starting the generated environment."
+            )
+
+        if install_spx_ui:
+            notices.append(
+                "SPX UI is installed as part of the generated container stack and starts through Docker."
+            )
+
+        for service_id in service_ids:
+            notice = THIRD_PARTY_SERVICE_NOTICES.get(service_id)
+            if notice and notice not in seen:
+                notices.append(notice)
+                seen.add(notice)
+
+            manifest = index.services.get(service_id)
+            deployment = manifest.deployment if manifest is not None else None
+            if deployment is None or deployment.runtime != "native":
+                continue
+
+            instruction = (deployment.instructions or {}).get(normalized_platform)
+            if not instruction:
+                continue
+
+            native_notice = (
+                f"{manifest.name} requires host-side setup on {normalized_platform}: {instruction}"
+            )
+            if native_notice not in seen:
+                notices.append(native_notice)
+                seen.add(native_notice)
+
+        return notices
+
     def _print_summary(
         self,
         packages: Sequence[str],
@@ -450,7 +524,7 @@ class InstallerWizard:
         install_models: bool,
         install_instances: bool,
         install_spx_ui: bool,
-        offline_bundle: bool,
+        start_now: bool,
         license_key: str,
         model_ids: Sequence[str],
         service_ids: Sequence[str],
@@ -479,7 +553,7 @@ class InstallerWizard:
         print(f"\nInstall models: {ui.success('yes') if install_models else ui.warn('no')}")
         print(f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}")
         print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
-        print(f"Offline bundle: {ui.success('yes') if offline_bundle else ui.warn('no')}")
+        print(f"Start stack now: {ui.success('yes') if start_now else ui.warn('no')}")
         print(f"SPX product key: {ui.heading(self._mask_secret(license_key))}")
         print("\nModels:")
         for model_id in model_ids:
