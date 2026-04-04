@@ -5,11 +5,14 @@ from __future__ import annotations
 
 import getpass
 import os
+import re
 from dataclasses import dataclass
 from shutil import get_terminal_size
+from textwrap import shorten
 from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
+from . import paths
 from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
 from .selection import apply_platform_compatibility, current_platform_name
 from . import ui
@@ -17,6 +20,28 @@ from . import ui
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
 PROTOCOL_ALIASES = {"ascii": "scpi"}
 PROTOCOL_LABELS = {"scpi": "scpi (ASCII)"}
+PROTOCOL_BADGE_LABELS = {
+    "ascii": "ASCII",
+    "opcua": "OPC UA",
+    "modbus": "Modbus",
+    "mqtt": "MQTT",
+    "bacnet": "BACnet",
+    "knx": "KNX",
+    "matter": "Matter",
+    "lwm2m": "LwM2M",
+    "http": "HTTP",
+    "ocpp": "OCPP",
+    "ble": "BLE",
+    "scpi": "SCPI",
+}
+PACKAGE_PROTOCOL_HIGHLIGHTS = {
+    "embedded_lab_pack": ("ascii", "scpi", "ble", "modbus"),
+    "industrial_iiot_pack": ("opcua", "modbus", "mqtt"),
+    "smart_building_pack": ("bacnet", "knx", "mqtt"),
+}
+PACKAGE_DISPLAY_SUMMARIES = {
+    "embedded_lab_pack": "Modbus TCP, SCPI, BLE, MQTT/LwM2M for firmware CI and hardware-in-the-loop labs.",
+}
 THIRD_PARTY_SERVICE_NOTICES = {
     "mqtt_broker": "MQTT Broker pulls Eclipse Mosquitto under separate open-source license terms.",
     "lwm2m_server": "LwM2M Server pulls Eclipse Leshan under separate open-source license terms.",
@@ -128,6 +153,9 @@ class InstallerWizard:
             print(ui.warn("\nRuntime & third-party notices:"))
             for notice in runtime_notices:
                 print(f"  - {notice}")
+            self._prompt_continue(
+                "\nPress ENTER to continue after reviewing these notices (or q to quit): "
+            )
 
         self._print_summary(
             packages,
@@ -163,14 +191,27 @@ class InstallerWizard:
     def _print_banner(self) -> None:
         width = max(60, min(get_terminal_size((80, 20)).columns, 120))
         bar = ui.hr("=", width)
+        version = self._resolve_installer_version()
         print(bar)
         print(ui.heading(" SPX Installation Wizard ".center(width)))
+        print(ui.accent(f" Version {version} ".center(width)))
         print(bar)
         print(
             ui.accent(
                 "Select packages or protocols, then customize optional components.\n"
             )
         )
+
+    def _resolve_installer_version(self) -> str:
+        pyproject = paths.repo_root() / "pyproject.toml"
+        if not pyproject.exists():
+            return "dev"
+
+        content = pyproject.read_text(encoding="utf-8")
+        match = re.search(r'^\s*version\s*=\s*"([^"]+)"', content, flags=re.MULTILINE)
+        if not match:
+            return "dev"
+        return match.group(1).strip() or "dev"
 
     def _available_protocols(self, index: ManifestIndex) -> List[str]:
         protocol_set = {
@@ -206,16 +247,14 @@ class InstallerWizard:
         entries.sort(key=lambda ind: ind.name.lower())
         default_protocols = self._resolve_default_protocols(index)
         default_protocol_label = ", ".join(self._format_protocol_label(p) for p in default_protocols)
+        width = max(60, min(get_terminal_size((80, 20)).columns, 120))
 
         print(ui.heading("Available packages:\n"))
         for idx, ind in enumerate(entries, start=1):
-            print(f"  [{ui.accent(str(idx))}] {ui.heading(ind.name)}")
-            print(f"      {ind.description}")
-            if ind.protocols:
-                print(f"      Protocols: {', '.join(ind.protocols)}")
-            if ind.services:
-                print(f"      Services: {', '.join(ind.services)}")
-            print()
+            print(
+                f"  [{ui.accent(str(idx))}] {ui.heading(ind.name)}"
+                f" {self._format_package_overview(ind, width)}"
+            )
 
         if default_protocol_label:
             print(
@@ -271,22 +310,41 @@ class InstallerWizard:
         ]
         if not available_profiles:
             return []
+        width = max(60, min(get_terminal_size((80, 20)).columns, 120))
 
-        print(ui.heading("\nQuickstart profiles matching your packages:\n"))
+        print(ui.heading("\nOptional starter scenarios for your package:\n"))
         for idx, profile_id in enumerate(sorted(available_profiles), start=1):
             profile = index.profiles[profile_id]
-            print(f"  [{ui.accent(str(idx))}] {ui.heading(profile.name)} (pack: {profile.pack_id})")
-            print(f"      {profile.description}")
-            if profile.services:
-                print(f"      Extra services: {', '.join(profile.services)}")
-            print()
+            print(
+                f"  [{ui.accent(str(idx))}] {ui.heading(profile.name)} "
+                f"(pack: {profile.pack_id}) {self._format_profile_overview(profile, width)}"
+            )
 
-        choices = self._prompt_indices(
-            "Select quickstart profiles (comma-separated, ENTER to skip, q to quit): ",
-            len(available_profiles),
-            allow_empty=True,
-        )
-        return [sorted(available_profiles)[i - 1] for i in choices]
+        while True:
+            raw = input(
+                "Select starter scenarios (comma-separated, ENTER to use package defaults only, a for all, q to quit): "
+            ).strip()
+            self._check_quit(raw)
+            if not raw:
+                return []
+            if raw.lower() in {"a", "all"}:
+                return sorted(available_profiles)
+            try:
+                values = [
+                    int(token)
+                    for token in raw.split(",")
+                    if token.strip()
+                ]
+            except ValueError:
+                print(ui.warn("  Invalid input. Please enter numbers separated by commas, or 'a' for all."))
+                continue
+            if not values:
+                print(ui.warn("  Please select at least one entry."))
+                continue
+            if any(v < 1 or v > len(available_profiles) for v in values):
+                print(ui.warn(f"  Values must be between 1 and {len(available_profiles)}."))
+                continue
+            return [sorted(available_profiles)[i - 1] for i in sorted(set(values))]
 
     def _prompt_start_instances(
         self,
@@ -336,6 +394,10 @@ class InstallerWizard:
             if raw in {"n", "no"}:
                 return False
             print(ui.warn("  Please enter 'y' or 'n'."))
+
+    def _prompt_continue(self, prompt: str) -> None:
+        raw = input(prompt).strip()
+        self._check_quit(raw)
 
     def _prompt_protocols(self, index: ManifestIndex) -> List[str]:
         sorted_protocols = self._available_protocols(index)
@@ -464,6 +526,41 @@ class InstallerWizard:
                 print(ui.warn(f"  Values must be between 1 and {max_index}."))
                 continue
             return sorted(set(values))
+
+    def _format_package_overview(self, manifest: IndustryManifest, width: int) -> str:
+        desc = PACKAGE_DISPLAY_SUMMARIES.get(manifest.id, manifest.description or "")
+        desc = " ".join(str(desc).split())
+        badges = ", ".join(self._package_protocol_badges(manifest))
+        counts = f"{badges} | {len(manifest.protocols)} protocols, {len(manifest.services)} services"
+        return self._format_compact_overview(desc, counts, width)
+
+    def _format_profile_overview(self, profile, width: int) -> str:
+        desc = " ".join(str(profile.description or "").split())
+        counts = f"{len(profile.models)} models, {len(profile.services)} extra services"
+        return self._format_compact_overview(desc, counts, width)
+
+    def _format_compact_overview(self, description: str, counts: str, width: int) -> str:
+        suffix = f" [{counts}]"
+        available = max(20, width - len(suffix) - 12)
+        compact_description = shorten(description, width=available, placeholder="...")
+        if not compact_description:
+            return suffix
+        return f"- {compact_description}{suffix}"
+
+    def _package_protocol_badges(self, manifest: IndustryManifest) -> List[str]:
+        preferred = PACKAGE_PROTOCOL_HIGHLIGHTS.get(manifest.id)
+        protocol_ids: List[str]
+        if preferred:
+            protocol_ids = [proto for proto in preferred if self._protocol_present(proto, manifest.protocols)]
+        else:
+            protocol_ids = list(manifest.protocols[:3])
+        return [PROTOCOL_BADGE_LABELS.get(proto, proto.upper()) for proto in protocol_ids]
+
+    def _protocol_present(self, protocol: str, available_protocols: Sequence[str]) -> bool:
+        if protocol in available_protocols:
+            return True
+        alias_target = PROTOCOL_ALIASES.get(protocol)
+        return bool(alias_target and alias_target in available_protocols)
 
     def _build_runtime_notices(
         self,

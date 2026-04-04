@@ -98,7 +98,7 @@ def test_wizard_with_inputs(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -125,7 +125,7 @@ def test_wizard_can_opt_in_to_default_instances(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "y", "", "n", "n"])
+    inputs = iter(["1", "", "", "y", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -146,7 +146,7 @@ def test_wizard_can_select_quickstart_profiles(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "1", "", "", "n", "n"])
+    inputs = iter(["1", "1", "", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -159,6 +159,24 @@ def test_wizard_can_select_quickstart_profiles(
     assert selection.offline_bundle is True
 
 
+def test_wizard_can_select_all_quickstart_profiles(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+
+    inputs = iter(["1", "a", "", "", "n", "n", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    selection = wizard.run()
+
+    assert selection.packages == ["pack_a"]
+    assert selection.profiles == ["profile_a"]
+
+
 def test_wizard_protocol_selection(
     monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
 ) -> None:
@@ -167,7 +185,7 @@ def test_wizard_protocol_selection(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["0", "1", "", "", ""])
+    inputs = iter(["0", "1", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -192,7 +210,7 @@ def test_wizard_masks_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr(
         "getpass.getpass",
@@ -217,7 +235,7 @@ def test_wizard_masks_env_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -237,7 +255,7 @@ def test_wizard_prints_runtime_notices(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["1", "", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr("installer.wizard.current_platform_name", lambda: "windows")
 
@@ -247,3 +265,79 @@ def test_wizard_prints_runtime_notices(
     assert "Runtime & third-party notices:" in captured.out
     assert "Docker Desktop is required on this platform" in captured.out
     assert "Eclipse Mosquitto" in captured.out
+
+
+def test_wizard_banner_includes_installer_version(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+    inputs = iter(["1", "", "", "", "n", "n", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr(wizard, "_resolve_installer_version", lambda: "9.9.9-test")
+
+    wizard.run()
+    captured = capsys.readouterr()
+
+    assert "SPX Installation Wizard" in captured.out
+    assert "Version 9.9.9-test" in captured.out
+
+
+def test_prompt_packages_uses_compact_overview(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+    monkeypatch.setattr("builtins.input", lambda _: "1")
+
+    packages, protocols = wizard._prompt_packages(manifest_index.industries, manifest_index)
+    captured = capsys.readouterr()
+
+    assert packages == ["pack_a"]
+    assert protocols == []
+    assert "Pack description" in captured.out
+    assert "[MQTT | 1 protocols, 1 services]" in captured.out
+    assert "Protocols:" not in captured.out
+    assert "Services:" not in captured.out
+
+
+def test_package_protocol_badges_use_embedded_lab_highlights(
+    manifest_index: manifest.ManifestIndex,
+) -> None:
+    wizard = InstallerWizard()
+    manifest_value = manifest.IndustryManifest(
+        id="embedded_lab_pack",
+        name="Embedded & Lab Pack",
+        description="BLE, MQTT/LwM2M and SCPI devices for firmware CI and hardware-in-the-loop labs.",
+        protocols=["ble", "mqtt", "lwm2m", "coap", "scpi", "modbus"],
+        services=["btvirt_adapter", "mqtt_broker", "lwm2m_server", "scpi_tcp_stack", "modbus_tcp_gateway"],
+        profiles=["mhealth_ci"],
+        path="library/industries/embedded_lab_pack",
+    )
+
+    badges = wizard._package_protocol_badges(manifest_value)
+
+    assert badges == ["ASCII", "SCPI", "BLE", "Modbus"]
+
+
+def test_package_overview_uses_embedded_lab_display_summary() -> None:
+    wizard = InstallerWizard()
+    manifest_value = manifest.IndustryManifest(
+        id="embedded_lab_pack",
+        name="Embedded & Lab Pack",
+        description="BLE, MQTT/LwM2M and SCPI devices for firmware CI and hardware-in-the-loop labs.",
+        protocols=["ble", "mqtt", "lwm2m", "coap", "scpi", "modbus"],
+        services=["btvirt_adapter", "mqtt_broker", "lwm2m_server", "scpi_tcp_stack", "modbus_tcp_gateway"],
+        profiles=["mhealth_ci"],
+        path="library/industries/embedded_lab_pack",
+    )
+
+    overview = wizard._format_package_overview(manifest_value, 120)
+
+    assert "Modbus TCP, SCPI, BLE, MQTT/LwM2M" in overview
