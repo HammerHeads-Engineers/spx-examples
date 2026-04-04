@@ -139,6 +139,7 @@ industries:
     profiles:
       - profiles/industrial_iiot_pack/process_cell_quickstart.yaml
       - profiles/industrial_iiot_pack/iiot_monitoring.yaml
+      - profiles/industrial_iiot_pack/modbus_master_plc_demo.yaml
     default_instances:
       - model: Motion.StepperController.Modbus
         instance: spx_stepper_axis

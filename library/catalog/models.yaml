@@ -905,7 +905,8 @@ models:
   - id: modbus_tcp_gateway
   packages:
   - industrial_iiot_pack
-  profiles: []
+  profiles:
+  - modbus_master_plc_demo
 - id: IO.IOModule.Modbus
   name: IO Module (Modbus)
   path: library/domains/industrial/io_module/generic/io_module__modbus.yaml
@@ -950,6 +951,20 @@ models:
   - industrial_iiot_pack
   profiles:
   - process_cell_quickstart
+- id: Industrial.PlcController.ModbusMaster
+  name: Generic PLC Controller (Modbus Master)
+  path: library/domains/industrial/controller/generic/plc_controller__modbus_master.yaml
+  domain: industrial
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
+  protocols:
+  - modbus
+  services: []
+  packages:
+  - industrial_iiot_pack
+  profiles:
+  - modbus_master_plc_demo
 - id: Energy.EnergyMeter3Ph.Modbus
   name: 3-Phase Energy Meter (Modbus)
   path: library/domains/energy/meter/generic/energy_meter_3ph__modbus.yaml
@@ -979,8 +994,10 @@ models:
   - id: modbus_tcp_gateway
   packages:
   - smart_building_pack
+  - industrial_iiot_pack
   profiles:
   - bms_quickstart
+  - modbus_master_plc_demo
 - id: Energy.EnergyMeterPm3200.Modbus
   name: Schneider Electric PowerLogic PM3200 Energy Meter (Modbus)
   path: library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml

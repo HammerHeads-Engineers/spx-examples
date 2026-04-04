@@ -14,6 +14,11 @@ models:
   domain_group: energy
   device_class: meter
   vendor: generic
+- id: Energy.EnergyMeterIem3000.Modbus
+  path: library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml
+  domain_group: energy
+  device_class: meter
+  vendor: schneider
 - id: Energy.PowerMeter.AbbM1M.Modbus
   path: library/domains/energy/power_meter/abb/abb_m1m_power_meter__modbus.yaml
   domain_group: energy
@@ -49,6 +54,11 @@ models:
   domain_group: industrial
   device_class: io_module
   vendor: wago
+- id: Industrial.PlcController.ModbusMaster
+  path: library/domains/industrial/controller/generic/plc_controller__modbus_master.yaml
+  domain_group: industrial
+  device_class: controller
+  vendor: generic
 - id: Lab.Detector.PrevacMCD7.Modbus
   path: library/domains/lab/detector/prevac/prevac_mcd7__modbus.yaml
   domain_group: lab

@@ -11,7 +11,9 @@ additional Redfish device twins can land alongside.
   * `Process.Workcell.OpcUa` – robotic/machining gniazdo z pomiarem cykli i alarmami.
   * `Process.PackagingLine.OpcUa` – linia pakująca z wrapperem, kolejką i alarmami.
   * `Process.ProcessCell.SiemensS7_1500.OpcUa` – vendor-specific process cell endpoint.
-- **Quickstart**: `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`.
+- **Quickstarts**:
+  * `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`
+  * `profiles/industrial_iiot_pack/modbus_master_plc_demo.yaml` - generic PLC-style `modbus_master` demo that supervises an Altivar 320 VFD and an iEM3000 energy meter over direct Modbus TCP slave endpoints.
 
 ## Connection matrix
 

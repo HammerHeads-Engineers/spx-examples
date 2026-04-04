@@ -21,7 +21,10 @@ PACK_ID = "industrial_iiot_pack"
 REQUIRED_SMOKE_TESTS = {
     "Energy.PowerMeter.AbbM1M.Modbus": Path(
         "tests/packs/industrial_iiot_pack/integration/test_modbus_abb_m1m_smoke.py"
-    )
+    ),
+    "Industrial.PlcController.ModbusMaster": Path(
+        "tests/packs/industrial_iiot_pack/integration/test_modbus_master_plc_demo_smoke.py"
+    ),
 }
 
 
@@ -81,6 +84,12 @@ def test_pack_includes_abb_m1m_power_meter() -> None:
     models = models_for_pack(PACK_ID)
     model_ids = {entry.get("id") for entry in models}
     assert "Energy.PowerMeter.AbbM1M.Modbus" in model_ids
+
+
+def test_pack_includes_plc_modbus_master_controller() -> None:
+    models = models_for_pack(PACK_ID)
+    model_ids = {entry.get("id") for entry in models}
+    assert "Industrial.PlcController.ModbusMaster" in model_ids
 
 
 def test_pack_default_instances_include_abb_m1m_power_meter() -> None:
