@@ -98,7 +98,7 @@ def test_wizard_with_inputs(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -110,7 +110,7 @@ def test_wizard_with_inputs(
     assert selection.instances == []
     assert selection.start_instances == []
     assert selection.install_spx_ui is False
-    assert selection.offline_bundle is True
+    assert selection.offline_bundle is False
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == ["sensor"]
     assert selection.service_ids == ["mqtt_broker"]
@@ -125,7 +125,7 @@ def test_wizard_can_opt_in_to_default_instances(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "y", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "y", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -134,7 +134,7 @@ def test_wizard_can_opt_in_to_default_instances(
     assert selection.install_examples is True
     assert selection.instances == [{"model_id": "sensor", "instance_key": "pack_a_sensor_01"}]
     assert selection.start_instances == ["pack_a_sensor_01"]
-    assert selection.offline_bundle is True
+    assert selection.offline_bundle is False
 
 
 def test_wizard_can_select_quickstart_profiles(
@@ -146,7 +146,7 @@ def test_wizard_can_select_quickstart_profiles(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "1", "", "", "n", "n", ""])
+    inputs = iter(["1", "1", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -156,7 +156,7 @@ def test_wizard_can_select_quickstart_profiles(
     assert selection.install_examples is True
     assert selection.model_ids == ["sensor"]
     assert selection.service_ids == ["mqtt_broker"]
-    assert selection.offline_bundle is True
+    assert selection.offline_bundle is False
 
 
 def test_wizard_can_select_all_quickstart_profiles(
@@ -168,7 +168,7 @@ def test_wizard_can_select_all_quickstart_profiles(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "a", "", "", "n", "n", ""])
+    inputs = iter(["1", "a", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -193,7 +193,7 @@ def test_wizard_protocol_selection(
     assert selection.protocols == ["mqtt"]
     assert selection.install_examples is False
     assert selection.install_spx_ui is True
-    assert selection.offline_bundle is True
+    assert selection.offline_bundle is False
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == []
     assert selection.service_ids == ["mqtt_broker"]
@@ -210,7 +210,7 @@ def test_wizard_masks_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr(
         "getpass.getpass",
@@ -235,7 +235,7 @@ def test_wizard_masks_env_product_key_in_output(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -255,7 +255,7 @@ def test_wizard_prints_runtime_notices(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["1", "", "", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr("installer.wizard.current_platform_name", lambda: "windows")
 
@@ -275,7 +275,7 @@ def test_wizard_banner_includes_installer_version(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["1", "", "", "", "n", "n", ""])
+    inputs = iter(["1", "", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
     monkeypatch.setattr(wizard, "_resolve_installer_version", lambda: "9.9.9-test")
 
