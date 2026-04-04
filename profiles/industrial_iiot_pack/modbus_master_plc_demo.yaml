@@ -1,0 +1,9 @@
+name: modbus_master_plc_demo
+description: |
+  Minimal PLC-style Modbus master demo that supervises a Schneider Altivar 320
+  VFD and an iEM3000 energy meter over direct Modbus TCP slave endpoints.
+models:
+  - library/domains/industrial/controller/generic/plc_controller__modbus_master.yaml
+  - library/domains/industrial/drive/schneider/schneider_altivar_320__modbus.yaml
+  - library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml
+services: []
