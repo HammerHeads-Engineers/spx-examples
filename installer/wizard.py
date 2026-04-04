@@ -103,8 +103,8 @@ class InstallerWizard:
                     start_instances = self._prompt_start_instances(packages, index)
         install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
         start_now = self._prompt_yes_no(
-            "Start the stack immediately after generation? [y/N]: ",
-            default=False,
+            "Start the stack immediately after generation? [Y/n]: ",
+            default=True,
         )
         offline_bundle = not start_now
         license_key = self._prompt_license_key()
