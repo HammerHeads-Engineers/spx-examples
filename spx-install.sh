@@ -88,6 +88,14 @@ bootstrap_python_runtime() {
     --package colorama
 }
 
+print_python_runtime_hint() {
+  case "$(uname -s)" in
+    Linux)
+      echo "[spx-install] On Ubuntu/Debian, install 'python3-venv' and, if needed, 'python3-pip', then retry." >&2
+      ;;
+  esac
+}
+
 check_docker() {
   need_cmd docker
   if ! docker info >/dev/null 2>&1; then
@@ -107,7 +115,18 @@ check_docker() {
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"
 check_docker
-PYTHON_BIN="$(bootstrap_python_runtime "$SYSTEM_PYTHON_BIN" "$(resolve_runtime_root)")"
+BOOTSTRAP_LOG="$(mktemp)"
+trap 'rm -f "$BOOTSTRAP_LOG"' EXIT
+if PYTHON_BIN="$(
+  bootstrap_python_runtime "$SYSTEM_PYTHON_BIN" "$(resolve_runtime_root)" \
+    2>"$BOOTSTRAP_LOG"
+)"; then
+  :
+else
+  cat "$BOOTSTRAP_LOG" >&2
+  print_python_runtime_hint
+  exit 1
+fi
 if [ ! -x "${PYTHON_BIN}" ]; then
   echo "[spx-install] Python runtime bootstrap did not return an executable interpreter." >&2
   exit 1

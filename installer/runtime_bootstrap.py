@@ -54,6 +54,48 @@ def run_command(argv: list[str]) -> None:
     subprocess.run(argv, check=True, stdout=sys.stderr, stderr=sys.stderr)
 
 
+def has_module(python_bin: Path, module_name: str) -> bool:
+    try:
+        subprocess.run(
+            [
+                str(python_bin),
+                "-c",
+                (
+                    "import importlib.util, sys; "
+                    f"sys.exit(0 if importlib.util.find_spec({module_name!r}) else 1)"
+                ),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+    return True
+
+
+def ensure_pip_available(python_bin: Path) -> None:
+    if has_module(python_bin, "pip"):
+        return
+
+    print(
+        f"[runtime] Bootstrapping pip in {python_bin.parent.parent}",
+        file=sys.stderr,
+    )
+    try:
+        run_command([str(python_bin), "-m", "ensurepip", "--upgrade"])
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            "Python virtual environment does not include pip and ensurepip failed. "
+            "Install the distro Python venv/pip support packages and retry."
+        ) from exc
+
+    if not has_module(python_bin, "pip"):
+        raise RuntimeError(
+            "Python virtual environment was created, but pip is still unavailable after ensurepip."
+        )
+
+
 def is_healthy_virtualenv(venv_dir: Path) -> bool:
     python_bin = venv_python_path(venv_dir)
     if not python_bin.exists():
@@ -118,10 +160,10 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
         )
         run_command([sys.executable, "-m", "venv", str(venv_dir)])
         python_bin = venv_python_path(venv_dir)
-
     current_state = read_stamp(stamp_path)
     if current_state != desired_state:
         if packages:
+            ensure_pip_available(python_bin)
             print(
                 f"[runtime] Installing Python packages into {venv_dir}",
                 file=sys.stderr,

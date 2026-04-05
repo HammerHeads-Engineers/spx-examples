@@ -19,8 +19,9 @@ def test_is_healthy_virtualenv_rejects_missing_pyvenv_cfg(tmp_path: Path) -> Non
 
 def test_ensure_runtime_recreates_broken_virtualenv(tmp_path: Path, monkeypatch) -> None:
     venv_dir = tmp_path / ".venv"
-    (venv_dir / "bin").mkdir(parents=True)
-    (venv_dir / "bin" / "python").write_text("", encoding="utf-8")
+    python_path = runtime_bootstrap.venv_python_path(venv_dir)
+    python_path.parent.mkdir(parents=True)
+    python_path.write_text("", encoding="utf-8")
     stale_path = venv_dir / "stale.txt"
     stale_path.write_text("stale", encoding="utf-8")
 
@@ -29,8 +30,8 @@ def test_ensure_runtime_recreates_broken_virtualenv(tmp_path: Path, monkeypatch)
     def fake_run_command(argv: list[str]) -> None:
         calls.append(argv)
         assert argv == [runtime_bootstrap.sys.executable, "-m", "venv", str(venv_dir)]
-        (venv_dir / "bin").mkdir(parents=True, exist_ok=True)
-        (venv_dir / "bin" / "python").write_text("#!/usr/bin/env python\n", encoding="utf-8")
+        python_path.parent.mkdir(parents=True, exist_ok=True)
+        python_path.write_text("#!/usr/bin/env python\n", encoding="utf-8")
         (venv_dir / "pyvenv.cfg").write_text("home = /tmp/python\n", encoding="utf-8")
 
     monkeypatch.setattr(runtime_bootstrap, "run_command", fake_run_command)
@@ -43,7 +44,7 @@ def test_ensure_runtime_recreates_broken_virtualenv(tmp_path: Path, monkeypatch)
     python_bin = runtime_bootstrap.ensure_runtime(venv_dir, [])
 
     assert calls == [[runtime_bootstrap.sys.executable, "-m", "venv", str(venv_dir)]]
-    assert python_bin == venv_dir / "bin" / "python"
+    assert python_bin == python_path
     assert stale_path.exists() is False
     assert (venv_dir / "pyvenv.cfg").exists() is True
     assert json.loads((venv_dir / ".spx-runtime.json").read_text(encoding="utf-8")) == {
@@ -57,8 +58,9 @@ def test_ensure_runtime_reuses_healthy_virtualenv_without_recreate(
     monkeypatch,
 ) -> None:
     venv_dir = tmp_path / ".venv"
-    (venv_dir / "bin").mkdir(parents=True)
-    (venv_dir / "bin" / "python").write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    python_path = runtime_bootstrap.venv_python_path(venv_dir)
+    python_path.parent.mkdir(parents=True)
+    python_path.write_text("#!/usr/bin/env python\n", encoding="utf-8")
     (venv_dir / "pyvenv.cfg").write_text("home = /tmp/python\n", encoding="utf-8")
     (venv_dir / ".spx-runtime.json").write_text(
         json.dumps(
@@ -77,5 +79,5 @@ def test_ensure_runtime_reuses_healthy_virtualenv_without_recreate(
 
     python_bin = runtime_bootstrap.ensure_runtime(venv_dir, [])
 
-    assert python_bin == venv_dir / "bin" / "python"
+    assert python_bin == python_path
     assert calls == []
