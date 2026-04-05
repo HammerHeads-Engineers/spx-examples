@@ -102,6 +102,7 @@ without cloning the full spx-examples repository.
 - Python 3.9+ with `pip`
 - Docker Desktop / Docker Engine with Compose V2
 - Python 3.10+ if you want to bootstrap the local Codex MCP workspace
+- On Ubuntu/Debian, if the runtime venv cannot bootstrap pip, install `python3-venv` and, if needed, `python3-pip`
 
 ## Usage
 

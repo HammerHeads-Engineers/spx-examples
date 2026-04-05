@@ -195,6 +195,7 @@ Industry packs group models, services, and quickstart profiles around a specific
 - `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
 - Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
 - Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_BASE_URL` if you are not using `http://localhost:8000`.
+- On Ubuntu/Debian, if the installer reports that pip cannot be bootstrapped inside the runtime venv, install the distro Python support packages and retry: `python3-venv` and, if needed, `python3-pip`.
 
 ## Installer workflow (recommended)
 
