@@ -90,6 +90,30 @@ for entry in "${copy_entries[@]}"; do
   rsync "${rsync_opts[@]}" "${src}" "${PACKAGE_DIR}/"
 done
 
+normalize_text_line_endings() {
+  local package_dir="$1"
+  python3 - "$package_dir" <<'PY'
+from __future__ import annotations
+
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+extensions = {".sh", ".desktop", ".command", ".ps1", ".md", ".toml", ".yaml", ".yml", ".py"}
+for path in root.rglob("*"):
+    if not path.is_file():
+        continue
+    if path.suffix.lower() not in extensions:
+        continue
+    text = path.read_text(encoding="utf-8", errors="surrogatepass")
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if normalized != text:
+        path.write_text(normalized, encoding="utf-8", newline="\n")
+PY
+}
+
+normalize_text_line_endings "${PACKAGE_DIR}"
+
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
 
