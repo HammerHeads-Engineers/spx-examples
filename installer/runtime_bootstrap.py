@@ -160,11 +160,10 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
         )
         run_command([sys.executable, "-m", "venv", str(venv_dir)])
         python_bin = venv_python_path(venv_dir)
-
-    ensure_pip_available(python_bin)
     current_state = read_stamp(stamp_path)
     if current_state != desired_state:
         if packages:
+            ensure_pip_available(python_bin)
             print(
                 f"[runtime] Installing Python packages into {venv_dir}",
                 file=sys.stderr,
