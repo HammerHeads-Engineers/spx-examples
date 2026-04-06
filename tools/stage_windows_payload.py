@@ -22,6 +22,7 @@ DEFAULT_PAYLOAD_ENTRIES = (
     "docs",
     "AGENTS.md",
     "LICENSE",
+    "THIRD_PARTY_NOTICE.txt",
     "spx-setup.command",
     "spx-setup.desktop",
     "spx-setup.sh",

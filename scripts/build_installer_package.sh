@@ -58,6 +58,8 @@ copy_entries=(
   "tools"
   "docs"
   "AGENTS.md"
+  "LICENSE"
+  "THIRD_PARTY_NOTICE.txt"
   "spx-setup.command"
   "spx-setup.desktop"
   "spx-setup.sh"
@@ -127,6 +129,12 @@ without cloning the full spx-examples repository.
 - Docker Desktop / Docker Engine with Compose V2
 - Python 3.10+ if you want to bootstrap the local Codex MCP workspace
 - On Ubuntu/Debian, if the runtime venv cannot bootstrap pip, install `python3-venv` and, if needed, `python3-pip`
+
+## Licensing
+
+- Open-source license notices bundled with this package apply to the corresponding components, including the included `LICENSE` file.
+- Third-party distribution notes for installer-bundled dependencies are included in `THIRD_PARTY_NOTICE.txt`.
+- Proprietary SPX features, branding, hosted services, and subscription-gated functionality may require separate commercial terms or authorization.
 
 ## Usage
 
