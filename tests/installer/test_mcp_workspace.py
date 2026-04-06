@@ -226,9 +226,57 @@ def test_resolve_workspace_selection_prompts_and_can_override_suggested_mode(
         workspace_dir=workspace,
         explicit_workspace_kind=None,
         explicit_work_mode=None,
+        suggested_work_mode=mcp_workspace.WORK_MODE_RUNTIME_MCP,
+    )
+
+    assert prompted_defaults == [mcp_workspace.WORK_MODE_RUNTIME_MCP]
+    assert workspace_kind == mcp_workspace.WORKSPACE_KIND_MANAGED
+    assert work_mode == mcp_workspace.WORK_MODE_RUNTIME_MCP
+
+
+def test_resolve_workspace_selection_keeps_existing_repo_dev_as_prompt_default(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".git").mkdir()
+    prompted_defaults: list[str] = []
+
+    monkeypatch.setattr(mcp_workspace, "is_interactive_session", lambda: True)
+    monkeypatch.setattr(
+        mcp_workspace,
+        "prompt_work_mode",
+        lambda default_mode: prompted_defaults.append(default_mode) or mcp_workspace.WORK_MODE_REPO_DEV,
+    )
+
+    workspace_kind, work_mode = mcp_workspace.resolve_workspace_selection(
+        workspace_dir=workspace,
+        explicit_workspace_kind=None,
+        explicit_work_mode=None,
+        suggested_work_mode=mcp_workspace.WORK_MODE_RUNTIME_MCP,
     )
 
     assert prompted_defaults == [mcp_workspace.WORK_MODE_REPO_DEV]
+    assert workspace_kind == mcp_workspace.WORKSPACE_KIND_GIT
+    assert work_mode == mcp_workspace.WORK_MODE_REPO_DEV
+
+
+def test_resolve_workspace_selection_uses_suggested_mode_noninteractive_for_clean_workspace(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+
+    monkeypatch.setattr(mcp_workspace, "is_interactive_session", lambda: False)
+
+    workspace_kind, work_mode = mcp_workspace.resolve_workspace_selection(
+        workspace_dir=workspace,
+        explicit_workspace_kind=None,
+        explicit_work_mode=None,
+        suggested_work_mode=mcp_workspace.WORK_MODE_RUNTIME_MCP,
+    )
+
     assert workspace_kind == mcp_workspace.WORKSPACE_KIND_MANAGED
     assert work_mode == mcp_workspace.WORK_MODE_RUNTIME_MCP
 
