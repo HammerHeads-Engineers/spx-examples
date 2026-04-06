@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: mhealth_ci
 description: |
   BLE health wearable regression profile pairing the vital signs monitor with

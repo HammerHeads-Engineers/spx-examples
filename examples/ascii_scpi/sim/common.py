@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Shared ASCII/SCPI simulator helpers."""
 
 from __future__ import annotations

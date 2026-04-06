@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 - id: '1767345066240'
   alias: 'Blinds: night by brightness + temp; sunny shading; otherwise open'
   triggers:

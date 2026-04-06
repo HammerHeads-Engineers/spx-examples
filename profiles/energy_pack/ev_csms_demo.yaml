@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: ev_csms_demo
 description: |
   Minimal EV/DER orchestration profile showcasing the built-in OCPP 1.6 handshake

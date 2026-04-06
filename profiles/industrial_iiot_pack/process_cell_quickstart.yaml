@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: process_cell_quickstart
 description: |
   Quick baseline for motion/process control containing the stepper axis, thermal

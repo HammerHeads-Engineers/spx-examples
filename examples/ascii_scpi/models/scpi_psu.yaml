@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: scpi_psu
 description: |
   Example SCPI bench power supply model for ASCII/TCP demos.

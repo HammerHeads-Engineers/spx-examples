@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 models:
 - id: Building.BMSController.OpcUa
   path: library/domains/building/controller/generic/bms_controller__opcua.yaml

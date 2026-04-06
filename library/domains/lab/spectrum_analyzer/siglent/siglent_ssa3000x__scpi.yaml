@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_ssa3000x__scpi
 description: |
   Virtual Siglent SSA3000X series spectrum analyzer exposing a subset of the

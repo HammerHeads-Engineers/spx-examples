@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: modbus_master_plc_demo
 description: |
   Minimal PLC-style Modbus master demo that supervises a Schneider Altivar 320

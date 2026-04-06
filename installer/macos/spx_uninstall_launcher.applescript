@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 property appTitle : "SPX Uninstall"
 property packageId : "com.hammerheadsengineers.spx.installer"
 property supportDirRelativePath : "Library/Application Support/SPX"

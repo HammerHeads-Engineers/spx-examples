@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_sdg1032x__scpi
 description: |
   Virtual Siglent SDG1000X series function generator (modeled after SDG1032X)

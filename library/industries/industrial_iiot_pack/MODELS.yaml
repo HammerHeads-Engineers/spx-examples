@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 models:
 - id: Condition.ConditionMonitor.Mqtt
   path: library/domains/industrial/monitor/generic/condition_monitor__mqtt.yaml

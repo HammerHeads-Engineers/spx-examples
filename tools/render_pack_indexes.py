@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Render pack model indexes from the catalog source of truth."""
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ except ImportError as exc:  # pragma: no cover - import guard for CLI use
     ) from exc
 
 PACK_INDEX_FIELDS = ("id", "path", "domain_group", "device_class", "vendor")
+SPDX_HEADER = "# SPDX-License-Identifier: MIT\n"
 
 
 def _load_yaml(path: Path) -> Any:
@@ -69,7 +71,7 @@ def render_pack_indexes(root: Path) -> list[Path]:
         pack_index_path = pack_dir / "MODELS.yaml"
         payload = {"models": _pack_index_rows(models, pack_id)}
         pack_index_path.write_text(
-            yaml.safe_dump(payload, sort_keys=False, allow_unicode=False),
+            SPDX_HEADER + yaml.safe_dump(payload, sort_keys=False, allow_unicode=False),
             encoding="utf-8",
         )
         written.append(pack_index_path)

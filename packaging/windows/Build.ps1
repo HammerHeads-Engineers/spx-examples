@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+# SPDX-License-Identifier: MIT
 param(
     [string]$Configuration = "Release",
     [string]$RuntimeIdentifier = "win-x64",

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Simple SCPI bench power supply simulator."""
 
 from __future__ import annotations

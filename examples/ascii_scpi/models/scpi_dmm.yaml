@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: scpi_dmm
 description: |
   Example SCPI digital multimeter model for ASCII/TCP demos.

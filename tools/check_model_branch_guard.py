@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Guard rails for model-yaml automation branch drift and duplicate additions.
 
 This script is designed to prevent the automation/model-yaml branch from

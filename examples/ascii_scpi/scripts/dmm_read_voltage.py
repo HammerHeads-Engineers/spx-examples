@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Read DMM voltage via SCPI using the SPX-hosted model."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 import json
 import paho.mqtt.client as mqtt
 import requests

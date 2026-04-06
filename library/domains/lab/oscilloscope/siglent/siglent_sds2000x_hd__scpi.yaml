@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_sds2000x_hd__scpi
 description: |
   Virtual Siglent SDS2000X HD series oscilloscope exposing a subset of the

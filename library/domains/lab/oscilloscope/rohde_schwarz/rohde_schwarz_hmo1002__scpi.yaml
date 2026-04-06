@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rohde_schwarz_hmo1002__scpi
 description: |
   Virtual Rohde & Schwarz HMO1002 oscilloscope with SCPI commands for

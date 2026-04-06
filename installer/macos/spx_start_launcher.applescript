@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 property appTitle : "SPX Start"
 property generatedLauncherRelativePath : "Library/Application Support/SPX/generated/spx-start.command"
 

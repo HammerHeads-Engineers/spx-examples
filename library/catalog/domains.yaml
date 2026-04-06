@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 domains:
 - id: building
   name: Building Systems

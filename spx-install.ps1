@@ -1,4 +1,5 @@
 #!/usr/bin/env pwsh
+# SPDX-License-Identifier: MIT
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 

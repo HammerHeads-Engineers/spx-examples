@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Load BLE models from YAML and spin up an instance for quick inspection."""
 
 import argparse

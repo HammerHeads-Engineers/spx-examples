@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Set PSU voltage/current via SCPI using the SPX-hosted model."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: keysight_e36312a__scpi
 description: |
   Keysight E36312A triple-output DC power supply model driven by SCPI
