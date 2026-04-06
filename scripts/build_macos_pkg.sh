@@ -92,6 +92,35 @@ EOF
   chmod +x "${scripts_dir}/postinstall"
 }
 
+write_distribution_file() {
+  local distribution_path="$1"
+  local package_id="$2"
+  local package_file_name="$3"
+  local version="$4"
+  local title="$5"
+
+  cat > "${distribution_path}" <<EOF
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="1">
+    <title>${title}</title>
+    <license file="License.rtf"/>
+    <pkg-ref id="${package_id}"/>
+    <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="${package_id}"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="${package_id}" visible="false">
+        <pkg-ref id="${package_id}"/>
+    </choice>
+    <pkg-ref id="${package_id}" version="${version}" onConclusion="none">${package_file_name}</pkg-ref>
+</installer-gui-script>
+EOF
+}
+
 OUTPUT_DIR="dist"
 STAGING_DIR="build/macos-pkg"
 PKG_NAME="spx-installer-macos"
@@ -115,6 +144,7 @@ APP_SIGN_IDENTITY=""
 SIGN_IDENTITY=""
 KEYCHAIN_PATH=""
 NOTARYTOOL_PROFILE=""
+PRODUCT_TITLE="SPX Tools"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -190,6 +220,7 @@ APP_ROOT="${STAGING_ROOT}/root"
 APP_OUTPUT_DIR="${STAGING_DIR}/root/${TOOLS_DIR_NAME}"
 APP_INSTALL_ROOT="${APP_ROOT}/${TOOLS_DIR_NAME}"
 PKG_SCRIPTS_DIR="${STAGING_ROOT}/pkg-scripts"
+MACOS_RESOURCES_DIR="${REPO_ROOT}/packaging/macos/resources"
 
 if [[ -z "${VERSION}" ]]; then
   VERSION="$(resolve_version)"
@@ -210,11 +241,17 @@ if [[ -n "${SIGN_IDENTITY}" && "${SIGN_IDENTITY}" != Developer\ ID\ Installer:* 
 fi
 
 require_command pkgbuild
+require_command productbuild
 require_command pkgutil
 require_command sed
 require_command /usr/libexec/PlistBuddy
 require_command chflags
 require_command xattr
+
+if [[ ! -d "${MACOS_RESOURCES_DIR}" ]]; then
+  echo "Missing macOS installer resources directory: ${MACOS_RESOURCES_DIR}" >&2
+  exit 1
+fi
 
 mkdir -p "${DEST_DIR}"
 rm -rf "${APP_ROOT}"
@@ -307,8 +344,12 @@ write_pkg_scripts "${PKG_SCRIPTS_DIR}" "${INSTALL_LOCATION}" "${TOOLS_DIR_NAME}"
 
 PKG_PATH="${DEST_DIR}/${PKG_NAME}-${VERSION}.pkg"
 COMPONENT_PLIST="${STAGING_ROOT}/component.plist"
+COMPONENT_PKG_PATH="${STAGING_ROOT}/${PKG_NAME}-${VERSION}-component.pkg"
+DISTRIBUTION_PATH="${STAGING_ROOT}/Distribution.xml"
 rm -f "${PKG_PATH}"
 rm -f "${COMPONENT_PLIST}"
+rm -f "${COMPONENT_PKG_PATH}"
+rm -f "${DISTRIBUTION_PATH}"
 
 pkgbuild --analyze --root "${APP_ROOT}" "${COMPONENT_PLIST}"
 
@@ -335,7 +376,30 @@ if [[ -n "${SIGN_IDENTITY}" ]]; then
   fi
 fi
 
-pkgbuild "${pkgbuild_args[@]}" "${PKG_PATH}"
+pkgbuild "${pkgbuild_args[@]}" "${COMPONENT_PKG_PATH}"
+
+write_distribution_file \
+  "${DISTRIBUTION_PATH}" \
+  "${IDENTIFIER}" \
+  "$(basename "${COMPONENT_PKG_PATH}")" \
+  "${VERSION}" \
+  "${PRODUCT_TITLE}"
+
+productbuild_args=(
+  --distribution "${DISTRIBUTION_PATH}"
+  --resources "${MACOS_RESOURCES_DIR}"
+  --package-path "${STAGING_ROOT}"
+  --version "${VERSION}"
+)
+
+if [[ -n "${SIGN_IDENTITY}" ]]; then
+  productbuild_args+=(--sign "${SIGN_IDENTITY}")
+  if [[ -n "${KEYCHAIN_PATH}" ]]; then
+    productbuild_args+=(--keychain "${KEYCHAIN_PATH}")
+  fi
+fi
+
+productbuild "${productbuild_args[@]}" "${PKG_PATH}"
 
 echo "Created macOS package: ${PKG_PATH}"
 

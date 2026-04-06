@@ -120,6 +120,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         help="Semantic work mode: runtime_mcp or repo_dev.",
     )
     parser.add_argument(
+        "--suggested-work-mode",
+        choices=(WORK_MODE_RUNTIME_MCP, WORK_MODE_REPO_DEV),
+        default=None,
+        help="Suggested default work mode for interactive packaged launchers.",
+    )
+    parser.add_argument(
         "--python",
         required=False,
         default=sys.executable,
@@ -629,6 +635,7 @@ def resolve_workspace_selection(
     workspace_dir: Path,
     explicit_workspace_kind: Optional[str],
     explicit_work_mode: Optional[str],
+    suggested_work_mode: Optional[str] = None,
 ) -> tuple[str, str]:
     if explicit_workspace_kind is not None or explicit_work_mode is not None:
         return resolve_workspace_contract(
@@ -642,10 +649,24 @@ def resolve_workspace_selection(
         explicit_workspace_kind=None,
         explicit_work_mode=None,
     )
+
+    prompt_default_mode = work_mode
+    normalized_suggested_mode = normalize_work_mode(suggested_work_mode)
+    local_work_mode = read_workspace_mode_file(workspace_dir)
+    marker_work_mode = marker_default_work_mode(read_workspace_marker(workspace_dir))
+    should_apply_suggestion = (
+        normalized_suggested_mode is not None
+        and local_work_mode is None
+        and marker_work_mode is None
+        and not is_git_workspace(workspace_dir)
+    )
+    if should_apply_suggestion:
+        prompt_default_mode = normalized_suggested_mode
+
     if is_interactive_session():
-        selected_mode = prompt_work_mode(work_mode)
+        selected_mode = prompt_work_mode(prompt_default_mode)
         return workspace_kind_for_work_mode(selected_mode), selected_mode
-    return workspace_kind, work_mode
+    return workspace_kind_for_work_mode(prompt_default_mode), prompt_default_mode
 
 
 def assert_workspace_ready_for_managed_bootstrap(workspace_dir: Path) -> None:
@@ -1093,6 +1114,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         workspace_dir=workspace_dir,
         explicit_workspace_kind=args.workspace_kind,
         explicit_work_mode=args.work_mode,
+        suggested_work_mode=args.suggested_work_mode,
     )
 
     if workspace_kind == WORKSPACE_KIND_GIT:

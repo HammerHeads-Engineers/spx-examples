@@ -8,6 +8,7 @@ SERVER_NAME="${SPX_MCP_SERVER_NAME:-spx}"
 WORK_MODE="${SPX_MCP_WORK_MODE:-}"
 WORKSPACE_KIND="${SPX_MCP_WORKSPACE_KIND:-}"
 LEGACY_WORKSPACE_MODE="${SPX_MCP_WORKSPACE_MODE:-}"
+SUGGESTED_WORK_MODE="${SPX_MCP_SUGGESTED_WORK_MODE:-runtime_mcp}"
 GIT_REMOTE_URL="${SPX_MCP_GIT_REMOTE_URL:-https://github.com/HammerHeads-Engineers/spx-examples.git}"
 GIT_BRANCH="${SPX_MCP_GIT_BRANCH:-develop}"
 REPLACE_EXISTING_WORKSPACE="${SPX_MCP_REPLACE_EXISTING_WORKSPACE:-0}"
@@ -379,7 +380,13 @@ resolve_suggested_work_mode() {
     return 0
   fi
 
-  printf '%s\n' "repo_dev"
+  suggested_mode="$(normalize_work_mode "${SUGGESTED_WORK_MODE}" || true)"
+  if [[ -n "${suggested_mode}" ]]; then
+    printf '%s\n' "${suggested_mode}"
+    return 0
+  fi
+
+  printf '%s\n' "runtime_mcp"
 }
 
 prompt_work_mode() {

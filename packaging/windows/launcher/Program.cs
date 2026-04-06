@@ -135,6 +135,8 @@ internal static class Program
             pythonExecutable,
             "--server-name",
             "spx",
+            "--suggested-work-mode",
+            "runtime_mcp",
         };
         if (!hasSeedEnv)
         {

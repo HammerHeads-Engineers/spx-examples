@@ -356,6 +356,9 @@ a packaged location such as `/Applications/SPX Tools/`. Once they have
 generated a local environment, they can later manage it via the companion
 launchers in the same folder:
 
+The macOS installer now also uses the native Installer.app license step. Its
+content is sourced from `packaging/macos/resources/English.lproj/License.rtf`.
+
 - `SPX MCP Setup.app` creates `~/Documents/SPX Codex Workspace`, prepares a
   local `.venv`, writes `.codex/config.toml`, and opens that folder for Codex.
   During setup the user chooses a work mode:
