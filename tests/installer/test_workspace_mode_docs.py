@@ -21,6 +21,17 @@ def test_readme_describes_work_modes_for_end_users() -> None:
     assert "write-enabled by default" in readme
 
 
+def test_readme_describes_recommended_release_installers() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "Prefer the versioned" in readme
+    assert "`spx-installer-<version>.exe`" in readme
+    assert "`spx-installer-macos-<version>.pkg`" in readme
+    assert "`spx-installer-<version>.run`" in readme
+    assert "Use the unpacked `.tgz` / `.zip` package and `spx-setup.*` only as a fallback" in readme
+    assert "chmod +x ./spx-installer-<version>.run" in readme
+
+
 def test_agents_defines_runtime_only_instance_and_diagnostic_policy() -> None:
     agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
