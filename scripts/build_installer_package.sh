@@ -119,9 +119,19 @@ normalize_text_line_endings "${PACKAGE_DIR}"
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
 
-This archive contains the interactive installer (launch via `spx-setup.*`),
-the manifest library, and all helper scripts required to generate a deployment bundle
-without cloning the full spx-examples repository.
+This archive contains the portable SPX installer payload, the manifest library,
+and all helper scripts required to generate a deployment bundle without cloning
+the full `spx-examples` repository.
+
+Preferred release artifacts remain:
+
+- Windows: `spx-installer-<version>.exe`
+- macOS: `spx-installer-macos-<version>.pkg`
+- Linux/Unix: `spx-installer-<version>.run`
+
+Use this unpacked archive when you intentionally want the portable payload on
+disk, need to redistribute the installer contents directly, or are working in a
+development/debug flow where the native wrappers are not required.
 
 ## Requirements
 
@@ -139,13 +149,14 @@ without cloning the full spx-examples repository.
 ## Usage
 
 1. Extract this archive (e.g. `tar -xzf spx-installer.tgz`).
-2. Run the installer:
+2. Run the portable installer launcher:
    - macOS: `./spx-setup.command`
    - Linux desktop: `./spx-setup.desktop`
    - Windows: `spx-setup.bat`
    - macOS/Linux shells: `./spx-setup.sh`
-3. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
-4. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
+3. If you unpacked a `.zip` and the shell launchers are not executable, run `chmod +x spx-setup.command spx-setup.sh`.
+4. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
+5. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
 
 ## Optional Codex MCP workspace
 

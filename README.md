@@ -199,40 +199,47 @@ Industry packs group models, services, and quickstart profiles around a specific
 
 ## Installer workflow (recommended)
 
-This is the primary way to install and run an SPX environment:
+This is the primary end-user installation path for SPX. Prefer the versioned
+release installers over unpacked archives and repo launchers:
 
-1. Download the installer package (`.tgz` or `.zip`).
-2. Extract it.
-3. Run the platform-specific setup launcher (`spx-setup.*`).
+- **Windows:** `spx-installer-<version>.exe`
+- **macOS:** `spx-installer-macos-<version>.pkg`
+- **Linux/Unix:** `spx-installer-<version>.run`
 
-The wizard will guide you through package selection, generate a local bundle, and optionally start the stack immediately.
-If you press ENTER through the defaults, the wizard uses a protocol-only setup (Modbus + SCPI/ASCII), skips model installation, and keeps the SPX UI enabled.
+Use the unpacked `.tgz` / `.zip` package and `spx-setup.*` only as a fallback
+for internal sharing, portable payload handoff, or development/debug flows
+where you want the installer contents on disk.
 
-### 1. Run the wizard
+### 1. Download the recommended release artifact
 
-Use the platform launchers (recommended and primary):
+Choose the artifact that matches your platform:
 
-- **macOS:** `./spx-setup.command`
-- **Linux desktop:** `./spx-setup.desktop`
-- **Windows:** `spx-setup.bat`
-- **macOS/Linux shells:** `./spx-setup.sh`
+- **Windows:** `spx-installer-<version>.exe`
+- **macOS:** `spx-installer-macos-<version>.pkg`
+- **Linux/Unix:** `spx-installer-<version>.run`
 
-If you extracted from a `.zip` and the launchers are not executable, run `chmod +x spx-setup.command spx-setup.sh` and retry.
+### 2. Run the installer / setup wizard
 
-The setup launchers call the underlying installer engine (`spx-install.sh`, `spx-install.ps1`, or a versioned `spx-installer-*.run` if present). You can run the engine directly if needed:
+- **Windows:** launch `spx-installer-<version>.exe`, finish installation, then
+  open `SPX Setup` from the Start Menu or Windows Apps.
+- **macOS:** open `spx-installer-macos-<version>.pkg`, finish installation,
+  then launch `SPX Setup.app` from `/Applications/SPX Tools/`.
+- **Linux/Unix:** make the self-extractor executable, then run it:
 
-- **Bash:** `./spx-install.sh`
-- **PowerShell (Windows or pwsh on macOS/Linux):** `pwsh ./spx-install.ps1`
+  ```bash
+  chmod +x ./spx-installer-<version>.run
+  ./spx-installer-<version>.run
+  ```
 
-The installer engine:
+The wizard will guide you through package selection, generate a local bundle,
+and optionally start the stack immediately. If you press ENTER through the
+defaults, the wizard uses a protocol-only setup (Modbus + SCPI/ASCII), skips
+model installation, and keeps the SPX UI enabled.
 
-- checks that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
-- launches `python -m installer generate` with the wizard,
-- writes the output to `build/spx-generated` (or another `--output` path you pass through).
+On Linux/Unix, the `.run` artifact extracts to a temporary directory and then
+launches the same terminal-based installer engine used by the portable package.
 
-After the wizard finishes, it will prompt to start the stack now. If you choose yes, it will run the generated start script for you.
-
-### 2. Inspect the generated directory
+### 3. Inspect the generated directory
 
 Inside `build/spx-generated/` you will see:
 
@@ -244,7 +251,7 @@ Inside `build/spx-generated/` you will see:
 
 You can zip or commit this folder and hand it to teammates; they do not need the full repo.
 
-### 3. Start and stop the stack (manual)
+### 4. Start and stop the stack (manual)
 
 From inside the generated folder:
 
@@ -257,7 +264,37 @@ From inside the generated folder:
 
 `spx-start` performs safety checks, installs/updates the BLE adapter if needed, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.
 
-### 4. Build a distributable installer (optional)
+### 5. Portable archive fallback (`.tgz` / `.zip`)
+
+If you intentionally want the unpacked installer payload instead of the
+platform-native release artifact, extract the archive and run the platform
+launcher:
+
+- **macOS:** `./spx-setup.command`
+- **Linux desktop:** `./spx-setup.desktop`
+- **Windows:** `spx-setup.bat`
+- **macOS/Linux shells:** `./spx-setup.sh`
+
+If you extracted from a `.zip` and the launchers are not executable, run
+`chmod +x spx-setup.command spx-setup.sh` and retry.
+
+The setup launchers call the underlying installer engine
+(`spx-install.sh`, `spx-install.ps1`, or the matching packaged
+self-extractor when present). You can run the engine directly if needed:
+
+- **Bash:** `./spx-install.sh`
+- **PowerShell (Windows or pwsh on macOS/Linux):** `pwsh ./spx-install.ps1`
+
+The installer engine:
+
+- checks that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
+- launches `python -m installer generate` with the wizard,
+- writes the output to `build/spx-generated` (or another `--output` path you pass through).
+
+After the wizard finishes, it will prompt to start the stack now. If you choose
+yes, it will run the generated start script for you.
+
+### 6. Build a portable installer package (optional)
 
 To share the installer (wizard + manifests) without the whole repository, run:
 
@@ -272,9 +309,12 @@ This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 - installer engine (`spx-install.sh` / `spx-install.ps1`)
 - `INSTALLER_README.md` with quickstart instructions
 
-Hand the `.tgz` to teammates; they can extract it anywhere and run the platform launcher (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or `spx-setup.bat`) to go through the wizard locally.
+Hand the `.tgz` to teammates when you want the portable fallback distribution;
+they can extract it anywhere and run the platform launcher
+(`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or
+`spx-setup.bat`) to go through the wizard locally.
 
-### 6. Build a trusted macOS installer (Developer ID + notarization)
+### 7. Build a trusted macOS installer (Developer ID + notarization)
 
 For a macOS-native distribution, build a signed `.pkg` that installs
 `SPX Setup.app`, `SPX MCP Setup.app`, `SPX Start.app`, `SPX Stop.app`,
@@ -335,7 +375,7 @@ launchers in the same folder:
   forgets the package receipt, and can optionally remove
   `~/Documents/SPX Codex Workspace`.
 
-### Windows trusted installer foundation (WiX MSI/EXE)
+### 8. Windows trusted installer foundation (WiX MSI/EXE)
 
 The repository now includes an additive Windows packaging scaffold under
 `packaging/windows/` that stages the existing installer payload, publishes a
@@ -353,9 +393,11 @@ See `packaging/windows/README.md` for the current build flow, prerequisites, and
 known gaps. The first iteration keeps macOS behavior untouched and reuses the
 current Python installer logic as the payload source of truth.
 
-### 5. Produce single-file installers (optional)
+### 9. Produce Unix self-extractor (optional)
 
-Convert the package into self-extracting files so users run a single artifact per platform:
+Convert the portable package into self-extracting artifacts. For end-user
+releases, keep preferring `spx-installer-<version>.exe` on Windows and
+`spx-installer-macos-<version>.pkg` on macOS.
 
 ```bash
 scripts/build_self_extractors.sh --version v1.2.3
@@ -363,7 +405,12 @@ scripts/build_self_extractors.sh --version v1.2.3
 
 Outputs:
 
-- `dist/spx-installer-v1.2.3.run` – executable for macOS/Linux that extracts to a temporary directory and launches `spx-install.sh`.
-- `dist/spx-installer-v1.2.3.ps1` – PowerShell script for Windows/pwsh that unpacks to `%TEMP%` and runs `spx-install.ps1`.
+- `dist/spx-installer-v1.2.3.run` – executable for Linux/Unix that extracts to
+  a temporary directory and launches `spx-install.sh`. Run it with
+  `chmod +x ./spx-installer-v1.2.3.run` first.
+- `dist/spx-installer-v1.2.3.ps1` – PowerShell fallback for internal/testing
+  workflows that unpacks to `%TEMP%` and runs `spx-install.ps1`.
 
-Share these files directly; recipients only need Docker + Python and can execute them without manual extraction.
+Share the `.run` directly for Linux/Unix recipients who want a single-file
+artifact without manual extraction. On macOS prefer the notarized `.pkg`, and
+on Windows prefer the signed `spx-installer-<version>.exe`.
