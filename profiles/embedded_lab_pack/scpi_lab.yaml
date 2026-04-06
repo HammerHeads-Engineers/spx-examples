@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: scpi_lab
 description: |
   SCPI-focused lab harness bundling the virtual multimeter, oscilloscope, and

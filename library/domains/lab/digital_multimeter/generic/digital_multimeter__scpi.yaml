@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: digital_multimeter__scpi
 description: |
   Generic SCPI digital multimeter with DC voltage and resistance measurements,

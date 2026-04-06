@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """SPX client helpers for ASCII/SCPI examples."""
 
 from __future__ import annotations

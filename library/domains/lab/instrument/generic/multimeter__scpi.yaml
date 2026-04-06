@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: multimeter__scpi
 description: |
   Virtual SCPI multimeter providing a compact set of measurement and

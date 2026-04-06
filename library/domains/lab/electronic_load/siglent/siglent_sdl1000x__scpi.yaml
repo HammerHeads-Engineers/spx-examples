@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_sdl1000x__scpi
 description: |
   Virtual Siglent SDL1000X series programmable DC electronic load exposing

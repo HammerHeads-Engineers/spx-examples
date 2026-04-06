@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rigol_ds1000z__scpi
 description: |
   Virtual Rigol DS1000Z-series oscilloscope exposing a subset of the SCPI

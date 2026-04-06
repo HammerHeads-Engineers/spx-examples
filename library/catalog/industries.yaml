@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 industries:
   - id: smart_building_pack
     name: Smart-Building Pack (BMS)

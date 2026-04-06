@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # extensions/py_temp_sensor.py
 import math
 import time

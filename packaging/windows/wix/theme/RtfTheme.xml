@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: MIT -->
 <!--
   Custom Burn theme derived from the standard WiX RTF theme layout.
   Purpose: allow SPX-specific logo sizing and title alignment.

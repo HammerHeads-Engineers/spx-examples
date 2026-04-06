@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rohde_schwarz_hmc8015__scpi
 description: |
   Virtual Rohde & Schwarz HMC8015 power analyzer with SCPI measurements for

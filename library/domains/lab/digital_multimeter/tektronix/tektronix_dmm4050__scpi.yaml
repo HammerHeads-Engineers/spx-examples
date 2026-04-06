@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: tektronix_dmm4050__scpi
 description: |
   Virtual Tektronix DMM4050 digital multimeter exposing a focused SCPI command

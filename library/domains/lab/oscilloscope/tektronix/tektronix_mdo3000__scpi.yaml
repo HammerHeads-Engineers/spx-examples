@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: tektronix_mdo3000__scpi
 description: |
   Tektronix MDO3000 Series mixed domain oscilloscope model driven by SCPI

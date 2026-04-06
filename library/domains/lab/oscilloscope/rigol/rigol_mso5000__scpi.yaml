@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rigol_mso5000__scpi
 description: |
   Virtual Rigol MSO5000-series oscilloscope exposing a subset of the SCPI

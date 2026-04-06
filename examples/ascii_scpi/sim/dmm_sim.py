@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Simple SCPI digital multimeter simulator."""
 
 from __future__ import annotations

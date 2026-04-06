@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rohde_schwarz_hmc8012__scpi
 description: |
   Virtual Rohde & Schwarz HMC8012 digital multimeter with a focused SCPI

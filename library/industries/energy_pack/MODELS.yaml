@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 models:
 - id: Energy.CSMS.Ocpp
   path: library/domains/energy/csms/generic/csms__ocpp.yaml

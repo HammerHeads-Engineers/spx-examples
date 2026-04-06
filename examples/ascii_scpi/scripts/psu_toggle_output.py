@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Toggle PSU output on/off via SCPI using the SPX-hosted model."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 services:
   - id: mqtt_broker
     name: MQTT Broker

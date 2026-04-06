@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 models:
 - id: Env.EnvSensor.Mqtt
   name: MQTT Environment Sensor

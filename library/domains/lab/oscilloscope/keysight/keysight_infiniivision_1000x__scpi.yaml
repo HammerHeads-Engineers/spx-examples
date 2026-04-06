@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: keysight_infiniivision_1000x__scpi
 description: |
   Keysight InfiniiVision 1000 X-Series oscilloscope model driven by SCPI

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 
 # Loads default set of integrations. Do not remove.
 default_config:

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Minimal theme to ensure Home Assistant loads the themes folder without errors.
 spx_default:
   primary-color: "#03a9f4"

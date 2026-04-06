@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: bms_quickstart
 description: |
   Minimal smart-building baseline containing environmental telemetry, HVAC control

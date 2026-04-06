@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: iiot_monitoring
 description: |
   Monitoring-oriented profile that feeds MQTT/HTTP telemetry from the building

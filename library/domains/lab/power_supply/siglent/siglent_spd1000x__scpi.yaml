@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_spd1000x__scpi
 description: |
   Siglent SPD1000X series single-channel programmable DC power supply driven by

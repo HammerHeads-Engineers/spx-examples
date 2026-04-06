@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Lightweight validation for model YAML files and catalog references."""
 from __future__ import annotations
 

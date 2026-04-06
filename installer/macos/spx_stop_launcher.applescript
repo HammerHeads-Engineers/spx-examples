@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 property appTitle : "SPX Stop"
 property generatedLauncherRelativePath : "Library/Application Support/SPX/generated/spx-stop.command"
 

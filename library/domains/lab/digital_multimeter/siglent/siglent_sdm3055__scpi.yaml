@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_sdm3055__scpi
 description: |
   Virtual Siglent SDM3055 digital multimeter exposing a compact SCPI command

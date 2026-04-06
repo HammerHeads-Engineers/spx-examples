@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 property appTitle : "SPX Cleanup"
 property generatedDirRelativePath : "Library/Application Support/SPX/generated"
 property runtimeDirRelativePath : "Library/Application Support/SPX/runtime"

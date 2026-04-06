@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: siglent_sds1000x_e__scpi
 description: |
   Virtual Siglent SDS1000X-E series oscilloscope exposing a subset of the

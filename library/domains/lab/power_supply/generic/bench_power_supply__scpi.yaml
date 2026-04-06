@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: bench_power_supply__scpi
 description: |
   Generic bench power supply with a compact SCPI command set for

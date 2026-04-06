@@ -1,3 +1,4 @@
+-- SPDX-License-Identifier: MIT
 property appTitle : "SPX Setup"
 property payloadDirName : "spx-installer"
 property launcherName : "spx-setup.command"

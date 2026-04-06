@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rigol_dp800__scpi
 description: |
   Virtual Rigol DP800-series programmable linear power supply exposing a

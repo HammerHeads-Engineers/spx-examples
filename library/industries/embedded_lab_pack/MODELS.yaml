@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 models:
 - id: Embedded.HealthMonitor.BleGatt
   path: library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml

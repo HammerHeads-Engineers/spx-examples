@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Thin ASCII/SCPI transport used by the example scripts."""
 
 from __future__ import annotations

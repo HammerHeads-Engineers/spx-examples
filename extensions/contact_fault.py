@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Minimal implementation of a custom action that simulates intermittent
 # contact faults on a PT100-like sensor. It randomly injects either a
 # drop-to-zero or a spike to a configured value. Typical usage maps this

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: rohde_schwarz_hmp4040__scpi
 description: |
   Virtual Rohde & Schwarz HMP4040 programmable power supply with a focused
