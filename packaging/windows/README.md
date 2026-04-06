@@ -67,7 +67,7 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
 ```
 
 Artifacts are written under `build/windows/artifacts/`. The user-facing bundle file is emitted as `spx-installer-<version>.exe`, while its display name in the installer UI and Windows Apps is `SPX Tools`. The installed environment wizard remains `SPX Setup`, so its name is no longer overloaded with the bootstrap bundle.
-The Burn license dialog is sourced from `packaging/windows/LICENSE.rtf` and is intentionally installer-specific; it does not change the repository-wide `MIT` license files.
+The Burn license dialog is sourced from `packaging/windows/LICENSE.rtf` and is intentionally installer-specific; it does not change the repository-wide `MIT` license files. Third-party distribution notes for installer-bundled dependencies are shipped in `THIRD_PARTY_NOTICE.txt`.
 
 If you are upgrading from an older preview that installed into `Program Files\SPX`, uninstall that preview first before testing the per-user layout. The current bundle now blocks installation when it detects that legacy machine-wide preview, because Windows otherwise merges the old all-users Start Menu folder with the new per-user one and shows duplicate `SPX` shortcuts.
 

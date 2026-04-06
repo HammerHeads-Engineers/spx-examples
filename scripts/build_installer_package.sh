@@ -59,6 +59,7 @@ copy_entries=(
   "docs"
   "AGENTS.md"
   "LICENSE"
+  "THIRD_PARTY_NOTICE.txt"
   "spx-setup.command"
   "spx-setup.desktop"
   "spx-setup.sh"
@@ -132,6 +133,7 @@ without cloning the full spx-examples repository.
 ## Licensing
 
 - Open-source license notices bundled with this package apply to the corresponding components, including the included `LICENSE` file.
+- Third-party distribution notes for installer-bundled dependencies are included in `THIRD_PARTY_NOTICE.txt`.
 - Proprietary SPX features, branding, hosted services, and subscription-gated functionality may require separate commercial terms or authorization.
 
 ## Usage
