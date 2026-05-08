@@ -91,6 +91,9 @@ attributes:
   k__ventilation_mode:
     type: int
     default: 3
+  operation_mode:
+    type: int
+    default: 3
   _ventilation_mode_prev:
     type: int
     default: 3
@@ -200,6 +203,15 @@ actions:
     call: (
           $in(k__air_temp_setpoint_away_c) if $in(k__ventilation_mode) == 2
           else $in(k__air_temp_setpoint_home_c)
+        )
+
+  - function: $in(operation_mode)
+    name: derive_operation_mode
+    description: Report the Flexit operation mode expected by Home Assistant flexit_bacnet.
+    call: (
+          6 if $in(fireplace_active) == 1
+          else 5 if $in(cooker_hood_active) == 1
+          else max(1, min(4, int($in(k__ventilation_mode))))
         )
 
   - function: $in(heat_loss_kw)
@@ -498,6 +510,30 @@ communication:
               read: "#attr(comfort_button_delay_min)"
               write: "#attr(comfort_button_delay_min)"
             units: "minutes"
+
+        operation_mode:
+          type: multiStateValue
+          instance: 361
+          properties:
+            presentValue:
+              read: "#attr(operation_mode)"
+              states:
+                1: "off"
+                2: "away"
+                3: "home"
+                4: "high"
+                5: "cooker_hood"
+                6: "fireplace"
+                7: "temporary_high"
+            numberOfStates: 7
+            stateText:
+              - "off"
+              - "away"
+              - "home"
+              - "high"
+              - "cooker_hood"
+              - "fireplace"
+              - "temporary_high"
 
         fireplace_ventilation:
           type: multiStateValue

@@ -11,6 +11,15 @@ automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
+lovelace:
+  dashboards:
+    smart-building-pack:
+      mode: yaml
+      title: Smart Building
+      icon: mdi:office-building-cog
+      show_in_sidebar: true
+      filename: dashboards/smart_building.yaml
+
 # SPX demo integrations -------------------------------------------------------
 # NOTE: This file is bundled into installer builds via `library/assets/homeassistant/config`.
 modbus:

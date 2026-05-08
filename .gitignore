@@ -209,7 +209,17 @@ __marimo__/
 # Runtime state from bundled services (keep only template configs)
 library/assets/homeassistant/config/home-assistant*.db*
 library/assets/homeassistant/config/home-assistant*.log*
-library/assets/homeassistant/config/.storage/
+library/assets/homeassistant/config/.storage/*
+!library/assets/homeassistant/config/.storage/
+!library/assets/homeassistant/config/.storage/auth
+!library/assets/homeassistant/config/.storage/auth_provider.homeassistant
+!library/assets/homeassistant/config/.storage/core.area_registry
+!library/assets/homeassistant/config/.storage/core.config
+!library/assets/homeassistant/config/.storage/core.config_entries
+!library/assets/homeassistant/config/.storage/core.device_registry
+!library/assets/homeassistant/config/.storage/core.entity_registry
+!library/assets/homeassistant/config/.storage/onboarding
+!library/assets/homeassistant/config/.storage/person
 library/assets/homeassistant/config/deps/
 library/assets/homeassistant/config/tts/
 library/assets/homeassistant/config/secrets.yaml

@@ -1,0 +1,224 @@
+# SPDX-License-Identifier: MIT
+title: Smart Building Pack
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:office-building-cog
+    cards:
+      - type: thermostat
+        entity: climate.hvac_flexit_nordic
+        name: Flexit Nordic
+
+      - type: entities
+        title: Flexit Air Temperatures
+        show_header_toggle: false
+        entities:
+          - entity: sensor.hvac_flexit_nordic_room_temperature
+            name: Room
+          - entity: sensor.hvac_flexit_nordic_supply_air_temperature
+            name: Supply air
+          - entity: sensor.hvac_flexit_nordic_extract_air_temperature
+            name: Extract air
+          - entity: sensor.hvac_flexit_nordic_exhaust_air_temperature
+            name: Exhaust air
+          - entity: sensor.hvac_flexit_nordic_outside_air_temperature
+            name: Outside air
+
+      - type: entities
+        title: Flexit Control
+        show_header_toggle: false
+        entities:
+          - entity: switch.hvac_flexit_nordic_electric_heater
+            name: Electric heater
+          - entity: switch.hvac_flexit_nordic_cooker_hood_mode
+            name: Cooker hood mode
+          - entity: number.hvac_flexit_nordic_home_supply_fan_setpoint
+            name: Home supply fan
+          - entity: number.hvac_flexit_nordic_home_extract_fan_setpoint
+            name: Home extract fan
+          - entity: number.hvac_flexit_nordic_high_supply_fan_setpoint
+            name: High supply fan
+          - entity: number.hvac_flexit_nordic_high_extract_fan_setpoint
+            name: High extract fan
+
+      - type: grid
+        title: Vaisala Weather
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+            name: Outdoor temp
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_humidity
+            name: Humidity
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_pressure
+            name: Pressure
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_brightness
+            name: Brightness
+            graph: line
+
+      - type: entities
+        title: Vaisala Wind And Rain
+        show_header_toggle: false
+        entities:
+          - entity: sensor.vaisala_wxt530_weather_transmitter_wind_speed
+            name: Wind speed
+          - entity: sensor.vaisala_wxt530_weather_transmitter_wind_gust
+            name: Wind gust
+          - entity: sensor.vaisala_wxt530_weather_transmitter_wind_direction
+            name: Wind direction
+          - entity: sensor.vaisala_wxt530_weather_transmitter_rain_rate
+            name: Rain rate
+          - entity: binary_sensor.vaisala_wxt530_weather_transmitter_rain
+            name: Rain
+
+      - type: history-graph
+        title: Comfort Trend
+        hours_to_show: 6
+        entities:
+          - entity: sensor.hvac_flexit_nordic_room_temperature
+            name: Room
+          - entity: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+            name: Outdoor
+          - entity: sensor.hvac_flexit_nordic_supply_air_temperature
+            name: Supply
+
+      - type: entities
+        title: KNX Quick Controls
+        show_header_toggle: false
+        entities:
+          - entity: switch.abb_sa_s_ch01
+            name: Light channel 1
+          - entity: switch.abb_sa_s_ch02
+            name: Light channel 2
+          - entity: switch.abb_sa_s_ch03
+            name: Light channel 3
+          - entity: switch.abb_sa_s_ch04
+            name: Light channel 4
+          - entity: cover.blind_1
+            name: Blind 1
+          - entity: cover.blind_2
+            name: Blind 2
+
+  - title: Flexit
+    path: flexit
+    icon: mdi:hvac
+    cards:
+      - type: thermostat
+        entity: climate.hvac_flexit_nordic
+        name: Flexit Nordic
+
+      - type: entities
+        title: Fan Setpoints
+        show_header_toggle: false
+        entities:
+          - number.hvac_flexit_nordic_home_supply_fan_setpoint
+          - number.hvac_flexit_nordic_home_extract_fan_setpoint
+          - number.hvac_flexit_nordic_away_supply_fan_setpoint
+          - number.hvac_flexit_nordic_away_extract_fan_setpoint
+          - number.hvac_flexit_nordic_high_supply_fan_setpoint
+          - number.hvac_flexit_nordic_high_extract_fan_setpoint
+          - number.hvac_flexit_nordic_fireplace_supply_fan_setpoint
+          - number.hvac_flexit_nordic_fireplace_extract_fan_setpoint
+
+      - type: entities
+        title: Diagnostics
+        show_header_toggle: false
+        entities:
+          - binary_sensor.hvac_flexit_nordic_air_filter_polluted
+          - sensor.hvac_flexit_nordic_air_filter_operating_time
+          - sensor.hvac_flexit_nordic_electric_heater_power
+          - sensor.hvac_flexit_nordic_heat_exchanger_efficiency
+          - sensor.hvac_flexit_nordic_heat_exchanger_speed
+          - sensor.hvac_flexit_nordic_supply_air_fan
+          - sensor.hvac_flexit_nordic_exhaust_air_fan
+
+  - title: Weather
+    path: weather
+    icon: mdi:weather-partly-cloudy
+    cards:
+      - type: entities
+        title: Vaisala WXT530
+        show_header_toggle: false
+        entities:
+          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+          - sensor.vaisala_wxt530_weather_transmitter_humidity
+          - sensor.vaisala_wxt530_weather_transmitter_pressure
+          - sensor.vaisala_wxt530_weather_transmitter_brightness
+          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+          - sensor.vaisala_wxt530_weather_transmitter_wind_gust
+          - sensor.vaisala_wxt530_weather_transmitter_wind_direction
+          - sensor.vaisala_wxt530_weather_transmitter_rain_rate
+          - binary_sensor.vaisala_wxt530_weather_transmitter_rain
+
+      - type: history-graph
+        title: Weather Trend
+        hours_to_show: 12
+        entities:
+          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+          - sensor.vaisala_wxt530_weather_transmitter_humidity
+          - sensor.vaisala_wxt530_weather_transmitter_pressure
+          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+
+  - title: KNX
+    path: knx
+    icon: mdi:knx
+    cards:
+      - type: entities
+        title: ABB SA/S12.16.5.1 Lighting Actuator
+        show_header_toggle: false
+        entities:
+          - entity: switch.abb_sa_s_ch01
+            name: Channel 1
+          - entity: switch.abb_sa_s_ch02
+            name: Channel 2
+          - entity: switch.abb_sa_s_ch03
+            name: Channel 3
+          - entity: switch.abb_sa_s_ch04
+            name: Channel 4
+          - entity: switch.abb_sa_s_ch05
+            name: Channel 5
+          - entity: switch.abb_sa_s_ch06
+            name: Channel 6
+          - entity: switch.abb_sa_s_ch07
+            name: Channel 7
+          - entity: switch.abb_sa_s_ch08
+            name: Channel 8
+          - entity: switch.abb_sa_s_ch09
+            name: Channel 9
+          - entity: switch.abb_sa_s_ch10
+            name: Channel 10
+          - entity: switch.abb_sa_s_ch11
+            name: Channel 11
+          - entity: switch.abb_sa_s_ch12
+            name: Channel 12
+
+      - type: entities
+        title: ABB JRA/S4.230.5.1 Blind Actuator
+        show_header_toggle: false
+        entities:
+          - entity: cover.blind_1
+            name: Blind 1
+          - entity: cover.blind_2
+            name: Blind 2
+          - entity: cover.blind_3
+            name: Blind 3
+          - entity: cover.blind_4
+            name: Blind 4
+
+      - type: entities
+        title: KNX Interface
+        show_header_toggle: false
+        entities:
+          - sensor.knx_interface_connection_established
+          - sensor.knx_interface_connection_type
+          - sensor.knx_interface_incoming_telegrams
+          - sensor.knx_interface_outgoing_telegrams
+          - sensor.knx_interface_incoming_telegram_errors
+          - sensor.knx_interface_outgoing_telegram_errors
