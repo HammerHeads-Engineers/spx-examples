@@ -116,6 +116,16 @@ PY
 
 normalize_text_line_endings "${PACKAGE_DIR}"
 
+normalize_payload_permissions() {
+  local package_dir="$1"
+
+  find "${package_dir}" -type d -exec chmod 755 {} +
+  find "${package_dir}" -type f -exec chmod 644 {} +
+  find "${package_dir}" -type f \( -name "*.sh" -o -name "*.command" -o -name "*.desktop" \) -exec chmod 755 {} +
+}
+
+normalize_payload_permissions "${PACKAGE_DIR}"
+
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
 
