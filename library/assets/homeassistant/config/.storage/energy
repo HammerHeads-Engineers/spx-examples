@@ -15,6 +15,15 @@
         "entity_energy_price_export": null,
         "number_energy_price_export": null,
         "cost_adjustment_day": 0.0
+      },
+      {
+        "type": "solar",
+        "stat_energy_from": "sensor.spx_victron_cerbo_pv_energy_total"
+      },
+      {
+        "type": "battery",
+        "stat_energy_from": "sensor.spx_victron_cerbo_battery_discharge_energy",
+        "stat_energy_to": "sensor.spx_victron_cerbo_battery_charge_energy"
       }
     ],
     "device_consumption": [],

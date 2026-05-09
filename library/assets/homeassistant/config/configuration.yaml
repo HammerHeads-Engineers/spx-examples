@@ -176,6 +176,167 @@ modbus:
         device_class: energy
         state_class: total_increasing
 
+  - name: spx_victron_cerbo
+    type: tcp
+    host: spx-server
+    port: 5035
+    timeout: 5
+
+    sensors:
+      # ===== HOLDING REGISTERS (Cerbo GX / ESS): 840..895 =====
+      - name: "SPX Victron Cerbo Battery SOC"
+        slave: 1
+        address: 840
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Battery Power"
+        slave: 1
+        address: 842
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Battery Voltage"
+        slave: 1
+        address: 844
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "V"
+        device_class: voltage
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Battery Current"
+        slave: 1
+        address: 846
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "A"
+        device_class: current
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo PV Power"
+        slave: 1
+        address: 850
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Grid Power"
+        slave: 1
+        address: 852
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Load Power"
+        slave: 1
+        address: 854
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Inverter AC Power"
+        slave: 1
+        address: 856
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+
+      - name: "SPX Victron Cerbo Grid Import Energy"
+        slave: 1
+        address: 858
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX Victron Cerbo Grid Export Energy"
+        slave: 1
+        address: 860
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX Victron Cerbo PV Energy Total"
+        slave: 1
+        address: 862
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX Victron Cerbo Battery Charge Energy"
+        slave: 1
+        address: 864
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX Victron Cerbo Battery Discharge Energy"
+        slave: 1
+        address: 866
+        input_type: holding
+        data_type: float32
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      - name: "SPX Victron Cerbo ESS Mode"
+        slave: 1
+        address: 870
+        input_type: holding
+        data_type: uint16
+
+      - name: "SPX Victron Cerbo Inverter State"
+        slave: 1
+        address: 871
+        input_type: holding
+        data_type: uint16
+
+      - name: "SPX Victron Cerbo Charger State"
+        slave: 1
+        address: 872
+        input_type: holding
+        data_type: uint16
+
+      - name: "SPX Victron Cerbo Grid Lost"
+        slave: 1
+        address: 873
+        input_type: holding
+        data_type: uint16
+
+      - name: "SPX Victron Cerbo Low Battery Alarm"
+        slave: 1
+        address: 874
+        input_type: holding
+        data_type: uint16
+
+      - name: "SPX Victron Cerbo Overload Alarm"
+        slave: 1
+        address: 875
+        input_type: holding
+        data_type: uint16
+
 knx:
   cover:
     - name: "Blind 1"

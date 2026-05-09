@@ -1178,6 +1178,21 @@ models:
   - smart_building_pack
   profiles:
   - bms_quickstart
+- id: Energy.ESS.VictronCerboGx.Modbus
+  name: Victron Cerbo GX ESS (Modbus)
+  path: library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml
+  domain: energy
+  domain_group: energy
+  device_class: ess
+  vendor: victron
+  protocols:
+  - modbus
+  services:
+  - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
 - id: Energy.RackPdu.ApcNetShelter2g.Modbus
   name: APC NetShelter Rack PDU RPDU2g (Modbus)
   path: library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml

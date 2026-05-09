@@ -65,6 +65,11 @@ models:
   domain_group: building
   device_class: thermostat
   vendor: generic
+- id: Energy.ESS.VictronCerboGx.Modbus
+  path: library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml
+  domain_group: energy
+  device_class: ess
+  vendor: victron
 - id: Energy.EnergyMeterAbbD13_15.Modbus
   path: library/domains/energy/meter/abb/abb_d13_15__modbus.yaml
   domain_group: energy

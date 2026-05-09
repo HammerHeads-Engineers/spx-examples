@@ -78,6 +78,86 @@ views:
           - entity: binary_sensor.vaisala_wxt530_weather_transmitter_rain
             name: Rain
 
+      - type: grid
+        title: iEM3000 Live Load
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.spx_iem3000_active_power_total
+            name: Active power
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_apparent_power_total
+            name: Apparent power
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_current_avg
+            name: Average current
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_voltage_ln_avg
+            name: Average L-N voltage
+            graph: line
+
+      - type: entities
+        title: iEM3000 Energy Totals
+        show_header_toggle: false
+        entities:
+          - entity: sensor.spx_iem3000_energy_import_total
+            name: Imported energy
+          - entity: sensor.spx_iem3000_energy_export_total
+            name: Exported energy
+          - entity: sensor.spx_iem3000_reactive_power_total
+            name: Reactive power
+          - entity: sensor.spx_iem3000_power_factor
+            name: Power factor
+          - entity: sensor.spx_iem3000_frequency
+            name: Frequency
+
+      - type: grid
+        title: Victron Cerbo GX ESS
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_pv_power
+            name: PV production
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_load_power
+            name: Home load
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_battery_power
+            name: Battery power
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_grid_power
+            name: Grid power
+            graph: line
+
+      - type: entities
+        title: Victron Battery And Energy
+        show_header_toggle: false
+        entities:
+          - entity: sensor.spx_victron_cerbo_battery_soc
+            name: Battery SOC
+          - entity: sensor.spx_victron_cerbo_battery_voltage
+            name: Battery voltage
+          - entity: sensor.spx_victron_cerbo_battery_current
+            name: Battery current
+          - entity: sensor.spx_victron_cerbo_pv_energy_total
+            name: PV energy
+          - entity: sensor.spx_victron_cerbo_battery_charge_energy
+            name: Battery charge energy
+          - entity: sensor.spx_victron_cerbo_battery_discharge_energy
+            name: Battery discharge energy
+          - entity: sensor.spx_victron_cerbo_ess_mode
+            name: ESS mode
+          - entity: sensor.spx_victron_cerbo_grid_lost
+            name: Grid lost
+
       - type: history-graph
         title: Comfort Trend
         hours_to_show: 6
