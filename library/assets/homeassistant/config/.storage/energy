@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "minor_version": 3,
+  "key": "energy",
+  "data": {
+    "energy_sources": [
+      {
+        "type": "grid",
+        "stat_energy_from": "sensor.spx_iem3000_energy_import_total",
+        "stat_energy_to": "sensor.spx_iem3000_energy_export_total",
+        "stat_cost": null,
+        "stat_compensation": null,
+        "entity_energy_price": null,
+        "number_energy_price": null,
+        "entity_energy_price_export": null,
+        "number_energy_price_export": null,
+        "cost_adjustment_day": 0.0
+      }
+    ],
+    "device_consumption": [],
+    "device_consumption_water": []
+  }
+}

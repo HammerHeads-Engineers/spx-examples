@@ -218,6 +218,7 @@ library/assets/homeassistant/config/.storage/*
 !library/assets/homeassistant/config/.storage/core.config_entries
 !library/assets/homeassistant/config/.storage/core.device_registry
 !library/assets/homeassistant/config/.storage/core.entity_registry
+!library/assets/homeassistant/config/.storage/energy
 !library/assets/homeassistant/config/.storage/onboarding
 !library/assets/homeassistant/config/.storage/person
 library/assets/homeassistant/config/deps/
