@@ -3,6 +3,12 @@
 # Loads default set of integrations. Do not remove.
 default_config:
 
+# Keep recorder writes off the installer asset bind mount. The config directory
+# is a seeded demo asset; SQLite WAL/SHM writes are more reliable on the
+# container filesystem, especially on Docker Desktop bind mounts.
+recorder:
+  db_url: sqlite:////tmp/home-assistant_v2.db
+
 # Load frontend themes from the themes folder
 frontend:
   themes: !include_dir_merge_named themes
