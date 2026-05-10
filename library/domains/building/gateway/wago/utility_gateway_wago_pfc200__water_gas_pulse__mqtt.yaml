@@ -1,0 +1,370 @@
+# SPDX-License-Identifier: MIT
+
+name: utility_gateway_wago_pfc200__water_gas_pulse__mqtt
+description: |
+  WAGO PFC200 utility gateway demo for Smart Building Pack. The model represents
+  pulse inputs from a water meter and gas meter, converts them into cumulative
+  consumption counters, and publishes Home Assistant MQTT Discovery sensors.
+
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: mosquitto-server
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_client_id:
+    type: str
+    default: spx_utility_gateway_1
+  mqtt_discovery_client_id:
+    type: str
+    default: spx_utility_gateway_1_discovery
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+
+attributes:
+  k__water_flow_l_min:
+    type: float
+    default: 4.2
+    unit: L/min
+  k__gas_flow_m3_h:
+    type: float
+    default: 0.35
+    unit: m3/h
+  k__water_pulse_weight_l:
+    type: float
+    default: 1.0
+    unit: L/pulse
+  k__gas_pulse_weight_m3:
+    type: float
+    default: 0.01
+    unit: m3/pulse
+  k__gas_calorific_value_kwh_m3:
+    type: float
+    default: 10.8
+    unit: kWh/m3
+  water_total_m3:
+    type: float
+    default: 24.0
+    unit: m3
+  water_flow_l_min:
+    type: float
+    default: 4.2
+    unit: L/min
+  water_pulse_count:
+    type: int
+    default: 24000
+  gas_total_m3:
+    type: float
+    default: 180.0
+    unit: m3
+  gas_flow_m3_h:
+    type: float
+    default: 0.35
+    unit: m3/h
+  gas_pulse_count:
+    type: int
+    default: 18000
+  gas_energy_total_kwh:
+    type: float
+    default: 1944.0
+    unit: kWh
+  availability:
+    type: str
+    default: online
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
+  _ha_discovery_water_total_config:
+    type: str
+    default: |-
+      {
+        "name": "Water Total",
+        "unique_id": "spx_utility_water_total",
+        "state_topic": "spx/utility/water_total_m3",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "m\u00b3",
+        "device_class": "water",
+        "state_class": "total_increasing",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_water_flow_config:
+    type: str
+    default: |-
+      {
+        "name": "Water Flow",
+        "unique_id": "spx_utility_water_flow",
+        "state_topic": "spx/utility/water_flow_l_min",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "L/min",
+        "state_class": "measurement",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_gas_total_config:
+    type: str
+    default: |-
+      {
+        "name": "Gas Total",
+        "unique_id": "spx_utility_gas_total",
+        "state_topic": "spx/utility/gas_total_m3",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "m\u00b3",
+        "device_class": "gas",
+        "state_class": "total_increasing",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_gas_flow_config:
+    type: str
+    default: |-
+      {
+        "name": "Gas Flow",
+        "unique_id": "spx_utility_gas_flow",
+        "state_topic": "spx/utility/gas_flow_m3_h",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "m\u00b3/h",
+        "state_class": "measurement",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_gas_energy_config:
+    type: str
+    default: |-
+      {
+        "name": "Gas Energy Total",
+        "unique_id": "spx_utility_gas_energy_total",
+        "state_topic": "spx/utility/gas_energy_total_kwh",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "kWh",
+        "device_class": "energy",
+        "state_class": "total_increasing",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_availability_config:
+    type: str
+    default: |-
+      {
+        "name": "Utility Gateway Availability",
+        "unique_id": "spx_utility_gateway_availability",
+        "state_topic": "spx/utility/availability",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "entity_category": "diagnostic",
+        "enabled_by_default": false,
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+
+timer:
+  time_step: 1.0
+
+actions:
+  - function: $in(water_flow_l_min)
+    name: clamp_water_flow
+    description: Expose sanitized water flow read from the PFC200 pulse input logic.
+    call: max(0.0, $in(k__water_flow_l_min))
+
+  - function: $in(gas_flow_m3_h)
+    name: clamp_gas_flow
+    description: Expose sanitized gas flow read from the PFC200 pulse input logic.
+    call: max(0.0, $in(k__gas_flow_m3_h))
+
+  - function: $in(water_total_m3)
+    name: integrate_water_total
+    description: Integrate cumulative water consumption from current flow.
+    call: $in(water_total_m3) + $in(water_flow_l_min) * $in(cycle_time_s) / 60000.0
+
+  - function: $in(gas_total_m3)
+    name: integrate_gas_total
+    description: Integrate cumulative gas consumption from current flow.
+    call: $in(gas_total_m3) + $in(gas_flow_m3_h) * $in(cycle_time_s) / 3600.0
+
+  - function: $in(water_pulse_count)
+    name: compute_water_pulse_count
+    description: Convert water total to pulse count using configured pulse weight.
+    call: int(round($in(water_total_m3) * 1000.0 / max(0.001, $in(k__water_pulse_weight_l))))
+
+  - function: $in(gas_pulse_count)
+    name: compute_gas_pulse_count
+    description: Convert gas total to pulse count using configured pulse weight.
+    call: int(round($in(gas_total_m3) / max(0.000001, $in(k__gas_pulse_weight_m3))))
+
+  - function: $in(gas_energy_total_kwh)
+    name: compute_gas_energy_total
+    description: Convert metered gas volume into approximate energy equivalent.
+    call: $in(gas_total_m3) * max(0.0, $in(k__gas_calorific_value_kwh_m3))
+
+communication:
+  - mqtt:
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      client_id: "$param(mqtt_client_id)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: spx/utility
+      default_qos: 1
+      default_retain: false
+      birth_topic: availability
+      birth_payload: online
+      birth_retain: true
+      will_topic: availability
+      will_payload: offline
+      will_retain: true
+      bindings:
+        - name: water_total_m3
+          attribute: $ext(water_total_m3)
+          topic: water_total_m3
+          direction: publish
+          publish_on_change: false
+        - name: water_flow_l_min
+          attribute: $ext(water_flow_l_min)
+          topic: water_flow_l_min
+          direction: publish
+          publish_on_change: false
+        - name: water_pulse_count
+          attribute: $ext(water_pulse_count)
+          topic: water_pulse_count
+          direction: publish
+          publish_on_change: false
+        - name: gas_total_m3
+          attribute: $ext(gas_total_m3)
+          topic: gas_total_m3
+          direction: publish
+          publish_on_change: false
+        - name: gas_flow_m3_h
+          attribute: $ext(gas_flow_m3_h)
+          topic: gas_flow_m3_h
+          direction: publish
+          publish_on_change: false
+        - name: gas_pulse_count
+          attribute: $ext(gas_pulse_count)
+          topic: gas_pulse_count
+          direction: publish
+          publish_on_change: false
+        - name: gas_energy_total_kwh
+          attribute: $ext(gas_energy_total_kwh)
+          topic: gas_energy_total_kwh
+          direction: publish
+          publish_on_change: false
+        - name: availability
+          attribute: $ext(availability)
+          topic: availability
+          direction: publish
+          retain: true
+          publish_on_change: false
+
+  - mqtt:
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      client_id: "$param(mqtt_discovery_client_id)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: homeassistant
+      default_qos: 1
+      default_retain: true
+      bindings:
+        - name: _ha_discovery_water_total_config
+          attribute: $ext(_ha_discovery_water_total_config)
+          topic: sensor/spx_utility_water_total/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - name: _ha_discovery_water_flow_config
+          attribute: $ext(_ha_discovery_water_flow_config)
+          topic: sensor/spx_utility_water_flow/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - name: _ha_discovery_gas_total_config
+          attribute: $ext(_ha_discovery_gas_total_config)
+          topic: sensor/spx_utility_gas_total/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - name: _ha_discovery_gas_flow_config
+          attribute: $ext(_ha_discovery_gas_flow_config)
+          topic: sensor/spx_utility_gas_flow/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - name: _ha_discovery_gas_energy_config
+          attribute: $ext(_ha_discovery_gas_energy_config)
+          topic: sensor/spx_utility_gas_energy_total/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+        - name: _ha_discovery_availability_config
+          attribute: $ext(_ha_discovery_availability_config)
+          topic: sensor/spx_utility_gateway_availability/config
+          direction: publish
+          retain: true
+          publish_on_change: true
+
+scenarios:
+  normal_household_usage:
+    display_name: Normal Household Usage
+    description: Moderate water flow and small gas consumption.
+    duration: 30.0
+    overrides:
+      $in(k__water_flow_l_min): 4.2
+      $in(k__gas_flow_m3_h): 0.35
+
+  morning_peak:
+    display_name: Morning Peak
+    description: Shower/kitchen water usage and heating or hot-water gas demand.
+    duration: 30.0
+    overrides:
+      $in(k__water_flow_l_min): 14.0
+      $in(k__gas_flow_m3_h): 1.8
+
+  away_mode:
+    display_name: Away Mode
+    description: No intentional utility consumption.
+    duration: 30.0
+    overrides:
+      $in(k__water_flow_l_min): 0.0
+      $in(k__gas_flow_m3_h): 0.0

@@ -1,0 +1,180 @@
+# SPDX-License-Identifier: MIT
+
+name: pv_physics_lux
+description: |
+  Minimal photovoltaic physics model for Smart Building Pack system demos. It
+  converts outdoor illuminance from a weather station into approximate solar
+  irradiance, applies panel temperature and availability derating, and exposes
+  the resulting PV available power for an ESS such as a Victron Cerbo GX model.
+
+attributes:
+  k__illuminance_lux:
+    type: float
+    default: 48000.0
+    unit: lux
+  k__outdoor_temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+  k__pv_capacity_kwp:
+    type: float
+    default: 7.2
+    unit: kWp
+  k__performance_ratio:
+    type: float
+    default: 0.82
+  k__luminous_efficacy_lm_per_w:
+    type: float
+    default: 120.0
+    unit: lm/W
+  k__max_irradiance_w_m2:
+    type: float
+    default: 1000.0
+    unit: W/m2
+  k__nominal_operating_cell_temperature_c:
+    type: float
+    default: 45.0
+    unit: degC
+  k__temperature_coefficient_pct_per_c:
+    type: float
+    default: -0.35
+    unit: "%/degC"
+  k__soiling_loss_pct:
+    type: float
+    default: 3.0
+    unit: "%"
+  k__availability_pct:
+    type: float
+    default: 100.0
+    unit: "%"
+  k__shading_loss_pct:
+    type: float
+    default: 0.0
+    unit: "%"
+
+  irradiance_w_m2:
+    type: float
+    default: 400.0
+    unit: W/m2
+  cell_temperature_c:
+    type: float
+    default: 32.5
+    unit: degC
+  temperature_derate_pct:
+    type: float
+    default: 97.4
+    unit: "%"
+  effective_performance_ratio:
+    type: float
+    default: 0.77
+  pv_available_power_w:
+    type: float
+    default: 2200.0
+    unit: W
+  pv_energy_estimate_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
+
+actions:
+  - function: $in(irradiance_w_m2)
+    name: estimate_irradiance
+    description: Convert broad-band outdoor illuminance into approximate solar irradiance.
+    call: max(
+          0.0,
+          min(
+            $in(k__max_irradiance_w_m2),
+            $in(k__illuminance_lux) / max(1.0, $in(k__luminous_efficacy_lm_per_w))
+          )
+        )
+
+  - function: $in(cell_temperature_c)
+    name: estimate_cell_temperature
+    description: Estimate PV cell temperature from ambient temperature and irradiance.
+    call: $in(k__outdoor_temperature_c) + (
+          ($in(k__nominal_operating_cell_temperature_c) - 20.0)
+          / 800.0
+        ) * $in(irradiance_w_m2)
+
+  - function: $in(temperature_derate_pct)
+    name: compute_temperature_derate
+    description: Apply a simple module temperature coefficient around STC 25 degC.
+    call: max(
+          0.0,
+          min(
+            115.0,
+            100.0 + $in(k__temperature_coefficient_pct_per_c)
+              * ($in(cell_temperature_c) - 25.0)
+          )
+        )
+
+  - function: $in(effective_performance_ratio)
+    name: compute_effective_performance_ratio
+    description: Combine inverter, soiling, shading, availability, and temperature losses.
+    call: max(
+          0.0,
+          min(
+            1.15,
+            $in(k__performance_ratio)
+            * max(0.0, min(100.0, $in(temperature_derate_pct))) / 100.0
+            * max(0.0, min(100.0, 100.0 - $in(k__soiling_loss_pct))) / 100.0
+            * max(0.0, min(100.0, 100.0 - $in(k__shading_loss_pct))) / 100.0
+            * max(0.0, min(100.0, $in(k__availability_pct))) / 100.0
+          )
+        )
+
+  - function: $in(pv_available_power_w)
+    name: compute_pv_available_power
+    description: Estimate AC-side PV power available to the ESS.
+    call: max(
+          0.0,
+          min(
+            $in(k__pv_capacity_kwp) * 1000.0,
+            $in(k__pv_capacity_kwp) * 1000.0
+            * $in(irradiance_w_m2) / max(1.0, $in(k__max_irradiance_w_m2))
+            * $in(effective_performance_ratio)
+          )
+        )
+
+  - function: $in(pv_energy_estimate_kwh)
+    name: integrate_pv_energy_estimate
+    description: Integrate estimated PV energy from the calculated available power.
+    call: $in(pv_energy_estimate_kwh) + max(0.0, $in(pv_available_power_w)) * $in(cycle_time_s) / 3600000.0
+
+scenarios:
+  clear_midday:
+    display_name: Clear Midday
+    description: High outdoor brightness at moderate ambient temperature.
+    duration: 30.0
+    overrides:
+      $in(k__illuminance_lux): 105000.0
+      $in(k__outdoor_temperature_c): 22.0
+      $in(k__shading_loss_pct): 0.0
+
+  cloudy_day:
+    display_name: Cloudy Day
+    description: Reduced illuminance limits PV production.
+    duration: 30.0
+    overrides:
+      $in(k__illuminance_lux): 18000.0
+      $in(k__outdoor_temperature_c): 16.0
+
+  hot_day_derate:
+    display_name: Hot Day Derate
+    description: Strong sun with high ambient temperature reduces module efficiency.
+    duration: 30.0
+    overrides:
+      $in(k__illuminance_lux): 95000.0
+      $in(k__outdoor_temperature_c): 36.0
+
+  evening_low_sun:
+    display_name: Evening Low Sun
+    description: Low illuminance near sunset reduces PV output.
+    duration: 20.0
+    overrides:
+      $in(k__illuminance_lux): 3500.0
+      $in(k__outdoor_temperature_c): 18.0

@@ -222,6 +222,7 @@ services:
       container_name: homeassistant
       environment:
         TZ: Europe/Warsaw
+        SPX_AUTH_HEADER: "Bearer ${SPX_PRODUCT_KEY}"
       volumes:
         - ./library/assets/homeassistant/config:/config
         - /etc/localtime:/etc/localtime:ro

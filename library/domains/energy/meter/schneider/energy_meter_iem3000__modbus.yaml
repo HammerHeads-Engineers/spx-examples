@@ -5,7 +5,7 @@ description: |
   Minimal Modbus TCP (slave) simulation of Schneider Electric Acti9 iEM3000 series
   energy meters (e.g. iEM3255/iEM3355). The exposed registers follow the iEM3000
   addressing commonly used in BMS/HA demos:
-    - 3000..3110: instantaneous measurements (Float32, input registers)
+    - 3000..3110: instantaneous measurements (Float32, holding registers)
     - 45100..45102: total active energy import/export (Float32, holding registers)
 
 meta_parameters:
@@ -88,6 +88,14 @@ attributes:
     type: float
     default: 0.0
     unit: kW
+  k__hvac_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  active_power_total_w:
+    type: float
+    default: 0.0
+    unit: W
   k__reactive_power_total_kvar:
     type: float
     default: 0.0
@@ -164,8 +172,13 @@ actions:
 
   - function: $in(k__active_power_total_kw)
     name: compute_active_power_total
-    description: Total active power (sum of per-phase values).
-    call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw)
+    description: Total active power including measured phase load and HVAC contribution.
+    call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw) + max(0.0, $in(k__hvac_load_kw))
+
+  - function: $in(active_power_total_w)
+    name: compute_active_power_total_w
+    description: Total active power converted to watts for load-flow connections.
+    call: $in(k__active_power_total_kw) * 1000.0
 
   - function: $in(k__reactive_power_total_kvar)
     name: compute_reactive_power_total
@@ -190,34 +203,34 @@ communication:
       zero_fill: true
       mapping:
         # Currents (A) Float32
-        k__current_l1_a: {address: [3000, 3001], group: i_r, type: float}
-        k__current_l2_a: {address: [3002, 3003], group: i_r, type: float}
-        k__current_l3_a: {address: [3004, 3005], group: i_r, type: float}
-        current_avg_a: {address: [3010, 3011], group: i_r, type: float}
+        k__current_l1_a: {address: [3000, 3001], group: h_r, type: float}
+        k__current_l2_a: {address: [3002, 3003], group: h_r, type: float}
+        k__current_l3_a: {address: [3004, 3005], group: h_r, type: float}
+        current_avg_a: {address: [3010, 3011], group: h_r, type: float}
 
         # Voltages (V) Float32
-        voltage_l1_l2_v: {address: [3020, 3021], group: i_r, type: float}
-        voltage_l2_l3_v: {address: [3022, 3023], group: i_r, type: float}
-        voltage_l3_l1_v: {address: [3024, 3025], group: i_r, type: float}
-        voltage_ll_avg_v: {address: [3026, 3027], group: i_r, type: float}
-        k__voltage_l1_n_v: {address: [3028, 3029], group: i_r, type: float}
-        k__voltage_l2_n_v: {address: [3030, 3031], group: i_r, type: float}
-        k__voltage_l3_n_v: {address: [3032, 3033], group: i_r, type: float}
-        voltage_ln_avg_v: {address: [3036, 3037], group: i_r, type: float}
+        voltage_l1_l2_v: {address: [3020, 3021], group: h_r, type: float}
+        voltage_l2_l3_v: {address: [3022, 3023], group: h_r, type: float}
+        voltage_l3_l1_v: {address: [3024, 3025], group: h_r, type: float}
+        voltage_ll_avg_v: {address: [3026, 3027], group: h_r, type: float}
+        k__voltage_l1_n_v: {address: [3028, 3029], group: h_r, type: float}
+        k__voltage_l2_n_v: {address: [3030, 3031], group: h_r, type: float}
+        k__voltage_l3_n_v: {address: [3032, 3033], group: h_r, type: float}
+        voltage_ln_avg_v: {address: [3036, 3037], group: h_r, type: float}
 
         # Active power (kW) Float32
-        active_power_l1_kw: {address: [3054, 3055], group: i_r, type: float}
-        active_power_l2_kw: {address: [3056, 3057], group: i_r, type: float}
-        active_power_l3_kw: {address: [3058, 3059], group: i_r, type: float}
-        k__active_power_total_kw: {address: [3060, 3061], group: i_r, type: float}
+        active_power_l1_kw: {address: [3054, 3055], group: h_r, type: float}
+        active_power_l2_kw: {address: [3056, 3057], group: h_r, type: float}
+        active_power_l3_kw: {address: [3058, 3059], group: h_r, type: float}
+        k__active_power_total_kw: {address: [3060, 3061], group: h_r, type: float}
 
         # Optional power quality (kVAR/kVA) Float32
-        k__reactive_power_total_kvar: {address: [3068, 3069], group: i_r, type: float}
-        k__apparent_power_total_kva: {address: [3076, 3077], group: i_r, type: float}
+        k__reactive_power_total_kvar: {address: [3068, 3069], group: h_r, type: float}
+        k__apparent_power_total_kva: {address: [3076, 3077], group: h_r, type: float}
 
         # Power factor + frequency Float32
-        k__power_factor: {address: [3084, 3085], group: i_r, type: float}
-        k__frequency_hz: {address: [3110, 3111], group: i_r, type: float}
+        k__power_factor: {address: [3084, 3085], group: h_r, type: float}
+        k__frequency_hz: {address: [3110, 3111], group: h_r, type: float}
 
         # Energy totals (kWh) Float32
         k__energy_import_total_kwh: {address: [45100, 45101], group: h_r, type: float}

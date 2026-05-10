@@ -24,6 +24,20 @@
         "type": "battery",
         "stat_energy_from": "sensor.spx_victron_cerbo_battery_discharge_energy",
         "stat_energy_to": "sensor.spx_victron_cerbo_battery_charge_energy"
+      },
+      {
+        "type": "gas",
+        "stat_energy_from": "sensor.wago_pfc200_utility_gateway_gas_total",
+        "stat_cost": null,
+        "entity_energy_price": null,
+        "number_energy_price": null
+      },
+      {
+        "type": "water",
+        "stat_energy_from": "sensor.wago_pfc200_utility_gateway_water_total",
+        "stat_cost": null,
+        "entity_energy_price": null,
+        "number_energy_price": null
       }
     ],
     "device_consumption": [],

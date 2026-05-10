@@ -28,314 +28,166 @@ lovelace:
 
 # SPX demo integrations -------------------------------------------------------
 # NOTE: This file is bundled into installer builds via `library/assets/homeassistant/config`.
-modbus:
-  - name: spx_iem3000
-    type: tcp
-    host: spx-server   # <-- IP SPX
-    port: 5023
-    timeout: 5
-
-    sensors:
-      # ===== INPUT REGISTERS (i_r): 3000..3111 =====
-      # Float32 = 2 rejestry na wartość
-
-      # Currents (A)
+rest:
+  - resource: http://spx-server:8000/api/v3/system/instances/Energy_Meter_iEM3000_Modbus/attributes?attr_fields=type,internal_value,external_value&attr_details=value
+    scan_interval: 15
+    headers:
+      Authorization: !env_var SPX_AUTH_HEADER
+    sensor:
       - name: "SPX iEM3000 Current L1"
-        slave: 1
-        address: 3000
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l1_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
-
       - name: "SPX iEM3000 Current L2"
-        slave: 1
-        address: 3002
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l2_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
-
       - name: "SPX iEM3000 Current L3"
-        slave: 1
-        address: 3004
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l3_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
-
       - name: "SPX iEM3000 Current Avg"
-        slave: 1
-        address: 3010
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'current_avg_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
-
-      # Voltages (V) L-N
       - name: "SPX iEM3000 Voltage L1-N"
-        slave: 1
-        address: 3028
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l1_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
-
       - name: "SPX iEM3000 Voltage L2-N"
-        slave: 1
-        address: 3030
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l2_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
-
       - name: "SPX iEM3000 Voltage L3-N"
-        slave: 1
-        address: 3032
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l3_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
-
       - name: "SPX iEM3000 Voltage LN Avg"
-        slave: 1
-        address: 3036
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'voltage_ln_avg_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
-
-      # Power (kW / kVA / kVAR)
       - name: "SPX iEM3000 Active Power Total"
-        slave: 1
-        address: 3060
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__active_power_total_kw') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kW"
         device_class: power
         state_class: measurement
-
       - name: "SPX iEM3000 Reactive Power Total"
-        slave: 1
-        address: 3068
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__reactive_power_total_kvar') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kvar"
         state_class: measurement
-
       - name: "SPX iEM3000 Apparent Power Total"
-        slave: 1
-        address: 3076
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__apparent_power_total_kva') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kVA"
         state_class: measurement
-
-      # PF + Frequency
       - name: "SPX iEM3000 Power Factor"
-        slave: 1
-        address: 3084
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__power_factor') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         device_class: power_factor
         state_class: measurement
-
       - name: "SPX iEM3000 Frequency"
-        slave: 1
-        address: 3110
-        input_type: input
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__frequency_hz') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "Hz"
         device_class: frequency
         state_class: measurement
-
-      # ===== HOLDING REGISTERS (h_r): 45100.. =====
       - name: "SPX iEM3000 Energy Import Total"
-        slave: 1
-        address: 45100
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_import_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX iEM3000 Energy Export Total"
-        slave: 1
-        address: 45102
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_export_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
-  - name: spx_victron_cerbo
-    type: tcp
-    host: spx-server
-    port: 5035
-    timeout: 5
-
-    sensors:
-      # ===== HOLDING REGISTERS (Cerbo GX / ESS): 840..895 =====
+  - resource: http://spx-server:8000/api/v3/system/instances/Victron_Cerbo_GX_ESS_Modbus/attributes?attr_fields=type,internal_value,external_value&attr_details=value
+    scan_interval: 15
+    headers:
+      Authorization: !env_var SPX_AUTH_HEADER
+    sensor:
       - name: "SPX Victron Cerbo Battery SOC"
-        slave: 1
-        address: 840
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_soc_pct') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "%"
         device_class: battery
         state_class: measurement
-
       - name: "SPX Victron Cerbo Battery Power"
-        slave: 1
-        address: 842
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
-
       - name: "SPX Victron Cerbo Battery Voltage"
-        slave: 1
-        address: 844
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_voltage_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
-
       - name: "SPX Victron Cerbo Battery Current"
-        slave: 1
-        address: 846
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_current_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
-
       - name: "SPX Victron Cerbo PV Power"
-        slave: 1
-        address: 850
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
-
       - name: "SPX Victron Cerbo Grid Power"
-        slave: 1
-        address: 852
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
-
       - name: "SPX Victron Cerbo Load Power"
-        slave: 1
-        address: 854
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'load_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
-
       - name: "SPX Victron Cerbo Inverter AC Power"
-        slave: 1
-        address: 856
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'inverter_ac_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
-
       - name: "SPX Victron Cerbo Grid Import Energy"
-        slave: 1
-        address: 858
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_import_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX Victron Cerbo Grid Export Energy"
-        slave: 1
-        address: 860
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_export_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX Victron Cerbo PV Energy Total"
-        slave: 1
-        address: 862
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_energy_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX Victron Cerbo Battery Charge Energy"
-        slave: 1
-        address: 864
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_charge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX Victron Cerbo Battery Discharge Energy"
-        slave: 1
-        address: 866
-        input_type: holding
-        data_type: float32
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_discharge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
-
       - name: "SPX Victron Cerbo ESS Mode"
-        slave: 1
-        address: 870
-        input_type: holding
-        data_type: uint16
-
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__ess_mode') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Inverter State"
-        slave: 1
-        address: 871
-        input_type: holding
-        data_type: uint16
-
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'inverter_state') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Charger State"
-        slave: 1
-        address: 872
-        input_type: holding
-        data_type: uint16
-
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'charger_state') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Grid Lost"
-        slave: 1
-        address: 873
-        input_type: holding
-        data_type: uint16
-
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_lost') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Low Battery Alarm"
-        slave: 1
-        address: 874
-        input_type: holding
-        data_type: uint16
-
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'low_battery_alarm') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Overload Alarm"
-        slave: 1
-        address: 875
-        input_type: holding
-        data_type: uint16
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'overload_alarm') | map(attribute='attr.external_value.value') | first) | int(0) }}"
 
 knx:
   cover:

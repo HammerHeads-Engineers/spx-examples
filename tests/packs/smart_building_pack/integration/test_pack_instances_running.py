@@ -31,11 +31,11 @@ except Exception:  # pragma: no cover - optional dependency in some envs
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 
 INSTANCE_KEYS = [
-    "spx_hvac_flexit_nordic_bacnet",
-    "spx_energy_meter_iem3000_modbus",
-    "spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt",
-    "spx_abb_sa_s12_16_5_1_knx",
-    "spx_abb_jra_s4_230_5_1_knx",
+    "HVAC_Flexit_Nordic_BACnet",
+    "Energy_Meter_iEM3000_Modbus",
+    "Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT",
+    "ABB_SA_S12_16_5_1_KNX",
+    "ABB_JRA_S4_230_5_1_KNX",
 ]
 
 ABB_SWITCH_ATTRS = [
@@ -136,7 +136,7 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
         cls.spx_log_attr = "_test_logs"
         cls.spx_log_instance = None
         if cls._logging_enabled:
-            cls._log_instance = cls._instances["spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt"]
+            cls._log_instance = cls._instances["Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT"]
             spx_ensure_attribute(cls._log_instance, cls.spx_log_attr, default=[])
             cls.spx_log_instance = cls._log_instance
             cls._log_start_ts = time.time()
@@ -181,21 +181,21 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
 
     @spx_log_test_case()
     def test_homeassistant_outdoor_lights_automation(self):
-        weather_instance = self._instances["spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt"]
+        weather_instance = self._instances["Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT"]
         if (_instance_state(weather_instance) or "").lower() != "running":
             try:
                 weather_instance.start()
             except Exception:
                 pass
 
-        switch_instance = self._instances["spx_abb_sa_s12_16_5_1_knx"]
+        switch_instance = self._instances["ABB_SA_S12_16_5_1_KNX"]
         if (_instance_state(switch_instance) or "").lower() != "running":
             try:
                 switch_instance.start()
             except Exception:
                 pass
 
-        cover_instance = self._instances["spx_abb_jra_s4_230_5_1_knx"]
+        cover_instance = self._instances["ABB_JRA_S4_230_5_1_KNX"]
         if (_instance_state(cover_instance) or "").lower() != "running":
             try:
                 cover_instance.start()

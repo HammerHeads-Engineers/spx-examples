@@ -158,6 +158,28 @@ views:
           - entity: sensor.spx_victron_cerbo_grid_lost
             name: Grid lost
 
+      - type: grid
+        title: WAGO Utility Meters
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.wago_pfc200_utility_gateway_water_total
+            name: Water total
+            graph: line
+          - type: sensor
+            entity: sensor.wago_pfc200_utility_gateway_water_flow
+            name: Water flow
+            graph: line
+          - type: sensor
+            entity: sensor.wago_pfc200_utility_gateway_gas_total
+            name: Gas total
+            graph: line
+          - type: sensor
+            entity: sensor.wago_pfc200_utility_gateway_gas_flow
+            name: Gas flow
+            graph: line
+
       - type: history-graph
         title: Comfort Trend
         hours_to_show: 6

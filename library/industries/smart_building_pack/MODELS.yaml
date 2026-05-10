@@ -65,6 +65,11 @@ models:
   domain_group: building
   device_class: thermostat
   vendor: generic
+- id: Building.UtilityGateway.WagoPfc200.WaterGasPulse.Mqtt
+  path: library/domains/building/gateway/wago/utility_gateway_wago_pfc200__water_gas_pulse__mqtt.yaml
+  domain_group: building
+  device_class: gateway
+  vendor: wago
 - id: Energy.ESS.VictronCerboGx.Modbus
   path: library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml
   domain_group: energy
@@ -130,6 +135,11 @@ models:
   domain_group: energy
   device_class: power_quality_analyzer
   vendor: janitza
+- id: Energy.PvPhysics.GenericLux
+  path: library/domains/energy/pv/generic/pv_physics_lux.yaml
+  domain_group: energy
+  device_class: pv
+  vendor: generic
 - id: Energy.RackPdu.ApcNetShelter2g.Modbus
   path: library/domains/energy/rack_pdu/apc/rack_pdu_rpdu2g__modbus.yaml
   domain_group: energy
