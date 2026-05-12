@@ -13,13 +13,15 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 ### Model highlights
 
 - HVAC and energy
+  - Building Physics: `library/domains/building/physics/generic/building_physics.yaml`
   - BMS controller (OPC UA): `library/domains/building/controller/generic/bms_controller__opcua.yaml`
   - Flexit Nordic HVAC (BACnet): `library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml`
   - Thermal controller (Modbus): `library/domains/industrial/controller/generic/thermal_controller__modbus.yaml`
   - Energy meter iEM3000 (Modbus): `library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml`
   - PV Physics from Lux: `library/domains/energy/pv/generic/pv_physics_lux.yaml`
   - Victron Cerbo GX ESS (Modbus): `library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml`
-  - WAGO PFC200 utility gateway for water/gas pulse meters (MQTT): `library/domains/building/gateway/wago/utility_gateway_wago_pfc200__water_gas_pulse__mqtt.yaml`
+  - Building energy aggregator: `library/domains/energy/controller/generic/building_energy_aggregator.yaml`
+  - WAGO PFC200 utility gateway for water/gas pulse meters with weather-driven water demand (MQTT): `library/domains/building/gateway/wago/utility_gateway_wago_pfc200__water_gas_pulse__mqtt.yaml`
   - Easy UPS 3M (Modbus): `library/domains/energy/ups/apc/apc_easy_ups_3m__modbus.yaml`
   - Energy meter PM3200 (Modbus): `library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml`
   - Energy meter PM5330 (Modbus): `library/domains/energy/meter/schneider/schneider_pm5330__modbus.yaml`

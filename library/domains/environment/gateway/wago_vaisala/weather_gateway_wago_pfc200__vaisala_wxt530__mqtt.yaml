@@ -59,6 +59,22 @@ attributes:
     type: float
     default: 0.0
     unit: mm/h
+  outdoor_temperature_c:
+    type: float
+    default: 5.0
+    unit: degC
+  humidity_percent:
+    type: float
+    default: 62.0
+    unit: "%"
+  pressure_hpa:
+    type: float
+    default: 1012.0
+    unit: hPa
+  brightness_lux:
+    type: float
+    default: 20000.0
+    unit: lux
   dew_point_c:
     type: float
     default: -2.6
@@ -286,12 +302,56 @@ timer:
   time_step: 1.0
 
 actions:
+  - function: $in(outdoor_temperature_c)
+    name: Outdoor Temperature Refresh
+    description: Add tiny deterministic jitter so MQTT weather telemetry refreshes while preserving the base value.
+    params:
+      amplitude_c: 0.02
+      period_s: 6.0
+    call: |
+      (lambda t, base:
+        base + (amplitude_c if (t % period_s) < (period_s / 2.0) else -amplitude_c)
+      )($attr(timer.time), $in(k__outdoor_temperature_c))
+
+  - function: $in(humidity_percent)
+    name: Humidity Refresh
+    description: Add tiny deterministic jitter so MQTT humidity telemetry refreshes.
+    params:
+      amplitude_pct: 0.05
+      period_s: 8.0
+    call: |
+      (lambda t, base:
+        max(0.0, min(100.0, base + (amplitude_pct if (t % period_s) < (period_s / 2.0) else -amplitude_pct)))
+      )($attr(timer.time), $in(k__humidity_percent))
+
+  - function: $in(pressure_hpa)
+    name: Pressure Refresh
+    description: Add tiny deterministic jitter so MQTT pressure telemetry refreshes.
+    params:
+      amplitude_hpa: 0.03
+      period_s: 10.0
+    call: |
+      (lambda t, base:
+        base + (amplitude_hpa if (t % period_s) < (period_s / 2.0) else -amplitude_hpa)
+      )($attr(timer.time), $in(k__pressure_hpa))
+
+  - function: $in(brightness_lux)
+    name: Brightness Refresh
+    description: Add tiny deterministic jitter so MQTT illuminance telemetry refreshes.
+    params:
+      amplitude_lux: 3.0
+      period_s: 4.0
+    call: |
+      (lambda t, base:
+        max(0.0, base + (amplitude_lux if (t % period_s) < (period_s / 2.0) else -amplitude_lux))
+      )($attr(timer.time), $in(k__brightness_lux))
+
   - function: $in(dew_point_c)
     name: Dew Point Estimate
     description: Approximate dew point from ambient temperature and relative humidity.
     call: |
       (lambda rh:
-        $in(k__outdoor_temperature_c) - (100.0 - rh) / 5.0
+        $in(outdoor_temperature_c) - (100.0 - rh) / 5.0
       )(max(0.0, min(100.0, $in(k__humidity_percent))))
 
   - function: $in(wind_chill_c)
@@ -320,20 +380,23 @@ communication:
       will_payload: offline
       will_retain: true
       bindings:
-        - name: k__outdoor_temperature_c
-          attribute: $ext(k__outdoor_temperature_c)
+        - name: outdoor_temperature_c
+          attribute: $ext(outdoor_temperature_c)
           topic: outdoor_temperature_c
           direction: publish
+          retain: true
           publish_on_change: false
-        - name: k__humidity_percent
-          attribute: $ext(k__humidity_percent)
+        - name: humidity_percent
+          attribute: $ext(humidity_percent)
           topic: humidity_percent
           direction: publish
+          retain: true
           publish_on_change: false
-        - name: k__pressure_hpa
-          attribute: $ext(k__pressure_hpa)
+        - name: pressure_hpa
+          attribute: $ext(pressure_hpa)
           topic: pressure_hpa
           direction: publish
+          retain: true
           publish_on_change: false
         - name: k__wind_speed_ms
           attribute: $ext(k__wind_speed_ms)
@@ -345,10 +408,11 @@ communication:
           topic: wind_gust_ms
           direction: publish
           publish_on_change: false
-        - name: k__brightness_lux
-          attribute: $ext(k__brightness_lux)
+        - name: brightness_lux
+          attribute: $ext(brightness_lux)
           topic: brightness_lux
           direction: publish
+          retain: true
           publish_on_change: false
         - name: k__rain
           attribute: $ext(k__rain)

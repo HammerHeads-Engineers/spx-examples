@@ -86,6 +86,19 @@ The technical workspace kind is separate from the semantic work mode:
 - persist runtime scenarios or attribute behavior back into the repo only when the user explicitly asks for that promotion
 - protocol smoke tests such as Modbus/MQTT/OPC UA read-write checks are opt-in or failure-driven, not part of the default success path
 
+#### `runtime_mcp` connections work
+- Treat user requests such as "make X affect Y", "connect A to B", "feed A into B", or "wire this measurement into that model" as runtime connection tasks unless the user explicitly asks for model YAML changes.
+- Prefer the MCP connection tools over direct API calls: `server_list_connections`, `server_get_connection`, `server_upsert_connection`, `server_delete_connection`, `server_start_connections`, `server_start_connection`, and `server_run_connection`.
+- Use `server_list_instances`, `server_get_instance`, and `server_get_attrs` to identify exact instance keys and attribute names before creating a connection.
+- Direction matters: `from` is the source read endpoint and becomes `$out(source_instance.source_attr)`; `to` is the target write endpoint and becomes `$in(target_instance.target_attr)`.
+- Prefer telemetry or calculated outputs as sources, for example `brightness_lux`, `pv_available_power_w`, or `heating_coil_electric_power_kw`.
+- Prefer persistent control or simulation inputs as targets, usually `k__*` attributes such as `k__illuminance_lux`, `k__outdoor_temperature_c`, or `k__hvac_load_kw`.
+- Do not use `cmd__*` as a target for continuous propagation unless the requested behavior is explicitly a command or one-shot trigger.
+- For `server_upsert_connection`, prefer structured endpoint arguments (`source_instance_key`, `source_attr_path`, `target_instance_key`, `target_attr_path`) over handwritten expressions. Use `from_expr` and `to_expr` only when a custom expression is required.
+- Set `replace=true` for idempotent user-requested wiring. Set `start=true` when creating the connection, then call `server_start_connections` if the global `connections` container is not running.
+- After import or restore, always check `server_list_connections` and `server_get_connection`. If a connection or the container is `INITIALIZED`, start it before testing propagation.
+- Success for runtime connection work means the connection exists, is `RUNNING`, reports `propagation_status = ACTIVE` when available, and a source value change or `server_run_connection` updates the target.
+
 ### `repo_dev`
 - use the normal repository development workflow
 - update code, models, catalogs, tests, docs, packs, and installer assets as needed for a durable repo change

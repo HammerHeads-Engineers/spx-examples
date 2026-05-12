@@ -210,6 +210,8 @@ Read-only and diagnostics are always exposed:
 - `server_get_communication`
 - `server_get_bindings`
 - `server_diagnose_instance`
+- `server_list_connections`
+- `server_get_connection`
 
 Write tools are exposed only with `--allow-write`:
 
@@ -228,8 +230,82 @@ Write tools are exposed only with `--allow-write`:
 - `server_start_scenario`
 - `server_stop_scenario`
 - `server_delete_scenario`
+- `server_upsert_connection`
+- `server_delete_connection`
+- `server_start_connections`
+- `server_stop_connections`
+- `server_start_connection`
+- `server_stop_connection`
+- `server_run_connection`
 - `repo_bootstrap_pack`
 - `repo_bootstrap_profile`
+
+## Runtime Connection Workflow
+
+Use runtime connections when a user asks for one instance attribute to influence,
+feed, drive, or update another instance attribute. Typical requests include
+"make weather brightness affect PV generation" or "send the HVAC load to the
+main meter".
+
+Recommended flow:
+
+1. Use `server_list_instances` to find running instance keys.
+2. Use `server_get_attrs` on the candidate source and target instances.
+3. Choose a source telemetry or calculated output attribute.
+4. Choose a target persistent input attribute, usually a `k__*` attribute.
+5. Call `server_upsert_connection` with structured endpoint arguments.
+6. Use `replace=true` for idempotent wiring and `start=true` for immediate use.
+7. Call `server_start_connections` if the global `connections` container is not running.
+8. Verify with `server_get_connection`; expect `state = RUNNING` and, when present, `propagation_status = ACTIVE`.
+9. Change the source with `server_set_attr` or invoke `server_run_connection` once.
+10. Read the target with `server_get_attrs` to confirm propagation.
+
+Connection direction:
+
+```text
+from = source read endpoint = $out(source_instance.source_attr)
+to   = target write endpoint = $in(target_instance.target_attr)
+```
+
+Prefer structured arguments over handwritten expressions:
+
+```text
+server_upsert_connection(
+  connection_name="Weather_Brightness_to_PV_Physics_Illuminance",
+  source_instance_key="Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT",
+  source_attr_path="k__brightness_lux",
+  target_instance_key="PV_Physics_Lux",
+  target_attr_path="k__illuminance_lux",
+  replace=true,
+  start=true
+)
+```
+
+Common smart-building patterns:
+
+```text
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__brightness_lux
+  -> PV_Physics_Lux.k__illuminance_lux
+
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__outdoor_temperature_c
+  -> Building_Physics.k__outdoor_temperature_c
+
+PV_Physics_Lux.pv_available_power_w
+  -> Victron_Cerbo_GX_ESS_Modbus.pv_available_power_w
+
+HVAC_Flexit_Nordic_BACnet.heating_coil_electric_power_kw
+  -> Building_Energy_Aggregator.k__hvac_load_kw
+```
+
+After importing a system configuration, connections may exist but still be
+`INITIALIZED`. Always inspect and start them before testing:
+
+```text
+server_list_connections()
+server_get_connection(connection_name="...")
+server_start_connections()
+server_run_connection(connection_name="...")
+```
 
 ## Notes
 
@@ -262,6 +338,15 @@ Write tools are exposed only with `--allow-write`:
 - `server_register_model_and_ensure_instance` is the convenience workflow for
   "register this catalog model on the server and give me one instance from it"
   in a single MCP call.
+- `server_upsert_connection` creates or replaces one runtime connection. It can
+  accept explicit `from_expr` / `to_expr`, but agents should prefer
+  `source_instance_key`, `source_attr_path`, `target_instance_key`, and
+  `target_attr_path` for ordinary wiring.
+- `server_start_connections` starts the global connections container. Use it
+  after imports, restores, or batch connection creation when the container is
+  still `INITIALIZED`.
+- `server_run_connection` executes one connection once and is useful for
+  immediate verification before waiting for a source change hook.
 - Runtime semantics matter:
   - scenario `overrides` behave like a temporary overlay and revert on `stop()`
   - scenario `actions` such as `function` or `set` materialize state changes and

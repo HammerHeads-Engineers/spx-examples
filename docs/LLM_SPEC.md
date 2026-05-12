@@ -54,6 +54,52 @@ Use this path for agent-driven model work whose goal is local runtime validation
   6. verify any implemented mode/command path
 - Do not assume runtime tree shape blindly during live checks. If the object layout is unclear, inspect the live instance document or validate through protocol reads/writes instead of relying on guessed paths.
 
+## Runtime connection intent
+Use this guidance when a user asks an agent to wire behavior between existing live instances.
+
+- Interpret phrases such as "make X affect Y", "connect A to B", "feed A into B", "send this value to that device", or "make this measurement drive that model" as SPX runtime connection requests.
+- Prefer MCP connection tools for this work: `server_list_connections`, `server_get_connection`, `server_upsert_connection`, `server_start_connections`, `server_start_connection`, and `server_run_connection`.
+- Do not start by editing model YAML when the requested behavior can be expressed as an attribute-to-attribute runtime connection.
+- Find exact endpoints with `server_list_instances`, `server_get_instance`, and `server_get_attrs` before creating the connection.
+- The source side is `from` and is read with `$out(instance.attribute)`.
+- The target side is `to` and is written with `$in(instance.attribute)`.
+- As a default rule, use real telemetry or calculated outputs as `from` endpoints and persistent `k__*` simulation/control inputs as `to` endpoints.
+- Avoid continuous connections into `cmd__*` command attributes unless the user clearly wants a trigger-style action.
+- Use `server_upsert_connection` with structured endpoint fields whenever possible:
+
+```text
+connection_name: Source_Attribute_to_Target_Attribute
+source_instance_key: <source instance key>
+source_attr_path: <source attribute>
+target_instance_key: <target instance key>
+target_attr_path: <target attribute>
+replace: true
+start: true
+```
+
+- After creating, restoring, or importing connections, verify lifecycle state. A restored connection can exist while still being `INITIALIZED`; call `server_start_connections` before expecting propagation.
+- A connection task is complete only after the connection exists, is running, reports `propagation_status = ACTIVE` when available, and a source change or `server_run_connection` updates the target.
+
+Canonical smart-building examples:
+
+```text
+Weather brightness -> PV generation:
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__brightness_lux
+  -> PV_Physics_Lux.k__illuminance_lux
+
+PV generation -> Victron ESS:
+PV_Physics_Lux.pv_available_power_w
+  -> Victron_Cerbo_GX_ESS_Modbus.pv_available_power_w
+
+Outdoor temperature -> building physics:
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__outdoor_temperature_c
+  -> Building_Physics.k__outdoor_temperature_c
+
+Actual HVAC electric load -> energy aggregator:
+HVAC_Flexit_Nordic_BACnet.heating_coil_electric_power_kw
+  -> Building_Energy_Aggregator.k__hvac_load_kw
+```
+
 ## Operational flow for new-device-model generation automations
 Use this flow only for automations whose primary objective is creating a new
 device model YAML (plus required integration updates such as catalog/profile/tests).

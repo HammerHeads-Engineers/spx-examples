@@ -10,6 +10,162 @@ views:
         name: Flexit Nordic
 
       - type: entities
+        title: Flexit Nordic Climate Control
+        show_header_toggle: false
+        entities:
+          - entity: sensor.hvac_flexit_nordic_room_temperature
+            name: Room temperature
+          - entity: sensor.hvac_flexit_nordic_supply_air_temperature
+            name: Supply air
+          - entity: sensor.hvac_flexit_nordic_outside_air_temperature
+            name: Outside air
+          - entity: switch.hvac_flexit_nordic_electric_heater
+            name: Electric heater
+
+      - type: grid
+        title: Vaisala Weather Sensor
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+            name: Outdoor temp
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_humidity
+            name: Humidity
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_pressure
+            name: Pressure
+            graph: line
+          - type: sensor
+            entity: sensor.vaisala_wxt530_weather_transmitter_brightness
+            name: Brightness
+            graph: line
+
+      - type: grid
+        title: Schneider iEM3000 Main Meter
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.spx_iem3000_active_power_total
+            name: Active power
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_current_avg
+            name: Average current
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_voltage_ln_avg
+            name: Average L-N voltage
+            graph: line
+          - type: sensor
+            entity: sensor.spx_iem3000_power_factor
+            name: Power factor
+            graph: line
+
+      - type: grid
+        title: Victron Cerbo GX Energy Control
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_pv_power
+            name: PV production
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_load_power
+            name: Home load
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_battery_soc
+            name: Battery SOC
+            graph: line
+          - type: sensor
+            entity: sensor.spx_victron_cerbo_grid_power
+            name: Grid power
+            graph: line
+
+      - type: entities
+        title: WAGO Utilities
+        show_header_toggle: false
+        entities:
+          - entity: sensor.wago_pfc200_utility_gateway_water_flow
+            name: Water flow
+          - entity: sensor.wago_pfc200_utility_gateway_water_total
+            name: Water total
+          - entity: sensor.wago_pfc200_utility_gateway_gas_flow
+            name: Gas flow
+          - entity: sensor.wago_pfc200_utility_gateway_gas_total
+            name: Gas total
+
+      - type: grid
+        title: ABB KNX Exterior Lighting
+        columns: 2
+        square: false
+        cards:
+          - type: button
+            entity: switch.abb_sa_s_ch01
+            name: Garden
+            icon: mdi:tree
+            show_state: true
+            tap_action:
+              action: toggle
+          - type: button
+            entity: switch.abb_sa_s_ch02
+            name: Garage
+            icon: mdi:garage
+            show_state: true
+            tap_action:
+              action: toggle
+          - type: button
+            entity: switch.abb_sa_s_ch03
+            name: Front Porch
+            icon: mdi:door
+            show_state: true
+            tap_action:
+              action: toggle
+          - type: button
+            entity: switch.abb_sa_s_ch04
+            name: Driveway
+            icon: mdi:car-side
+            show_state: true
+            tap_action:
+              action: toggle
+
+      - type: grid
+        title: ABB KNX Blinds
+        columns: 2
+        square: false
+        cards:
+          - type: tile
+            entity: cover.blind_1
+            name: Blind 1
+            icon: mdi:blinds
+          - type: tile
+            entity: cover.blind_2
+            name: Blind 2
+            icon: mdi:blinds
+          - type: tile
+            entity: cover.blind_3
+            name: Blind 3
+            icon: mdi:blinds
+          - type: tile
+            entity: cover.blind_4
+            name: Blind 4
+            icon: mdi:blinds
+
+  - title: HVAC
+    path: hvac
+    icon: mdi:hvac
+    cards:
+      - type: thermostat
+        entity: climate.hvac_flexit_nordic
+        name: Flexit Nordic
+
+      - type: entities
         title: Flexit Air Temperatures
         show_header_toggle: false
         entities:
@@ -41,6 +197,46 @@ views:
           - entity: number.hvac_flexit_nordic_high_extract_fan_setpoint
             name: High extract fan
 
+      - type: entities
+        title: Fan Setpoints
+        show_header_toggle: false
+        entities:
+          - number.hvac_flexit_nordic_home_supply_fan_setpoint
+          - number.hvac_flexit_nordic_home_extract_fan_setpoint
+          - number.hvac_flexit_nordic_away_supply_fan_setpoint
+          - number.hvac_flexit_nordic_away_extract_fan_setpoint
+          - number.hvac_flexit_nordic_high_supply_fan_setpoint
+          - number.hvac_flexit_nordic_high_extract_fan_setpoint
+          - number.hvac_flexit_nordic_fireplace_supply_fan_setpoint
+          - number.hvac_flexit_nordic_fireplace_extract_fan_setpoint
+
+      - type: entities
+        title: Diagnostics
+        show_header_toggle: false
+        entities:
+          - binary_sensor.hvac_flexit_nordic_air_filter_polluted
+          - sensor.hvac_flexit_nordic_air_filter_operating_time
+          - sensor.hvac_flexit_nordic_electric_heater_power
+          - sensor.hvac_flexit_nordic_heat_exchanger_efficiency
+          - sensor.hvac_flexit_nordic_heat_exchanger_speed
+          - sensor.hvac_flexit_nordic_supply_air_fan
+          - sensor.hvac_flexit_nordic_exhaust_air_fan
+
+      - type: history-graph
+        title: Comfort Trend
+        hours_to_show: 6
+        entities:
+          - entity: sensor.hvac_flexit_nordic_room_temperature
+            name: Room
+          - entity: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+            name: Outdoor
+          - entity: sensor.hvac_flexit_nordic_supply_air_temperature
+            name: Supply
+
+  - title: Weather
+    path: weather
+    icon: mdi:weather-partly-cloudy
+    cards:
       - type: grid
         title: Vaisala Weather
         columns: 2
@@ -78,6 +274,33 @@ views:
           - entity: binary_sensor.vaisala_wxt530_weather_transmitter_rain
             name: Rain
 
+      - type: entities
+        title: Vaisala WXT530
+        show_header_toggle: false
+        entities:
+          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+          - sensor.vaisala_wxt530_weather_transmitter_humidity
+          - sensor.vaisala_wxt530_weather_transmitter_pressure
+          - sensor.vaisala_wxt530_weather_transmitter_brightness
+          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+          - sensor.vaisala_wxt530_weather_transmitter_wind_gust
+          - sensor.vaisala_wxt530_weather_transmitter_wind_direction
+          - sensor.vaisala_wxt530_weather_transmitter_rain_rate
+          - binary_sensor.vaisala_wxt530_weather_transmitter_rain
+
+      - type: history-graph
+        title: Weather Trend
+        hours_to_show: 12
+        entities:
+          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+          - sensor.vaisala_wxt530_weather_transmitter_humidity
+          - sensor.vaisala_wxt530_weather_transmitter_pressure
+          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+
+  - title: Energy
+    path: energy
+    icon: mdi:lightning-bolt
+    cards:
       - type: grid
         title: iEM3000 Live Load
         columns: 2
@@ -115,6 +338,10 @@ views:
           - entity: sensor.spx_iem3000_frequency
             name: Frequency
 
+  - title: Victron
+    path: victron
+    icon: mdi:battery-charging
+    cards:
       - type: grid
         title: Victron Cerbo GX ESS
         columns: 2
@@ -158,6 +385,10 @@ views:
           - entity: sensor.spx_victron_cerbo_grid_lost
             name: Grid lost
 
+  - title: Utilities
+    path: utilities
+    icon: mdi:meter-gas
+    cards:
       - type: grid
         title: WAGO Utility Meters
         columns: 2
@@ -172,6 +403,10 @@ views:
             name: Water flow
             graph: line
           - type: sensor
+            entity: sensor.wago_pfc200_utility_gateway_weather_water_boost
+            name: Weather water boost
+            graph: line
+          - type: sensor
             entity: sensor.wago_pfc200_utility_gateway_gas_total
             name: Gas total
             graph: line
@@ -180,93 +415,64 @@ views:
             name: Gas flow
             graph: line
 
-      - type: history-graph
-        title: Comfort Trend
-        hours_to_show: 6
-        entities:
-          - entity: sensor.hvac_flexit_nordic_room_temperature
-            name: Room
-          - entity: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-            name: Outdoor
-          - entity: sensor.hvac_flexit_nordic_supply_air_temperature
-            name: Supply
-
-      - type: entities
-        title: KNX Quick Controls
-        show_header_toggle: false
-        entities:
-          - entity: switch.abb_sa_s_ch01
-            name: Light channel 1
-          - entity: switch.abb_sa_s_ch02
-            name: Light channel 2
-          - entity: switch.abb_sa_s_ch03
-            name: Light channel 3
-          - entity: switch.abb_sa_s_ch04
-            name: Light channel 4
-          - entity: cover.blind_1
-            name: Blind 1
-          - entity: cover.blind_2
-            name: Blind 2
-
-  - title: Flexit
-    path: flexit
-    icon: mdi:hvac
+  - title: Physics
+    path: physics
+    icon: mdi:atom-variant
     cards:
-      - type: thermostat
-        entity: climate.hvac_flexit_nordic
-        name: Flexit Nordic
+      - type: grid
+        title: Building Physics
+        columns: 2
+        square: false
+        cards:
+          - type: sensor
+            entity: sensor.spx_building_physics_indoor_temperature
+            name: Indoor temp
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_comfort_score
+            name: Comfort score
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_solar_heat_gain
+            name: Solar heat gain
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_hvac_electric_power
+            name: HVAC electric
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_solar_shading_need
+            name: Solar shading need
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_lighting_demand
+            name: Lighting demand
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_water_demand_boost
+            name: Water demand boost
+            graph: line
+          - type: sensor
+            entity: sensor.spx_building_physics_gas_demand
+            name: Gas demand
+            graph: line
 
       - type: entities
-        title: Fan Setpoints
+        title: Building Physics Detail
         show_header_toggle: false
         entities:
-          - number.hvac_flexit_nordic_home_supply_fan_setpoint
-          - number.hvac_flexit_nordic_home_extract_fan_setpoint
-          - number.hvac_flexit_nordic_away_supply_fan_setpoint
-          - number.hvac_flexit_nordic_away_extract_fan_setpoint
-          - number.hvac_flexit_nordic_high_supply_fan_setpoint
-          - number.hvac_flexit_nordic_high_extract_fan_setpoint
-          - number.hvac_flexit_nordic_fireplace_supply_fan_setpoint
-          - number.hvac_flexit_nordic_fireplace_extract_fan_setpoint
-
-      - type: entities
-        title: Diagnostics
-        show_header_toggle: false
-        entities:
-          - binary_sensor.hvac_flexit_nordic_air_filter_polluted
-          - sensor.hvac_flexit_nordic_air_filter_operating_time
-          - sensor.hvac_flexit_nordic_electric_heater_power
-          - sensor.hvac_flexit_nordic_heat_exchanger_efficiency
-          - sensor.hvac_flexit_nordic_heat_exchanger_speed
-          - sensor.hvac_flexit_nordic_supply_air_fan
-          - sensor.hvac_flexit_nordic_exhaust_air_fan
-
-  - title: Weather
-    path: weather
-    icon: mdi:weather-partly-cloudy
-    cards:
-      - type: entities
-        title: Vaisala WXT530
-        show_header_toggle: false
-        entities:
-          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-          - sensor.vaisala_wxt530_weather_transmitter_humidity
-          - sensor.vaisala_wxt530_weather_transmitter_pressure
-          - sensor.vaisala_wxt530_weather_transmitter_brightness
-          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
-          - sensor.vaisala_wxt530_weather_transmitter_wind_gust
-          - sensor.vaisala_wxt530_weather_transmitter_wind_direction
-          - sensor.vaisala_wxt530_weather_transmitter_rain_rate
-          - binary_sensor.vaisala_wxt530_weather_transmitter_rain
-
-      - type: history-graph
-        title: Weather Trend
-        hours_to_show: 12
-        entities:
-          - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-          - sensor.vaisala_wxt530_weather_transmitter_humidity
-          - sensor.vaisala_wxt530_weather_transmitter_pressure
-          - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+          - entity: sensor.spx_building_physics_occupancy_count
+            name: Occupancy count
+          - entity: sensor.spx_building_physics_daylight_factor
+            name: Daylight factor
+          - entity: sensor.spx_building_physics_hvac_heat_demand
+            name: HVAC heat demand
+          - entity: sensor.spx_building_physics_hvac_cooling_demand
+            name: HVAC cooling demand
+          - entity: sensor.spx_building_physics_water_demand_boost
+            name: Water demand boost
+          - entity: sensor.spx_building_physics_gas_demand
+            name: Gas demand
 
   - title: KNX
     path: knx
@@ -277,13 +483,13 @@ views:
         show_header_toggle: false
         entities:
           - entity: switch.abb_sa_s_ch01
-            name: Channel 1
+            name: Garden
           - entity: switch.abb_sa_s_ch02
-            name: Channel 2
+            name: Garage
           - entity: switch.abb_sa_s_ch03
-            name: Channel 3
+            name: Front Porch
           - entity: switch.abb_sa_s_ch04
-            name: Channel 4
+            name: Driveway
           - entity: switch.abb_sa_s_ch05
             name: Channel 5
           - entity: switch.abb_sa_s_ch06

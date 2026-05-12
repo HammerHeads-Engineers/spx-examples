@@ -98,6 +98,12 @@ persist it into the model YAML with `repo_upsert_model_scenario`. For the server
 workflow "register this catalog model and ensure one instance exists from it",
 use `server_register_model_and_ensure_instance`.
 
+For runtime wiring between live instances, use the MCP connection tools instead
+of ad hoc API calls. Treat requests like "make this sensor affect that model" as
+connection work: inspect instances and attributes, create the connection with
+`server_upsert_connection`, start the global container with
+`server_start_connections` when needed, and verify with `server_get_connection`.
+
 - CLI entrypoint: `poetry run spx-mcp ...`
 - Detailed usage: `docs/MCP.md`
 - Runtime note: the official Python MCP SDK currently requires Python 3.10+,

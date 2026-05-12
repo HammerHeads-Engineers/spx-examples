@@ -4,7 +4,8 @@ name: utility_gateway_wago_pfc200__water_gas_pulse__mqtt
 description: |
   WAGO PFC200 utility gateway demo for Smart Building Pack. The model represents
   pulse inputs from a water meter and gas meter, converts them into cumulative
-  consumption counters, and publishes Home Assistant MQTT Discovery sensors.
+  consumption counters, adds simple weather-driven water demand for hot sunny
+  days, and publishes Home Assistant MQTT Discovery sensors.
 
 meta_parameters:
   mqtt_broker_host:
@@ -27,6 +28,34 @@ attributes:
   k__water_flow_l_min:
     type: float
     default: 4.2
+    unit: L/min
+  k__outdoor_temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+  k__brightness_lux:
+    type: float
+    default: 20000.0
+    unit: lux
+  k__daylight_threshold_lux:
+    type: float
+    default: 10000.0
+    unit: lux
+  k__water_heat_threshold_c:
+    type: float
+    default: 24.0
+    unit: degC
+  k__water_heat_gain_l_min_per_c:
+    type: float
+    default: 0.55
+    unit: L/min/degC
+  k__max_weather_water_boost_l_min:
+    type: float
+    default: 8.0
+    unit: L/min
+  k__external_water_demand_boost_l_min:
+    type: float
+    default: 0.0
     unit: L/min
   k__gas_flow_m3_h:
     type: float
@@ -51,6 +80,13 @@ attributes:
   water_flow_l_min:
     type: float
     default: 4.2
+    unit: L/min
+  daylight_active:
+    type: int
+    default: 1
+  weather_water_boost_l_min:
+    type: float
+    default: 0.0
     unit: L/min
   water_pulse_count:
     type: int
@@ -109,6 +145,27 @@ attributes:
         "payload_available": "online",
         "payload_not_available": "offline",
         "unit_of_measurement": "L/min",
+        "suggested_display_precision": 6,
+        "state_class": "measurement",
+        "device": {
+          "identifiers": ["wago_pfc200_utility_gateway_1"],
+          "manufacturer": "WAGO",
+          "model": "PFC200 + Pulse IO (Sim)",
+          "name": "WAGO PFC200 Utility Gateway",
+          "sw_version": "SPX"
+        }
+      }
+  _ha_discovery_weather_water_boost_config:
+    type: str
+    default: |-
+      {
+        "name": "Weather Water Boost",
+        "unique_id": "spx_utility_weather_water_boost",
+        "state_topic": "spx/utility/weather_water_boost_l_min",
+        "availability_topic": "spx/utility/availability",
+        "payload_available": "online",
+        "payload_not_available": "offline",
+        "unit_of_measurement": "L/min",
         "state_class": "measurement",
         "device": {
           "identifiers": ["wago_pfc200_utility_gateway_1"],
@@ -150,6 +207,7 @@ attributes:
         "payload_available": "online",
         "payload_not_available": "offline",
         "unit_of_measurement": "m\u00b3/h",
+        "suggested_display_precision": 6,
         "state_class": "measurement",
         "device": {
           "identifiers": ["wago_pfc200_utility_gateway_1"],
@@ -205,10 +263,31 @@ timer:
   time_step: 1.0
 
 actions:
+  - function: $in(daylight_active)
+    name: detect_daylight
+    description: Treat high outdoor brightness as daytime for utility demand physics.
+    call: 1 if $in(k__brightness_lux) >= $in(k__daylight_threshold_lux) else 0
+
+  - function: $in(weather_water_boost_l_min)
+    name: compute_weather_water_boost
+    description: Use central building-physics water demand when provided, otherwise estimate local hot-day demand.
+    call: (
+          max(0.0, $in(k__external_water_demand_boost_l_min))
+          if $in(k__external_water_demand_boost_l_min) > 0.0
+          else (
+            $in(daylight_active)
+            * min(
+              max(0.0, $in(k__max_weather_water_boost_l_min)),
+              max(0.0, $in(k__outdoor_temperature_c) - $in(k__water_heat_threshold_c))
+              * max(0.0, $in(k__water_heat_gain_l_min_per_c))
+            )
+          )
+        )
+
   - function: $in(water_flow_l_min)
     name: clamp_water_flow
-    description: Expose sanitized water flow read from the PFC200 pulse input logic.
-    call: max(0.0, $in(k__water_flow_l_min))
+    description: Expose sanitized water flow read from the PFC200 pulse input logic plus weather-driven demand.
+    call: max(0.0, $in(k__water_flow_l_min)) + max(0.0, $in(weather_water_boost_l_min))
 
   - function: $in(gas_flow_m3_h)
     name: clamp_gas_flow
@@ -271,6 +350,11 @@ communication:
           topic: water_pulse_count
           direction: publish
           publish_on_change: false
+        - name: weather_water_boost_l_min
+          attribute: $ext(weather_water_boost_l_min)
+          topic: weather_water_boost_l_min
+          direction: publish
+          publish_on_change: false
         - name: gas_total_m3
           attribute: $ext(gas_total_m3)
           topic: gas_total_m3
@@ -319,6 +403,12 @@ communication:
           direction: publish
           retain: true
           publish_on_change: true
+        - name: _ha_discovery_weather_water_boost_config
+          attribute: $ext(_ha_discovery_weather_water_boost_config)
+          topic: sensor/spx_utility_weather_water_boost/config
+          direction: publish
+          retain: true
+          publish_on_change: true
         - name: _ha_discovery_gas_total_config
           attribute: $ext(_ha_discovery_gas_total_config)
           topic: sensor/spx_utility_gas_total/config
@@ -352,6 +442,8 @@ scenarios:
     overrides:
       $in(k__water_flow_l_min): 4.2
       $in(k__gas_flow_m3_h): 0.35
+      $in(k__outdoor_temperature_c): 20.0
+      $in(k__brightness_lux): 20000.0
 
   morning_peak:
     display_name: Morning Peak
@@ -360,6 +452,18 @@ scenarios:
     overrides:
       $in(k__water_flow_l_min): 14.0
       $in(k__gas_flow_m3_h): 1.8
+      $in(k__outdoor_temperature_c): 18.0
+      $in(k__brightness_lux): 12000.0
+
+  hot_sunny_day:
+    display_name: Hot Sunny Day
+    description: High daytime temperature increases water demand through irrigation and occupant use.
+    duration: 30.0
+    overrides:
+      $in(k__water_flow_l_min): 4.2
+      $in(k__gas_flow_m3_h): 0.15
+      $in(k__outdoor_temperature_c): 32.0
+      $in(k__brightness_lux): 85000.0
 
   away_mode:
     display_name: Away Mode
@@ -368,3 +472,5 @@ scenarios:
     overrides:
       $in(k__water_flow_l_min): 0.0
       $in(k__gas_flow_m3_h): 0.0
+      $in(k__outdoor_temperature_c): 16.0
+      $in(k__brightness_lux): 0.0

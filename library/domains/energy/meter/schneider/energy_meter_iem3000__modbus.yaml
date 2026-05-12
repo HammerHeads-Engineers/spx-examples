@@ -92,6 +92,10 @@ attributes:
     type: float
     default: 0.0
     unit: kW
+  k__aux_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
   active_power_total_w:
     type: float
     default: 0.0
@@ -172,8 +176,8 @@ actions:
 
   - function: $in(k__active_power_total_kw)
     name: compute_active_power_total
-    description: Total active power including measured phase load and HVAC contribution.
-    call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw) + max(0.0, $in(k__hvac_load_kw))
+    description: Total active power including measured phase load, HVAC contribution, and aggregated auxiliary building loads.
+    call: $in(active_power_l1_kw) + $in(active_power_l2_kw) + $in(active_power_l3_kw) + max(0.0, $in(k__hvac_load_kw)) + max(0.0, $in(k__aux_load_kw))
 
   - function: $in(active_power_total_w)
     name: compute_active_power_total_w

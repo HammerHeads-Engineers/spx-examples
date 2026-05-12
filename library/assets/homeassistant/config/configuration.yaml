@@ -35,74 +35,74 @@ rest:
       Authorization: !env_var SPX_AUTH_HEADER
     sensor:
       - name: "SPX iEM3000 Current L1"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l1_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l1_a') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
       - name: "SPX iEM3000 Current L2"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l2_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l2_a') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
       - name: "SPX iEM3000 Current L3"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l3_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__current_l3_a') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
       - name: "SPX iEM3000 Current Avg"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'current_avg_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'current_avg_a') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
       - name: "SPX iEM3000 Voltage L1-N"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l1_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l1_n_v') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
       - name: "SPX iEM3000 Voltage L2-N"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l2_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l2_n_v') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
       - name: "SPX iEM3000 Voltage L3-N"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l3_n_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__voltage_l3_n_v') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
       - name: "SPX iEM3000 Voltage LN Avg"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'voltage_ln_avg_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'voltage_ln_avg_v') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
       - name: "SPX iEM3000 Active Power Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__active_power_total_kw') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__active_power_total_kw') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kW"
         device_class: power
         state_class: measurement
       - name: "SPX iEM3000 Reactive Power Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__reactive_power_total_kvar') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__reactive_power_total_kvar') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kvar"
         state_class: measurement
       - name: "SPX iEM3000 Apparent Power Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__apparent_power_total_kva') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__apparent_power_total_kva') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kVA"
         state_class: measurement
       - name: "SPX iEM3000 Power Factor"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__power_factor') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__power_factor') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         device_class: power_factor
         state_class: measurement
       - name: "SPX iEM3000 Frequency"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__frequency_hz') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__frequency_hz') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "Hz"
         device_class: frequency
         state_class: measurement
       - name: "SPX iEM3000 Energy Import Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_import_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_import_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
       - name: "SPX iEM3000 Energy Export Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_export_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__energy_export_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
@@ -112,67 +112,67 @@ rest:
       Authorization: !env_var SPX_AUTH_HEADER
     sensor:
       - name: "SPX Victron Cerbo Battery SOC"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_soc_pct') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_soc_pct') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "%"
         device_class: battery
         state_class: measurement
       - name: "SPX Victron Cerbo Battery Power"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_power_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
       - name: "SPX Victron Cerbo Battery Voltage"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_voltage_v') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_voltage_v') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "V"
         device_class: voltage
         state_class: measurement
       - name: "SPX Victron Cerbo Battery Current"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_current_a') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_current_a') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "A"
         device_class: current
         state_class: measurement
       - name: "SPX Victron Cerbo PV Power"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_power_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
       - name: "SPX Victron Cerbo Grid Power"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_power_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
       - name: "SPX Victron Cerbo Load Power"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'load_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'load_power_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
       - name: "SPX Victron Cerbo Inverter AC Power"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'inverter_ac_power_w') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'inverter_ac_power_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "W"
         device_class: power
         state_class: measurement
       - name: "SPX Victron Cerbo Grid Import Energy"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_import_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_import_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
       - name: "SPX Victron Cerbo Grid Export Energy"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_export_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'grid_energy_export_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
       - name: "SPX Victron Cerbo PV Energy Total"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_energy_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'pv_energy_total_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
       - name: "SPX Victron Cerbo Battery Charge Energy"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_charge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_charge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
       - name: "SPX Victron Cerbo Battery Discharge Energy"
-        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_discharge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) }}"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'battery_discharge_energy_kwh') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
         unit_of_measurement: "kWh"
         device_class: energy
         state_class: total_increasing
@@ -188,7 +188,62 @@ rest:
         value_template: "{{ (value_json.children | selectattr('name', 'eq', 'low_battery_alarm') | map(attribute='attr.external_value.value') | first) | int(0) }}"
       - name: "SPX Victron Cerbo Overload Alarm"
         value_template: "{{ (value_json.children | selectattr('name', 'eq', 'overload_alarm') | map(attribute='attr.external_value.value') | first) | int(0) }}"
-
+  - resource: http://spx-server:8000/api/v3/system/instances/Building_Physics/attributes?attr_fields=type,internal_value,external_value&attr_details=value
+    scan_interval: 15
+    headers:
+      Authorization: !env_var SPX_AUTH_HEADER
+    sensor:
+      - name: "SPX Building Physics Indoor Temperature"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'indoor_temperature_c') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+      - name: "SPX Building Physics Comfort Score"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'comfort_score_pct') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "%"
+        state_class: measurement
+      - name: "SPX Building Physics Solar Heat Gain"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'solar_heat_gain_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+      - name: "SPX Building Physics HVAC Heat Demand"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'hvac_heat_demand_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+      - name: "SPX Building Physics HVAC Cooling Demand"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'hvac_cooling_demand_w') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+      - name: "SPX Building Physics HVAC Electric Power"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'hvac_electric_power_kw') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "kW"
+        device_class: power
+        state_class: measurement
+      - name: "SPX Building Physics Lighting Demand"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'lighting_demand_pct') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "%"
+        state_class: measurement
+      - name: "SPX Building Physics Solar Shading Need"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'solar_shading_need_pct') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "%"
+        state_class: measurement
+      - name: "SPX Building Physics Occupancy Count"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'k__occupancy_count') | map(attribute='attr.external_value.value') | first) | int(0) }}"
+      - name: "SPX Building Physics Gas Demand"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'gas_demand_m3_h') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "m³/h"
+        state_class: measurement
+      - name: "SPX Building Physics Water Demand Boost"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'water_demand_boost_l_min') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "L/min"
+        state_class: measurement
+      - name: "SPX Building Physics Daylight Factor"
+        value_template: "{{ (value_json.children | selectattr('name', 'eq', 'daylight_factor_pct') | map(attribute='attr.external_value.value') | first) | float(0) | round(1) }}"
+        unit_of_measurement: "%"
+        state_class: measurement
 knx:
   cover:
     - name: "Blind 1"

@@ -1,107 +1,120 @@
 # SPDX-License-Identifier: MIT
-- id: '1767345066240'
-  alias: 'Blinds: night by brightness + temp; sunny shading; otherwise open'
+- id: 'spx_knx_blinds_from_weather_and_physics'
+  alias: 'KNX blinds: weather protection and solar shading'
+  description: >
+    Test automation kept in Home Assistant. Building Physics exposes only the
+    shading need signal; HA decides how blinds should react.
   triggers:
-  - trigger: state
-    entity_id:
-    - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-    - sensor.vaisala_wxt530_weather_transmitter_brightness
+    - trigger: state
+      entity_id:
+        - sensor.spx_building_physics_solar_shading_need
+        - sensor.vaisala_wxt530_weather_transmitter_wind_speed
+        - sensor.vaisala_wxt530_weather_transmitter_brightness
+        - sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
+        - binary_sensor.vaisala_wxt530_weather_transmitter_rain
+    - trigger: homeassistant
+      event: start
   actions:
-  - choose:
-    - conditions:
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-        below: 1000
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-        below: 20
-      sequence:
-      - action: cover.set_cover_position
-        target:
-          entity_id:
-          - cover.blind_1
-          - cover.blind_2
-          - cover.blind_3
-          - cover.blind_4
-        data:
-          position: 0
-    - conditions:
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-        below: 1000
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-        above: 19.999
-      sequence:
-      - action: cover.set_cover_position
-        target:
-          entity_id:
-          - cover.blind_1
-          - cover.blind_2
-          - cover.blind_3
-          - cover.blind_4
-        data:
-          position: 100
-    - conditions:
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-        above: 45000
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_outdoor_temperature
-        above: 20
-      sequence:
-      - action: cover.set_cover_position
-        target:
-          entity_id:
-          - cover.blind_1
-          - cover.blind_2
-          - cover.blind_3
-          - cover.blind_4
-        data:
-          position: 50
-    default:
-    - action: cover.set_cover_position
-      target:
-        entity_id:
-        - cover.blind_1
-        - cover.blind_2
-        - cover.blind_3
-        - cover.blind_4
-      data:
-        position: 100
+    - choose:
+        - conditions:
+            - condition: or
+              conditions:
+                - condition: state
+                  entity_id: binary_sensor.vaisala_wxt530_weather_transmitter_rain
+                  state: 'on'
+                - condition: numeric_state
+                  entity_id: sensor.vaisala_wxt530_weather_transmitter_wind_speed
+                  above: 14
+          sequence:
+            - action: cover.open_cover
+              target:
+                entity_id:
+                  - cover.blind_1
+                  - cover.blind_2
+                  - cover.blind_3
+                  - cover.blind_4
+        - conditions:
+            - condition: numeric_state
+              entity_id: sensor.spx_building_physics_solar_shading_need
+              above: 75
+          sequence:
+            - action: cover.close_cover
+              target:
+                entity_id:
+                  - cover.blind_1
+                  - cover.blind_2
+                  - cover.blind_3
+                  - cover.blind_4
+        - conditions:
+            - condition: numeric_state
+              entity_id: sensor.spx_building_physics_solar_shading_need
+              above: 45
+          sequence:
+            - action: cover.set_cover_position
+              target:
+                entity_id:
+                  - cover.blind_1
+                  - cover.blind_2
+                  - cover.blind_3
+                  - cover.blind_4
+              data:
+                position: 50
+      default:
+        - action: cover.open_cover
+          target:
+            entity_id:
+              - cover.blind_1
+              - cover.blind_2
+              - cover.blind_3
+              - cover.blind_4
   mode: restart
-- id: '1767347335849'
-  alias: 'Outdoor lights: ABB SA/S Ch01–Ch04 by illuminance'
-  description: ''
+
+- id: 'spx_knx_lights_from_building_physics'
+  alias: 'KNX exterior lights: outdoor lighting demand from building physics'
+  description: >
+    Test automation kept in Home Assistant. Building Physics exposes outdoor
+    lighting demand; HA decides which exterior KNX light groups should be enabled.
   triggers:
-  - trigger: numeric_state
-    entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-    below: 5000
-  - trigger: numeric_state
-    entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-    above: 5000
-  - trigger: homeassistant
-    event: start
+    - trigger: state
+      entity_id:
+        - sensor.spx_building_physics_lighting_demand
+    - trigger: homeassistant
+      event: start
   actions:
-  - choose:
-    - conditions:
-      - condition: numeric_state
-        entity_id: sensor.vaisala_wxt530_weather_transmitter_brightness
-        below: 5000
-      sequence:
-      - action: switch.turn_on
-        target:
-          entity_id:
-          - switch.abb_sa_s_ch01
-          - switch.abb_sa_s_ch02
-          - switch.abb_sa_s_ch03
-          - switch.abb_sa_s_ch04
-    default:
-    - action: switch.turn_off
-      target:
-        entity_id:
-        - switch.abb_sa_s_ch01
-        - switch.abb_sa_s_ch02
-        - switch.abb_sa_s_ch03
-        - switch.abb_sa_s_ch04
+    - choose:
+        - conditions:
+            - condition: numeric_state
+              entity_id: sensor.spx_building_physics_lighting_demand
+              above: 75
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id:
+                  - switch.abb_sa_s_ch01
+                  - switch.abb_sa_s_ch02
+                  - switch.abb_sa_s_ch03
+                  - switch.abb_sa_s_ch04
+        - conditions:
+            - condition: numeric_state
+              entity_id: sensor.spx_building_physics_lighting_demand
+              above: 40
+          sequence:
+            - action: switch.turn_on
+              target:
+                entity_id:
+                  - switch.abb_sa_s_ch03
+                  - switch.abb_sa_s_ch04
+            - action: switch.turn_off
+              target:
+                entity_id:
+                  - switch.abb_sa_s_ch01
+                  - switch.abb_sa_s_ch02
+      default:
+        - action: switch.turn_off
+          target:
+            entity_id:
+              - switch.abb_sa_s_ch01
+              - switch.abb_sa_s_ch02
+              - switch.abb_sa_s_ch03
+              - switch.abb_sa_s_ch04
   mode: restart

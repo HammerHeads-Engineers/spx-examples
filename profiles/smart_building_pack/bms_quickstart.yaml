@@ -12,6 +12,7 @@ models:
   - library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml
   - library/domains/energy/pv/generic/pv_physics_lux.yaml
   - library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml
+  - library/domains/energy/controller/generic/building_energy_aggregator.yaml
   - library/domains/energy/meter/schneider/schneider_pm3200__modbus.yaml
   - library/domains/energy/ups/apc/apc_easy_ups_3m__modbus.yaml
   - library/domains/energy/meter/schneider/schneider_pm5330__modbus.yaml
@@ -28,6 +29,7 @@ models:
   - library/domains/environment/feed/generic/weather_forecast__http.yaml
   - library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml
   - library/domains/building/gateway/wago/utility_gateway_wago_pfc200__water_gas_pulse__mqtt.yaml
+  - library/domains/building/physics/generic/building_physics.yaml
   - library/domains/building/controller/generic/bms_controller__opcua.yaml
   - library/domains/building/panel/generic/lighting_panel__opcua.yaml
   - library/domains/building/controller/generic/room_controller__knx.yaml

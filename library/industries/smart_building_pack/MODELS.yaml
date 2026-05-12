@@ -30,6 +30,11 @@ models:
   domain_group: building
   device_class: zone
   vendor: generic
+- id: Building.Physics.Generic
+  path: library/domains/building/physics/generic/building_physics.yaml
+  domain_group: building
+  device_class: physics
+  vendor: generic
 - id: Building.PresenceDetector.ThebenP360.Knx
   path: library/domains/building/sensor/theben/theronda_p360__knx.yaml
   domain_group: building
@@ -70,6 +75,11 @@ models:
   domain_group: building
   device_class: gateway
   vendor: wago
+- id: Energy.BuildingEnergyAggregator.Generic
+  path: library/domains/energy/controller/generic/building_energy_aggregator.yaml
+  domain_group: energy
+  device_class: controller
+  vendor: generic
 - id: Energy.ESS.VictronCerboGx.Modbus
   path: library/domains/energy/ess/victron/cerbo_gx_ess__modbus.yaml
   domain_group: energy

@@ -291,6 +291,32 @@ models:
   - smart_building_pack
   profiles:
   - bms_quickstart
+- id: Building.Physics.Generic
+  name: Building Physics
+  path: library/domains/building/physics/generic/building_physics.yaml
+  domain: building
+  domain_group: building
+  device_class: physics
+  vendor: generic
+  protocols: []
+  services: []
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.BuildingEnergyAggregator.Generic
+  name: Building Energy Aggregator
+  path: library/domains/energy/controller/generic/building_energy_aggregator.yaml
+  domain: energy
+  domain_group: energy
+  device_class: controller
+  vendor: generic
+  protocols: []
+  services: []
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
 - id: Process.ThermalController.Modbus
   name: Thermal Controller (Modbus)
   path: library/domains/industrial/controller/generic/thermal_controller__modbus.yaml

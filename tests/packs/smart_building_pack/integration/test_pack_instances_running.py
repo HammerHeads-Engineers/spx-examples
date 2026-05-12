@@ -33,6 +33,8 @@ SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEYS = [
     "HVAC_Flexit_Nordic_BACnet",
     "Energy_Meter_iEM3000_Modbus",
+    "Building_Energy_Aggregator",
+    "Building_Physics",
     "Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT",
     "ABB_SA_S12_16_5_1_KNX",
     "ABB_JRA_S4_230_5_1_KNX",
