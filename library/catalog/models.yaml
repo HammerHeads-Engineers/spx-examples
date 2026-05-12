@@ -276,6 +276,47 @@ models:
   - smart_building_pack
   profiles:
   - bms_quickstart
+- id: Building.UtilityGateway.WagoPfc200.WaterGasPulse.Mqtt
+  name: Utility Gateway (WAGO PFC200 + Water/Gas Pulse, MQTT Discovery)
+  path: library/domains/building/gateway/wago/utility_gateway_wago_pfc200__water_gas_pulse__mqtt.yaml
+  domain: building
+  domain_group: building
+  device_class: gateway
+  vendor: wago
+  protocols:
+  - mqtt
+  services:
+  - id: mqtt_broker
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Building.Physics.Generic
+  name: Building Physics
+  path: library/domains/building/physics/generic/building_physics.yaml
+  domain: building
+  domain_group: building
+  device_class: physics
+  vendor: generic
+  protocols: []
+  services: []
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.BuildingEnergyAggregator.Generic
+  name: Building Energy Aggregator
+  path: library/domains/energy/controller/generic/building_energy_aggregator.yaml
+  domain: energy
+  domain_group: energy
+  device_class: controller
+  vendor: generic
+  protocols: []
+  services: []
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
 - id: Process.ThermalController.Modbus
   name: Thermal Controller (Modbus)
   path: library/domains/industrial/controller/generic/thermal_controller__modbus.yaml
@@ -1189,6 +1230,19 @@ models:
   - modbus
   services:
   - id: modbus_tcp_gateway
+  packages:
+  - smart_building_pack
+  profiles:
+  - bms_quickstart
+- id: Energy.PvPhysics.GenericLux
+  name: PV Physics from Lux
+  path: library/domains/energy/pv/generic/pv_physics_lux.yaml
+  domain: energy
+  domain_group: energy
+  device_class: pv
+  vendor: generic
+  protocols: []
+  services: []
   packages:
   - smart_building_pack
   profiles:

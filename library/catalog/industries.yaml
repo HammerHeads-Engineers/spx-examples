@@ -17,11 +17,15 @@ industries:
       - model: Process.ThermalController.Modbus
         instance: spx_hvac_controller
       - model: Building.HvacFlexitNordic.Bacnet
-        instance: spx_hvac_flexit_nordic_bacnet
+        instance: HVAC_Flexit_Nordic_BACnet
       - model: Energy.EnergyMeterIem3000.Modbus
-        instance: spx_energy_meter_iem3000_modbus
+        instance: Energy_Meter_iEM3000_Modbus
+      - model: Energy.PvPhysics.GenericLux
+        instance: PV_Physics_Lux
       - model: Energy.ESS.VictronCerboGx.Modbus
-        instance: spx_victron_cerbo_gx_ess_modbus
+        instance: Victron_Cerbo_GX_ESS_Modbus
+      - model: Energy.BuildingEnergyAggregator.Generic
+        instance: Building_Energy_Aggregator
       - model: Energy.UpsEasy3M.Modbus
         instance: spx_easy_ups_3m_modbus
       - model: Energy.EnergyMeterPm3200.Modbus
@@ -50,7 +54,11 @@ industries:
       - model: Weather.WeatherFeed.Http
         instance: spx_weather_feed
       - model: Weather.WeatherGateway.WagoPfc200.VaisalaWxt530.Mqtt
-        instance: spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
+        instance: Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT
+      - model: Building.UtilityGateway.WagoPfc200.WaterGasPulse.Mqtt
+        instance: Utility_Gateway_WAGO_PFC200_Water_Gas_Pulse_MQTT
+      - model: Building.Physics.Generic
+        instance: Building_Physics
       - model: Env.AirQualityStation.Http
         instance: spx_air_quality_feed
       - model: Building.BMSController.OpcUa
@@ -62,20 +70,24 @@ industries:
       - model: Building.LightingZone.Knx
         instance: spx_lighting_zone_knx
       - model: Building.SwitchActuator.AbbSaS12_16_5_1.Knx
-        instance: spx_abb_sa_s12_16_5_1_knx
+        instance: ABB_SA_S12_16_5_1_KNX
       - model: Building.CoverActuator.AbbJraS4_230_5_1.Knx
-        instance: spx_abb_jra_s4_230_5_1_knx
+        instance: ABB_JRA_S4_230_5_1_KNX
       - model: Building.FireAlarmPanel.Bacnet
         instance: spx_fire_alarm_panel_bacnet
       - model: Building.SecurityAccessController.Bacnet
         instance: spx_security_access_controller_bacnet
     start_instances:
-      - spx_hvac_flexit_nordic_bacnet
-      - spx_energy_meter_iem3000_modbus
-      - spx_victron_cerbo_gx_ess_modbus
-      - spx_weather_gateway_wago_pfc200_vaisala_wxt530_mqtt
-      - spx_abb_sa_s12_16_5_1_knx
-      - spx_abb_jra_s4_230_5_1_knx
+      - HVAC_Flexit_Nordic_BACnet
+      - Energy_Meter_iEM3000_Modbus
+      - PV_Physics_Lux
+      - Victron_Cerbo_GX_ESS_Modbus
+      - Building_Energy_Aggregator
+      - Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT
+      - Utility_Gateway_WAGO_PFC200_Water_Gas_Pulse_MQTT
+      - Building_Physics
+      - ABB_SA_S12_16_5_1_KNX
+      - ABB_JRA_S4_230_5_1_KNX
     path: library/industries/smart_building_pack
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)

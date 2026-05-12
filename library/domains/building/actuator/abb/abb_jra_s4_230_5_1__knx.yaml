@@ -165,6 +165,17 @@ attributes:
   c4_position_state_raw:
     type: int
     default: 0
+  k__moving_channel_load_w:
+    type: float
+    default: 150.0
+    unit: W
+  moving_channel_count:
+    type: int
+    default: 0
+  blind_motor_load_w:
+    type: float
+    default: 0.0
+    unit: W
   _cycle_time_s:
     type: float
     default: 0.2
@@ -195,7 +206,11 @@ actions:
     call: (
           1 if $in(c1_position_set_raw_cmd) >= 0.0
           else 0 if $in(c1_move_long_cmd) != 2
-          else $in(c1_target_active)
+          else (
+            1
+            if abs($in(k__c1_target_pct) - $in(k__c1_position_pct)) > $in(position_tolerance_pct)
+            else 0
+          )
         )
 
   - function: $in(c1_moving)
@@ -209,7 +224,7 @@ actions:
               if abs($in(k__c1_target_pct) - $in(k__c1_position_pct)) <= $in(position_tolerance_pct)
               else (1 if $in(k__c1_target_pct) > $in(k__c1_position_pct) else -1)
             )
-            if $in(c1_position_set_raw_cmd) >= 0.0
+            if ($in(c1_position_set_raw_cmd) >= 0.0 or $in(c1_target_active) == 1)
             else (
               (
                 1
@@ -306,7 +321,11 @@ actions:
     call: (
           1 if $in(c2_position_set_raw_cmd) >= 0.0
           else 0 if $in(c2_move_long_cmd) != 2
-          else $in(c2_target_active)
+          else (
+            1
+            if abs($in(k__c2_target_pct) - $in(k__c2_position_pct)) > $in(position_tolerance_pct)
+            else 0
+          )
         )
 
   - function: $in(c2_moving)
@@ -320,7 +339,7 @@ actions:
               if abs($in(k__c2_target_pct) - $in(k__c2_position_pct)) <= $in(position_tolerance_pct)
               else (1 if $in(k__c2_target_pct) > $in(k__c2_position_pct) else -1)
             )
-            if $in(c2_position_set_raw_cmd) >= 0.0
+            if ($in(c2_position_set_raw_cmd) >= 0.0 or $in(c2_target_active) == 1)
             else (
               (
                 1
@@ -417,7 +436,11 @@ actions:
     call: (
           1 if $in(c3_position_set_raw_cmd) >= 0.0
           else 0 if $in(c3_move_long_cmd) != 2
-          else $in(c3_target_active)
+          else (
+            1
+            if abs($in(k__c3_target_pct) - $in(k__c3_position_pct)) > $in(position_tolerance_pct)
+            else 0
+          )
         )
 
   - function: $in(c3_moving)
@@ -431,7 +454,7 @@ actions:
               if abs($in(k__c3_target_pct) - $in(k__c3_position_pct)) <= $in(position_tolerance_pct)
               else (1 if $in(k__c3_target_pct) > $in(k__c3_position_pct) else -1)
             )
-            if $in(c3_position_set_raw_cmd) >= 0.0
+            if ($in(c3_position_set_raw_cmd) >= 0.0 or $in(c3_target_active) == 1)
             else (
               (
                 1
@@ -528,7 +551,11 @@ actions:
     call: (
           1 if $in(c4_position_set_raw_cmd) >= 0.0
           else 0 if $in(c4_move_long_cmd) != 2
-          else $in(c4_target_active)
+          else (
+            1
+            if abs($in(k__c4_target_pct) - $in(k__c4_position_pct)) > $in(position_tolerance_pct)
+            else 0
+          )
         )
 
   - function: $in(c4_moving)
@@ -542,7 +569,7 @@ actions:
               if abs($in(k__c4_target_pct) - $in(k__c4_position_pct)) <= $in(position_tolerance_pct)
               else (1 if $in(k__c4_target_pct) > $in(k__c4_position_pct) else -1)
             )
-            if $in(c4_position_set_raw_cmd) >= 0.0
+            if ($in(c4_position_set_raw_cmd) >= 0.0 or $in(c4_target_active) == 1)
             else (
               (
                 1
@@ -614,6 +641,16 @@ actions:
   - function: $in(c4_position_set_raw_cmd)
     name: clear_position_set_raw_cmd_c4
     call: -1.0
+
+  - function: $in(moving_channel_count)
+    name: compute_moving_channel_count
+    description: Count blind channels currently moving so their motor load can be estimated.
+    call: int(abs($in(c1_moving)) > 0) + int(abs($in(c2_moving)) > 0) + int(abs($in(c3_moving)) > 0) + int(abs($in(c4_moving)) > 0)
+
+  - function: $in(blind_motor_load_w)
+    name: compute_blind_motor_load
+    description: Approximate instantaneous blind motor load while ABB cover channels are moving.
+    call: max(0.0, $in(moving_channel_count)) * max(0.0, $in(k__moving_channel_load_w))
 
 communication:
   - knx_ip:

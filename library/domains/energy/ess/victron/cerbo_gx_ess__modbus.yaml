@@ -62,7 +62,7 @@ attributes:
     unit: W
   hvac_load_w:
     type: float
-    default: 650.0
+    default: 0.0
     unit: W
   ev_load_w:
     type: float

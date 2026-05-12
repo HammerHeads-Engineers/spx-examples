@@ -31,6 +31,17 @@ attributes:
     type: float
     default: 0.2
     unit: s
+  k__channel_load_w:
+    type: float
+    default: 60.0
+    unit: W
+  active_channel_count:
+    type: int
+    default: 0
+  lighting_load_w:
+    type: float
+    default: 0.0
+    unit: W
 
   all_off_cmd:
     type: int
@@ -102,6 +113,19 @@ conditions:
         call: 0
       - function: $in(all_off_cmd)
         call: 0
+
+actions:
+  - function: $in(active_channel_count)
+    name: compute_active_channel_count
+    description: Count active KNX lighting channels currently turned on.
+    call: int(max(0, $in(k__ch01))) + int(max(0, $in(k__ch02))) + int(max(0, $in(k__ch03))) + int(max(0, $in(k__ch04)))
+      + int(max(0, $in(k__ch05))) + int(max(0, $in(k__ch06))) + int(max(0, $in(k__ch07))) + int(max(0, $in(k__ch08)))
+      + int(max(0, $in(k__ch09))) + int(max(0, $in(k__ch10))) + int(max(0, $in(k__ch11))) + int(max(0, $in(k__ch12)))
+
+  - function: $in(lighting_load_w)
+    name: compute_lighting_load
+    description: Approximate active lighting load from enabled ABB switch channels.
+    call: max(0.0, $in(active_channel_count)) * max(0.0, $in(k__channel_load_w))
 
 communication:
   - knx_ip:
