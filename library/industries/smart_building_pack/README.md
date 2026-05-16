@@ -62,6 +62,11 @@ to validate multi-protocol integrations, test gateways, or build demo dashboards
 - Profile: `profiles/smart_building_pack/bms_quickstart.yaml`
 - Services enabled by the profile: MQTT, Modbus, BACnet, LwM2M, HTTP, OPC UA, KNX,
   Home Assistant bridge, Matter server.
+- The installer's default starter set is intentionally capped at 5 running instances so
+  the pack works out of the box with the Community license. The default starter
+  instances are: `HVAC_Flexit_Nordic_BACnet`, `Energy_Meter_iEM3000_Modbus`,
+  `Victron_Cerbo_GX_ESS_Modbus`, `Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT`,
+  and `Building_Physics`.
 - When selecting this pack in the installer, Home Assistant is installed as well.
   Access it at `http://localhost:8123` (login: `admin`, password: `spx-examples`).
 - Use the installer wizard (`./spx-install.sh`) or generate non-interactively:

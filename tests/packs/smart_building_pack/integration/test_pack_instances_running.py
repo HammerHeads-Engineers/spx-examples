@@ -33,9 +33,11 @@ SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
 INSTANCE_KEYS = [
     "HVAC_Flexit_Nordic_BACnet",
     "Energy_Meter_iEM3000_Modbus",
-    "Building_Energy_Aggregator",
+    "Victron_Cerbo_GX_ESS_Modbus",
     "Building_Physics",
     "Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT",
+]
+OPTIONAL_KNX_INSTANCE_KEYS = [
     "ABB_SA_S12_16_5_1_KNX",
     "ABB_JRA_S4_230_5_1_KNX",
 ]
@@ -134,6 +136,16 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
             key: require_existing_instance(cls._client, key, ensure_running=False)
             for key in INSTANCE_KEYS
         }
+        cls._optional_instances = {}
+        for key in OPTIONAL_KNX_INSTANCE_KEYS:
+            try:
+                cls._optional_instances[key] = require_existing_instance(
+                    cls._client,
+                    key,
+                    ensure_running=False,
+                )
+            except unittest.SkipTest:
+                continue
         cls._logging_enabled = spx_ensure_attribute is not None and spx_append_attribute_value is not None
         cls.spx_log_attr = "_test_logs"
         cls.spx_log_instance = None
@@ -183,6 +195,9 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
 
     @spx_log_test_case()
     def test_homeassistant_outdoor_lights_automation(self):
+        if set(OPTIONAL_KNX_INSTANCE_KEYS) - set(self._optional_instances):
+            self.skipTest("Optional KNX lighting/blinds instances are not part of the Community starter.")
+
         weather_instance = self._instances["Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT"]
         if (_instance_state(weather_instance) or "").lower() != "running":
             try:
@@ -190,14 +205,14 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
             except Exception:
                 pass
 
-        switch_instance = self._instances["ABB_SA_S12_16_5_1_KNX"]
+        switch_instance = self._optional_instances["ABB_SA_S12_16_5_1_KNX"]
         if (_instance_state(switch_instance) or "").lower() != "running":
             try:
                 switch_instance.start()
             except Exception:
                 pass
 
-        cover_instance = self._instances["ABB_JRA_S4_230_5_1_KNX"]
+        cover_instance = self._optional_instances["ABB_JRA_S4_230_5_1_KNX"]
         if (_instance_state(cover_instance) or "").lower() != "running":
             try:
                 cover_instance.start()
@@ -414,6 +429,9 @@ class TestSmartBuildingPackInstancesRunning(SpxAssertionLoggingMixin, unittest.T
 
     @spx_log_test_case()
     def test_z_test_logs_recorded(self):
+        if set(OPTIONAL_KNX_INSTANCE_KEYS) - set(self._optional_instances):
+            self.skipTest("Optional KNX lighting/blinds instances are not part of the Community starter.")
+
         entries = self._recent_logs()
         self.assertIsInstance(entries, list)
         self.assertTrue(entries, "Expected _test_logs entries to be recorded.")

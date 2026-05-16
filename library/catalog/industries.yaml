@@ -80,14 +80,9 @@ industries:
     start_instances:
       - HVAC_Flexit_Nordic_BACnet
       - Energy_Meter_iEM3000_Modbus
-      - PV_Physics_Lux
       - Victron_Cerbo_GX_ESS_Modbus
-      - Building_Energy_Aggregator
       - Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT
-      - Utility_Gateway_WAGO_PFC200_Water_Gas_Pulse_MQTT
       - Building_Physics
-      - ABB_SA_S12_16_5_1_KNX
-      - ABB_JRA_S4_230_5_1_KNX
     path: library/industries/smart_building_pack
   - id: energy_pack
     name: Energy Pack (e-Mobility & DER)
