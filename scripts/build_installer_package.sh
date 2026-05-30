@@ -147,7 +147,7 @@ development/debug flow where the native wrappers are not required.
 
 - Python 3.9+ with `pip`
 - Docker Desktop / Docker Engine with Compose V2
-- Python 3.10+ if you want to bootstrap the local Codex MCP workspace
+- Python 3.10+ if you want to bootstrap the local SPX MCP workspace
 - On Ubuntu/Debian, if the runtime venv cannot bootstrap pip, install `python3-venv` and, if needed, `python3-pip`
 
 ## Licensing
@@ -168,16 +168,17 @@ development/debug flow where the native wrappers are not required.
 4. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
 5. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
 
-## Optional Codex MCP workspace
+## Optional SPX MCP workspace
 
-If you want a repo-like workspace that Codex can open with the local `spx-mcp`
-server preconfigured, run:
+If you want a repo-like workspace that MCP-capable clients can open with the
+local `spx-mcp` server preconfigured, run:
 
 - macOS: `./spx-mcp-setup.command`
 - macOS/Linux shells: `./spx-mcp-setup.sh`
 
-This creates an installer-managed workspace and a local `.codex/config.toml`
-for that folder. Open Codex in the generated workspace and start a fresh thread.
+This creates an installer-managed workspace plus local `.codex/config.toml` for
+Codex and `.mcp.json` for Claude Code. Open the generated workspace in your MCP
+client and start a fresh session.
 
 You can safely redistribute the extracted folder (including `build/spx-generated`) to teammates.
 EOF

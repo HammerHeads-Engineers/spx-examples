@@ -3,7 +3,8 @@ property appTitle : "SPX Uninstall"
 property packageId : "com.hammerheadsengineers.spx.installer"
 property supportDirRelativePath : "Library/Application Support/SPX"
 property generatedDirRelativePath : "Library/Application Support/SPX/generated"
-property workspaceRelativePath : "Documents/SPX Codex Workspace"
+property workspaceRelativePath : "Documents/SPX MCP Workspace"
+property legacyWorkspaceRelativePath : "Documents/SPX Codex Workspace"
 
 on run
   set homePath to POSIX path of (path to home folder)
@@ -12,19 +13,24 @@ on run
   set supportDir to homePath & supportDirRelativePath
   set generatedDir to homePath & generatedDirRelativePath
   set workspaceDir to homePath & workspaceRelativePath
+  set legacyWorkspaceDir to homePath & legacyWorkspaceRelativePath
+  set workspacePromptPath to workspaceDir
+  if (not my fileOrDirExists(workspaceDir)) and my fileOrDirExists(legacyWorkspaceDir) then
+    set workspacePromptPath to legacyWorkspaceDir
+  end if
   set removeWorkspace to false
   set uninstallMessage to "SPX Uninstall will stop the local stack, remove generated SPX files, delete the installed SPX apps, and forget the macOS package receipt."
 
   activate
-  if my fileOrDirExists(workspaceDir) then
-    set workspaceChoice to button returned of (display dialog uninstallMessage & return & return & "Choose whether to keep the installer-managed workspace:" & return & workspaceDir buttons {"Cancel", "Keep Workspace", "Remove Workspace"} default button "Keep Workspace" cancel button "Cancel" with icon caution)
+  if my fileOrDirExists(workspaceDir) or my fileOrDirExists(legacyWorkspaceDir) then
+    set workspaceChoice to button returned of (display dialog uninstallMessage & return & return & "Choose whether to keep the installer-managed workspace:" & return & workspacePromptPath buttons {"Cancel", "Keep Workspace", "Remove Workspace"} default button "Keep Workspace" cancel button "Cancel" with icon caution)
     set removeWorkspace to workspaceChoice is "Remove Workspace"
   else
     display dialog uninstallMessage buttons {"Cancel", "Uninstall"} default button "Uninstall" cancel button "Cancel" with icon caution
   end if
 
   try
-    do shell script "/bin/bash -lc " & quoted form of my cleanupShell(supportDir, generatedDir, workspaceDir, removeWorkspace)
+    do shell script "/bin/bash -lc " & quoted form of my cleanupShell(supportDir, generatedDir, workspaceDir, legacyWorkspaceDir, removeWorkspace)
     do shell script "/bin/bash -lc " & quoted form of my uninstallShell(appsDirPath, packageId) with administrator privileges
     activate
     if removeWorkspace then
@@ -42,12 +48,13 @@ on run
   end try
 end run
 
-on cleanupShell(supportDir, generatedDir, workspaceDir, removeWorkspace)
+on cleanupShell(supportDir, generatedDir, workspaceDir, legacyWorkspaceDir, removeWorkspace)
   set commandLines to {}
   set end of commandLines to "set -euo pipefail"
   set end of commandLines to "SUPPORT_DIR=" & quoted form of supportDir
   set end of commandLines to "GENERATED_DIR=" & quoted form of generatedDir
   set end of commandLines to "WORKSPACE_DIR=" & quoted form of workspaceDir
+  set end of commandLines to "LEGACY_WORKSPACE_DIR=" & quoted form of legacyWorkspaceDir
   set end of commandLines to "REMOVE_WORKSPACE=" & (my boolToFlag(removeWorkspace))
   set end of commandLines to "pkill -f spx-ble-adapter >/dev/null 2>&1 || true"
   set end of commandLines to "if [ -f \"$GENERATED_DIR/docker-compose.generated.yml\" ] && command -v docker >/dev/null 2>&1; then"
@@ -56,6 +63,7 @@ on cleanupShell(supportDir, generatedDir, workspaceDir, removeWorkspace)
   set end of commandLines to "rm -rf \"$SUPPORT_DIR\""
   set end of commandLines to "if [ \"$REMOVE_WORKSPACE\" = 1 ]; then"
   set end of commandLines to "  rm -rf \"$WORKSPACE_DIR\""
+  set end of commandLines to "  rm -rf \"$LEGACY_WORKSPACE_DIR\""
   set end of commandLines to "fi"
   return my joinLines(commandLines, linefeed)
 end cleanupShell

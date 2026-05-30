@@ -24,7 +24,8 @@ PLACEHOLDER_PRODUCT_KEY_MARKERS = {
     "PLACEHOLDER",
 }
 WORKSPACE_MARKER_NAME = ".spx-mcp-workspace.json"
-WORKSPACE_MARKER_KIND = "spx-codex-mcp-workspace"
+WORKSPACE_MARKER_KIND = "spx-mcp-workspace"
+LEGACY_WORKSPACE_MARKER_KIND = "spx-codex-mcp-workspace"
 WORKSPACE_KIND_MANAGED = "managed"
 WORKSPACE_KIND_GIT = "git"
 PRODUCT_KEY_MASK_RE = re.compile(r"[^A-Z0-9]+")
@@ -268,7 +269,7 @@ def _read_workspace_marker(repo_root: Path) -> Optional[dict[str, object]]:
         return None
     if not isinstance(payload, dict):
         return None
-    if payload.get("kind") not in {None, WORKSPACE_MARKER_KIND}:
+    if payload.get("kind") not in {None, WORKSPACE_MARKER_KIND, LEGACY_WORKSPACE_MARKER_KIND}:
         return None
     return payload
 

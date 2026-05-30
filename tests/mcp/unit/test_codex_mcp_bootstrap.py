@@ -114,6 +114,8 @@ def test_local_git_exclude_patterns_include_workspace_mode_file() -> None:
     assert LOCAL_GIT_EXCLUDE_PATTERNS == (
         ".codex/config.toml",
         ".codex/workspace_mode.toml",
+        ".mcp.json",
+        ".spx/workspace_mode.toml",
     )
 
 

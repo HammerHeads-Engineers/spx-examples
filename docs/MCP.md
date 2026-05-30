@@ -17,7 +17,8 @@ The current MCP server is designed for local `stdio` workflows:
 
 ## Work modes
 
-The repository distinguishes two semantic work modes for Codex/LLM agents:
+The repository distinguishes two semantic work modes for MCP-capable LLM
+agents:
 
 - `runtime_mcp`: shortest reliable path to a live result on a local
   `spx-server`. Prefer MCP-first flows, avoid repo-wide hardening by default,
@@ -35,9 +36,10 @@ These work modes are separate from the technical workspace shape:
 Agents should resolve work mode in this order:
 
 1. explicit user intent
-2. `.codex/workspace_mode.toml`
-3. `.spx-mcp-workspace.json`
-4. `repo_dev`
+2. `.spx/workspace_mode.toml`
+3. legacy `.codex/workspace_mode.toml`
+4. `.spx-mcp-workspace.json`
+5. `repo_dev`
 
 ## Runtime requirements
 
@@ -53,12 +55,12 @@ poetry env use C:\Python314\python.exe
 poetry install --with dev
 ```
 
-## Bootstrap Codex config
+## Bootstrap MCP client configs
 
 To generate a local Codex MCP config for this repository without committing
 machine-specific paths, use one of the bootstrap scripts below. They create
-`<repo>/.codex/config.toml` and add `.codex/config.toml` to the local
-git exclude file for the worktree.
+`<repo>/.codex/config.toml` and add local client config files to the worktree's
+git exclude file.
 
 Windows:
 
@@ -74,20 +76,22 @@ sh tools/setup_codex_mcp.sh
 
 If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app` from
 `/Applications/SPX Tools/`. That companion app creates a workspace at
-`~/Documents/SPX Codex Workspace`, prepares a local `.venv`, and writes
-`.codex/config.toml` for that folder in read/write mode by default. During setup
-you choose the work mode first:
+`~/Documents/SPX MCP Workspace`, prepares a local `.venv`, writes
+`.codex/config.toml` for Codex, writes project-local `.mcp.json` for Claude
+Code, and copies `CLAUDE.md` so Claude Code can follow `@AGENTS.md`. Both MCP
+client configs point at the same local `spx-mcp` stdio server and are
+read/write by default. During setup you choose the work mode first:
 
 - `runtime_mcp`: installer-managed MCP workspace copy
 - `repo_dev`: full Git clone of `spx-examples` on `develop`
 
-The setup flow also writes `.codex/workspace_mode.toml` so the workspace keeps a
-local record of the intended mode. In git-backed workspaces, the setup updates
-the local git exclude file so `.codex/config.toml` and
-`.codex/workspace_mode.toml` do not show up in normal commits. Open Codex in
-the generated workspace and start a fresh thread to pick up the config. That
-fresh-thread reload is currently a host-app limitation, not a repo bootstrap
-problem.
+The setup flow also writes `.spx/workspace_mode.toml` so the workspace keeps a
+local record of the intended mode. Existing `.codex/workspace_mode.toml` files
+are still read as a legacy fallback. In git-backed workspaces, the setup updates
+the local git exclude file so `.codex/config.toml`, `.mcp.json`, and
+workspace-mode files do not show up in normal commits. Open the generated
+workspace in Codex, Claude Code, or another MCP-capable client and start a fresh
+session to pick up the local config.
 
 ## Runtime-first MCP workflow
 
@@ -139,7 +143,7 @@ available and a local `spx-server` is running.
 Optional flags:
 
 - `--read-only` to omit `--allow-write`
-- `--server-name custom_name` to use a different Codex MCP id
+- `--server-name custom_name` to use a different MCP server id
 
 The generated config prefers the local `.venv` Python interpreter when present
 and otherwise falls back to `poetry run python -m spx_mcp ...`.

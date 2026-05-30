@@ -56,7 +56,7 @@ internal static class Program
         Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup] [--pause-on-error]");
         Console.WriteLine();
         Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
-        Console.WriteLine("  mcp-setup  Create or refresh the Codex MCP workspace.");
+        Console.WriteLine("  mcp-setup  Create or refresh the SPX MCP workspace.");
         Console.WriteLine("  start      Run the generated SPX start script.");
         Console.WriteLine("  stop       Run the generated SPX stop script.");
         Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");

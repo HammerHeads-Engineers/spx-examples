@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Create or refresh a Codex MCP workspace."""
+"""Create or refresh an SPX MCP workspace."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ from typing import Mapping, Optional, Sequence
 DEFAULT_SERVER_NAME = "spx"
 DEFAULT_BASE_URL = "http://localhost:8000"
 DEFAULT_PRODUCT_KEY = "REPLACE_ME"
-DEFAULT_WORKSPACE_NAME = "SPX Codex Workspace"
+DEFAULT_WORKSPACE_NAME = "SPX MCP Workspace"
+LEGACY_WORKSPACE_NAME = "SPX Codex Workspace"
 DEFAULT_GIT_REMOTE_URL = "https://github.com/HammerHeads-Engineers/spx-examples.git"
 DEFAULT_GIT_BRANCH = "develop"
 WORKSPACE_KIND_MANAGED = "managed"
@@ -35,11 +36,13 @@ PLACEHOLDER_PRODUCT_KEYS = {
     "PRODUCT_KEY",
     "PLACEHOLDER",
 }
-WORKSPACE_MARKER_KIND = "spx-codex-mcp-workspace"
+WORKSPACE_MARKER_KIND = "spx-mcp-workspace"
+LEGACY_WORKSPACE_MARKER_KIND = "spx-codex-mcp-workspace"
 WORKSPACE_MARKER_VERSION = 2
 WORKSPACE_README_NAME = "MCP_WORKSPACE_README.md"
 WORKSPACE_MARKER_NAME = ".spx-mcp-workspace.json"
-WORKSPACE_MODE_FILE_REL = Path(".codex") / "workspace_mode.toml"
+WORKSPACE_MODE_FILE_REL = Path(".spx") / "workspace_mode.toml"
+LEGACY_WORKSPACE_MODE_FILE_REL = Path(".codex") / "workspace_mode.toml"
 SKIP_ENTRY_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache", ".DS_Store"}
 WORKSPACE_ENTRY_NAMES = (
     "installer",
@@ -50,6 +53,7 @@ WORKSPACE_ENTRY_NAMES = (
     "tools",
     "docs",
     "AGENTS.md",
+    "CLAUDE.md",
     "spx-setup.command",
     "spx-setup.desktop",
     "spx-setup.sh",
@@ -88,7 +92,7 @@ REQUIRED_RUNTIME_WRITE_TOOLS = (
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Bootstrap a local Codex workspace for the packaged SPX MCP tool.",
+        description="Bootstrap a local MCP workspace for the packaged SPX MCP tool.",
     )
     parser.add_argument(
         "--source-root",
@@ -99,7 +103,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "--workspace-dir",
         required=False,
         default=None,
-        help="Destination directory for the Codex workspace.",
+        help="Destination directory for the MCP workspace.",
     )
     parser.add_argument(
         "--workspace-kind",
@@ -140,7 +144,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--server-name",
         default=DEFAULT_SERVER_NAME,
-        help="Codex MCP server name written into .codex/config.toml.",
+        help="MCP server name written into generated client configs.",
     )
     parser.add_argument(
         "--git-remote-url",
@@ -163,13 +167,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         dest="allow_write",
         action="store_true",
         default=None,
-        help="Generate the Codex MCP config with write tools enabled.",
+        help="Generate MCP client configs with write tools enabled.",
     )
     allow_write_group.add_argument(
         "--read-only",
         dest="allow_write",
         action="store_false",
-        help="Generate the Codex MCP config without write tools.",
+        help="Generate MCP client configs without write tools.",
     )
     args = parser.parse_args(argv)
 
@@ -199,7 +203,37 @@ def default_workspace_dir(
         if local_app_data:
             return Path(local_app_data).expanduser().resolve() / "SPX" / "workspace"
         return home / "AppData" / "Local" / "SPX" / "workspace"
+    return home / "spx-mcp-workspace"
+
+
+def legacy_default_workspace_dir(
+    home: Optional[Path] = None,
+    platform_name: Optional[str] = None,
+) -> Path:
+    home = (home or Path.home()).expanduser().resolve()
+    platform_name = platform_name or sys.platform
+    if platform_name == "darwin":
+        return home / "Documents" / LEGACY_WORKSPACE_NAME
+    if platform_name.startswith("win"):
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if local_app_data:
+            return Path(local_app_data).expanduser().resolve() / "SPX" / "workspace"
+        return home / "AppData" / "Local" / "SPX" / "workspace"
     return home / "spx-codex-workspace"
+
+
+def resolve_default_workspace_dir(
+    home: Optional[Path] = None,
+    platform_name: Optional[str] = None,
+) -> Path:
+    current = default_workspace_dir(home=home, platform_name=platform_name)
+    legacy = legacy_default_workspace_dir(home=home, platform_name=platform_name)
+    if current == legacy or current.exists() or not legacy.exists():
+        return current
+
+    current.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(legacy), str(current))
+    return current
 
 
 def read_dotenv(path: Path) -> dict[str, str]:
@@ -437,9 +471,17 @@ def workspace_mode_file_path(workspace_dir: Path) -> Path:
     return workspace_dir / WORKSPACE_MODE_FILE_REL
 
 
+def legacy_workspace_mode_file_path(workspace_dir: Path) -> Path:
+    return workspace_dir / LEGACY_WORKSPACE_MODE_FILE_REL
+
+
 def read_workspace_mode_file(workspace_dir: Path) -> Optional[str]:
-    mode_path = workspace_mode_file_path(workspace_dir)
-    if not mode_path.exists():
+    candidates = [
+        workspace_mode_file_path(workspace_dir),
+        legacy_workspace_mode_file_path(workspace_dir),
+    ]
+    mode_path = next((path for path in candidates if path.exists()), None)
+    if mode_path is None:
         return None
 
     for raw_line in mode_path.read_text(encoding="utf-8").splitlines():
@@ -459,12 +501,15 @@ def write_workspace_mode_file(workspace_dir: Path, work_mode: str) -> None:
     mode_path = workspace_mode_file_path(workspace_dir)
     mode_path.parent.mkdir(parents=True, exist_ok=True)
     mode_path.write_text(
-        "# Local SPX Codex workspace override.\n"
+        "# Local SPX MCP workspace override.\n"
         "# Keep this file uncommitted and adjust only when you intentionally\n"
-        "# want Codex to prefer a different work mode in this workspace.\n"
+        "# want agents to prefer a different work mode in this workspace.\n"
         f'mode = "{work_mode}"\n',
         encoding="utf-8",
     )
+    legacy_mode_path = legacy_workspace_mode_file_path(workspace_dir)
+    if legacy_mode_path.exists():
+        legacy_mode_path.write_text(mode_path.read_text(encoding="utf-8"), encoding="utf-8")
 
 
 def read_workspace_marker(workspace_dir: Path) -> Optional[dict[str, object]]:
@@ -478,7 +523,7 @@ def read_workspace_marker(workspace_dir: Path) -> Optional[dict[str, object]]:
     if not isinstance(payload, dict):
         raise RuntimeError(f"Invalid workspace metadata payload in {marker_path}")
     marker_kind = payload.get("kind")
-    if marker_kind not in {None, WORKSPACE_MARKER_KIND}:
+    if marker_kind not in {None, WORKSPACE_MARKER_KIND, LEGACY_WORKSPACE_MARKER_KIND}:
         raise RuntimeError(f"Unexpected workspace metadata kind in {marker_path}")
     return payload
 
@@ -811,6 +856,43 @@ def bootstrap_codex(
     run_command(argv, cwd=workspace_dir)
 
 
+def claude_stdio_args(workspace_dir: Path, *, allow_write: bool) -> list[str]:
+    args = ["-m", "spx_mcp", "stdio", "--repo-root", str(workspace_dir)]
+    if allow_write:
+        args.append("--allow-write")
+    return args
+
+
+def write_claude_mcp_config(
+    workspace_dir: Path,
+    venv_python: Path,
+    *,
+    server_name: str,
+    allow_write: bool,
+) -> None:
+    config_path = workspace_dir / ".mcp.json"
+    if config_path.exists():
+        try:
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid Claude MCP config: {config_path}") from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"Invalid Claude MCP config payload: {config_path}")
+    else:
+        payload = {}
+
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict):
+        servers = {}
+    servers[server_name] = {
+        "command": str(venv_python),
+        "args": claude_stdio_args(workspace_dir, allow_write=allow_write),
+        "env": {},
+    }
+    payload["mcpServers"] = servers
+    config_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def read_codex_server_args(config_path: Path, server_name: str) -> list[str]:
     config_text = config_path.read_text(encoding="utf-8")
     section_re = re.compile(
@@ -841,6 +923,29 @@ def read_codex_server_args(config_path: Path, server_name: str) -> list[str]:
     return list(args)
 
 
+def read_claude_server_args(config_path: Path, server_name: str) -> list[str]:
+    try:
+        payload = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Generated Claude MCP config is invalid JSON: {config_path}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Generated Claude MCP config is not an object: {config_path}")
+    servers = payload.get("mcpServers")
+    if not isinstance(servers, dict):
+        raise RuntimeError(f"Generated Claude MCP config is missing mcpServers: {config_path}")
+    server = servers.get(server_name)
+    if not isinstance(server, dict):
+        raise RuntimeError(
+            f"Generated Claude MCP config is missing mcpServers.{server_name}: {config_path}"
+        )
+    args = server.get("args")
+    if not isinstance(args, list) or not all(isinstance(value, str) for value in args):
+        raise RuntimeError(
+            f"Generated Claude MCP config has invalid args for server '{server_name}' in {config_path}."
+        )
+    return list(args)
+
+
 def verify_workspace(
     venv_python: Path,
     workspace_dir: Path,
@@ -860,6 +965,23 @@ def verify_workspace(
         raise RuntimeError(
             "Workspace bootstrap expected a read-only MCP config, but "
             f"{config_path} still includes --allow-write for server '{server_name}'."
+        )
+    claude_config_path = workspace_dir / ".mcp.json"
+    claude_config_args = read_claude_server_args(claude_config_path, server_name)
+    claude_config_has_allow_write = "--allow-write" in claude_config_args
+    if "--repo-root" not in claude_config_args:
+        raise RuntimeError(
+            f"Generated Claude MCP config is missing --repo-root for server '{server_name}'."
+        )
+    if allow_write and not claude_config_has_allow_write:
+        raise RuntimeError(
+            "Workspace bootstrap expected a write-enabled Claude MCP config, but "
+            f"{claude_config_path} does not include --allow-write for server '{server_name}'."
+        )
+    if not allow_write and claude_config_has_allow_write:
+        raise RuntimeError(
+            "Workspace bootstrap expected a read-only Claude MCP config, but "
+            f"{claude_config_path} still includes --allow-write for server '{server_name}'."
         )
 
     doctor_argv = [
@@ -986,8 +1108,9 @@ def write_workspace_readme(
             "- a local `.venv` prepared for the MCP server\n"
             "- `.codex/config.toml` pointing Codex at the local MCP server id "
             f"`{server_name}`\n"
-            "- local git exclude updated so `.codex/config.toml` and "
-            "`.codex/workspace_mode.toml` stay out of normal commits"
+            "- `.mcp.json` pointing Claude Code at the same local MCP server\n"
+            "- local git exclude updated so `.codex/config.toml`, `.mcp.json`, and "
+            "`.spx/workspace_mode.toml` stay out of normal commits"
         )
         mode_note = (
             "This workspace keeps `.git`, branches, and remotes so you can build "
@@ -1000,7 +1123,9 @@ def write_workspace_readme(
             "- a local `.venv` prepared for the MCP server\n"
             "- `.codex/config.toml` pointing Codex at the local MCP server id "
             f"`{server_name}`\n"
-            "- `.codex/workspace_mode.toml` pinned to `runtime_mcp` for MCP-first work"
+            "- `.mcp.json` pointing Claude Code at the same local MCP server\n"
+            "- `CLAUDE.md` pointing Claude Code at `AGENTS.md`\n"
+            "- `.spx/workspace_mode.toml` pinned to `runtime_mcp` for MCP-first work"
         )
         mode_note = (
             "This workspace is not a full git checkout. Treat it as a runtime-first "
@@ -1009,22 +1134,23 @@ def write_workspace_readme(
             "port them back into a repo_dev checkout later."
         )
 
-    readme = f"""# SPX Codex Workspace
+    readme = f"""# SPX MCP Workspace
 
-This folder was created by the packaged SPX installer so Codex can use the local
-`spx-mcp` server.
+This folder was created by the packaged SPX installer so MCP-capable coding
+agents can use the local `spx-mcp` server.
 
 ## Workspace contract
 
 - workspace kind: `{workspace_kind}`
 - default work mode: `{work_mode}`
 
-Codex and other agents should resolve work mode in this order:
+Agents should resolve work mode in this order:
 
 1. explicit user intent
-2. `.codex/workspace_mode.toml`
-3. `{WORKSPACE_MARKER_NAME}`
-4. `repo_dev`
+2. `.spx/workspace_mode.toml`
+3. legacy `.codex/workspace_mode.toml`
+4. `{WORKSPACE_MARKER_NAME}`
+5. `repo_dev`
 
 ## What is inside
 
@@ -1032,14 +1158,14 @@ Codex and other agents should resolve work mode in this order:
 
 ## How to use it
 
-1. Open this folder in Codex.
-2. Start a fresh thread so Codex reloads `.codex/config.toml` in the host app.
+1. Open this folder in Codex, Claude Code, or another MCP-capable client.
+2. Start a fresh session so the client reloads its local MCP configuration.
 3. Use the `{server_name}` MCP server from this workspace.
 
 The generated config currently uses `{mode_label}` mode.
 Packaged workspaces default to read/write mode; use `--read-only` only when you
 intentionally want inspection-only MCP access.
-If you want to regenerate it manually, run:
+If you want to regenerate the Codex config manually, run:
 
 ```bash
 sh tools/setup_codex_mcp.sh{" --read-only" if not allow_write else ""}
@@ -1102,7 +1228,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     workspace_dir = (
         Path(args.workspace_dir).expanduser().resolve()
         if args.workspace_dir
-        else default_workspace_dir()
+        else resolve_default_workspace_dir()
     )
     seed_env_path = (
         Path(args.seed_env).expanduser().resolve()
@@ -1156,6 +1282,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         allow_write=allow_write,
         update_git_exclude=workspace_kind == WORKSPACE_KIND_GIT,
     )
+    write_claude_mcp_config(
+        workspace_dir,
+        venv_python,
+        server_name=args.server_name,
+        allow_write=allow_write,
+    )
     write_workspace_mode_file(workspace_dir, work_mode)
     write_workspace_readme(
         workspace_dir,
@@ -1190,6 +1322,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"[spx-mcp-workspace] Default work mode: {work_mode}")
     print(f"[spx-mcp-workspace] Local venv python: {venv_python}")
     print(f"[spx-mcp-workspace] Codex config: {workspace_dir / '.codex' / 'config.toml'}")
+    print(f"[spx-mcp-workspace] Claude Code config: {workspace_dir / '.mcp.json'}")
     print(
         f"[spx-mcp-workspace] Workspace mode file: "
         f"{workspace_mode_file_path(workspace_dir)}"

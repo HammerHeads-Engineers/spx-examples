@@ -62,12 +62,37 @@ resolve_allow_write() {
 default_workspace_dir() {
   case "$(uname -s)" in
     Darwin)
+      printf '%s\n' "${HOME}/Documents/SPX MCP Workspace"
+      ;;
+    *)
+      printf '%s\n' "${HOME}/spx-mcp-workspace"
+      ;;
+  esac
+}
+
+legacy_default_workspace_dir() {
+  case "$(uname -s)" in
+    Darwin)
       printf '%s\n' "${HOME}/Documents/SPX Codex Workspace"
       ;;
     *)
       printf '%s\n' "${HOME}/spx-codex-workspace"
       ;;
   esac
+}
+
+resolve_default_workspace_dir() {
+  local current
+  local legacy
+  current="$(default_workspace_dir)"
+  legacy="$(legacy_default_workspace_dir)"
+
+  if [[ "${current}" != "${legacy}" && ! -e "${current}" && -e "${legacy}" ]]; then
+    mkdir -p "$(dirname "${current}")"
+    mv "${legacy}" "${current}"
+  fi
+
+  printf '%s\n' "${current}"
 }
 
 default_seed_env() {
@@ -266,6 +291,11 @@ work_mode_to_workspace_kind() {
 
 workspace_mode_file_path() {
   local workspace_dir="$1"
+  printf '%s\n' "${workspace_dir}/.spx/workspace_mode.toml"
+}
+
+legacy_workspace_mode_file_path() {
+  local workspace_dir="$1"
   printf '%s\n' "${workspace_dir}/.codex/workspace_mode.toml"
 }
 
@@ -277,10 +307,11 @@ workspace_marker_path() {
 read_workspace_local_work_mode() {
   local workspace_dir="$1"
   local mode_file
-  mode_file="$(workspace_mode_file_path "${workspace_dir}")"
-  [[ -f "${mode_file}" ]] || return 1
+  local mode
 
-  "${MCP_PYTHON}" - "${mode_file}" <<'PY'
+  for mode_file in "$(workspace_mode_file_path "${workspace_dir}")" "$(legacy_workspace_mode_file_path "${workspace_dir}")"; do
+    [[ -f "${mode_file}" ]] || continue
+    if ! mode="$("${MCP_PYTHON}" - "${mode_file}" <<'PY'
 from pathlib import Path
 import re
 import sys
@@ -297,6 +328,16 @@ for raw_line in path.read_text(encoding="utf-8").splitlines():
         raise SystemExit(0)
 raise SystemExit(1)
 PY
+    )"; then
+      continue
+    fi
+    if [[ -n "${mode}" ]]; then
+      printf '%s\n' "${mode}"
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 read_workspace_metadata_work_mode() {
@@ -455,7 +496,7 @@ resolve_work_mode() {
 }
 
 if [[ -z "${WORKSPACE_DIR}" ]]; then
-  WORKSPACE_DIR="$(default_workspace_dir)"
+  WORKSPACE_DIR="$(resolve_default_workspace_dir)"
 fi
 
 parse_cli_args "$@"
@@ -463,7 +504,7 @@ parse_cli_args "$@"
 SEED_ENV_PATH="${SPX_MCP_SOURCE_ENV:-$(default_seed_env)}"
 MCP_PYTHON="$(resolve_mcp_python || true)"
 if [[ -z "${MCP_PYTHON}" ]]; then
-  echo "[spx-mcp-setup] Python 3.10+ is required to install the local Codex MCP workspace." >&2
+  echo "[spx-mcp-setup] Python 3.10+ is required to install the local SPX MCP workspace." >&2
   echo "[spx-mcp-setup] Install Python 3.10+ and rerun this launcher." >&2
   exit 1
 fi
@@ -545,8 +586,8 @@ fi
 "${MCP_PYTHON}" "${python_args[@]}"
 
 echo ""
-echo "[spx-mcp-setup] Codex MCP workspace is ready."
-echo "[spx-mcp-setup] Open this folder in Codex. The host app reloads MCP config on a fresh thread:"
+echo "[spx-mcp-setup] SPX MCP workspace is ready."
+echo "[spx-mcp-setup] Open this folder in Codex, Claude Code, or another MCP-capable client:"
 echo "  ${WORKSPACE_DIR}"
 
 if command -v open >/dev/null 2>&1; then

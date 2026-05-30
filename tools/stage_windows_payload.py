@@ -53,7 +53,7 @@ SHORTCUTS = (
     (
         "shortcutSpxMcpSetup",
         "SPX MCP Setup",
-        "Create the local Codex MCP workspace for SPX.",
+        "Create the local SPX MCP workspace.",
         "mcp-setup --pause-on-error",
     ),
     (

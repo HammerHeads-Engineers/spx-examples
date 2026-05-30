@@ -51,9 +51,10 @@ Apply this standard to every new or updated model YAML. Legacy models may still 
 Resolve the active work mode in this order:
 
 1. explicit user intent in the current request
-2. `.codex/workspace_mode.toml` when it exists
-3. `.spx-mcp-workspace.json` workspace metadata
-4. default to `repo_dev`
+2. `.spx/workspace_mode.toml` when it exists
+3. legacy `.codex/workspace_mode.toml` when it exists
+4. `.spx-mcp-workspace.json` workspace metadata
+5. default to `repo_dev`
 
 Do not infer the work mode from MCP availability, a running `spx-server`, or the mere presence of local runtime files. A full repo checkout can still be doing MCP-driven live work, and a packaged runtime workspace is not a normal development checkout.
 
@@ -188,10 +189,11 @@ poetry run pytest
 - Repo-local MCP entrypoint: `poetry run python -m spx_mcp ...`
 - Installed script entrypoint: `poetry run spx-mcp ...` after `poetry install --with dev`
 - Use the MCP tool for repo-aware catalog inspection, model validation, and live `spx-server` diagnostics when the task involves local runtime investigation.
-- Bootstrap the repo-local Codex MCP config before first use or after interpreter changes:
+- Bootstrap the repo-local Codex MCP config before first use with Codex or after interpreter changes:
   - Windows: `powershell -ExecutionPolicy Bypass -File tools\setup_codex_mcp.ps1`
   - Linux/macOS: `sh tools/setup_codex_mcp.sh`
 - After creating or updating `.codex/config.toml`, restart Codex or open a fresh thread in this workspace before relying on MCP tools.
+- Claude Code uses project-local `.mcp.json`; packaged MCP workspaces generate it automatically next to `CLAUDE.md`, which points Claude Code at `AGENTS.md`.
 - When the host client already exposes the repo-local MCP server, prefer host-managed MCP tools over ad hoc shell calls or custom Python MCP client scripts.
 - Do not launch `python -m spx_mcp stdio` from the shell for routine read/write flows; reserve direct CLI use for bootstrap, `doctor`, `list-tools`, smoke tests, or MCP debugging.
 - Assume `stdio` session reuse only within the current host-managed session; do not rely on transport persistence across separate threads.

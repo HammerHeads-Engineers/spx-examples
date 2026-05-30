@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Tests for the installer-managed Codex MCP workspace bootstrap."""
+"""Tests for the installer-managed SPX MCP workspace bootstrap."""
 
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ def build_minimal_workspace_source(root: Path) -> Path:
     (root / "pyproject.toml").write_text("[tool.poetry]\nname='spx-examples'\n", encoding="utf-8")
     (root / "README.md").write_text("workspace\n", encoding="utf-8")
     (root / "AGENTS.md").write_text("agents\n", encoding="utf-8")
+    (root / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
     (root / "docs").mkdir(parents=True)
     (root / "docs" / "MCP.md").write_text("mcp\n", encoding="utf-8")
     return root
@@ -37,7 +38,20 @@ def test_default_workspace_dir_uses_documents_on_macos(tmp_path: Path) -> None:
 
     result = mcp_workspace.default_workspace_dir(home=home, platform_name="darwin")
 
-    assert result == home / "Documents" / "SPX Codex Workspace"
+    assert result == home / "Documents" / "SPX MCP Workspace"
+
+
+def test_resolve_default_workspace_dir_migrates_legacy_macos_workspace(tmp_path: Path) -> None:
+    home = tmp_path / "home"
+    legacy = home / "Documents" / "SPX Codex Workspace"
+    legacy.mkdir(parents=True)
+    (legacy / "local.txt").write_text("keep\n", encoding="utf-8")
+
+    result = mcp_workspace.resolve_default_workspace_dir(home=home, platform_name="darwin")
+
+    assert result == home / "Documents" / "SPX MCP Workspace"
+    assert not legacy.exists()
+    assert (result / "local.txt").read_text(encoding="utf-8") == "keep\n"
 
 
 def test_default_workspace_dir_uses_local_app_data_on_windows(
@@ -140,6 +154,7 @@ def test_sync_payload_replaces_managed_entries_and_keeps_local_state(tmp_path: P
     source_root = tmp_path / "source"
     source_root.mkdir()
     (source_root / "README.md").write_text("new readme\n", encoding="utf-8")
+    (source_root / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
     docs_dir = source_root / "docs"
     docs_dir.mkdir()
     (docs_dir / "MCP.md").write_text("docs\n", encoding="utf-8")
@@ -157,6 +172,7 @@ def test_sync_payload_replaces_managed_entries_and_keeps_local_state(tmp_path: P
     mcp_workspace.sync_payload(source_root, workspace)
 
     assert (workspace / "README.md").read_text(encoding="utf-8") == "new readme\n"
+    assert (workspace / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
     assert (workspace / "docs" / "MCP.md").read_text(encoding="utf-8") == "docs\n"
     assert not (workspace / "junk.txt").exists()
     assert venv_dir.exists()
@@ -627,6 +643,34 @@ def test_bootstrap_codex_updates_git_exclude_for_git_workspaces(
     ]]
 
 
+def test_write_claude_mcp_config_uses_same_write_mode_and_explicit_repo_root(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    venv_python = workspace / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.write_text("", encoding="utf-8")
+
+    mcp_workspace.write_claude_mcp_config(
+        workspace,
+        venv_python,
+        server_name="spx",
+        allow_write=True,
+    )
+
+    payload = json.loads((workspace / ".mcp.json").read_text(encoding="utf-8"))
+    server = payload["mcpServers"]["spx"]
+    assert server["command"] == str(venv_python)
+    assert server["args"] == [
+        "-m",
+        "spx_mcp",
+        "stdio",
+        "--repo-root",
+        str(workspace),
+        "--allow-write",
+    ]
+    assert server["env"] == {}
+
+
 def test_write_workspace_mode_file_is_idempotent(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -638,6 +682,35 @@ def test_write_workspace_mode_file_is_idempotent(tmp_path: Path) -> None:
 
     assert first == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert second == mcp_workspace.WORK_MODE_RUNTIME_MCP
+    assert (workspace / ".spx" / "workspace_mode.toml").exists()
+    assert not (workspace / ".codex" / "workspace_mode.toml").exists()
+
+
+def test_read_workspace_mode_file_prefers_neutral_file_over_legacy(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / ".spx").mkdir(parents=True)
+    (workspace / ".codex").mkdir(parents=True)
+    (workspace / ".spx" / "workspace_mode.toml").write_text(
+        'mode = "runtime_mcp"\n',
+        encoding="utf-8",
+    )
+    (workspace / ".codex" / "workspace_mode.toml").write_text(
+        'mode = "repo_dev"\n',
+        encoding="utf-8",
+    )
+
+    assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_RUNTIME_MCP
+
+
+def test_read_workspace_mode_file_falls_back_to_legacy_codex_file(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / ".codex").mkdir(parents=True)
+    (workspace / ".codex" / "workspace_mode.toml").write_text(
+        'mode = "repo_dev"\n',
+        encoding="utf-8",
+    )
+
+    assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_REPO_DEV
 
 
 def test_write_workspace_marker_and_mode_file_remain_consistent_for_managed_workspace(
@@ -694,6 +767,27 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_git_workspac
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_GIT
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_REPO_DEV
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_REPO_DEV
+
+
+def test_read_workspace_marker_accepts_legacy_codex_marker_kind(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / mcp_workspace.WORKSPACE_MARKER_NAME).write_text(
+        json.dumps(
+            {
+                "kind": mcp_workspace.LEGACY_WORKSPACE_MARKER_KIND,
+                "workspace_kind": mcp_workspace.WORKSPACE_KIND_MANAGED,
+                "default_work_mode": mcp_workspace.WORK_MODE_RUNTIME_MCP,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    marker = mcp_workspace.read_workspace_marker(workspace)
+
+    assert marker is not None
+    assert mcp_workspace.marker_workspace_kind(marker) == mcp_workspace.WORKSPACE_KIND_MANAGED
+    assert mcp_workspace.marker_default_work_mode(marker) == mcp_workspace.WORK_MODE_RUNTIME_MCP
 
 
 def test_main_managed_bootstrap_is_idempotent(tmp_path: Path, monkeypatch) -> None:
@@ -759,6 +853,8 @@ def test_main_managed_bootstrap_is_idempotent(tmp_path: Path, monkeypatch) -> No
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert mcp_workspace.read_dotenv(workspace / ".env")["SPX_PRODUCT_KEY"] == "TEST-PRODUCT-KEY"
+    assert (workspace / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+    assert "--allow-write" in mcp_workspace.read_claude_server_args(workspace / ".mcp.json", "spx")
     assert bootstrap_codex_calls == [True, True]
 
 
@@ -812,6 +908,7 @@ def test_main_managed_bootstrap_respects_explicit_read_only(tmp_path: Path, monk
     marker = mcp_workspace.read_workspace_marker(workspace)
     assert marker is not None
     assert marker["allow_write"] is False
+    assert "--allow-write" not in mcp_workspace.read_claude_server_args(workspace / ".mcp.json", "spx")
     assert bootstrap_codex_calls == [False]
 
 
@@ -880,6 +977,7 @@ def test_main_git_bootstrap_sets_repo_dev_and_does_not_sync_managed_copy(
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_GIT
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_REPO_DEV
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_REPO_DEV
+    assert "--allow-write" in mcp_workspace.read_claude_server_args(workspace / ".mcp.json", "spx")
     assert bootstrap_codex_calls == [True]
 
 
@@ -901,7 +999,8 @@ def test_write_workspace_readme_describes_git_mode(tmp_path: Path) -> None:
     assert "workspace kind: `git`" in readme
     assert "default work mode: `repo_dev`" in readme
     assert "full Git clone" in readme
-    assert "read/write mode" in readme
+    assert "`read-only` mode" in readme
+    assert ".mcp.json" in readme
     assert "https://example.com/spx-examples.git" in readme
     assert "`develop`" in readme
 
@@ -918,6 +1017,12 @@ def test_verify_workspace_checks_config_and_required_runtime_write_tools(
         'command = "python3.11"\n'
         'args = ["-m", "spx_mcp", "stdio", "--allow-write"]\n',
         encoding="utf-8",
+    )
+    mcp_workspace.write_claude_mcp_config(
+        workspace,
+        tmp_path / ".venv" / "bin" / "python",
+        server_name="spx",
+        allow_write=True,
     )
     calls: list[list[str]] = []
 
@@ -975,6 +1080,12 @@ def test_verify_workspace_fails_when_required_runtime_write_tools_are_missing(
         'args = ["-m", "spx_mcp", "stdio", "--allow-write"]\n',
         encoding="utf-8",
     )
+    mcp_workspace.write_claude_mcp_config(
+        workspace,
+        tmp_path / ".venv" / "bin" / "python",
+        server_name="spx",
+        allow_write=True,
+    )
 
     def fake_run(argv, *, cwd=None, capture_output=False):
         if "doctor" in argv:
@@ -1008,6 +1119,12 @@ def test_verify_workspace_reports_doctor_problems_from_nonzero_json(
         'command = "python3.11"\n'
         'args = ["-m", "spx_mcp", "stdio", "--allow-write"]\n',
         encoding="utf-8",
+    )
+    mcp_workspace.write_claude_mcp_config(
+        workspace,
+        tmp_path / ".venv" / "bin" / "python",
+        server_name="spx",
+        allow_write=True,
     )
 
     def fake_run(argv, *, cwd=None, capture_output=False):

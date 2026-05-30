@@ -81,7 +81,7 @@ def test_config_from_sources_falls_back_to_managed_source_root_env(
     (tmp_path / ".spx-mcp-workspace.json").write_text(
         json.dumps(
             {
-                "kind": "spx-codex-mcp-workspace",
+                "kind": "spx-mcp-workspace",
                 "workspace_kind": "managed",
                 "default_work_mode": "runtime_mcp",
                 "source_root": str(source_root),
@@ -94,5 +94,32 @@ def test_config_from_sources_falls_back_to_managed_source_root_env(
 
     assert config.product_key == "TEST-SOURCE-KEY-123"
     assert config.product_key_source == f"managed source_root .env ({source_root / '.env'})"
+    assert config.workspace_kind == "managed"
+    assert config.default_work_mode == "runtime_mcp"
+
+
+def test_config_from_sources_accepts_legacy_codex_marker_kind(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (source_root / ".env").write_text(
+        "SPX_PRODUCT_KEY=TEST-SOURCE-KEY-123\n",
+        encoding="utf-8",
+    )
+    (tmp_path / ".spx-mcp-workspace.json").write_text(
+        json.dumps(
+            {
+                "kind": "spx-codex-mcp-workspace",
+                "workspace_kind": "managed",
+                "default_work_mode": "runtime_mcp",
+                "source_root": str(source_root),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = SpxMcpConfig.from_sources(repo_root=str(tmp_path))
+
+    assert config.product_key == "TEST-SOURCE-KEY-123"
     assert config.workspace_kind == "managed"
     assert config.default_work_mode == "runtime_mcp"

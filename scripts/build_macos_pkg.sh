@@ -11,7 +11,7 @@ Usage: scripts/build_macos_pkg.sh [options]
  SPX Uninstall.app into /Applications/SPX Tools. SPX Setup.app contains the
  full installer payload; the other launchers operate on the generated
  environment in the user's Application Support directory, bootstrap a managed
- Codex MCP workspace, or remove the installed SPX tools.
+ SPX MCP workspace, or remove the installed SPX tools.
 
 Options:
   --output-dir DIR              Directory for the final .pkg (default: dist)
