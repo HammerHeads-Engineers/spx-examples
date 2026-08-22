@@ -54,19 +54,19 @@ communication:
         response: "#out(frequency)"
       "CONF:VOLT":
         name: set_voltage_mode
-        response: ""
+        response: null
         "#attr(measurement_mode)": voltage
       "CONF:CURR":
         name: set_current_mode
-        response: ""
+        response: null
         "#attr(measurement_mode)": current
       "CONF:RES":
         name: set_resistance_mode
-        response: ""
+        response: null
         "#attr(measurement_mode)": resistance
       "CONF:FREQ":
         name: set_frequency_mode
-        response: ""
+        response: null
         "#attr(measurement_mode)": frequency
       "CONF:MODE {mode}":
         name: set_measurement_mode

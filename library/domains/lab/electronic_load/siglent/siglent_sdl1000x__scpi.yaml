@@ -134,19 +134,19 @@ communication:
 
         ":SOURce:FUNCtion CURRent":
           name: set_current_mode
-          response: ""
+          response: null
           "#attr(k__mode)": "CURRent"
         ":SOURce:FUNCtion VOLTage":
           name: set_voltage_mode
-          response: ""
+          response: null
           "#attr(k__mode)": "VOLTage"
         ":SOURce:FUNCtion POWer":
           name: set_power_mode
-          response: ""
+          response: null
           "#attr(k__mode)": "POWer"
         ":SOURce:FUNCtion RESistance":
           name: set_resistance_mode
-          response: ""
+          response: null
           "#attr(k__mode)": "RESistance"
         ":SOURce:FUNCtion?":
           name: query_mode
@@ -154,11 +154,11 @@ communication:
 
         ":SOURce:INPut:STATe ON":
           name: enable_input
-          response: ""
+          response: null
           "#attr(k__input_state)": "ON"
         ":SOURce:INPut:STATe OFF":
           name: disable_input
-          response: ""
+          response: null
           "#attr(k__input_state)": "OFF"
         ":SOURce:INPut:STATe?":
           name: query_input
@@ -166,7 +166,7 @@ communication:
 
         ":SOURce:CURRent:LEVel:IMMediate {current}":
           name: set_current
-          response: ""
+          response: null
           "#attr(k__current_set_a)": "current"
         ":SOURce:CURRent:LEVel:IMMediate?":
           name: query_current
@@ -174,7 +174,7 @@ communication:
 
         ":SOURce:VOLTage:LEVel:IMMediate {voltage}":
           name: set_voltage
-          response: ""
+          response: null
           "#attr(k__voltage_set_v)": "voltage"
         ":SOURce:VOLTage:LEVel:IMMediate?":
           name: query_voltage
@@ -182,7 +182,7 @@ communication:
 
         ":SOURce:POWer:LEVel:IMMediate {power}":
           name: set_power
-          response: ""
+          response: null
           "#attr(k__power_set_w)": "power"
         ":SOURce:POWer:LEVel:IMMediate?":
           name: query_power
@@ -190,7 +190,7 @@ communication:
 
         ":SOURce:RESistance:LEVel:IMMediate {resistance}":
           name: set_resistance
-          response: ""
+          response: null
           "#attr(k__resistance_set_ohm)": "resistance"
         ":SOURce:RESistance:LEVel:IMMediate?":
           name: query_resistance

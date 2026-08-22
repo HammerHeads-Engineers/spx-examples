@@ -187,14 +187,14 @@ communication:
 
         ":SOURce1:VOLTage {voltage}":
           name: set_channel_1_voltage
-          response: ""
+          response: null
           "#attr(k__ch1_voltage_set_v)": "voltage"
         ":SOURce1:VOLTage?":
           name: query_channel_1_voltage_setpoint
           response: "#out(k__ch1_voltage_set_v)"
         ":SOURce1:CURRent {current}":
           name: set_channel_1_current
-          response: ""
+          response: null
           "#attr(k__ch1_current_set_a)": "current"
         ":SOURce1:CURRent?":
           name: query_channel_1_current_setpoint
@@ -202,14 +202,14 @@ communication:
 
         ":SOURce2:VOLTage {voltage}":
           name: set_channel_2_voltage
-          response: ""
+          response: null
           "#attr(k__ch2_voltage_set_v)": "voltage"
         ":SOURce2:VOLTage?":
           name: query_channel_2_voltage_setpoint
           response: "#out(k__ch2_voltage_set_v)"
         ":SOURce2:CURRent {current}":
           name: set_channel_2_current
-          response: ""
+          response: null
           "#attr(k__ch2_current_set_a)": "current"
         ":SOURce2:CURRent?":
           name: query_channel_2_current_setpoint
@@ -217,14 +217,14 @@ communication:
 
         ":SOURce3:VOLTage {voltage}":
           name: set_channel_3_voltage
-          response: ""
+          response: null
           "#attr(k__ch3_voltage_set_v)": "voltage"
         ":SOURce3:VOLTage?":
           name: query_channel_3_voltage_setpoint
           response: "#out(k__ch3_voltage_set_v)"
         ":SOURce3:CURRent {current}":
           name: set_channel_3_current
-          response: ""
+          response: null
           "#attr(k__ch3_current_set_a)": "current"
         ":SOURce3:CURRent?":
           name: query_channel_3_current_setpoint
@@ -241,27 +241,27 @@ communication:
           response: "#out(k__ch3_output_state)"
         ":OUTP CH1,ON":
           name: enable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": "ON"
         ":OUTP CH1,OFF":
           name: disable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": "OFF"
         ":OUTP CH2,ON":
           name: enable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": "ON"
         ":OUTP CH2,OFF":
           name: disable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": "OFF"
         ":OUTP CH3,ON":
           name: enable_channel_3_output
-          response: ""
+          response: null
           "#attr(k__ch3_output_state)": "ON"
         ":OUTP CH3,OFF":
           name: disable_channel_3_output
-          response: ""
+          response: null
           "#attr(k__ch3_output_state)": "OFF"
 
         ":OUTP:MODE? CH1":

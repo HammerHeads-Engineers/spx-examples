@@ -131,11 +131,11 @@ communication:
 
         "C1:OUTP ON":
           name: enable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": "ON"
         "C1:OUTP OFF":
           name: disable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": "OFF"
         "C1:OUTP?":
           name: query_channel_1_output
@@ -143,11 +143,11 @@ communication:
 
         "C2:OUTP ON":
           name: enable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": "ON"
         "C2:OUTP OFF":
           name: disable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": "OFF"
         "C2:OUTP?":
           name: query_channel_2_output
@@ -155,19 +155,19 @@ communication:
 
         "C1:BSWV WVTP,{wave}":
           name: set_channel_1_waveform
-          response: ""
+          response: null
           "#attr(k__ch1_waveform)": "wave"
         "C1:BSWV FRQ,{frequency}":
           name: set_channel_1_frequency
-          response: ""
+          response: null
           "#attr(k__ch1_frequency_hz)": "frequency"
         "C1:BSWV AMP,{amplitude}":
           name: set_channel_1_amplitude
-          response: ""
+          response: null
           "#attr(k__ch1_amplitude_vpp)": "amplitude"
         "C1:BSWV OFST,{offset}":
           name: set_channel_1_offset
-          response: ""
+          response: null
           "#attr(k__ch1_offset_v)": "offset"
         "C1:BSWV?":
           name: query_channel_1_basic_wave
@@ -175,19 +175,19 @@ communication:
 
         "C2:BSWV WVTP,{wave}":
           name: set_channel_2_waveform
-          response: ""
+          response: null
           "#attr(k__ch2_waveform)": "wave"
         "C2:BSWV FRQ,{frequency}":
           name: set_channel_2_frequency
-          response: ""
+          response: null
           "#attr(k__ch2_frequency_hz)": "frequency"
         "C2:BSWV AMP,{amplitude}":
           name: set_channel_2_amplitude
-          response: ""
+          response: null
           "#attr(k__ch2_amplitude_vpp)": "amplitude"
         "C2:BSWV OFST,{offset}":
           name: set_channel_2_offset
-          response: ""
+          response: null
           "#attr(k__ch2_offset_v)": "offset"
         "C2:BSWV?":
           name: query_channel_2_basic_wave

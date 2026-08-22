@@ -134,7 +134,7 @@ communication:
           response: "#out(measurement_data)"
         "CHAN:MEAS:FUNC {functions}":
           name: set_measurement_functions
-          response: ""
+          response: null
           "#attr(k__measurement_functions)": "functions"
         "CHAN:MEAS:FUNC?":
           name: query_measurement_functions

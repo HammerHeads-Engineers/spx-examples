@@ -134,11 +134,11 @@ communication:
 
         ":SOURce:VOLTage {voltage}, (@1)":
           name: set_channel_1_voltage
-          response: ""
+          response: null
           "#attr(k__ch1_voltage_set_v)": "voltage"
         ":SOURce:CURRent {current}, (@1)":
           name: set_channel_1_current_limit
-          response: ""
+          response: null
           "#attr(k__ch1_current_limit_a)": "current"
         ":SOURce:VOLTage? (@1)":
           name: query_channel_1_voltage
@@ -149,11 +149,11 @@ communication:
 
         ":SOURce:VOLTage {voltage}, (@2)":
           name: set_channel_2_voltage
-          response: ""
+          response: null
           "#attr(k__ch2_voltage_set_v)": "voltage"
         ":SOURce:CURRent {current}, (@2)":
           name: set_channel_2_current_limit
-          response: ""
+          response: null
           "#attr(k__ch2_current_limit_a)": "current"
         ":SOURce:VOLTage? (@2)":
           name: query_channel_2_voltage
@@ -164,11 +164,11 @@ communication:
 
         ":SOURce:VOLTage {voltage}, (@3)":
           name: set_channel_3_voltage
-          response: ""
+          response: null
           "#attr(k__ch3_voltage_set_v)": "voltage"
         ":SOURce:CURRent {current}, (@3)":
           name: set_channel_3_current_limit
-          response: ""
+          response: null
           "#attr(k__ch3_current_limit_a)": "current"
         ":SOURce:VOLTage? (@3)":
           name: query_channel_3_voltage
@@ -179,11 +179,11 @@ communication:
 
         ":OUTPut ON, (@1)":
           name: enable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": 1
         ":OUTPut OFF, (@1)":
           name: disable_channel_1_output
-          response: ""
+          response: null
           "#attr(k__ch1_output_state)": 0
         ":OUTPut? (@1)":
           name: query_channel_1_output
@@ -191,11 +191,11 @@ communication:
 
         ":OUTPut ON, (@2)":
           name: enable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": 1
         ":OUTPut OFF, (@2)":
           name: disable_channel_2_output
-          response: ""
+          response: null
           "#attr(k__ch2_output_state)": 0
         ":OUTPut? (@2)":
           name: query_channel_2_output
@@ -203,11 +203,11 @@ communication:
 
         ":OUTPut ON, (@3)":
           name: enable_channel_3_output
-          response: ""
+          response: null
           "#attr(k__ch3_output_state)": 1
         ":OUTPut OFF, (@3)":
           name: disable_channel_3_output
-          response: ""
+          response: null
           "#attr(k__ch3_output_state)": 0
         ":OUTPut? (@3)":
           name: query_channel_3_output
