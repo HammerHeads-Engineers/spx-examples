@@ -128,41 +128,73 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         ":SOURce:FUNCtion CURRent":
+          name: set_current_mode
           "#attr(k__mode)": "CURRent"
         ":SOURce:FUNCtion VOLTage":
+          name: set_voltage_mode
           "#attr(k__mode)": "VOLTage"
         ":SOURce:FUNCtion POWer":
+          name: set_power_mode
           "#attr(k__mode)": "POWer"
         ":SOURce:FUNCtion RESistance":
+          name: set_resistance_mode
           "#attr(k__mode)": "RESistance"
-        ":SOURce:FUNCtion?": "#out(mode_status)"
+        ":SOURce:FUNCtion?":
+          name: query_mode
+          response: "#out(mode_status)"
 
         ":SOURce:INPut:STATe ON":
+          name: enable_input
           "#attr(k__input_state)": "ON"
         ":SOURce:INPut:STATe OFF":
+          name: disable_input
           "#attr(k__input_state)": "OFF"
-        ":SOURce:INPut:STATe?": "#out(input_state_value)"
+        ":SOURce:INPut:STATe?":
+          name: query_input
+          response: "#out(input_state_value)"
 
         ":SOURce:CURRent:LEVel:IMMediate {current}":
+          name: set_current
           "#attr(k__current_set_a)": "current"
-        ":SOURce:CURRent:LEVel:IMMediate?": "#out(k__current_set_a)"
+        ":SOURce:CURRent:LEVel:IMMediate?":
+          name: query_current
+          response: "#out(k__current_set_a)"
 
         ":SOURce:VOLTage:LEVel:IMMediate {voltage}":
+          name: set_voltage
           "#attr(k__voltage_set_v)": "voltage"
-        ":SOURce:VOLTage:LEVel:IMMediate?": "#out(k__voltage_set_v)"
+        ":SOURce:VOLTage:LEVel:IMMediate?":
+          name: query_voltage
+          response: "#out(k__voltage_set_v)"
 
         ":SOURce:POWer:LEVel:IMMediate {power}":
+          name: set_power
           "#attr(k__power_set_w)": "power"
-        ":SOURce:POWer:LEVel:IMMediate?": "#out(k__power_set_w)"
+        ":SOURce:POWer:LEVel:IMMediate?":
+          name: query_power
+          response: "#out(k__power_set_w)"
 
         ":SOURce:RESistance:LEVel:IMMediate {resistance}":
+          name: set_resistance
           "#attr(k__resistance_set_ohm)": "resistance"
-        ":SOURce:RESistance:LEVel:IMMediate?": "#out(k__resistance_set_ohm)"
+        ":SOURce:RESistance:LEVel:IMMediate?":
+          name: query_resistance
+          response: "#out(k__resistance_set_ohm)"
 
-        ":MEASure:CURRent?": "#out(current_a)"
-        ":MEASure:VOLTage?": "#out(voltage_v)"
-        ":MEASure:POWer?": "#out(power_w)"
-        ":MEASure:RESistance?": "#out(resistance_ohm)"
+        ":MEASure:CURRent?":
+          name: query_current_measurement
+          response: "#out(current_a)"
+        ":MEASure:VOLTage?":
+          name: query_voltage_measurement
+          response: "#out(voltage_v)"
+        ":MEASure:POWer?":
+          name: query_power_measurement
+          response: "#out(power_w)"
+        ":MEASure:RESistance?":
+          name: query_resistance_measurement
+          response: "#out(resistance_ohm)"

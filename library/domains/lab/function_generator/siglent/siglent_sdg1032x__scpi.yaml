@@ -125,36 +125,58 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         "C1:OUTP ON":
+          name: enable_channel_1_output
           "#attr(k__ch1_output_state)": "ON"
         "C1:OUTP OFF":
+          name: disable_channel_1_output
           "#attr(k__ch1_output_state)": "OFF"
-        "C1:OUTP?": "#out(ch1_output_status)"
+        "C1:OUTP?":
+          name: query_channel_1_output
+          response: "#out(ch1_output_status)"
 
         "C2:OUTP ON":
+          name: enable_channel_2_output
           "#attr(k__ch2_output_state)": "ON"
         "C2:OUTP OFF":
+          name: disable_channel_2_output
           "#attr(k__ch2_output_state)": "OFF"
-        "C2:OUTP?": "#out(ch2_output_status)"
+        "C2:OUTP?":
+          name: query_channel_2_output
+          response: "#out(ch2_output_status)"
 
         "C1:BSWV WVTP,{wave}":
+          name: set_channel_1_waveform
           "#attr(k__ch1_waveform)": "wave"
         "C1:BSWV FRQ,{frequency}":
+          name: set_channel_1_frequency
           "#attr(k__ch1_frequency_hz)": "frequency"
         "C1:BSWV AMP,{amplitude}":
+          name: set_channel_1_amplitude
           "#attr(k__ch1_amplitude_vpp)": "amplitude"
         "C1:BSWV OFST,{offset}":
+          name: set_channel_1_offset
           "#attr(k__ch1_offset_v)": "offset"
-        "C1:BSWV?": "#out(ch1_basic_wave_status)"
+        "C1:BSWV?":
+          name: query_channel_1_basic_wave
+          response: "#out(ch1_basic_wave_status)"
 
         "C2:BSWV WVTP,{wave}":
+          name: set_channel_2_waveform
           "#attr(k__ch2_waveform)": "wave"
         "C2:BSWV FRQ,{frequency}":
+          name: set_channel_2_frequency
           "#attr(k__ch2_frequency_hz)": "frequency"
         "C2:BSWV AMP,{amplitude}":
+          name: set_channel_2_amplitude
           "#attr(k__ch2_amplitude_vpp)": "amplitude"
         "C2:BSWV OFST,{offset}":
+          name: set_channel_2_offset
           "#attr(k__ch2_offset_v)": "offset"
-        "C2:BSWV?": "#out(ch2_basic_wave_status)"
+        "C2:BSWV?":
+          name: query_channel_2_basic_wave
+          response: "#out(ch2_basic_wave_status)"

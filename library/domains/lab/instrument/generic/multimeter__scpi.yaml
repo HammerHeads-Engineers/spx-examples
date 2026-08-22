@@ -40,19 +40,32 @@ communication:
     response_delay: 0.01
     response_jitter: 0.0
     mappings:
-      "MEAS:VOLT?": "#out(voltage)"
-      "MEAS:CURR?": "#out(current)"
-      "MEAS:RES?": "#out(resistance)"
-      "MEAS:FREQ?": "#out(frequency)"
+      "MEAS:VOLT?":
+        name: query_voltage
+        response: "#out(voltage)"
+      "MEAS:CURR?":
+        name: query_current
+        response: "#out(current)"
+      "MEAS:RES?":
+        name: query_resistance
+        response: "#out(resistance)"
+      "MEAS:FREQ?":
+        name: query_frequency
+        response: "#out(frequency)"
       "CONF:VOLT":
+        name: set_voltage_mode
         "#attr(measurement_mode)": voltage
       "CONF:CURR":
+        name: set_current_mode
         "#attr(measurement_mode)": current
       "CONF:RES":
+        name: set_resistance_mode
         "#attr(measurement_mode)": resistance
       "CONF:FREQ":
+        name: set_frequency_mode
         "#attr(measurement_mode)": frequency
       "CONF:MODE {mode}":
+        name: set_measurement_mode
         "#attr(measurement_mode)": "mode"
         "response": "ACK"
 

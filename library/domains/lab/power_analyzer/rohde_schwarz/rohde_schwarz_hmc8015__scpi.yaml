@@ -123,9 +123,18 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
-        "SYST:ERR?": "#out(error_status)"
-        "CHAN:MEAS:DATA?": "#out(measurement_data)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        "SYST:ERR?":
+          name: query_system_error
+          response: "#out(error_status)"
+        "CHAN:MEAS:DATA?":
+          name: query_measurement_data
+          response: "#out(measurement_data)"
         "CHAN:MEAS:FUNC {functions}":
+          name: set_measurement_functions
           "#attr(k__measurement_functions)": "functions"
-        "CHAN:MEAS:FUNC?": "#out(k__measurement_functions)"
+        "CHAN:MEAS:FUNC?":
+          name: query_measurement_functions
+          response: "#out(k__measurement_functions)"

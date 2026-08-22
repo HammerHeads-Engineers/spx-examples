@@ -43,26 +43,42 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
-        ":SENSe:FREQuency:CENTer?": "#out(k__center_frequency_hz)"
+        ":SENSe:FREQuency:CENTer?":
+          name: query_center_frequency
+          response: "#out(k__center_frequency_hz)"
         ":SENSe:FREQuency:CENTer {frequency}":
+          name: set_center_frequency
           "#attr(k__center_frequency_hz)": "frequency"
           response: "OK"
 
-        ":SENSe:FREQuency:SPAN?": "#out(k__span_hz)"
+        ":SENSe:FREQuency:SPAN?":
+          name: query_span
+          response: "#out(k__span_hz)"
         ":SENSe:FREQuency:SPAN {span}":
+          name: set_span
           "#attr(k__span_hz)": "span"
           response: "OK"
 
-        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel?": "#out(k__reference_level_dbm)"
+        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel?":
+          name: query_reference_level
+          response: "#out(k__reference_level_dbm)"
         ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel {level}":
+          name: set_reference_level
           "#attr(k__reference_level_dbm)": "level"
           response: "OK"
 
-        ":CALCulate:MARKer1:STATe?": "#out(k__marker_1_enabled)"
+        ":CALCulate:MARKer1:STATe?":
+          name: query_marker_1_enabled
+          response: "#out(k__marker_1_enabled)"
         ":CALCulate:MARKer1:STATe {state}":
+          name: set_marker_1_enabled
           "#attr(k__marker_1_enabled)": "state"
           response: "OK"
 
-        ":CALCulate:MARKer1:Y?": "#out(marker_1_level_dbm)"
+        ":CALCulate:MARKer1:Y?":
+          name: query_marker_1_level
+          response: "#out(marker_1_level_dbm)"

@@ -31,68 +31,141 @@ def _communication_blocks(model: dict) -> list[dict]:
     return []
 
 
+def _has_meta_parameter(meta_parameters: dict, name: str, type_name: str) -> bool:
+    spec = meta_parameters.get(name)
+    return isinstance(spec, dict) and spec.get("type") == type_name
+
+
+def _missing_ascii_endpoint(
+    model_id: str, block: dict, meta_parameters: dict
+) -> str | None:
+    config = block.get("ascii")
+    if not isinstance(config, dict):
+        return None
+    if not _has_meta_parameter(meta_parameters, "ascii_port", "int"):
+        return f"{model_id}:ascii"
+    if config.get("port") != "$param(ascii_port)":
+        return f"{model_id}:ascii"
+    return None
+
+
+def _missing_ble_endpoint(
+    model_id: str, block: dict, meta_parameters: dict
+) -> str | None:
+    config = block.get("ble")
+    if not isinstance(config, dict):
+        return None
+    if not _has_meta_parameter(meta_parameters, "ble_adapter_base_url", "str"):
+        return f"{model_id}:ble"
+    if not _has_meta_parameter(meta_parameters, "ble_device_name", "str"):
+        return f"{model_id}:ble"
+    if config.get("adapter", {}).get("baseUrl") != "$param(ble_adapter_base_url)":
+        return f"{model_id}:ble"
+    if config.get("device", {}).get("name") != "$param(ble_device_name)":
+        return f"{model_id}:ble"
+    return None
+
+
+def _missing_mqtt_endpoint(
+    model_id: str, block: dict, meta_parameters: dict
+) -> str | None:
+    config = block.get("mqtt")
+    if not isinstance(config, dict):
+        return None
+    if not _has_meta_parameter(meta_parameters, "mqtt_broker_host", "str"):
+        return f"{model_id}:mqtt"
+    if not _has_meta_parameter(meta_parameters, "mqtt_broker_port", "int"):
+        return f"{model_id}:mqtt"
+    if config.get("broker") != "$param(mqtt_broker_host)":
+        return f"{model_id}:mqtt"
+    if config.get("port") != "$param(mqtt_broker_port)":
+        return f"{model_id}:mqtt"
+    return None
+
+
+def _missing_lwm2m_endpoint(
+    model_id: str, block: dict, meta_parameters: dict
+) -> str | None:
+    config = block.get("lwm2m")
+    if not isinstance(config, dict):
+        return None
+    expected_parameters = (
+        ("lwm2m_endpoint", "str"),
+        ("lwm2m_server_host", "str"),
+        ("lwm2m_server_port", "int"),
+        ("lwm2m_server_endpoint", "str"),
+    )
+    if any(not _has_meta_parameter(meta_parameters, name, type_name)
+           for name, type_name in expected_parameters):
+        return f"{model_id}:lwm2m"
+    if config.get("client", {}).get("endpoint") != "$param(lwm2m_endpoint)":
+        return f"{model_id}:lwm2m"
+    if config.get("server", {}).get("host") != "$param(lwm2m_server_host)":
+        return f"{model_id}:lwm2m"
+    if config.get("server", {}).get("port") != "$param(lwm2m_server_port)":
+        return f"{model_id}:lwm2m"
+    if config.get("server", {}).get("endpoint") != "$param(lwm2m_server_endpoint)":
+        return f"{model_id}:lwm2m"
+    return None
+
+
+def _missing_modbus_endpoint(
+    model_id: str, block: dict, meta_parameters: dict
+) -> str | None:
+    config = block.get("modbus_slave")
+    if not isinstance(config, dict):
+        return None
+    if not _has_meta_parameter(meta_parameters, "modbus_port", "int"):
+        return f"{model_id}:modbus_slave"
+    if not _has_meta_parameter(meta_parameters, "modbus_unit_id", "int"):
+        return f"{model_id}:modbus_slave"
+    if config.get("port") != "$param(modbus_port)":
+        return f"{model_id}:modbus_slave"
+    if config.get("unit_id") != "$param(modbus_unit_id)":
+        return f"{model_id}:modbus_slave"
+    return None
+
+
+def _missing_communication_endpoints(model_id: str, model: dict) -> list[str]:
+    meta_parameters = model.get("meta_parameters") or {}
+    checkers = (
+        _missing_ascii_endpoint,
+        _missing_ble_endpoint,
+        _missing_mqtt_endpoint,
+        _missing_lwm2m_endpoint,
+        _missing_modbus_endpoint,
+    )
+    missing = []
+    for block in _communication_blocks(model):
+        for checker in checkers:
+            if (issue := checker(model_id, block, meta_parameters)) is not None:
+                missing.append(issue)
+    return missing
+
+
+def _missing_mapping_names(model_id: str, model: dict) -> list[str]:
+    missing = []
+    for block in _communication_blocks(model):
+        config = block.get("ascii")
+        if not isinstance(config, dict):
+            continue
+        for command, mapping in (config.get("mappings") or {}).items():
+            if not isinstance(mapping, dict) or not mapping.get("name"):
+                missing.append(f"{model_id}:ascii:{command}")
+    return missing
+
+
 def test_embedded_lab_pack_communication_endpoints_use_meta_parameters() -> None:
-    missing: list[str] = []
-
+    missing = []
     for model_id, relative_path in _pack_models():
-        model = _load_yaml(relative_path)
-        meta_parameters = model.get("meta_parameters") or {}
+        missing.extend(_missing_communication_endpoints(model_id, _load_yaml(relative_path)))
+    assert missing == []
 
-        for block in _communication_blocks(model):
-            if "ascii" in block:
-                ascii_cfg = block["ascii"]
-                if (
-                    meta_parameters.get("ascii_port", {}).get("type") != "int"
-                    or ascii_cfg.get("port") != "$param(ascii_port)"
-                ):
-                    missing.append(f"{model_id}:ascii")
 
-            if "ble" in block:
-                ble_cfg = block["ble"]
-                if (
-                    meta_parameters.get("ble_adapter_base_url", {}).get("type") != "str"
-                    or meta_parameters.get("ble_device_name", {}).get("type") != "str"
-                    or ble_cfg.get("adapter", {}).get("baseUrl")
-                    != "$param(ble_adapter_base_url)"
-                    or ble_cfg.get("device", {}).get("name") != "$param(ble_device_name)"
-                ):
-                    missing.append(f"{model_id}:ble")
-
-            if "mqtt" in block:
-                mqtt_cfg = block["mqtt"]
-                if (
-                    meta_parameters.get("mqtt_broker_host", {}).get("type") != "str"
-                    or meta_parameters.get("mqtt_broker_port", {}).get("type") != "int"
-                    or mqtt_cfg.get("broker") != "$param(mqtt_broker_host)"
-                    or mqtt_cfg.get("port") != "$param(mqtt_broker_port)"
-                ):
-                    missing.append(f"{model_id}:mqtt")
-
-            if "lwm2m" in block:
-                lwm2m_cfg = block["lwm2m"]
-                if (
-                    meta_parameters.get("lwm2m_endpoint", {}).get("type") != "str"
-                    or meta_parameters.get("lwm2m_server_host", {}).get("type") != "str"
-                    or meta_parameters.get("lwm2m_server_port", {}).get("type") != "int"
-                    or meta_parameters.get("lwm2m_server_endpoint", {}).get("type") != "str"
-                    or lwm2m_cfg.get("client", {}).get("endpoint") != "$param(lwm2m_endpoint)"
-                    or lwm2m_cfg.get("server", {}).get("host") != "$param(lwm2m_server_host)"
-                    or lwm2m_cfg.get("server", {}).get("port") != "$param(lwm2m_server_port)"
-                    or lwm2m_cfg.get("server", {}).get("endpoint")
-                    != "$param(lwm2m_server_endpoint)"
-                ):
-                    missing.append(f"{model_id}:lwm2m")
-
-            if "modbus_slave" in block:
-                modbus_cfg = block["modbus_slave"]
-                if (
-                    meta_parameters.get("modbus_port", {}).get("type") != "int"
-                    or meta_parameters.get("modbus_unit_id", {}).get("type") != "int"
-                    or modbus_cfg.get("port") != "$param(modbus_port)"
-                    or modbus_cfg.get("unit_id") != "$param(modbus_unit_id)"
-                ):
-                    missing.append(f"{model_id}:modbus_slave")
-
+def test_embedded_lab_pack_scpi_mappings_have_explicit_names() -> None:
+    missing = []
+    for model_id, relative_path in _pack_models():
+        missing.extend(_missing_mapping_names(model_id, _load_yaml(relative_path)))
     assert missing == []
 
 

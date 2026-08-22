@@ -416,47 +416,81 @@ communication:
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         ":INSTrument:NSELect 1":
+          name: select_channel_1
           "#attr(k__selected_channel)": 1
         ":INSTrument:NSELect 2":
+          name: select_channel_2
           "#attr(k__selected_channel)": 2
         ":INSTrument:NSELect 3":
+          name: select_channel_3
           "#attr(k__selected_channel)": 3
         ":INSTrument:NSELect 4":
+          name: select_channel_4
           "#attr(k__selected_channel)": 4
-        ":INSTrument:NSELect?": "#out(k__selected_channel)"
+        ":INSTrument:NSELect?":
+          name: query_selected_channel
+          response: "#out(k__selected_channel)"
         ":INSTrument:SELect 1":
+          name: select_channel_1_legacy
           "#attr(k__selected_channel)": 1
         ":INSTrument:SELect 2":
+          name: select_channel_2_legacy
           "#attr(k__selected_channel)": 2
         ":INSTrument:SELect 3":
+          name: select_channel_3_legacy
           "#attr(k__selected_channel)": 3
         ":INSTrument:SELect 4":
+          name: select_channel_4_legacy
           "#attr(k__selected_channel)": 4
-        ":INSTrument:SELect?": "#out(k__selected_channel)"
+        ":INSTrument:SELect?":
+          name: query_selected_channel_legacy
+          response: "#out(k__selected_channel)"
 
         ":SOURce:VOLTage {voltage}":
+          name: set_voltage
           "#attr(k__selected_voltage_set_v)": "voltage"
           "#attr(cmd__apply_voltage)": 1
-        ":SOURce:VOLTage?": "#out(k__selected_voltage_set_v)"
+        ":SOURce:VOLTage?":
+          name: query_voltage
+          response: "#out(k__selected_voltage_set_v)"
         ":SOURce:CURRent {current}":
+          name: set_current
           "#attr(k__selected_current_set_a)": "current"
           "#attr(cmd__apply_current)": 1
-        ":SOURce:CURRent?": "#out(k__selected_current_set_a)"
+        ":SOURce:CURRent?":
+          name: query_current
+          response: "#out(k__selected_current_set_a)"
 
         ":OUTPut ON":
+          name: enable_output
           "#attr(k__selected_output_state)": 1
           "#attr(cmd__apply_output)": 1
         ":OUTPut OFF":
+          name: disable_output
           "#attr(k__selected_output_state)": 0
           "#attr(cmd__apply_output)": 1
-        ":OUTPut?": "#out(k__selected_output_state)"
-        ":OUTPut:STATe?": "#out(k__selected_output_state)"
+        ":OUTPut?":
+          name: query_output
+          response: "#out(k__selected_output_state)"
+        ":OUTPut:STATe?":
+          name: query_output_state
+          response: "#out(k__selected_output_state)"
 
-        ":MEASure:VOLTage?": "#out(selected_voltage_v)"
-        ":MEASure:CURRent?": "#out(selected_current_a)"
-        ":MEASure:POWer?": "#out(selected_power_w)"
+        ":MEASure:VOLTage?":
+          name: query_voltage_measurement
+          response: "#out(selected_voltage_v)"
+        ":MEASure:CURRent?":
+          name: query_current_measurement
+          response: "#out(selected_current_a)"
+        ":MEASure:POWer?":
+          name: query_power_measurement
+          response: "#out(selected_power_w)"
 
-        "SYST:ERR?": "#out(error_status)"
+        "SYST:ERR?":
+          name: query_system_error
+          response: "#out(error_status)"
