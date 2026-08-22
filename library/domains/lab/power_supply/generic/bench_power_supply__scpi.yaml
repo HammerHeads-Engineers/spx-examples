@@ -63,9 +63,11 @@ communication:
 
         "SOUR:VOLT {voltage}":
           name: set_voltage
+          response: ""
           "#attr(k__voltage_set_v)": "voltage"
         "SOUR:CURR {current}":
           name: set_current
+          response: ""
           "#attr(k__current_set_a)": "current"
 
         "SOUR:VOLT?":
@@ -84,9 +86,11 @@ communication:
 
         "OUTP ON":
           name: enable_output
+          response: ""
           "#attr(k__output_state)": "ON"
         "OUTP OFF":
           name: disable_output
+          response: ""
           "#attr(k__output_state)": "OFF"
         "OUTP?":
           name: query_output

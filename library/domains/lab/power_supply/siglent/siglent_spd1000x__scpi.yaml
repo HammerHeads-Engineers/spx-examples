@@ -103,6 +103,7 @@ communication:
 
         "CH1:VOLTage {voltage}":
           name: set_channel_1_voltage
+          response: ""
           "#attr(k__ch1_voltage_set_v)": "voltage"
         "CH1:VOLTage?":
           name: query_channel_1_voltage
@@ -110,6 +111,7 @@ communication:
 
         "CH1:CURRent {current}":
           name: set_channel_1_current_limit
+          response: ""
           "#attr(k__ch1_current_limit_a)": "current"
         "CH1:CURRent?":
           name: query_channel_1_current_limit
@@ -117,9 +119,11 @@ communication:
 
         ":OUTPut CH1,ON":
           name: enable_channel_1_output
+          response: ""
           "#attr(k__ch1_output_state)": 1
         ":OUTPut CH1,OFF":
           name: disable_channel_1_output
+          response: ""
           "#attr(k__ch1_output_state)": 0
 
         ":MEASure:VOLTage? CH1":
