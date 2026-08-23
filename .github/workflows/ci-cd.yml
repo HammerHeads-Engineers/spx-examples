@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -154,7 +154,7 @@ jobs:
 
       - name: Set up Python
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.10.14
 
@@ -186,7 +186,8 @@ jobs:
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
         run: |
-          export PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
           export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
           mkdir -p "${NPM_CONFIG_PREFIX}"
           export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
@@ -308,7 +309,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -399,3 +400,51 @@ jobs:
           upload_pkg "dist/spx-installer.tgz"
           upload_pkg "dist/spx-installer-${VERSION}.run"
           upload_pkg "dist/spx-installer-${VERSION}.ps1"
+
+  build-macos-installer:
+    needs: [pack-tests, build-installer]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Build macOS installer package
+        id: macos_package
+        shell: bash
+        run: |
+          chmod +x scripts/build_macos_pkg.sh
+          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' pyproject.toml | head -n 1)"
+          if [[ -z "${version}" ]]; then
+            echo "Unable to resolve package version from pyproject.toml." >&2
+            exit 1
+          fi
+          scripts/build_macos_pkg.sh --version "${version}"
+          echo "path=dist/spx-installer-macos-${version}.pkg" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate macOS installer artifact
+        shell: bash
+        run: |
+          test -f "${{ steps.macos_package.outputs.path }}"
+          pkgutil --check-signature "${{ steps.macos_package.outputs.path }}" || true
+
+      - name: Upload macOS installer as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spx-installer-${{ github.ref_name }}-macos
+          path: ${{ steps.macos_package.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload macOS installer to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "${{ steps.macos_package.outputs.path }}" \
+            --clobber
