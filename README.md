@@ -377,6 +377,11 @@ a packaged location such as `/Applications/SPX Tools/`. Once they have
 generated a local environment, they can later manage it via the companion
 launchers in the same folder:
 
+Tag releases also build this package on a native `macos-latest` GitHub Actions
+runner and attach `spx-installer-macos-<version>.pkg` to the matching GitHub
+Release. The CI path currently creates an unsigned package; Developer ID
+signing and notarization remain opt-in through the existing script options.
+
 The macOS installer now also uses the native Installer.app license step. Its
 content is sourced from `packaging/macos/resources/English.lproj/License.rtf`.
 
