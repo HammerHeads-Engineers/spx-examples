@@ -416,8 +416,12 @@ stays versioned as `spx-installer-<version>.exe`. Installer-managed Windows cont
 The Windows launcher, bundle, and Apps entry also reuse one shared SPX icon asset.
 
 See `packaging/windows/README.md` for the current build flow, prerequisites, and
-known gaps. The first iteration keeps macOS behavior untouched and reuses the
-current Python installer logic as the payload source of truth.
+known gaps. Tag releases now build the Windows bundle on a native
+`windows-latest` GitHub Actions runner and attach the resulting `.exe` to the
+matching GitHub Release. The CI build is currently unsigned; signing remains an
+explicit release-environment concern. The first iteration keeps macOS behavior
+untouched and reuses the current Python installer logic as the payload source
+of truth.
 
 ### 9. Produce Unix self-extractor (optional)
 

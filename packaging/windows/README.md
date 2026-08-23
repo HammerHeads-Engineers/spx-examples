@@ -73,6 +73,16 @@ If you are upgrading from an older preview that installed into `Program Files\SP
 
 The Python prerequisite is cached under `build/windows/cache/` by default and is validated with `Get-AuthenticodeSignature` against the `Python Software Foundation` signer before WiX consumes it.
 
+## GitHub Actions
+
+The tag workflow runs this builder on `windows-latest` after the pack tests and
+portable installer job finish. It installs the .NET 8 SDK, WiX Toolset v6 CLI,
+and the repository's Poetry dependencies, then publishes the generated
+`spx-installer-<version>.exe` both as a workflow artifact and as an asset on
+the matching GitHub Release. The CI job currently produces an unsigned bundle;
+certificate or Azure Trusted Signing credentials can still be supplied to
+`Build.ps1` for a trusted release build.
+
 ## Signing
 
 Classic certificate signing:
@@ -96,4 +106,5 @@ Trusted Signing expects a modern Windows SDK `signtool.exe` and the build script
 ## Next steps
 
 - Add a clearer Docker Desktop prerequisite UX in the bootstrapper and launcher.
-- Add a CI job that builds and signs the Windows artifacts on a trusted Windows runner.
+- Wire the repository's certificate or Azure Trusted Signing credentials into a
+  protected release environment when signed CI artifacts are required.
