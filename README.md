@@ -353,12 +353,14 @@ tools.
 security find-identity -v -p basic | grep "Developer ID"
 ```
 
-2. Store notarization credentials once in the keychain:
+2. Store notarization credentials once in the keychain. For direct local
+   distribution, use a Team API key from App Store Connect:
 
 ```bash
 xcrun notarytool store-credentials spx-notary \
-  --apple-id "YOUR_APPLE_ID" \
-  --team-id "YOUR_TEAM_ID"
+  --key "/path/to/AuthKey_KEY_ID.p8" \
+  --key-id "YOUR_KEY_ID" \
+  --issuer "YOUR_ISSUER_ID"
 ```
 
 3. Build, sign, notarize, and staple the macOS installer package:
@@ -370,6 +372,14 @@ scripts/build_macos_pkg.sh \
   --notarytool-profile spx-notary
 ```
 
+For GitHub Actions, configure the `macos-signing` environment with
+`docs/macos-signing-gh-config.example.sh`. It stores the two P12 exports and
+the App Store Connect `.p8` key as Actions secrets, while certificate
+identities and API identifiers are stored as environment variables. The
+workflow creates an ephemeral keychain on the macOS runner, signs every
+launcher app and the final package, submits it to Apple, staples the ticket,
+and rejects the release if signature or Gatekeeper validation fails.
+
 The output package is written to `dist/spx-installer-macos-<version>.pkg`. After
 installation, users launch `SPX Setup.app` from `/Applications/SPX Tools/`; the
 installer defaults to a user-writable output directory when it is running from
@@ -377,10 +387,10 @@ a packaged location such as `/Applications/SPX Tools/`. Once they have
 generated a local environment, they can later manage it via the companion
 launchers in the same folder:
 
-Tag releases also build this package on a native `macos-latest` GitHub Actions
-runner and attach `spx-installer-macos-<version>.pkg` to the matching GitHub
-Release. The CI path currently creates an unsigned package; Developer ID
-signing and notarization remain opt-in through the existing script options.
+Tag releases also build this signed, notarized, and stapled package on a native
+`macos-latest` GitHub Actions runner and attach
+`spx-installer-macos-<version>.pkg` to the matching GitHub Release. The
+`macos-signing` environment must be configured before creating a release tag.
 
 The macOS installer now also uses the native Installer.app license step. Its
 content is sourced from `packaging/macos/resources/English.lproj/License.rtf`.
