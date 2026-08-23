@@ -257,6 +257,12 @@ and optionally start the stack immediately. If you press ENTER through the
 defaults, the wizard uses a protocol-only setup (Modbus + SCPI/ASCII), skips
 model installation, and keeps the SPX UI enabled.
 
+When selecting protocols with option `0`, the wizard also offers compatible
+model packages. Selecting a package continues through the normal model and
+instance prompts and installs that package's models; it does not select every
+model in the catalog that happens to use one of the selected protocols. Press
+ENTER at the package prompt to keep the protocol-only setup.
+
 On Linux/Unix, the `.run` artifact extracts to a temporary directory and then
 launches the same terminal-based installer engine used by the portable package.
 

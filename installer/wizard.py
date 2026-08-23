@@ -83,6 +83,11 @@ class InstallerWizard:
         self._print_banner()
         packages, protocol_filters = self._prompt_packages(index.industries, index)
         protocol_only = bool(protocol_filters) and not packages
+        if protocol_only:
+            packages = self._prompt_protocol_model_packages(
+                protocol_filters, index
+            )
+            protocol_only = not packages
         profiles: List[str] = []
         install_models = False
         install_instances = False
@@ -113,7 +118,14 @@ class InstallerWizard:
             model_ids = []
             service_ids = self._prompt_protocol_services(protocol_filters, index)
         else:
-            model_ids = resolve_model_ids(packages, profiles, protocol_filters, index) if install_models else []
+            model_protocol_filters = protocol_filters if not packages else []
+            model_ids = (
+                resolve_model_ids(
+                    packages, profiles, model_protocol_filters, index
+                )
+                if install_models
+                else []
+            )
             service_ids = resolve_service_ids(model_ids, packages, profiles, index)
         instances = resolve_default_instances(packages, index) if install_instances else []
         if install_instances:
@@ -398,6 +410,51 @@ class InstallerWizard:
     def _prompt_continue(self, prompt: str) -> None:
         raw = input(prompt).strip()
         self._check_quit(raw)
+
+    def _prompt_protocol_model_packages(
+        self,
+        protocols: Sequence[str],
+        index: ManifestIndex,
+    ) -> List[str]:
+        """Offer model packages compatible with selected protocols."""
+
+        candidates = [
+            manifest
+            for manifest in index.industries.values()
+            if any(protocol in manifest.protocols for protocol in protocols)
+        ]
+        if not candidates:
+            return []
+
+        candidates.sort(key=lambda manifest: manifest.name.lower())
+        width = max(60, min(get_terminal_size((80, 20)).columns, 120))
+        print(
+            ui.heading(
+                "\nCompatible model packages for selected protocols:\n"
+            )
+        )
+        print(
+            "Select a package to install its models and optional default instances. "
+            "This does not select every model matching the protocols.\n"
+        )
+        for idx, manifest in enumerate(candidates, start=1):
+            print(
+                f"  [{ui.accent(str(idx))}] {ui.heading(manifest.name)} "
+                f"{self._format_package_overview(manifest, width)}"
+            )
+
+        if not self._prompt_yes_no(
+            "Add a compatible model package? [y/N]: ",
+            default=False,
+        ):
+            return []
+
+        choices = self._prompt_indices(
+            "Select model packages (comma-separated, q to quit): ",
+            len(candidates),
+            allow_empty=False,
+        )
+        return [candidates[index - 1].id for index in choices]
 
     def _prompt_protocols(self, index: ManifestIndex) -> List[str]:
         sorted_protocols = self._available_protocols(index)

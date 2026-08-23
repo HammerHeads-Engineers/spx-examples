@@ -45,7 +45,23 @@ def manifest_index() -> manifest.ManifestIndex:
             domain_group="environment",
             device_class="sensor",
             vendor="generic",
-        )
+        ),
+        "other_sensor": manifest.ModelManifest(
+            id="other_sensor",
+            name="Other Sensor",
+            path=(
+                "library/domains/environment/sensor/generic/"
+                "other_sensor.yaml"
+            ),
+            domain="environment",
+            protocols=["mqtt"],
+            services=["mqtt_broker"],
+            packages=["other_pack"],
+            profiles=[],
+            domain_group="environment",
+            device_class="sensor",
+            vendor="generic",
+        ),
     }
     domains = {
         "environment": manifest.DomainManifest(
@@ -185,7 +201,7 @@ def test_wizard_protocol_selection(
             return manifest_index
 
     wizard = InstallerWizard(loader=FakeLoader())
-    inputs = iter(["0", "1", "", "", "", ""])
+    inputs = iter(["0", "1", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()
@@ -197,6 +213,30 @@ def test_wizard_protocol_selection(
     assert selection.license_key == "TEST-KEY"
     assert selection.model_ids == []
     assert selection.service_ids == ["mqtt_broker"]
+
+
+def test_wizard_protocol_selection_can_add_compatible_model_package(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex
+) -> None:
+    class FakeLoader:
+        def load(self):
+            return manifest_index
+
+    wizard = InstallerWizard(loader=FakeLoader())
+    inputs = iter(["0", "1", "y", "1", "", "", "y", "", "", "", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    selection = wizard.run()
+
+    assert selection.packages == ["pack_a"]
+    assert selection.protocols == ["mqtt"]
+    assert selection.install_examples is True
+    assert selection.model_ids == ["sensor"]
+    assert selection.service_ids == ["mqtt_broker"]
+    assert selection.instances == [
+        {"model_id": "sensor", "instance_key": "pack_a_sensor_01"}
+    ]
+    assert selection.start_instances == ["pack_a_sensor_01"]
 
 
 def test_wizard_masks_product_key_in_output(
