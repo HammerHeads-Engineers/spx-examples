@@ -105,11 +105,34 @@ The technical workspace kind is separate from the semantic work mode:
 - update code, models, catalogs, tests, docs, packs, and installer assets as needed for a durable repo change
 - run the relevant validation for the touched area instead of stopping at local runtime proof
 
+## Communication meta-parameters
+For new or updated models, do not hardcode communication endpoints or instance-level transport identifiers in `communication` when they may vary across instances or environments.
+
+- Use `meta_parameters` primarily for communication/protocol parameterization such as hostnames, ports, unit IDs, endpoints, topics, device names, and adapter base URLs.
+- Bind protocol config through `$param(...)` instead of literal values when the value is part of deployment/runtime wiring.
+- Prefer keeping simulation tuning and ordinary model behavior in `attributes`; use `meta_parameters` for provisioning/runtime config.
+- When a protocol exposes `bindings` or legacy `mappings`, use explicit stable names:
+  - every binding or mapping entry should have an explicit `name` when the runtime supports it
+  - names must be unique within the container
+  - prefer verb-led names such as `query_*`, `set_*`, `configure_*`, `publish_*`, `subscribe_*`
+- For new or updated protocol blocks, prefer patterns like:
+  - `ascii`: `ascii_port`
+  - `modbus_slave`: `modbus_port`, `modbus_unit_id`
+  - `mqtt`: `mqtt_broker_host`, `mqtt_broker_port`
+  - `lwm2m`: `lwm2m_endpoint`, `lwm2m_server_host`, `lwm2m_server_port`, `lwm2m_server_endpoint`
+  - `ble`: `ble_adapter_base_url`, `ble_device_name`
+  - `http`: `http_host`, `http_port`
+  - `ocpp`: protocol-specific host/port/path/id parameters such as `ocpp_server_host`, `ocpp_server_port`, `ocpp_server_path`
+- For `ascii`/SCPI models, prefer `ascii_port` with `default: 0` so runtime auto-assignment remains intact for multi-instance packs; only use a fixed default port when a single fixed endpoint is explicitly required.
+- When updating a legacy model, add communication `meta_parameters` if the transport still relies on hardcoded endpoints or identifiers.
+- Before finishing a model change, explicitly check whether every communication block that exposes a configurable endpoint is parameterized through `meta_parameters`.
+- If one model in a device family shows a legacy communication issue, audit sibling models in the same family/protocol before finishing and prefer a consistent family-wide cleanup when it is safe and non-breaking.
+
 ## How to add a model
 1. Copy the closest existing model YAML in `library/domains/...`.
 2. Review the pack spec in `library/industries/<pack>/SPEC.md` if the model belongs to a pack.
 3. Name the file `lower_snake_case` with optional `__protocol` suffix; for new or updated models, keep `name` aligned with the file stem.
-4. For new or updated models, include `name`, `description`, and `attributes` when feasible (legacy models may omit `name`/`description`).
+4. For new or updated models, include `name`, `description`, `attributes`, and communication `meta_parameters` when feasible (legacy models may omit `name`/`description`).
 5. Update `library/catalog/models.yaml` with the new entry, including `domain_group`, `device_class`, and `vendor`.
 6. If you add a new domain or protocol, update `library/catalog/domains.yaml` or `library/catalog/services.yaml`.
 7. If the model belongs to a pack, update `library/catalog/industries.yaml`, relevant `profiles/<pack>/*.yaml`, the pack README in `library/industries/<pack>/README.md`, and regenerate `library/industries/<pack>/MODELS.yaml` via `poetry run python tools/render_pack_indexes.py`.

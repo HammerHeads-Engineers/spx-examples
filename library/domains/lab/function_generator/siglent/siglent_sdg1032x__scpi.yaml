@@ -4,6 +4,11 @@ description: |
   Virtual Siglent SDG1000X series function generator (modeled after SDG1032X)
   exposing basic waveform and output SCPI commands over ASCII/TCP.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -114,41 +119,76 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         "C1:OUTP ON":
+          name: enable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": "ON"
         "C1:OUTP OFF":
+          name: disable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": "OFF"
-        "C1:OUTP?": "#out(ch1_output_status)"
+        "C1:OUTP?":
+          name: query_channel_1_output
+          response: "#out(ch1_output_status)"
 
         "C2:OUTP ON":
+          name: enable_channel_2_output
+          response: null
           "#attr(k__ch2_output_state)": "ON"
         "C2:OUTP OFF":
+          name: disable_channel_2_output
+          response: null
           "#attr(k__ch2_output_state)": "OFF"
-        "C2:OUTP?": "#out(ch2_output_status)"
+        "C2:OUTP?":
+          name: query_channel_2_output
+          response: "#out(ch2_output_status)"
 
         "C1:BSWV WVTP,{wave}":
+          name: set_channel_1_waveform
+          response: null
           "#attr(k__ch1_waveform)": "wave"
         "C1:BSWV FRQ,{frequency}":
+          name: set_channel_1_frequency
+          response: null
           "#attr(k__ch1_frequency_hz)": "frequency"
         "C1:BSWV AMP,{amplitude}":
+          name: set_channel_1_amplitude
+          response: null
           "#attr(k__ch1_amplitude_vpp)": "amplitude"
         "C1:BSWV OFST,{offset}":
+          name: set_channel_1_offset
+          response: null
           "#attr(k__ch1_offset_v)": "offset"
-        "C1:BSWV?": "#out(ch1_basic_wave_status)"
+        "C1:BSWV?":
+          name: query_channel_1_basic_wave
+          response: "#out(ch1_basic_wave_status)"
 
         "C2:BSWV WVTP,{wave}":
+          name: set_channel_2_waveform
+          response: null
           "#attr(k__ch2_waveform)": "wave"
         "C2:BSWV FRQ,{frequency}":
+          name: set_channel_2_frequency
+          response: null
           "#attr(k__ch2_frequency_hz)": "frequency"
         "C2:BSWV AMP,{amplitude}":
+          name: set_channel_2_amplitude
+          response: null
           "#attr(k__ch2_amplitude_vpp)": "amplitude"
         "C2:BSWV OFST,{offset}":
+          name: set_channel_2_offset
+          response: null
           "#attr(k__ch2_offset_v)": "offset"
-        "C2:BSWV?": "#out(ch2_basic_wave_status)"
+        "C2:BSWV?":
+          name: query_channel_2_basic_wave
+          response: "#out(ch2_basic_wave_status)"

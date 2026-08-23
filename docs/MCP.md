@@ -79,8 +79,8 @@ If you installed the macOS `.pkg`, you can also launch `SPX MCP Setup.app` from
 `~/Documents/SPX MCP Workspace`, prepares a local `.venv`, writes
 `.codex/config.toml` for Codex, writes project-local `.mcp.json` for Claude
 Code, and copies `CLAUDE.md` so Claude Code can follow `@AGENTS.md`. Both MCP
-client configs point at the same local `spx-mcp` stdio server and are
-read/write by default. During setup you choose the work mode first:
+client configs point at the same local `spx-mcp` stdio server. They use
+read/write mode by default. During setup you choose the work mode first:
 
 - `runtime_mcp`: installer-managed MCP workspace copy
 - `repo_dev`: full Git clone of `spx-examples` on `develop`

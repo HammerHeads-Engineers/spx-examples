@@ -4,6 +4,11 @@ description: |
   Generic bench power supply with a compact SCPI command set for
   ASCII-over-TCP integration tests and demos.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -46,28 +51,51 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
         "SOUR:VOLT {voltage}":
+          name: set_voltage
+          response: null
           "#attr(k__voltage_set_v)": "voltage"
         "SOUR:CURR {current}":
+          name: set_current
+          response: null
           "#attr(k__current_set_a)": "current"
 
-        "SOUR:VOLT?": "#out(k__voltage_set_v)"
-        "SOUR:CURR?": "#out(k__current_set_a)"
+        "SOUR:VOLT?":
+          name: query_voltage
+          response: "#out(k__voltage_set_v)"
+        "SOUR:CURR?":
+          name: query_current
+          response: "#out(k__current_set_a)"
 
-        "MEAS:VOLT?": "#out(voltage_readback_v)"
-        "MEAS:CURR?": "#out(current_readback_a)"
+        "MEAS:VOLT?":
+          name: query_voltage_readback
+          response: "#out(voltage_readback_v)"
+        "MEAS:CURR?":
+          name: query_current_readback
+          response: "#out(current_readback_a)"
 
         "OUTP ON":
+          name: enable_output
+          response: null
           "#attr(k__output_state)": "ON"
         "OUTP OFF":
+          name: disable_output
+          response: null
           "#attr(k__output_state)": "OFF"
-        "OUTP?": "#out(k__output_state)"
+        "OUTP?":
+          name: query_output
+          response: "#out(k__output_state)"
 
-        "SYST:ERR?": "#out(error_status)"
+        "SYST:ERR?":
+          name: query_system_error
+          response: "#out(error_status)"

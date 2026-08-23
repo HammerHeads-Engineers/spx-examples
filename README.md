@@ -17,6 +17,17 @@ This repository is prepared for LLM-first contributions so expanding or using SP
 - `tools/validate_models.py` offers a single-command sanity check for model YAMLs.
 - For tests that use the `spx_python` client, follow `SPX_PYTHON_LLM.md` (the single source of truth shipped with the spx-python package).
 
+### Model authoring quick rules
+
+When creating or updating model YAMLs, keep these repo-level rules in mind:
+- Prefer typed attributes (`type`, `default`, `unit`) and keep names aligned with repo naming rules.
+- Add explicit `name` fields for protocol bindings and legacy mappings when the runtime supports them; keep names stable and unique.
+- Use `meta_parameters` for runtime communication wiring such as ports, hosts, unit IDs, endpoints, topics, adapter URLs, and device names.
+- Bind communication config through `$param(...)` rather than hardcoding instance-level endpoints in `communication`.
+- For `ascii`/SCPI models, prefer `ascii_port` with `default: 0` so runtime auto-assignment remains safe for multi-instance packs.
+- For user-facing scenarios, include `display_name`.
+- Before opening a PR, run `poetry run python tools/validate_models.py` and the relevant pack or unit tests.
+
 ## Local MCP tool
 
 This repository includes a local MCP tool for code-oriented LLM workflows against
@@ -205,7 +216,8 @@ Industry packs group models, services, and quickstart profiles around a specific
 - Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
 - Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_BASE_URL` if you are not using `http://localhost:8000`.
 - On Ubuntu/Debian, if the installer reports that pip cannot be bootstrapped inside the runtime venv, install the distro Python support packages and retry: `python3-venv` and, if needed, `python3-pip`.
-
+- Protocol endpoint models often use communication `meta_parameters` (for example `modbus_port`, `http_port`, `ascii_port`) instead of hardcoded literal ports - if you run with plain `docker-compose.yml`, expose or override the effective ports accordingly, or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
+- Generated Windows bundles may skip unsupported BLE/GATT components for selected packs; if you need BLE on Windows, prefer WSL2 or an external BLE bridge.
 ## Installer workflow (recommended)
 
 This is the primary end-user installation path for SPX. Prefer the versioned
@@ -271,7 +283,7 @@ From inside the generated folder:
   - macOS/Linux: `./spx-stop.sh`  
   - Windows/pwsh: `pwsh ./spx-stop.ps1`
 
-`spx-start` performs safety checks, installs/updates the BLE adapter if needed, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.
+`spx-start` performs safety checks, installs/updates the BLE adapter when that component is selected and supported on the current host, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.
 
 ### 5. Portable archive fallback (`.tgz` / `.zip`)
 

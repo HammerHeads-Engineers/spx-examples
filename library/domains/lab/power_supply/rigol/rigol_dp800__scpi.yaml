@@ -5,6 +5,11 @@ description: |
   subset of SCPI commands for channel voltage/current setpoints, output
   enable, and measurement readback over TCP.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -133,66 +138,147 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
 
-        ":MEAS? CH1": "#out(ch1_voltage_v)"
-        ":MEAS? CH2": "#out(ch2_voltage_v)"
-        ":MEAS? CH3": "#out(ch3_voltage_v)"
-        ":MEAS:VOLT? CH1": "#out(ch1_voltage_v)"
-        ":MEAS:VOLT? CH2": "#out(ch2_voltage_v)"
-        ":MEAS:VOLT? CH3": "#out(ch3_voltage_v)"
-        ":MEAS:CURR? CH1": "#out(ch1_current_a)"
-        ":MEAS:CURR? CH2": "#out(ch2_current_a)"
-        ":MEAS:CURR? CH3": "#out(ch3_current_a)"
-        ":MEAS:POWE? CH1": "#out(ch1_power_w)"
-        ":MEAS:POWE? CH2": "#out(ch2_power_w)"
-        ":MEAS:POWE? CH3": "#out(ch3_power_w)"
+        ":MEAS? CH1":
+          name: query_channel_1_voltage
+          response: "#out(ch1_voltage_v)"
+        ":MEAS? CH2":
+          name: query_channel_2_voltage
+          response: "#out(ch2_voltage_v)"
+        ":MEAS? CH3":
+          name: query_channel_3_voltage
+          response: "#out(ch3_voltage_v)"
+        ":MEAS:VOLT? CH1":
+          name: query_channel_1_voltage_explicit
+          response: "#out(ch1_voltage_v)"
+        ":MEAS:VOLT? CH2":
+          name: query_channel_2_voltage_explicit
+          response: "#out(ch2_voltage_v)"
+        ":MEAS:VOLT? CH3":
+          name: query_channel_3_voltage_explicit
+          response: "#out(ch3_voltage_v)"
+        ":MEAS:CURR? CH1":
+          name: query_channel_1_current
+          response: "#out(ch1_current_a)"
+        ":MEAS:CURR? CH2":
+          name: query_channel_2_current
+          response: "#out(ch2_current_a)"
+        ":MEAS:CURR? CH3":
+          name: query_channel_3_current
+          response: "#out(ch3_current_a)"
+        ":MEAS:POWE? CH1":
+          name: query_channel_1_power
+          response: "#out(ch1_power_w)"
+        ":MEAS:POWE? CH2":
+          name: query_channel_2_power
+          response: "#out(ch2_power_w)"
+        ":MEAS:POWE? CH3":
+          name: query_channel_3_power
+          response: "#out(ch3_power_w)"
 
         ":SOURce1:VOLTage {voltage}":
+          name: set_channel_1_voltage
+          response: null
           "#attr(k__ch1_voltage_set_v)": "voltage"
-        ":SOURce1:VOLTage?": "#out(k__ch1_voltage_set_v)"
+        ":SOURce1:VOLTage?":
+          name: query_channel_1_voltage_setpoint
+          response: "#out(k__ch1_voltage_set_v)"
         ":SOURce1:CURRent {current}":
+          name: set_channel_1_current
+          response: null
           "#attr(k__ch1_current_set_a)": "current"
-        ":SOURce1:CURRent?": "#out(k__ch1_current_set_a)"
+        ":SOURce1:CURRent?":
+          name: query_channel_1_current_setpoint
+          response: "#out(k__ch1_current_set_a)"
 
         ":SOURce2:VOLTage {voltage}":
+          name: set_channel_2_voltage
+          response: null
           "#attr(k__ch2_voltage_set_v)": "voltage"
-        ":SOURce2:VOLTage?": "#out(k__ch2_voltage_set_v)"
+        ":SOURce2:VOLTage?":
+          name: query_channel_2_voltage_setpoint
+          response: "#out(k__ch2_voltage_set_v)"
         ":SOURce2:CURRent {current}":
+          name: set_channel_2_current
+          response: null
           "#attr(k__ch2_current_set_a)": "current"
-        ":SOURce2:CURRent?": "#out(k__ch2_current_set_a)"
+        ":SOURce2:CURRent?":
+          name: query_channel_2_current_setpoint
+          response: "#out(k__ch2_current_set_a)"
 
         ":SOURce3:VOLTage {voltage}":
+          name: set_channel_3_voltage
+          response: null
           "#attr(k__ch3_voltage_set_v)": "voltage"
-        ":SOURce3:VOLTage?": "#out(k__ch3_voltage_set_v)"
+        ":SOURce3:VOLTage?":
+          name: query_channel_3_voltage_setpoint
+          response: "#out(k__ch3_voltage_set_v)"
         ":SOURce3:CURRent {current}":
+          name: set_channel_3_current
+          response: null
           "#attr(k__ch3_current_set_a)": "current"
-        ":SOURce3:CURRent?": "#out(k__ch3_current_set_a)"
+        ":SOURce3:CURRent?":
+          name: query_channel_3_current_setpoint
+          response: "#out(k__ch3_current_set_a)"
 
-        ":OUTP? CH1": "#out(k__ch1_output_state)"
-        ":OUTP? CH2": "#out(k__ch2_output_state)"
-        ":OUTP? CH3": "#out(k__ch3_output_state)"
+        ":OUTP? CH1":
+          name: query_channel_1_output
+          response: "#out(k__ch1_output_state)"
+        ":OUTP? CH2":
+          name: query_channel_2_output
+          response: "#out(k__ch2_output_state)"
+        ":OUTP? CH3":
+          name: query_channel_3_output
+          response: "#out(k__ch3_output_state)"
         ":OUTP CH1,ON":
+          name: enable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": "ON"
         ":OUTP CH1,OFF":
+          name: disable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": "OFF"
         ":OUTP CH2,ON":
+          name: enable_channel_2_output
+          response: null
           "#attr(k__ch2_output_state)": "ON"
         ":OUTP CH2,OFF":
+          name: disable_channel_2_output
+          response: null
           "#attr(k__ch2_output_state)": "OFF"
         ":OUTP CH3,ON":
+          name: enable_channel_3_output
+          response: null
           "#attr(k__ch3_output_state)": "ON"
         ":OUTP CH3,OFF":
+          name: disable_channel_3_output
+          response: null
           "#attr(k__ch3_output_state)": "OFF"
 
-        ":OUTP:MODE? CH1": "#out(ch1_output_mode)"
-        ":OUTP:MODE? CH2": "#out(ch2_output_mode)"
-        ":OUTP:MODE? CH3": "#out(ch3_output_mode)"
-        ":OUTP:CVCC? CH1": "#out(ch1_output_mode)"
-        ":OUTP:CVCC? CH2": "#out(ch2_output_mode)"
-        ":OUTP:CVCC? CH3": "#out(ch3_output_mode)"
+        ":OUTP:MODE? CH1":
+          name: query_channel_1_output_mode
+          response: "#out(ch1_output_mode)"
+        ":OUTP:MODE? CH2":
+          name: query_channel_2_output_mode
+          response: "#out(ch2_output_mode)"
+        ":OUTP:MODE? CH3":
+          name: query_channel_3_output_mode
+          response: "#out(ch3_output_mode)"
+        ":OUTP:CVCC? CH1":
+          name: query_channel_1_cvcc_mode
+          response: "#out(ch1_output_mode)"
+        ":OUTP:CVCC? CH2":
+          name: query_channel_2_cvcc_mode
+          response: "#out(ch2_output_mode)"
+        ":OUTP:CVCC? CH3":
+          name: query_channel_3_cvcc_mode
+          response: "#out(ch3_output_mode)"

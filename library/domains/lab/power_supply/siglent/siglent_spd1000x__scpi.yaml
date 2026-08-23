@@ -5,6 +5,11 @@ description: |
   SCPI (ASCII/TCP). Exposes voltage/current setpoints, output state, and basic
   measurements for lab automation workflows.
 
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   idn:
     type: str
@@ -69,34 +74,64 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
       mappings:
-        "*IDN?": "#out(idn)"
-        ":SYSTem:ERRor?": "#out(error_status)"
-        ":SYSTem:VERSion?": "#out(system_version)"
-        ":SYSTem:STATus?": "#out(system_status)"
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        ":SYSTem:ERRor?":
+          name: query_system_error
+          response: "#out(error_status)"
+        ":SYSTem:VERSion?":
+          name: query_system_version
+          response: "#out(system_version)"
+        ":SYSTem:STATus?":
+          name: query_system_status
+          response: "#out(system_status)"
 
         ":INSTrument CH1":
+          name: select_channel_1
           "#attr(k__selected_output)": "CH1"
           response: "OK"
-        ":INSTrument?": "#out(k__selected_output)"
+        ":INSTrument?":
+          name: query_selected_channel
+          response: "#out(k__selected_output)"
 
         "CH1:VOLTage {voltage}":
+          name: set_channel_1_voltage
+          response: null
           "#attr(k__ch1_voltage_set_v)": "voltage"
-        "CH1:VOLTage?": "#out(k__ch1_voltage_set_v)"
+        "CH1:VOLTage?":
+          name: query_channel_1_voltage
+          response: "#out(k__ch1_voltage_set_v)"
 
         "CH1:CURRent {current}":
+          name: set_channel_1_current_limit
+          response: null
           "#attr(k__ch1_current_limit_a)": "current"
-        "CH1:CURRent?": "#out(k__ch1_current_limit_a)"
+        "CH1:CURRent?":
+          name: query_channel_1_current_limit
+          response: "#out(k__ch1_current_limit_a)"
 
         ":OUTPut CH1,ON":
+          name: enable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": 1
         ":OUTPut CH1,OFF":
+          name: disable_channel_1_output
+          response: null
           "#attr(k__ch1_output_state)": 0
 
-        ":MEASure:VOLTage? CH1": "#out(ch1_voltage_readback_v)"
-        ":MEASure:CURRent? CH1": "#out(ch1_current_readback_a)"
-        ":MEASure:POWEr? CH1": "#out(ch1_power_readback_w)"
+        ":MEASure:VOLTage? CH1":
+          name: query_channel_1_voltage_readback
+          response: "#out(ch1_voltage_readback_v)"
+        ":MEASure:CURRent? CH1":
+          name: query_channel_1_current_readback
+          response: "#out(ch1_current_readback_a)"
+        ":MEASure:POWEr? CH1":
+          name: query_channel_1_power_readback
+          response: "#out(ch1_power_readback_w)"

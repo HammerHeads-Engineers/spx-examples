@@ -3,6 +3,11 @@ name: rigol_mso5000__scpi
 description: |
   Virtual Rigol MSO5000-series oscilloscope exposing a subset of the SCPI
   measurement interface for VPP/VRMS/VAVG/frequency and ID queries over TCP.
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
 attributes:
   channel1_vpp_v:
     type: float
@@ -44,7 +49,8 @@ actions:
 
 communication:
   - ascii:
-      # Port is auto-assigned at runtime (starting from 5025) to avoid collisions.
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
       terminator: "\n"
       response_delay: 0.01
       response_jitter: 0.0
