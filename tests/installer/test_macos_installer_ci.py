@@ -13,11 +13,12 @@ def _macos_job() -> str:
     return workflow[start:]
 
 
-def test_macos_installer_job_runs_only_for_release_tags() -> None:
+def test_macos_installer_job_runs_after_semantic_release() -> None:
     job = _macos_job()
 
-    assert "needs: [pack-tests, build-installer]" in job
-    assert "if: startsWith(github.ref, 'refs/tags/')" in job
+    assert "needs: release" in job
+    assert "needs.release.outputs.released == 'true'" in job
+    assert "ref: ${{ needs.release.outputs.tag }}" in job
     assert "runs-on: macos-latest" in job
     assert "environment: macos-signing" in job
 
@@ -59,6 +60,13 @@ def test_macos_installer_job_validates_and_publishes_package() -> None:
     assert "gh release upload" in job
     assert "steps.macos_package.outputs.path" in job
     assert "Clean up macOS signing material" in job
+
+
+def test_macos_job_publishes_release_tagged_workflow_artifact() -> None:
+    job = _macos_job()
+
+    assert "name: spx-installer-${{ needs.release.outputs.tag }}-macos" in job
+    assert 'gh release upload "${{ needs.release.outputs.tag }}"' in job
 
 
 def test_macos_release_docs_describe_ci_artifact() -> None:
