@@ -77,7 +77,8 @@ The Python prerequisite is cached under `build/windows/cache/` by default and is
 
 The release workflow runs this native build on `windows-latest` after
 Semantic Release has created a version tag. The job checks out that exact tag,
-installs Python 3.12, .NET 8, Poetry, and WiX v6, then publishes the unsigned
+installs Python 3.12, .NET 8, Poetry, WiX v6, and the required WiX
+Bootstrapper Applications and Util extensions, then publishes the unsigned
 bundle both as a workflow artifact and as a GitHub Release asset named
 `spx-installer-<version>.exe`.
 
