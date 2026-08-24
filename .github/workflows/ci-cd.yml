@@ -615,7 +615,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
-          assets="$(gh release view "${RELEASE_TAG}" --json assets --jq '.assets[].name')"
+          assets="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')"
           printf '%s\n' "${assets}"
 
           expected_assets=(

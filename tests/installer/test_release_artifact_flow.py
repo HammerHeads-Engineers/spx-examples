@@ -35,6 +35,7 @@ def test_release_verification_requires_all_platform_assets() -> None:
     verification = workflow[start:]
 
     assert "needs: [release, build-windows-installer, build-macos-installer]" in verification
+    assert 'gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"' in verification
     assert '"spx-installer.tgz"' in verification
     assert '"spx-installer-${RELEASE_TAG}.run"' in verification
     assert '"spx-installer-${RELEASE_TAG}.ps1"' in verification
