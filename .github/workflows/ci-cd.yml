@@ -12,8 +12,6 @@ on:
       - perf/**
       - performance/**
       - ci/**
-    tags:
-      - "*"
   pull_request:
     branches:
       - main
@@ -249,48 +247,16 @@ jobs:
         run: |
           "${OUT_DIR}/spx-stop.sh"
 
-  build-installer:
-    needs: pack-tests
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build installer package
-        run: |
-          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
-          scripts/build_installer_package.sh --package-name "spx-installer"
-          scripts/build_self_extractors.sh --version "${{ github.ref_name }}"
-
-      - name: Upload installer assets to GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${{ github.ref_name }}"
-          if gh release view "${tag}" >/dev/null 2>&1; then
-            gh release upload "${tag}" \
-              "dist/spx-installer.tgz" \
-              "dist/spx-installer-${tag}.run" \
-              "dist/spx-installer-${tag}.ps1" \
-              --clobber
-          else
-            gh release create "${tag}" \
-              "dist/spx-installer.tgz" \
-              "dist/spx-installer-${tag}.run" \
-              "dist/spx-installer-${tag}.ps1" \
-              --title "SPX Installer ${tag}" \
-              --generate-notes
-          fi
-
   release:
+    outputs:
+      released: ${{ steps.release_result.outputs.released }}
+      tag: ${{ steps.release_result.outputs.tag }}
     runs-on: ubuntu-latest
     concurrency: release
     needs: pack-tests
     if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
     env:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
-      SPX_PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
     steps:
       - name: Setup | Checkout Repository at workflow sha
         uses: actions/checkout@v4
@@ -372,43 +338,126 @@ jobs:
             "dist/spx-installer-${tag}.ps1" \
             --clobber
 
-      - name: Ensure SPX_PACKAGES_TOKEN is set
-        if: steps.release.outputs.released == 'true'
-        shell: bash
-        run: |
-          if [ -z "${SPX_PACKAGES_TOKEN}" ]; then
-            echo "SPX_PACKAGES_TOKEN is required to publish GitHub Packages."
-            exit 1
-          fi
-
       - name: Publish installer to GitHub Packages
         if: steps.release.outputs.released == 'true'
         env:
-          PACKAGES_TOKEN: ${{ env.SPX_PACKAGES_TOKEN }}
+          PACKAGES_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           PKG_NAME="spx-installer"
           VERSION="${{ steps.release.outputs.tag }}"
           upload_pkg() {
             local file="$1"
-            curl -L \
+            curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors -L \
               -X PUT \
               -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
               -H "Content-Type: application/octet-stream" \
               --data-binary @"${file}" \
-              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
+              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")" \
+              -o /dev/null
           }
           upload_pkg "dist/spx-installer.tgz"
           upload_pkg "dist/spx-installer-${VERSION}.run"
           upload_pkg "dist/spx-installer-${VERSION}.ps1"
 
+      - name: Export release result for downstream artifact jobs
+        id: release_result
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${{ steps.release.outputs.released }}" == "true" ]]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ steps.release.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows-installer:
+    needs: release
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Poetry
+        shell: pwsh
+        run: python -m pip install --upgrade pip poetry
+
+      - name: Install repository dependencies
+        shell: pwsh
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Install WiX Toolset v6 CLI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version "6.*"
+          $toolPath = "$env:USERPROFILE\.dotnet\tools"
+          $env:Path = "$toolPath;$env:Path"
+          $toolPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          wix --version
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          & .\packaging\windows\Build.ps1 `
+            -Configuration Release `
+            -RuntimeIdentifier win-x64 `
+            -BuildRoot build/windows
+
+      - name: Validate Windows installer artifact
+        id: windows_artifact
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem -Path "build/windows/artifacts" -Filter "spx-installer-*.exe" -File)
+          if ($artifacts.Count -ne 1) {
+            throw "Expected exactly one Windows installer bundle, found $($artifacts.Count)."
+          }
+          "path=build/windows/artifacts/$($artifacts[0].Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload Windows installer as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spx-installer-${{ needs.release.outputs.tag }}-windows
+          path: ${{ steps.windows_artifact.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload Windows installer to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release.outputs.tag }}" `
+            "${{ steps.windows_artifact.outputs.path }}" `
+            --clobber
+
   build-macos-installer:
-    needs: [pack-tests, build-installer]
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: release
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
     runs-on: macos-latest
     environment: macos-signing
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -507,9 +556,10 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x scripts/build_macos_pkg.sh
-          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' pyproject.toml | head -n 1)"
+          tag="${{ needs.release.outputs.tag }}"
+          version="${tag#v}"
           if [[ -z "${version}" ]]; then
-            echo "Unable to resolve package version from pyproject.toml." >&2
+            echo "Unable to resolve package version from release tag." >&2
             exit 1
           fi
           scripts/build_macos_pkg.sh \
@@ -532,16 +582,16 @@ jobs:
       - name: Upload macOS installer as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spx-installer-${{ github.ref_name }}-macos
+          name: spx-installer-${{ needs.release.outputs.tag }}-macos
           path: ${{ steps.macos_package.outputs.path }}
           if-no-files-found: error
 
       - name: Upload macOS installer to GitHub Release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" \
+          gh release upload "${{ needs.release.outputs.tag }}" \
             "${{ steps.macos_package.outputs.path }}" \
             --clobber
 
@@ -556,3 +606,49 @@ jobs:
             "${MACOS_SIGNING_APP_P12:-${RUNNER_TEMP}/developer-id-application.p12}" \
             "${MACOS_SIGNING_INSTALLER_P12:-${RUNNER_TEMP}/developer-id-installer.p12}" \
             "${MACOS_SIGNING_NOTARY_KEY:-${RUNNER_TEMP}/AuthKey_${{ vars.MACOS_NOTARY_KEY_ID }}.p8}"
+
+  release-verification:
+    needs: [release, build-windows-installer, build-macos-installer]
+    if: >-
+      always() &&
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - name: Verify platform build jobs succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.build-windows-installer.result }}" != "success" ]]; then
+            echo "Windows installer job did not succeed: ${{ needs.build-windows-installer.result }}" >&2
+            exit 1
+          fi
+          if [[ "${{ needs.build-macos-installer.result }}" != "success" ]]; then
+            echo "macOS installer job did not succeed: ${{ needs.build-macos-installer.result }}" >&2
+            exit 1
+          fi
+
+      - name: Verify complete GitHub Release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          assets="$(gh release view "${RELEASE_TAG}" --json assets --jq '.assets[].name')"
+          printf '%s\n' "${assets}"
+
+          expected_assets=(
+            "spx-installer.tgz"
+            "spx-installer-${RELEASE_TAG}.run"
+            "spx-installer-${RELEASE_TAG}.ps1"
+            "spx-installer-${version}.exe"
+            "spx-installer-macos-${version}.pkg"
+          )
+          for expected in "${expected_assets[@]}"; do
+            if ! grep -Fxq "${expected}" <<<"${assets}"; then
+              echo "Missing release asset: ${expected}" >&2
+              exit 1
+            fi
+          done

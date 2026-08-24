@@ -393,10 +393,12 @@ a packaged location such as `/Applications/SPX Tools/`. Once they have
 generated a local environment, they can later manage it via the companion
 launchers in the same folder:
 
-Tag releases also build this signed, notarized, and stapled package on a native
-`macos-latest` GitHub Actions runner and attach
+The release workflow builds this signed, notarized, and stapled package on a
+native `macos-latest` GitHub Actions runner and attaches
 `spx-installer-macos-<version>.pkg` to the matching GitHub Release. The
-`macos-signing` environment must be configured before creating a release tag.
+`macos-signing` environment must be configured before a releasable push; the
+job checks out the exact tag produced by Semantic Release, so the package and
+the release metadata cannot drift apart.
 
 The macOS installer now also uses the native Installer.app license step. Its
 content is sourced from `packaging/macos/resources/English.lproj/License.rtf`.
@@ -439,6 +441,15 @@ The Windows launcher, bundle, and Apps entry also reuse one shared SPX icon asse
 See `packaging/windows/README.md` for the current build flow, prerequisites, and
 known gaps. The first iteration keeps macOS behavior untouched and reuses the
 current Python installer logic as the payload source of truth.
+
+### 8.1 Automated release artifact flow
+
+On a releasable push to `develop` or `main`, Semantic Release creates the
+version tag and GitHub Release first. Windows and macOS jobs then build from
+that exact tag and attach the native installers. A final verification job
+requires the complete release set: `.tgz`, `.run`, `.ps1`, `.exe`, and `.pkg`.
+The workflow uses the repository `GITHUB_TOKEN` with `packages: write` to
+publish the portable files to GitHub Packages and fails on any HTTP error.
 
 ### 9. Produce Unix self-extractor (optional)
 
