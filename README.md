@@ -448,8 +448,10 @@ On a releasable push to `develop` or `main`, Semantic Release creates the
 version tag and GitHub Release first. Windows and macOS jobs then build from
 that exact tag and attach the native installers. A final verification job
 requires the complete release set: `.tgz`, `.run`, `.ps1`, `.exe`, and `.pkg`.
-The workflow uses the repository `GITHUB_TOKEN` with `packages: write` to
-publish the portable files to GitHub Packages and fails on any HTTP error.
+GitHub Release assets are the canonical public distribution channel; their
+`browser_download_url` values can be consumed directly by a Vercel site or
+copied by a follow-up job into Supabase Storage. No GitHub Packages registry
+token is required for installer distribution.
 
 ### 9. Produce Unix self-extractor (optional)
 

@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   pr-title-gate:
@@ -337,29 +336,6 @@ jobs:
             "dist/spx-installer-${tag}.run" \
             "dist/spx-installer-${tag}.ps1" \
             --clobber
-
-      - name: Publish installer to GitHub Packages
-        if: steps.release.outputs.released == 'true'
-        env:
-          PACKAGES_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          PKG_NAME="spx-installer"
-          VERSION="${{ steps.release.outputs.tag }}"
-          upload_pkg() {
-            local file="$1"
-            curl --fail-with-body --silent --show-error --retry 3 --retry-all-errors -L \
-              -X PUT \
-              -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"${file}" \
-              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")" \
-              -o /dev/null
-          }
-          upload_pkg "dist/spx-installer.tgz"
-          upload_pkg "dist/spx-installer-${VERSION}.run"
-          upload_pkg "dist/spx-installer-${VERSION}.ps1"
 
       - name: Export release result for downstream artifact jobs
         id: release_result
