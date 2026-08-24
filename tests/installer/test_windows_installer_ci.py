@@ -38,6 +38,9 @@ def test_windows_installer_job_provisions_native_build_dependencies() -> None:
     assert "actions/setup-dotnet@v4" in job
     assert 'dotnet-version: "8.0.x"' in job
     assert 'dotnet tool install --global wix --version "6.*"' in job
+    assert 'wix extension add --global "WixToolset.BootstrapperApplications.wixext/$wixVersion"' in job
+    assert 'wix extension add --global "WixToolset.Util.wixext/$wixVersion"' in job
+    assert "wix extension list --global" in job
     assert "poetry install --with=dev --no-root" in job
 
 
