@@ -21,12 +21,12 @@ def test_release_exposes_tag_and_release_status_to_artifact_jobs() -> None:
     assert 'echo "released=true" >> "$GITHUB_OUTPUT"' in workflow
 
 
-def test_package_upload_fails_on_http_errors() -> None:
+def test_release_does_not_use_unsupported_generic_packages_endpoint() -> None:
     workflow = _workflow()
 
-    assert "set -euo pipefail" in workflow
-    assert "curl --fail-with-body --silent --show-error --retry 3" in workflow
-    assert "PACKAGES_TOKEN: ${{ github.token }}" in workflow
+    assert "packages: write" not in workflow
+    assert "Publish installer to GitHub Packages" not in workflow
+    assert "packages/generic" not in workflow
 
 
 def test_release_verification_requires_all_platform_assets() -> None:
