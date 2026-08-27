@@ -27,6 +27,7 @@ def test_readme_describes_recommended_release_installers() -> None:
     assert "Prefer the versioned" in readme
     assert "`spx-installer-<version>.exe`" in readme
     assert "`spx-installer-macos-<version>.pkg`" in readme
+    assert "`spx-installer-<version>.tgz`" in readme
     assert "`spx-installer-<version>.run`" in readme
     assert "Use the unpacked `.tgz` / `.zip` package and `spx-setup.*` only as a fallback" in readme
     assert "chmod +x ./spx-installer-<version>.run" in readme

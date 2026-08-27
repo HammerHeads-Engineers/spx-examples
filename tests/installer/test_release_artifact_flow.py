@@ -36,8 +36,19 @@ def test_release_verification_requires_all_platform_assets() -> None:
 
     assert "needs: [release, build-windows-installer, build-macos-installer]" in verification
     assert 'gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}"' in verification
-    assert '"spx-installer.tgz"' in verification
-    assert '"spx-installer-${RELEASE_TAG}.run"' in verification
-    assert '"spx-installer-${RELEASE_TAG}.ps1"' in verification
+    assert '"spx-installer-${version}.tgz"' in verification
+    assert '"spx-installer-${version}.run"' in verification
+    assert '"spx-installer-${version}.ps1"' in verification
     assert '"spx-installer-${version}.exe"' in verification
     assert '"spx-installer-macos-${version}.pkg"' in verification
+
+
+def test_release_build_uses_one_versioned_filename_convention() -> None:
+    workflow = _workflow()
+
+    assert 'version="${tag#v}"' in workflow
+    assert 'scripts/build_installer_package.sh --package-name "spx-installer" --version "${version}"' in workflow
+    assert 'scripts/build_self_extractors.sh --version "${version}"' in workflow
+    assert '"dist/spx-installer-${version}.tgz"' in workflow
+    assert '"dist/spx-installer-${version}.run"' in workflow
+    assert '"dist/spx-installer-${version}.ps1"' in workflow

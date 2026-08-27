@@ -336,6 +336,11 @@ This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 - installer engine (`spx-install.sh` / `spx-install.ps1`)
 - `INSTALLER_README.md` with quickstart instructions
 
+For a release-style, versioned archive, pass the version without the tag
+prefix. For example, `scripts/build_installer_package.sh --version 1.2.3`
+creates `dist/spx-installer-1.2.3.tgz`. The unversioned form remains available
+for local and development use.
+
 Hand the `.tgz` to teammates when you want the portable fallback distribution;
 they can extract it anywhere and run the platform launcher
 (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or
@@ -447,7 +452,9 @@ current Python installer logic as the payload source of truth.
 On a releasable push to `develop` or `main`, Semantic Release creates the
 version tag and GitHub Release first. Windows and macOS jobs then build from
 that exact tag and attach the native installers. A final verification job
-requires the complete release set: `.tgz`, `.run`, `.ps1`, `.exe`, and `.pkg`.
+requires the complete versioned release set: `spx-installer-<version>.tgz`,
+`spx-installer-<version>.run`, `spx-installer-<version>.ps1`,
+`spx-installer-<version>.exe`, and `spx-installer-macos-<version>.pkg`.
 GitHub Release assets are the canonical public distribution channel; their
 `browser_download_url` values can be consumed directly by a Vercel site or
 copied by a follow-up job into Supabase Storage. No GitHub Packages registry
@@ -460,15 +467,18 @@ releases, keep preferring `spx-installer-<version>.exe` on Windows and
 `spx-installer-macos-<version>.pkg` on macOS.
 
 ```bash
-scripts/build_self_extractors.sh --version v1.2.3
+scripts/build_self_extractors.sh --version 1.2.3
 ```
+
+The command also accepts a `v1.2.3` tag and removes the leading `v` from the
+generated filenames.
 
 Outputs:
 
-- `dist/spx-installer-v1.2.3.run` – executable for Linux/Unix that extracts to
+- `dist/spx-installer-1.2.3.run` – executable for Linux/Unix that extracts to
   a temporary directory and launches `spx-install.sh`. Run it with
-  `chmod +x ./spx-installer-v1.2.3.run` first.
-- `dist/spx-installer-v1.2.3.ps1` – PowerShell fallback for internal/testing
+  `chmod +x ./spx-installer-1.2.3.run` first.
+- `dist/spx-installer-1.2.3.ps1` – PowerShell fallback for internal/testing
   workflows that unpacks to `%TEMP%` and runs `spx-install.ps1`.
 
 Share the `.run` directly for Linux/Unix recipients who want a single-file

@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME]
+Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME] [--version VERSION]
 
 Creates a portable installer archive (tgz) with the wizard CLI, manifests,
 and helper scripts so end users can run `spx-setup` without cloning the repo.
@@ -12,11 +12,13 @@ and helper scripts so end users can run `spx-setup` without cloning the repo.
 Options:
   --output-dir DIR     Directory to place the assembled folder and tarball (default: dist)
   --package-name NAME  Name of the folder/tarball (default: spx-installer)
+  --version VERSION    Add VERSION to the archive filename; a leading 'v' is removed
 EOF
 }
 
 OUTPUT_DIR="dist"
 PACKAGE_NAME="spx-installer"
+VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --package-name)
       PACKAGE_NAME="$2"
+      shift 2
+      ;;
+    --version)
+      VERSION="$2"
       shift 2
       ;;
     -h|--help)
@@ -40,10 +46,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -n "${VERSION}" ]]; then
+  VERSION="${VERSION#v}"
+  if [[ -z "${VERSION}" || ! "${VERSION}" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
+    echo "Version must contain only letters, numbers, dots, and hyphens." >&2
+    exit 1
+  fi
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+if [[ "${OUTPUT_DIR}" = /* ]]; then
+  DEST_DIR="${OUTPUT_DIR}"
+else
+  DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+fi
 PACKAGE_DIR="${DEST_DIR}/${PACKAGE_NAME}"
-ARCHIVE_PATH="${DEST_DIR}/${PACKAGE_NAME}.tgz"
+ARCHIVE_NAME="${PACKAGE_NAME}.tgz"
+if [[ -n "${VERSION}" ]]; then
+  ARCHIVE_NAME="${PACKAGE_NAME}-${VERSION}.tgz"
+fi
+ARCHIVE_PATH="${DEST_DIR}/${ARCHIVE_NAME}"
 
 mkdir -p "${DEST_DIR}"
 rm -rf "${PACKAGE_DIR}"

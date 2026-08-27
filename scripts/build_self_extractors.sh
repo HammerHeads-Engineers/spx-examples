@@ -40,19 +40,30 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+VERSION="${VERSION#v}"
+if [[ -z "${VERSION}" || ! "${VERSION}" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
+  echo "Version must contain only letters, numbers, dots, and hyphens." >&2
+  exit 1
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASE_DIR="${REPO_ROOT}/${OUTPUT_DIR}/spx-installer"
+if [[ "${OUTPUT_DIR}" = /* ]]; then
+  DEST_DIR="${OUTPUT_DIR}"
+else
+  DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+fi
+BASE_DIR="${DEST_DIR}/spx-installer"
 
 if [[ ! -d "${BASE_DIR}" ]]; then
   echo "[self-extract] Base installer directory not found at ${BASE_DIR}. Building it first..."
-  "${REPO_ROOT}/scripts/build_installer_package.sh" --output-dir "${OUTPUT_DIR}"
+  "${REPO_ROOT}/scripts/build_installer_package.sh" --output-dir "${DEST_DIR}"
 fi
 
-RUN_FILE="${REPO_ROOT}/${OUTPUT_DIR}/spx-installer-${VERSION}.run"
-PS1_FILE="${REPO_ROOT}/${OUTPUT_DIR}/spx-installer-${VERSION}.ps1"
+RUN_FILE="${DEST_DIR}/spx-installer-${VERSION}.run"
+PS1_FILE="${DEST_DIR}/spx-installer-${VERSION}.ps1"
 
 tmp_tar="$(mktemp)"
-tar -C "${REPO_ROOT}/${OUTPUT_DIR}" -czf "${tmp_tar}" "spx-installer"
+tar -C "${DEST_DIR}" -czf "${tmp_tar}" "spx-installer"
 cat > "${RUN_FILE}" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
