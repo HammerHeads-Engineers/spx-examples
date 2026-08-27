@@ -322,8 +322,10 @@ jobs:
         if: steps.release.outputs.released == 'true'
         run: |
           chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
-          scripts/build_installer_package.sh --package-name "spx-installer"
-          scripts/build_self_extractors.sh --version "${{ steps.release.outputs.tag }}"
+          tag="${{ steps.release.outputs.tag }}"
+          version="${tag#v}"
+          scripts/build_installer_package.sh --package-name "spx-installer" --version "${version}"
+          scripts/build_self_extractors.sh --version "${version}"
 
       - name: Upload installer assets to GitHub Release
         if: steps.release.outputs.released == 'true'
@@ -331,10 +333,11 @@ jobs:
           GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
         run: |
           tag="${{ steps.release.outputs.tag }}"
+          version="${tag#v}"
           gh release upload "${tag}" \
-            "dist/spx-installer.tgz" \
-            "dist/spx-installer-${tag}.run" \
-            "dist/spx-installer-${tag}.ps1" \
+            "dist/spx-installer-${version}.tgz" \
+            "dist/spx-installer-${version}.run" \
+            "dist/spx-installer-${version}.ps1" \
             --clobber
 
       - name: Export release result for downstream artifact jobs
@@ -619,9 +622,9 @@ jobs:
           printf '%s\n' "${assets}"
 
           expected_assets=(
-            "spx-installer.tgz"
-            "spx-installer-${RELEASE_TAG}.run"
-            "spx-installer-${RELEASE_TAG}.ps1"
+            "spx-installer-${version}.tgz"
+            "spx-installer-${version}.run"
+            "spx-installer-${version}.ps1"
             "spx-installer-${version}.exe"
             "spx-installer-macos-${version}.pkg"
           )
