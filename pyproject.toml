@@ -34,6 +34,7 @@ black = "*"
 isort = "*"
 flake8 = "*"
 commitizen = "*"
+gitpython = "<3.1.60"  # semantic-release currently uses Actor.name_email_regex
 python-semantic-release = "*"  # keep versioning & changelog automation
 
 
@@ -75,4 +76,3 @@ upload_to_vcs_release = true
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
