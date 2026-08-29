@@ -287,6 +287,18 @@ jobs:
           if ($version -notmatch '^3\.12\.') {
             throw "MCP workspace is not based on bundled Python 3.12: $version"
           }
+          $spxKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\HammerHeads Engineers\SPX")
+          if ($null -eq $spxKey) {
+            throw "SPX installation marker was not found."
+          }
+          try {
+            $bundledPythonMarker = $spxKey.GetValue("BundledPython312Installed")
+          } finally {
+            $spxKey.Dispose()
+          }
+          if ([string]$bundledPythonMarker -ne "1") {
+            throw "SPX bundled Python installation marker was not found."
+          }
           $registryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("SOFTWARE\Python\PythonCore\3.12\InstallPath")
           if ($null -eq $registryKey) {
             throw "Bundled Python registry key was not found."
@@ -304,6 +316,10 @@ jobs:
           $bootstrapPython = [IO.Path]::GetFullPath([string]$marker.bootstrap_python)
           if ($bootstrapPython -ine $registryPython) {
             throw "MCP did not use the bundled Python from the registry: $bootstrapPython"
+          }
+          $toolCachePython = [IO.Path]::GetFullPath((Join-Path ([string]$env:pythonLocation) "python.exe"))
+          if ($bootstrapPython -ieq $toolCachePython) {
+            throw "MCP incorrectly used the build runner Python instead of the bundled runtime: $bootstrapPython"
           }
           & $venvPython (Join-Path $workspace "tools\verify_mcp_stdio.py") `
             --python $venvPython `

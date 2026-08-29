@@ -76,6 +76,9 @@ def test_windows_smoke_installs_bundle_and_runs_installed_launcher() -> None:
     assert "Remove-Item Env:PYTHON_BIN" in job
     assert '".venv\\Scripts\\python.exe"' in job
     assert "tools\\verify_mcp_stdio.py" in job
+    assert "BundledPython312Installed" in job
+    assert "pythonLocation" in job
+    assert "instead of the bundled runtime" in job
 
 
 def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:

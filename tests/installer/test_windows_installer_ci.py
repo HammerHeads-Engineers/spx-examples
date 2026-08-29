@@ -7,6 +7,8 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
 LAUNCHER_PATH = REPO_ROOT / "packaging" / "windows" / "launcher" / "Program.cs"
+BUNDLE_WXS_PATH = REPO_ROOT / "packaging" / "windows" / "wix" / "SPX.Bundle.wxs"
+PRODUCT_WXS_PATH = REPO_ROOT / "packaging" / "windows" / "wix" / "SPX.Product.wxs"
 
 
 def _workflow() -> str:
@@ -78,3 +80,14 @@ def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
     assert "requiredVersion: (3, 12)" in launcher
     assert "new PythonCandidate" not in launcher
     assert "The bundled Python 3.12 runtime was not found" in launcher
+
+
+def test_windows_bundle_uses_an_spx_owned_python_marker() -> None:
+    bundle = BUNDLE_WXS_PATH.read_text(encoding="utf-8")
+    product = PRODUCT_WXS_PATH.read_text(encoding="utf-8")
+
+    assert 'Value="BundledPython312Installed"' in bundle
+    assert 'Variable="SpxBundledPython312Installed"' in bundle
+    assert 'DetectCondition="SpxBundledPython312Installed = 1"' in bundle
+    assert "Python312InstallPathPerMachine OR Python312InstallPathPerUser" not in bundle
+    assert 'Name="BundledPython312Installed"' in product
