@@ -266,3 +266,70 @@ def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:
     assert "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" in ports
     assert "${BACNET_BIND_ADDR:-127.0.0.1}:47818:47818/udp" in ports
     assert "${BACNET_BIND_ADDR:-127.0.0.1}:47828:47828/udp" in ports
+
+
+def test_generator_writes_protocol_bundle_without_instances(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=[],
+        profiles=[],
+        protocols=["mqtt"],
+        install_examples=True,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="PROTOCOL-KEY",
+        model_ids=["sensor"],
+        service_ids=["mqtt_broker"],
+        instances=[],
+        start_instances=[],
+    )
+
+    output_dir = tmp_path / "out-protocol"
+    generator.generate(selection, output_dir)
+
+    compose = yaml.safe_load(
+        (output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8")
+    )
+    services = compose["services"]
+    assert set(services) == {"spx-server", "mqtt_broker"}
+
+    bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
+    assert bundle["packages"] == []
+    assert bundle["protocols"] == ["mqtt"]
+    assert [entry["id"] for entry in bundle["models"]] == ["sensor"]
+    assert bundle["instances"] == []
+    assert bundle["start_instances"] == []
+    assert bundle["services"] == ["mqtt_broker"]
+
+
+def test_generator_writes_service_only_protocol_bundle(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=[],
+        profiles=[],
+        protocols=["mqtt"],
+        install_examples=False,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="SERVICE-KEY",
+        model_ids=[],
+        service_ids=["mqtt_broker"],
+        instances=[],
+        start_instances=[],
+    )
+
+    output_dir = tmp_path / "out-service-only"
+    generator.generate(selection, output_dir)
+
+    compose = yaml.safe_load(
+        (output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8")
+    )
+    assert set(compose["services"]) == {"spx-server", "mqtt_broker"}
+
+    bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
+    assert bundle["models"] == []
+    assert bundle["instances"] == []
+    assert bundle["start_instances"] == []
+    assert bundle["services"] == ["mqtt_broker"]

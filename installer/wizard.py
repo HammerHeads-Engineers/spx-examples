@@ -11,11 +11,17 @@ from shutil import get_terminal_size
 from textwrap import shorten
 from typing import Dict, List, Sequence
 
+from . import paths, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
-from . import paths
-from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
-from .selection import apply_platform_compatibility, current_platform_name
-from . import ui
+from .selection import (
+    apply_platform_compatibility,
+    current_platform_name,
+    resolve_default_instances,
+    resolve_model_ids,
+    resolve_protocol_model_ids,
+    resolve_protocol_service_ids,
+    resolve_service_ids,
+)
 
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
 PROTOCOL_ALIASES = {"ascii": "scpi"}
@@ -83,18 +89,28 @@ class InstallerWizard:
         self._print_banner()
         packages, protocol_filters = self._prompt_packages(index.industries, index)
         protocol_only = bool(protocol_filters) and not packages
-        if protocol_only:
-            packages = self._prompt_protocol_model_packages(
-                protocol_filters, index
-            )
-            protocol_only = not packages
         profiles: List[str] = []
         install_models = False
         install_instances = False
         start_instances: List[str] = []
-        if not protocol_only:
+        model_ids: List[str] = []
+        service_ids: List[str] = []
+        instances: List[Dict[str, str]] = []
+
+        if protocol_only:
+            install_models = self._prompt_yes_no(
+                "\nInstall/register compatible models? [Y/n]: ",
+                default=True,
+            )
+            if install_models:
+                model_ids = resolve_protocol_model_ids(protocol_filters, index)
+            service_ids = self._prompt_protocol_services(protocol_filters, index)
+            self._warn_for_disabled_protocol_services(model_ids, service_ids, index)
+        else:
             profiles = self._prompt_profiles(packages, index)
-            selection_label = "selected packages and profiles" if profiles else "selected packages"
+            selection_label = (
+                "selected packages and profiles" if profiles else "selected packages"
+            )
             install_models = self._prompt_yes_no(
                 f"\nAdd models from {selection_label}? [Y/n]: ",
                 default=True,
@@ -106,7 +122,9 @@ class InstallerWizard:
                 )
                 if install_instances:
                     start_instances = self._prompt_start_instances(packages, index)
-        install_spx_ui = self._prompt_yes_no("Include SPX UI frontend container? [Y/n]: ", default=True)
+        install_spx_ui = self._prompt_yes_no(
+            "Include SPX UI frontend container? [Y/n]: ", default=True
+        )
         start_now = self._prompt_yes_no(
             "Start the stack immediately after generation? [Y/n]: ",
             default=True,
@@ -114,30 +132,33 @@ class InstallerWizard:
         offline_bundle = not start_now
         license_key = self._prompt_license_key()
 
-        if protocol_only:
-            model_ids = []
-            service_ids = self._prompt_protocol_services(protocol_filters, index)
-        else:
+        if not protocol_only:
             model_protocol_filters = protocol_filters if not packages else []
             model_ids = (
-                resolve_model_ids(
-                    packages, profiles, model_protocol_filters, index
-                )
+                resolve_model_ids(packages, profiles, model_protocol_filters, index)
                 if install_models
                 else []
             )
             service_ids = resolve_service_ids(model_ids, packages, profiles, index)
-        instances = resolve_default_instances(packages, index) if install_instances else []
-        if install_instances:
-            allowed = {entry.get("instance_key") for entry in instances if entry.get("instance_key")}
-            start_instances = [key for key in start_instances if key in allowed]
-        if install_instances and (
-            "smart_building_pack" in packages
-            or "industrial_iiot_pack" in packages
-            or "embedded_lab_pack" in packages
-        ):
-            allowed = set(start_instances)
-            instances = [entry for entry in instances if entry.get("instance_key") in allowed]
+            instances = (
+                resolve_default_instances(packages, index) if install_instances else []
+            )
+            if install_instances:
+                allowed = {
+                    entry.get("instance_key")
+                    for entry in instances
+                    if entry.get("instance_key")
+                }
+                start_instances = [key for key in start_instances if key in allowed]
+            if install_instances and (
+                "smart_building_pack" in packages
+                or "industrial_iiot_pack" in packages
+                or "embedded_lab_pack" in packages
+            ):
+                allowed = set(start_instances)
+                instances = [
+                    entry for entry in instances if entry.get("instance_key") in allowed
+                ]
 
         compatibility = apply_platform_compatibility(
             model_ids=model_ids,
@@ -227,14 +248,10 @@ class InstallerWizard:
 
     def _available_protocols(self, index: ManifestIndex) -> List[str]:
         protocol_set = {
-            proto
-            for model in index.models.values()
-            for proto in model.protocols
+            proto for model in index.models.values() for proto in model.protocols
         }
         protocol_set |= {
-            svc.protocol
-            for svc in index.services.values()
-            if svc.protocol
+            svc.protocol for svc in index.services.values() if svc.protocol
         }
         return sorted(protocol_set)
 
@@ -258,7 +275,9 @@ class InstallerWizard:
         entries = list(industries.values())
         entries.sort(key=lambda ind: ind.name.lower())
         default_protocols = self._resolve_default_protocols(index)
-        default_protocol_label = ", ".join(self._format_protocol_label(p) for p in default_protocols)
+        default_protocol_label = ", ".join(
+            self._format_protocol_label(p) for p in default_protocols
+        )
         width = max(60, min(get_terminal_size((80, 20)).columns, 120))
 
         print(ui.heading("Available packages:\n"))
@@ -284,7 +303,11 @@ class InstallerWizard:
             if not raw:
                 if default_protocols:
                     return [], default_protocols
-                print(ui.warn("  Default protocols are unavailable; please select an entry."))
+                print(
+                    ui.warn(
+                        "  Default protocols are unavailable; please select an entry."
+                    )
+                )
                 continue
             if raw in {"0", "p", "P"}:
                 protocols = self._prompt_protocols(index)
@@ -293,13 +316,13 @@ class InstallerWizard:
                 print(ui.warn("  Please select at least one protocol."))
                 continue
             try:
-                values = [
-                    int(token)
-                    for token in raw.split(",")
-                    if token.strip()
-                ]
+                values = [int(token) for token in raw.split(",") if token.strip()]
             except ValueError:
-                print(ui.warn("  Invalid input. Please enter numbers separated by commas."))
+                print(
+                    ui.warn(
+                        "  Invalid input. Please enter numbers separated by commas."
+                    )
+                )
                 continue
             if not values:
                 print(ui.warn("  Please select at least one entry."))
@@ -342,19 +365,23 @@ class InstallerWizard:
             if raw.lower() in {"a", "all"}:
                 return sorted(available_profiles)
             try:
-                values = [
-                    int(token)
-                    for token in raw.split(",")
-                    if token.strip()
-                ]
+                values = [int(token) for token in raw.split(",") if token.strip()]
             except ValueError:
-                print(ui.warn("  Invalid input. Please enter numbers separated by commas, or 'a' for all."))
+                print(
+                    ui.warn(
+                        "  Invalid input. Please enter numbers separated by commas, or 'a' for all."
+                    )
+                )
                 continue
             if not values:
                 print(ui.warn("  Please select at least one entry."))
                 continue
             if any(v < 1 or v > len(available_profiles) for v in values):
-                print(ui.warn(f"  Values must be between 1 and {len(available_profiles)}."))
+                print(
+                    ui.warn(
+                        f"  Values must be between 1 and {len(available_profiles)}."
+                    )
+                )
                 continue
             return [sorted(available_profiles)[i - 1] for i in sorted(set(values))]
 
@@ -372,7 +399,11 @@ class InstallerWizard:
             manifest = index.industries.get(pkg_id)
             if not manifest or not manifest.start_instances:
                 continue
-            start_keys = [str(entry).strip() for entry in manifest.start_instances if str(entry).strip()]
+            start_keys = [
+                str(entry).strip()
+                for entry in manifest.start_instances
+                if str(entry).strip()
+            ]
             if not start_keys:
                 continue
             instance_models = {
@@ -387,7 +418,9 @@ class InstallerWizard:
                     print(f"  • {instance_key} ({model_id})")
                 else:
                     print(f"  • {instance_key}")
-            if self._prompt_yes_no("Start these instances after creation? [Y/n]: ", default=True):
+            if self._prompt_yes_no(
+                "Start these instances after creation? [Y/n]: ", default=True
+            ):
                 for instance_key in start_keys:
                     if instance_key in seen:
                         continue
@@ -411,51 +444,6 @@ class InstallerWizard:
         raw = input(prompt).strip()
         self._check_quit(raw)
 
-    def _prompt_protocol_model_packages(
-        self,
-        protocols: Sequence[str],
-        index: ManifestIndex,
-    ) -> List[str]:
-        """Offer model packages compatible with selected protocols."""
-
-        candidates = [
-            manifest
-            for manifest in index.industries.values()
-            if any(protocol in manifest.protocols for protocol in protocols)
-        ]
-        if not candidates:
-            return []
-
-        candidates.sort(key=lambda manifest: manifest.name.lower())
-        width = max(60, min(get_terminal_size((80, 20)).columns, 120))
-        print(
-            ui.heading(
-                "\nCompatible model packages for selected protocols:\n"
-            )
-        )
-        print(
-            "Select a package to install its models and optional default instances. "
-            "This does not select every model matching the protocols.\n"
-        )
-        for idx, manifest in enumerate(candidates, start=1):
-            print(
-                f"  [{ui.accent(str(idx))}] {ui.heading(manifest.name)} "
-                f"{self._format_package_overview(manifest, width)}"
-            )
-
-        if not self._prompt_yes_no(
-            "Add a compatible model package? [y/N]: ",
-            default=False,
-        ):
-            return []
-
-        choices = self._prompt_indices(
-            "Select model packages (comma-separated, q to quit): ",
-            len(candidates),
-            allow_empty=False,
-        )
-        return [candidates[index - 1].id for index in choices]
-
     def _prompt_protocols(self, index: ManifestIndex) -> List[str]:
         sorted_protocols = self._available_protocols(index)
         if not sorted_protocols:
@@ -463,7 +451,9 @@ class InstallerWizard:
             return []
 
         default_protocols = self._resolve_default_protocols(index)
-        default_protocol_label = ", ".join(self._format_protocol_label(p) for p in default_protocols)
+        default_protocol_label = ", ".join(
+            self._format_protocol_label(p) for p in default_protocols
+        )
 
         print(ui.heading("\nAvailable protocols:\n"))
         for idx, proto in enumerate(sorted_protocols, start=1):
@@ -493,11 +483,8 @@ class InstallerWizard:
         if not protocols:
             return []
 
-        candidates = [
-            service
-            for service in index.services.values()
-            if service.protocol in protocols
-        ]
+        candidate_ids = resolve_protocol_service_ids(protocols, index)
+        candidates = [index.services[service_id] for service_id in candidate_ids]
         if not candidates:
             return []
 
@@ -505,9 +492,7 @@ class InstallerWizard:
         print(ui.heading("\nServices matching selected protocols:\n"))
         for idx, service in enumerate(candidates, start=1):
             runtime = service.deployment.runtime if service.deployment else "docker"
-            ports = ", ".join(
-                f"{port.host}/{port.transport}" for port in service.ports
-            )
+            ports = ", ".join(f"{port.host}/{port.transport}" for port in service.ports)
             print(
                 f"  [{ui.accent(str(idx))}] {ui.heading(service.name)} "
                 f"({service.protocol}, {runtime})"
@@ -518,14 +503,63 @@ class InstallerWizard:
                 print(f"      Ports: {ports}")
             print()
 
-        choices = self._prompt_indices(
-            "Select services to enable (comma-separated, ENTER for all, q to quit): ",
-            len(candidates),
-            allow_empty=True,
+        while True:
+            raw = input(
+                "Select services to enable (comma-separated, ENTER for all, none for none, q to quit): "
+            ).strip()
+            self._check_quit(raw)
+            if not raw:
+                return [service.id for service in candidates]
+            if raw.lower() in {"n", "none"}:
+                return []
+            if raw.lower() in {"a", "all"}:
+                return [service.id for service in candidates]
+            try:
+                choices = [int(token) for token in raw.split(",") if token.strip()]
+            except ValueError:
+                print(
+                    ui.warn("  Invalid input. Enter numbers, 'none', or ENTER for all.")
+                )
+                continue
+            if not choices or any(
+                choice < 1 or choice > len(candidates) for choice in choices
+            ):
+                print(ui.warn(f"  Values must be between 1 and {len(candidates)}."))
+                continue
+            return [candidates[index - 1].id for index in sorted(set(choices))]
+
+    def _warn_for_disabled_protocol_services(
+        self,
+        model_ids: Sequence[str],
+        service_ids: Sequence[str],
+        index: ManifestIndex,
+    ) -> None:
+        """Warn when selected models reference a service disabled in protocol mode."""
+
+        selected_services = set(service_ids)
+        missing_services = sorted(
+            {
+                service_id
+                for model_id in model_ids
+                for service_id in (
+                    index.models.get(model_id).services
+                    if index.models.get(model_id)
+                    else []
+                )
+                if service_id not in selected_services
+            }
         )
-        if not choices:
-            return [service.id for service in candidates]
-        return [candidates[i - 1].id for i in choices]
+        if not missing_services:
+            return
+
+        print(ui.warn("\nSome selected models reference disabled local services:"))
+        for service_id in missing_services:
+            service = index.services.get(service_id)
+            service_name = service.name if service is not None else service_id
+            print(
+                f"  - {service_name} ({service_id}) is disabled; configure an external "
+                "endpoint separately before using dependent models."
+            )
 
     def _prompt_license_key(self) -> str:
         env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
@@ -536,7 +570,9 @@ class InstallerWizard:
 
         print(ui.heading("\nSPX Product Key"))
         while True:
-            raw = getpass.getpass("Enter SPX product key (required, q to quit): ").strip()
+            raw = getpass.getpass(
+                "Enter SPX product key (required, q to quit): "
+            ).strip()
             self._check_quit(raw)
             if raw:
                 return raw
@@ -568,13 +604,13 @@ class InstallerWizard:
             if not raw and allow_empty:
                 return []
             try:
-                values = [
-                    int(token)
-                    for token in raw.split(",")
-                    if token.strip()
-                ]
+                values = [int(token) for token in raw.split(",") if token.strip()]
             except ValueError:
-                print(ui.warn("  Invalid input. Please enter numbers separated by commas."))
+                print(
+                    ui.warn(
+                        "  Invalid input. Please enter numbers separated by commas."
+                    )
+                )
                 continue
             if not values:
                 print(ui.warn("  Please select at least one entry."))
@@ -596,7 +632,9 @@ class InstallerWizard:
         counts = f"{len(profile.models)} models, {len(profile.services)} extra services"
         return self._format_compact_overview(desc, counts, width)
 
-    def _format_compact_overview(self, description: str, counts: str, width: int) -> str:
+    def _format_compact_overview(
+        self, description: str, counts: str, width: int
+    ) -> str:
         suffix = f" [{counts}]"
         available = max(20, width - len(suffix) - 12)
         compact_description = shorten(description, width=available, placeholder="...")
@@ -608,12 +646,20 @@ class InstallerWizard:
         preferred = PACKAGE_PROTOCOL_HIGHLIGHTS.get(manifest.id)
         protocol_ids: List[str]
         if preferred:
-            protocol_ids = [proto for proto in preferred if self._protocol_present(proto, manifest.protocols)]
+            protocol_ids = [
+                proto
+                for proto in preferred
+                if self._protocol_present(proto, manifest.protocols)
+            ]
         else:
             protocol_ids = list(manifest.protocols[:3])
-        return [PROTOCOL_BADGE_LABELS.get(proto, proto.upper()) for proto in protocol_ids]
+        return [
+            PROTOCOL_BADGE_LABELS.get(proto, proto.upper()) for proto in protocol_ids
+        ]
 
-    def _protocol_present(self, protocol: str, available_protocols: Sequence[str]) -> bool:
+    def _protocol_present(
+        self, protocol: str, available_protocols: Sequence[str]
+    ) -> bool:
         if protocol in available_protocols:
             return True
         alias_target = PROTOCOL_ALIASES.get(protocol)
@@ -661,9 +707,7 @@ class InstallerWizard:
             if not instruction:
                 continue
 
-            native_notice = (
-                f"{manifest.name} requires host-side setup on {normalized_platform}: {instruction}"
-            )
+            native_notice = f"{manifest.name} requires host-side setup on {normalized_platform}: {instruction}"
             if native_notice not in seen:
                 notices.append(native_notice)
                 seen.add(native_notice)
@@ -704,9 +748,15 @@ class InstallerWizard:
             print("\nProtocols:")
             for proto in protocols:
                 print(f"  • {self._format_protocol_label(proto)}")
-        print(f"\nInstall models: {ui.success('yes') if install_models else ui.warn('no')}")
-        print(f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}")
-        print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
+        print(
+            f"\nInstall models: {ui.success('yes') if install_models else ui.warn('no')}"
+        )
+        print(
+            f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}"
+        )
+        print(
+            f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}"
+        )
         print(f"Start stack now: {ui.success('yes') if start_now else ui.warn('no')}")
         print(f"SPX product key: {ui.heading(self._mask_secret(license_key))}")
         print("\nModels:")
@@ -734,7 +784,9 @@ class InstallerWizard:
         if service_ids:
             for service_id in service_ids:
                 manifest = index.services[service_id]
-                deployment = manifest.deployment.runtime if manifest.deployment else "docker"
+                deployment = (
+                    manifest.deployment.runtime if manifest.deployment else "docker"
+                )
                 print(f"  • {manifest.name} ({deployment})")
         else:
             print("  • (none selected)")

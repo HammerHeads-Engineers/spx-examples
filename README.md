@@ -253,15 +253,22 @@ Choose the artifact that matches your platform:
   ```
 
 The wizard will guide you through package selection, generate a local bundle,
-and optionally start the stack immediately. If you press ENTER through the
-defaults, the wizard uses a protocol-only setup (Modbus + SCPI/ASCII), skips
-model installation, and keeps the SPX UI enabled.
+and optionally start the stack immediately. When you choose protocols with
+option `0`, the protocol-first flow selects every catalog model compatible
+with at least one selected protocol by default. You can answer `n` to
+`Install/register compatible models?` to generate a service-only bundle.
+Protocol-first bundles never create or start model instances; model definitions
+are registered without provisioning instances.
 
-When selecting protocols with option `0`, the wizard also offers compatible
-model packages. Selecting a package continues through the normal model and
-instance prompts and installs that package's models; it does not select every
-model in the catalog that happens to use one of the selected protocols. Press
-ENTER at the package prompt to keep the protocol-only setup.
+Local services are selected independently from models. Press ENTER to enable
+all local services for the selected protocols, enter service numbers to choose
+a subset, or enter `none`/`n` to disable all local services. Disabling a
+service does not prevent compatible models from being registered, but the
+wizard warns that dependent models require a separately configured external
+endpoint. External endpoint configuration is not part of this flow yet.
+
+Package selection and quickstarts remain the curated path for package models,
+profiles, default instances, and their package-level services.
 
 On Linux/Unix, the `.run` artifact extracts to a temporary directory and then
 launches the same terminal-based installer engine used by the portable package.
