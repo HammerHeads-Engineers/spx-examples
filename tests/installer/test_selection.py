@@ -6,7 +6,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from installer import manifest
-from installer.selection import apply_platform_compatibility
+from installer.selection import (
+    apply_platform_compatibility,
+    resolve_model_ids,
+    resolve_protocol_model_ids,
+    resolve_protocol_service_ids,
+    resolve_service_ids,
+)
 
 
 def build_index() -> manifest.ManifestIndex:
@@ -44,14 +50,18 @@ def build_index() -> manifest.ManifestIndex:
                     transport="tcp", host=1883, container=1883, purpose="telemetry"
                 )
             ],
-            deployment=manifest.ServiceDeployment(runtime="docker", image="eclipse-mosquitto"),
+            deployment=manifest.ServiceDeployment(
+                runtime="docker", image="eclipse-mosquitto"
+            ),
         ),
     }
     models = {
         "ble_monitor": manifest.ModelManifest(
             id="ble_monitor",
             name="BLE Vital Signs Monitor",
-            path=Path("library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml"),
+            path=Path(
+                "library/domains/lab/monitor/generic/vital_signs_monitor__ble_gatt.yaml"
+            ),
             domain="lab",
             protocols=["ble"],
             services=["btvirt_adapter"],
@@ -64,7 +74,9 @@ def build_index() -> manifest.ManifestIndex:
         "mqtt_sensor": manifest.ModelManifest(
             id="mqtt_sensor",
             name="MQTT Environment Sensor",
-            path=Path("library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml"),
+            path=Path(
+                "library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml"
+            ),
             domain="environment",
             protocols=["mqtt"],
             services=["mqtt_broker"],
@@ -106,7 +118,10 @@ def test_apply_platform_compatibility_filters_ble_on_windows() -> None:
     ]
     assert adjustment.start_instances == ["spx_env_sensor_mqtt"]
     assert adjustment.warnings
-    assert "Windows does not support btvirt Adapter (BLE/GATT, btvirt_adapter)" in adjustment.warnings[0]
+    assert (
+        "Windows does not support btvirt Adapter (BLE/GATT, btvirt_adapter)"
+        in adjustment.warnings[0]
+    )
     assert "BLE Vital Signs Monitor" in adjustment.warnings[0]
     assert "spx_health_monitor_ble" in adjustment.warnings[0]
 
@@ -132,5 +147,24 @@ def test_apply_platform_compatibility_keeps_ble_on_linux() -> None:
         {"model_id": "ble_monitor", "instance_key": "spx_health_monitor_ble"},
         {"model_id": "mqtt_sensor", "instance_key": "spx_env_sensor_mqtt"},
     ]
-    assert adjustment.start_instances == ["spx_health_monitor_ble", "spx_env_sensor_mqtt"]
+    assert adjustment.start_instances == [
+        "spx_health_monitor_ble",
+        "spx_env_sensor_mqtt",
+    ]
     assert adjustment.warnings == []
+
+
+def test_protocol_resolvers_use_catalog_protocols_only() -> None:
+    index = build_index()
+
+    assert resolve_protocol_model_ids(["mqtt"], index) == ["mqtt_sensor"]
+    assert resolve_protocol_service_ids(["mqtt"], index) == ["mqtt_broker"]
+
+
+def test_protocol_model_and_service_resolution_does_not_change_package_resolution() -> (
+    None
+):
+    index = build_index()
+
+    assert resolve_model_ids([], [], ["mqtt"], index) == ["mqtt_sensor"]
+    assert resolve_service_ids(["mqtt_sensor"], [], [], index) == ["mqtt_broker"]

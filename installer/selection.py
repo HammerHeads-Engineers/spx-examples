@@ -3,12 +3,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import platform
+from dataclasses import dataclass
 from typing import Any, Dict, List, Sequence, Set, Tuple
 
 from .manifest import ManifestIndex
-
 
 PLATFORM_LABELS = {
     "linux": "Linux",
@@ -39,7 +38,9 @@ def current_platform_name(platform_name: str | None = None) -> str:
     return raw or "unknown"
 
 
-def _service_supported_on_platform(service_id: str, index: ManifestIndex, platform_name: str) -> bool:
+def _service_supported_on_platform(
+    service_id: str, index: ManifestIndex, platform_name: str
+) -> bool:
     manifest = index.services.get(service_id)
     if manifest is None or manifest.deployment is None:
         return True
@@ -93,11 +94,18 @@ def apply_platform_compatibility(
 
     for service_id in unsupported_service_ids:
         service_manifest = index.services.get(service_id)
-        service_name = service_manifest.name if service_manifest is not None else service_id
+        service_name = (
+            service_manifest.name if service_manifest is not None else service_id
+        )
         service_models = [
             model_id
             for model_id in model_ids
-            if service_id in (index.models.get(model_id).services if index.models.get(model_id) else [])
+            if service_id
+            in (
+                index.models.get(model_id).services
+                if index.models.get(model_id)
+                else []
+            )
         ]
         removed_model_ids.update(service_models)
         removed_instance_keys = [
@@ -132,9 +140,13 @@ def apply_platform_compatibility(
             warning += f"; removed instances: {', '.join(removed_instance_keys)}"
         warnings.append(warning + ".")
 
-    filtered_model_ids = [model_id for model_id in model_ids if model_id not in removed_model_ids]
+    filtered_model_ids = [
+        model_id for model_id in model_ids if model_id not in removed_model_ids
+    ]
     filtered_service_ids = [
-        service_id for service_id in service_ids if service_id not in unsupported_service_ids
+        service_id
+        for service_id in service_ids
+        if service_id not in unsupported_service_ids
     ]
     filtered_instances = [
         dict(entry)
@@ -175,27 +187,53 @@ def resolve_model_ids(
         if any(pkg in manifest.packages for pkg in packages)
     }
     if protocols:
-        result.update(
-            {
-                model_id
-                for model_id, manifest in index.models.items()
-                if any(proto in manifest.protocols for proto in protocols)
-            }
-        )
+        result.update(resolve_protocol_model_ids(protocols, index))
 
     profile_model_paths = {
-        path
-        for profile_id in profiles
-        for path in index.profiles[profile_id].models
+        path for profile_id in profiles for path in index.profiles[profile_id].models
     }
     if profile_model_paths:
-        path_to_model = {manifest.path: model_id for model_id, manifest in index.models.items()}
+        path_to_model = {
+            manifest.path: model_id for model_id, manifest in index.models.items()
+        }
         for profile_path in profile_model_paths:
             model_id = path_to_model.get(profile_path)
             if model_id:
                 result.add(model_id)
 
     return sorted(result)
+
+
+def resolve_protocol_model_ids(
+    protocols: Sequence[str],
+    index: ManifestIndex,
+) -> List[str]:
+    """Resolve every catalog model compatible with at least one protocol."""
+
+    selected_protocols = set(protocols)
+    if not selected_protocols:
+        return []
+    return sorted(
+        model_id
+        for model_id, manifest in index.models.items()
+        if selected_protocols.intersection(manifest.protocols)
+    )
+
+
+def resolve_protocol_service_ids(
+    protocols: Sequence[str],
+    index: ManifestIndex,
+) -> List[str]:
+    """Resolve local services whose protocol is explicitly selected."""
+
+    selected_protocols = set(protocols)
+    if not selected_protocols:
+        return []
+    return sorted(
+        service_id
+        for service_id, service in index.services.items()
+        if service.protocol in selected_protocols
+    )
 
 
 def resolve_service_ids(
