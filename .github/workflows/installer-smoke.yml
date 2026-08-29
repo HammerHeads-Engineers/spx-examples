@@ -149,7 +149,7 @@ jobs:
           - windows-2022
           - windows-2025
     env:
-      VERSION: 0.0.0-ci.${{ github.run_id }}
+      VERSION: 0.0.0-ci.1
       BUILD_ROOT: build/windows-smoke
     steps:
       - name: Checkout repository

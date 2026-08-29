@@ -38,6 +38,8 @@ def test_macos_installer_job_builds_signed_native_package() -> None:
 def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     script = (REPO_ROOT / "scripts" / "build_macos_pkg.sh").read_text(encoding="utf-8")
 
+    assert 'if [[ "${OUTPUT_DIR}" = /* ]]; then' in script
+    assert 'DEST_DIR="${OUTPUT_DIR}"' in script
     assert "python-${PYTHON_VERSION}-macos11.pkg" in script
     assert "8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4" in script
     assert "pkgutil --expand-full" in script

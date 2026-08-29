@@ -329,7 +329,11 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+if [[ "${OUTPUT_DIR}" = /* ]]; then
+  DEST_DIR="${OUTPUT_DIR}"
+else
+  DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+fi
 STAGING_ROOT="${REPO_ROOT}/${STAGING_DIR}"
 APP_ROOT="${STAGING_ROOT}/root"
 PYTHON_FRAMEWORK_VERSION="${PYTHON_VERSION%.*}"
