@@ -59,6 +59,11 @@ class DeploymentGenerator:
 
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
 
@@ -86,6 +91,15 @@ resolve_system_python() {
   if [ -n "${PYTHON_BIN:-}" ]; then
     printf '%s\n' "${PYTHON_BIN}"
     return
+  fi
+
+  if [ "$(uname -s)" = "Darwin" ] && command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    local bundled_python
+    bundled_python="$(spx_resolve_macos_python || true)"
+    if [ -n "${bundled_python}" ]; then
+      printf '%s\n' "${bundled_python}"
+      return
+    fi
   fi
 
   if command -v python3 >/dev/null 2>&1; then
@@ -330,6 +344,7 @@ exit /b %EXITCODE%
         self._write_text_script(output_dir / "spx-start.bat", start_bat.strip() + "\n")
         self._write_bootstrap_runner(output_dir)
         self._write_runtime_bootstrap(output_dir)
+        self._write_macos_python_helper(output_dir)
         stop_script = """
 pkill -f spx-ble-adapter >/dev/null 2>&1 || true
 docker compose -f "$(dirname "$0")/docker-compose.generated.yml" --env-file "$(dirname "$0")/.env" down
@@ -827,6 +842,18 @@ if __name__ == "__main__":  # pragma: no cover
             raise FileNotFoundError(f"Missing runtime bootstrap helper: {src}")
 
         dest = output_dir / "runtime_bootstrap.py"
+        shutil.copy2(src, dest)
+        mode = os.stat(dest).st_mode
+        os.chmod(dest, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_macos_python_helper(self, output_dir: Path) -> None:
+        src = self.repo_root / "installer" / "macos" / "python_runtime.sh"
+        if not src.exists():
+            src = Path(__file__).parent / "macos" / "python_runtime.sh"
+        if not src.exists():
+            raise FileNotFoundError(f"Missing macOS Python runtime helper: {src}")
+
+        dest = output_dir / "macos_python_runtime.sh"
         shutil.copy2(src, dest)
         mode = os.stat(dest).st_mode
         os.chmod(dest, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

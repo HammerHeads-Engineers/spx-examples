@@ -4,6 +4,12 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNTIME_BOOTSTRAP="${REPO_DIR}/installer/runtime_bootstrap.py"
+MACOS_PYTHON_HELPER="${REPO_DIR}/installer/macos/python_runtime.sh"
+
+if [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
 
 need_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -16,6 +22,15 @@ resolve_system_python() {
   if [ -n "${PYTHON_BIN:-}" ]; then
     printf '%s\n' "${PYTHON_BIN}"
     return
+  fi
+
+  if [ "$(uname -s)" = "Darwin" ] && command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    local bundled_python
+    bundled_python="$(spx_resolve_macos_python || true)"
+    if [ -n "${bundled_python}" ]; then
+      printf '%s\n' "${bundled_python}"
+      return
+    fi
   fi
 
   if command -v python3 >/dev/null 2>&1; then

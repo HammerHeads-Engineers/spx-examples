@@ -1,0 +1,549 @@
+# SPDX-License-Identifier: MIT
+name: Installer smoke and integration
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      run_full_stack:
+        description: Run the Docker-backed full-stack smoke test
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-installer-smoke:
+    name: Linux installer smoke (${{ matrix.os }})
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build portable Linux installer artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_DIR="${RUNNER_TEMP}/spx-linux-dist"
+          OUTPUT_DIR="${RUNNER_TEMP}/spx-linux-generated"
+          RUNTIME_DIR="${RUNNER_TEMP}/spx-linux-runtime"
+          {
+            echo "DIST_DIR=${DIST_DIR}"
+            echo "OUTPUT_DIR=${OUTPUT_DIR}"
+            echo "RUNTIME_DIR=${RUNTIME_DIR}"
+          } >> "${GITHUB_ENV}"
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh \
+            --output-dir "${DIST_DIR}" \
+            --version "${VERSION}"
+          scripts/build_self_extractors.sh \
+            --output-dir "${DIST_DIR}" \
+            --version "${VERSION}"
+          test -f "${DIST_DIR}/spx-installer-${VERSION}.tgz"
+          test -x "${DIST_DIR}/spx-installer-${VERSION}.run"
+
+      - name: Install a Docker probe for no-start wizard smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          fake_bin="${RUNNER_TEMP}/spx-fake-bin"
+          mkdir -p "${fake_bin}"
+          cat > "${fake_bin}/docker" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ "${1:-}" == "info" ]]; then
+            exit 0
+          fi
+          if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
+            echo "Docker Compose version v2.0.0-ci"
+            exit 0
+          fi
+          exit 0
+          EOF
+          chmod +x "${fake_bin}/docker"
+          echo "${fake_bin}" >> "${GITHUB_PATH}"
+
+      - name: Run the self-extracting installer and generate a bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+          SPX_RUNTIME_HOME="${RUNTIME_DIR}" \
+            "${DIST_DIR}/spx-installer-${VERSION}.run" \
+            generate \
+            --protocols "modbus,mqtt,bacnet" \
+            --output "${OUTPUT_DIR}" \
+            --allow-missing-product-key \
+            --no-start \
+            2>&1 | tee "${RUNNER_TEMP}/spx-linux-generate.log"
+
+      - name: Exercise the interactive wizard with scripted stdin
+        shell: bash
+        env:
+          SPX_PRODUCT_KEY: CI-WIZARD-TEST-KEY
+        run: |
+          set -euo pipefail
+          printf '0\n\nn\nn\nn\n\n\n' | \
+            SPX_RUNTIME_HOME="${RUNTIME_DIR}-wizard" \
+            "${DIST_DIR}/spx-installer-${VERSION}.run" wizard \
+            2>&1 | tee "${RUNNER_TEMP}/spx-linux-wizard.log"
+
+      - name: Validate generated Linux bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${OUTPUT_DIR}/bundle.json"
+          test -f "${OUTPUT_DIR}/docker-compose.generated.yml"
+          test -x "${OUTPUT_DIR}/spx-start.sh"
+          test -x "${OUTPUT_DIR}/spx-stop.sh"
+          python3 - "${OUTPUT_DIR}/bundle.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          bundle = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          for field in ("models", "services", "instances", "start_instances"):
+              assert field in bundle, f"missing bundle field: {field}"
+          assert bundle["models"], "protocol smoke should resolve at least one model"
+          assert isinstance(bundle["services"], list)
+          assert bundle["instances"] == [], "protocol smoke must not create instances"
+          assert bundle["start_instances"] == [], "protocol smoke must not start instances"
+          PY
+
+      - name: Upload Linux smoke diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-smoke-linux-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/spx-linux-*.log
+            ${{ runner.temp }}/spx-linux-generated
+          if-no-files-found: ignore
+
+  windows-installer-smoke:
+    name: Windows installer smoke (${{ matrix.os }})
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-2022
+          - windows-2025
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_id }}
+      BUILD_ROOT: build/windows-smoke
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Poetry
+        shell: pwsh
+        run: python -m pip install --upgrade pip poetry
+
+      - name: Install repository dependencies
+        shell: pwsh
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Install WiX Toolset v6 CLI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version "6.*"
+          $toolPath = "$env:USERPROFILE\.dotnet\tools"
+          $env:Path = "$toolPath;$env:Path"
+          $toolPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $wixVersion = ((wix --version) -split '\+')[0].Trim()
+          wix extension add --global "WixToolset.BootstrapperApplications.wixext/$wixVersion"
+          wix extension add --global "WixToolset.Util.wixext/$wixVersion"
+
+      - name: Build Windows installer bundle
+        shell: pwsh
+        run: |
+          & .\packaging\windows\Build.ps1 `
+            -Configuration Release `
+            -RuntimeIdentifier win-x64 `
+            -BuildRoot $env:BUILD_ROOT `
+            -Version $env:VERSION
+          $artifacts = @(Get-ChildItem -Path "$env:BUILD_ROOT\artifacts" -Filter "spx-installer-*.exe" -File)
+          if ($artifacts.Count -ne 1) {
+            throw "Expected one Windows bundle, found $($artifacts.Count)."
+          }
+          "OUTPUT_DIR=$env:RUNNER_TEMP\spx-windows-generated" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "BUNDLE_PATH=$($artifacts[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install a Docker probe for no-start wizard smoke
+        shell: pwsh
+        run: |
+          $projectDir = Join-Path $env:RUNNER_TEMP "spx-fake-docker"
+          $fakeBin = Join-Path $env:RUNNER_TEMP "spx-fake-bin"
+          New-Item -ItemType Directory -Force -Path $projectDir, $fakeBin | Out-Null
+          dotnet new console --framework net8.0 --output $projectDir --force | Out-Null
+          @'
+          using System;
+
+          if (args.Length == 1 && args[0].Equals("info", StringComparison.OrdinalIgnoreCase))
+          {
+              Console.WriteLine("Docker daemon probe");
+          }
+          else if (args.Length == 2 && args[0].Equals("compose", StringComparison.OrdinalIgnoreCase) && args[1].Equals("version", StringComparison.OrdinalIgnoreCase))
+          {
+              Console.WriteLine("Docker Compose version v2.0.0-ci");
+          }
+          return 0;
+          '@ | Set-Content -Path (Join-Path $projectDir "Program.cs") -Encoding utf8
+          dotnet publish $projectDir --configuration Release --framework net8.0 --self-contained false --output $fakeBin | Out-Null
+          $env:Path = "$fakeBin;$env:Path"
+          $fakeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install Windows bundle silently
+        shell: pwsh
+        run: |
+          $logPath = Join-Path $env:RUNNER_TEMP "spx-windows-install.log"
+          $process = Start-Process `
+            -FilePath $env:BUNDLE_PATH `
+            -ArgumentList @("/quiet", "/norestart", "/log", $logPath) `
+            -Wait `
+            -PassThru `
+            -NoNewWindow
+          if ($process.ExitCode -notin @(0, 3010)) {
+            throw "Windows installer failed with exit code $($process.ExitCode)."
+          }
+
+      - name: Run installed Windows setup launcher
+        shell: pwsh
+        run: |
+          $launcher = Join-Path $env:LOCALAPPDATA "SPX\app\SpxLauncher.exe"
+          if (-not (Test-Path $launcher -PathType Leaf)) {
+            throw "Installed SPX launcher not found at $launcher."
+          }
+          New-Item -ItemType Directory -Force -Path $env:OUTPUT_DIR | Out-Null
+          $process = Start-Process `
+            -FilePath $launcher `
+            -ArgumentList @(
+              "setup",
+              "generate",
+              "--protocols", "modbus,mqtt,bacnet",
+              "--output", $env:OUTPUT_DIR,
+              "--allow-missing-product-key",
+              "--no-start"
+            ) `
+            -Wait `
+            -PassThru `
+            -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            throw "Installed SPX setup launcher failed with exit code $($process.ExitCode)."
+          }
+
+      - name: Validate generated Windows bundle
+        shell: pwsh
+        run: |
+          $bundlePath = Join-Path $env:OUTPUT_DIR "bundle.json"
+          $composePath = Join-Path $env:OUTPUT_DIR "docker-compose.generated.yml"
+          if (-not (Test-Path $bundlePath -PathType Leaf)) { throw "Missing $bundlePath" }
+          if (-not (Test-Path $composePath -PathType Leaf)) { throw "Missing $composePath" }
+          foreach ($script in @("spx-start.ps1", "spx-stop.ps1")) {
+            if (-not (Test-Path (Join-Path $env:OUTPUT_DIR $script) -PathType Leaf)) {
+              throw "Missing generated launcher $script"
+            }
+          }
+          $bundle = Get-Content -Path $bundlePath -Raw | ConvertFrom-Json
+          if (-not $bundle.models) { throw "Protocol smoke resolved no models." }
+          if ($null -eq $bundle.instances -or $bundle.instances.Count -ne 0) {
+            throw "Protocol smoke must not create instances."
+          }
+          if ($null -eq $bundle.start_instances -or $bundle.start_instances.Count -ne 0) {
+            throw "Protocol smoke must not start instances."
+          }
+
+      - name: Upload Windows smoke diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-smoke-windows-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/spx-windows-*.log
+            ${{ runner.temp }}/spx-windows-generated
+          if-no-files-found: ignore
+
+  macos-installer-smoke:
+    name: macOS installer smoke (${{ matrix.arch }})
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    env:
+      VERSION: 0.0.0-ci.${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+
+      - name: Build unsigned macOS installer package
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_DIR="${RUNNER_TEMP}/spx-macos-dist"
+          OUTPUT_DIR="${RUNNER_TEMP}/spx-macos-generated"
+          RUNTIME_DIR="${RUNNER_TEMP}/spx-macos-runtime"
+          {
+            echo "DIST_DIR=${DIST_DIR}"
+            echo "OUTPUT_DIR=${OUTPUT_DIR}"
+            echo "RUNTIME_DIR=${RUNTIME_DIR}"
+          } >> "${GITHUB_ENV}"
+          chmod +x scripts/build_macos_pkg.sh
+          scripts/build_macos_pkg.sh \
+            --version "${VERSION}" \
+            --output-dir "${DIST_DIR}" \
+            --staging-dir "build/macos-installer-smoke"
+          test -f "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg"
+
+      - name: Install a Docker probe for no-start wizard smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          fake_bin="${RUNNER_TEMP}/spx-fake-bin"
+          mkdir -p "${fake_bin}"
+          cat > "${fake_bin}/docker" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          if [[ "${1:-}" == "info" ]]; then
+            exit 0
+          fi
+          if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
+            echo "Docker Compose version v2.0.0-ci"
+            exit 0
+          fi
+          exit 0
+          EOF
+          chmod +x "${fake_bin}/docker"
+          echo "${fake_bin}" >> "${GITHUB_PATH}"
+
+      - name: Install macOS package on the disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo /usr/sbin/installer \
+            -pkg "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg" \
+            -target / \
+            -allowUntrusted
+
+      - name: Verify bundled Python and run the installed setup payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_bin="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+          python_app="/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app"
+          test -x "${python_bin}"
+          "${python_bin}" --version
+          file "${python_bin}" | grep -q "universal binary"
+          codesign --verify --deep --strict "${python_app}"
+          pkgutil --pkg-info com.hammerheadsengineers.spx.python
+
+          payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
+          test -x "${payload}/spx-install.sh"
+          mkdir -p "${OUTPUT_DIR}"
+          PATH="${RUNNER_TEMP}/spx-fake-bin:/usr/bin:/bin" \
+            SPX_RUNTIME_HOME="${RUNTIME_DIR}" \
+            "${payload}/spx-install.sh" \
+            generate \
+            --protocols "modbus,mqtt,bacnet" \
+            --output "${OUTPUT_DIR}" \
+            --allow-missing-product-key \
+            --no-start \
+            2>&1 | tee "${RUNNER_TEMP}/spx-macos-generate.log"
+
+      - name: Validate generated macOS bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${OUTPUT_DIR}/bundle.json"
+          test -f "${OUTPUT_DIR}/docker-compose.generated.yml"
+          test -x "${OUTPUT_DIR}/spx-start.sh"
+          test -x "${OUTPUT_DIR}/spx-stop.sh"
+          /usr/bin/python3 - "${OUTPUT_DIR}/bundle.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          bundle = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert bundle["models"], "protocol smoke should resolve at least one model"
+          assert bundle["instances"] == [], "protocol smoke must not create instances"
+          assert bundle["start_instances"] == [], "protocol smoke must not start instances"
+          PY
+
+      - name: Upload macOS smoke diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-smoke-macos-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/spx-macos-*.log
+            ${{ runner.temp }}/spx-macos-generated
+          if-no-files-found: ignore
+
+  full-stack-smoke:
+    name: Full stack installer smoke (Ubuntu)
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_full_stack) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_TEST_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+      VERSION: 0.0.0-ci.${{ github.run_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Require a dedicated test product key
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${SPX_PRODUCT_KEY:-}" ]]; then
+            echo "SPX_TEST_PRODUCT_KEY repository secret is required for the full-stack smoke test." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10.14"
+
+      - name: Install Poetry and repository dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip poetry
+          poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Build the portable installer used by the integration test
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_DIR="${RUNNER_TEMP}/spx-full-dist"
+          OUTPUT_DIR="${RUNNER_TEMP}/spx-full-generated"
+          RUNTIME_DIR="${RUNNER_TEMP}/spx-full-runtime"
+          {
+            echo "DIST_DIR=${DIST_DIR}"
+            echo "OUTPUT_DIR=${OUTPUT_DIR}"
+            echo "RUNTIME_DIR=${RUNTIME_DIR}"
+          } >> "${GITHUB_ENV}"
+          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
+          scripts/build_installer_package.sh --output-dir "${DIST_DIR}" --version "${VERSION}"
+          scripts/build_self_extractors.sh --output-dir "${DIST_DIR}" --version "${VERSION}"
+
+      - name: Generate a Docker-backed bundle through the installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${OUTPUT_DIR}"
+          "${DIST_DIR}/spx-installer-${VERSION}.run" \
+            generate \
+            --packages industrial_iiot_pack \
+            --output "${OUTPUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            2>&1 | tee "${RUNNER_TEMP}/spx-full-generate.log"
+
+      - name: Start the generated SPX stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
+          "${OUTPUT_DIR}/spx-start.sh" 2>&1 | tee "${RUNNER_TEMP}/spx-full-start.log"
+
+      - name: Wait for SPX health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..48}; do
+            if curl -fsS "${SPX_BASE_URL}/" >/dev/null; then
+              echo "SPX server is healthy"
+              exit 0
+            fi
+            echo "Waiting for SPX server (${attempt}/48)..."
+            sleep 5
+          done
+          echo "SPX server did not become healthy." >&2
+          exit 1
+
+      - name: Verify generated bundle through the running API
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS "${SPX_BASE_URL}/" >/dev/null
+          poetry run python -m installer bootstrap \
+            --bundle "${OUTPUT_DIR}/bundle.json" \
+            --api-url "${SPX_BASE_URL}" \
+            --skip-instances
+          docker compose -f "${OUTPUT_DIR}/docker-compose.generated.yml" \
+            --env-file "${OUTPUT_DIR}/.env" ps
+
+      - name: Run one representative pack integration suite
+        shell: bash
+        run: poetry run pytest -q tests/packs/industrial_iiot_pack
+
+      - name: Show full-stack diagnostics on failure
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          docker compose -f "${OUTPUT_DIR}/docker-compose.generated.yml" \
+            --env-file "${OUTPUT_DIR}/.env" logs --no-color || true
+          docker compose ps || true
+
+      - name: Upload full-stack diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-full-stack-diagnostics
+          path: |
+            ${{ runner.temp }}/spx-full-*.log
+            ${{ runner.temp }}/spx-full-generated
+          if-no-files-found: ignore
+
+      - name: Stop and clean up the generated stack
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -x "${OUTPUT_DIR}/spx-stop.sh" ]]; then
+            "${OUTPUT_DIR}/spx-stop.sh" || true
+          fi
+          docker compose down --remove-orphans --volumes || true

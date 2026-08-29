@@ -12,6 +12,12 @@ Current third-party component called by the installer:
    - License information: https://docs.python.org/3/license.html
    - Additional notices may be included in the upstream Python distribution.
 
+2. Python 3.12 macOS universal2 framework
+   - Supplier: Python Software Foundation
+   - Used by: the native macOS package as its bundled Python runtime
+   - License information: https://docs.python.org/3/license.html
+   - Additional notices may be included in the upstream Python distribution.
+
 Repository components distributed under open-source licenses remain subject
 to their applicable license texts, including the MIT license included in the
 repository root LICENSE file.

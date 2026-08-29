@@ -26,6 +26,9 @@ Options:
   --sign IDENTITY               Sign the .pkg with this Developer ID Installer identity
   --keychain PATH               Optional keychain for pkg signing / notarytool profile lookup
   --notarytool-profile PROFILE  Submit the signed .pkg with this notarytool keychain profile
+  --python-version VERSION      Official universal2 Python version to bundle (default: 3.12.10)
+  --python-package PATH         Use a local official Python macOS .pkg instead of downloading it
+  --python-sha256 SHA256        Expected SHA-256 for the Python package
   -h, --help                    Show this help
 EOF
 }
@@ -96,8 +99,11 @@ write_distribution_file() {
   local distribution_path="$1"
   local package_id="$2"
   local package_file_name="$3"
-  local version="$4"
-  local title="$5"
+  local python_package_id="$4"
+  local python_package_file_name="$5"
+  local python_version="$6"
+  local version="$7"
+  local title="$8"
 
   cat > "${distribution_path}" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
@@ -105,11 +111,13 @@ write_distribution_file() {
     <title>${title}</title>
     <license file="License.rtf"/>
     <pkg-ref id="${package_id}"/>
+    <pkg-ref id="${python_package_id}"/>
     <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
     <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
     <choices-outline>
         <line choice="default">
             <line choice="${package_id}"/>
+            <line choice="${python_package_id}"/>
         </line>
     </choices-outline>
     <choice id="default"/>
@@ -117,8 +125,100 @@ write_distribution_file() {
         <pkg-ref id="${package_id}"/>
     </choice>
     <pkg-ref id="${package_id}" version="${version}" onConclusion="none">${package_file_name}</pkg-ref>
+    <choice id="${python_package_id}" visible="false">
+        <pkg-ref id="${python_package_id}"/>
+    </choice>
+    <pkg-ref id="${python_package_id}" version="${python_version}" onConclusion="none">${python_package_file_name}</pkg-ref>
 </installer-gui-script>
 EOF
+}
+
+prepare_python_component() {
+  local package_path="${STAGING_ROOT}/python-${PYTHON_VERSION}.pkg"
+  local expanded_path="${STAGING_ROOT}/python-expanded"
+  local framework_payload="${expanded_path}/Python_Framework.pkg/Payload"
+
+  if [[ -n "${PYTHON_PACKAGE_INPUT}" ]]; then
+    if [[ ! -f "${PYTHON_PACKAGE_INPUT}" ]]; then
+      echo "Python package not found: ${PYTHON_PACKAGE_INPUT}" >&2
+      exit 1
+    fi
+    cp "${PYTHON_PACKAGE_INPUT}" "${package_path}"
+  else
+    require_command curl
+    echo "Downloading universal2 Python ${PYTHON_VERSION} package..."
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+      "${PYTHON_PACKAGE_URL}" \
+      --output "${package_path}"
+  fi
+
+  local actual_sha256
+  actual_sha256="$(shasum -a 256 "${package_path}" | awk '{print $1}')"
+  if [[ "${actual_sha256}" != "${PYTHON_PACKAGE_SHA256}" ]]; then
+    echo "Python package checksum mismatch." >&2
+    echo "  Expected: ${PYTHON_PACKAGE_SHA256}" >&2
+    echo "  Actual:   ${actual_sha256}" >&2
+    exit 1
+  fi
+
+  rm -rf "${expanded_path}" "${PYTHON_FRAMEWORK_ROOT}"
+  pkgutil --expand-full "${package_path}" "${expanded_path}"
+  if [[ ! -d "${framework_payload}" ]]; then
+    echo "Official Python package does not contain Python_Framework.pkg/Payload." >&2
+    exit 1
+  fi
+
+  mkdir -p "${PYTHON_FRAMEWORK_ROOT}"
+  rsync -a --delete --exclude '._*' "${framework_payload}/" "${PYTHON_FRAMEWORK_ROOT}/"
+
+  local python_bin="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/bin/python${PYTHON_FRAMEWORK_VERSION}"
+  if [[ ! -x "${python_bin}" ]]; then
+    echo "Bundled Python executable is missing: ${python_bin}" >&2
+    exit 1
+  fi
+  if ! file "${python_bin}" | grep -q "universal binary"; then
+    echo "Bundled Python executable is not universal2: ${python_bin}" >&2
+    exit 1
+  fi
+  codesign --verify --deep --strict \
+    "${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/Resources/Python.app"
+
+  local python_scripts_dir="${STAGING_ROOT}/python-scripts"
+  rm -rf "${python_scripts_dir}"
+  mkdir -p "${python_scripts_dir}"
+  cat > "${python_scripts_dir}/postinstall" <<EOF
+#!/bin/sh
+set -eu
+
+framework_root="/Library/Frameworks/Python.framework/Versions/${PYTHON_FRAMEWORK_VERSION}"
+python_bin="\${framework_root}/bin/python${PYTHON_FRAMEWORK_VERSION}"
+compileall="\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}/compileall.py"
+
+if [ -x "\${python_bin}" ] && [ -f "\${compileall}" ]; then
+  "\${python_bin}" -E -s -Wi "\${compileall}" -q -j0 \\
+    -f -x 'bad_coding|badsyntax|site-packages|test/test_lib2to3/data' \\
+    "\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}"
+fi
+EOF
+  chmod +x "${python_scripts_dir}/postinstall"
+
+  python_pkgbuild_args=(
+    --root "${PYTHON_FRAMEWORK_ROOT}"
+    --scripts "${python_scripts_dir}"
+    --identifier "${PYTHON_COMPONENT_ID}"
+    --version "${PYTHON_VERSION}"
+    --install-location "/Library/Frameworks/Python.framework"
+    --ownership recommended
+  )
+
+  if [[ -n "${SIGN_IDENTITY}" ]]; then
+    python_pkgbuild_args+=(--sign "${SIGN_IDENTITY}")
+    if [[ -n "${KEYCHAIN_PATH}" ]]; then
+      python_pkgbuild_args+=(--keychain "${KEYCHAIN_PATH}")
+    fi
+  fi
+
+  pkgbuild "${python_pkgbuild_args[@]}" "${PYTHON_COMPONENT_PKG_PATH}"
 }
 
 OUTPUT_DIR="dist"
@@ -144,6 +244,9 @@ APP_SIGN_IDENTITY=""
 SIGN_IDENTITY=""
 KEYCHAIN_PATH=""
 NOTARYTOOL_PROFILE=""
+PYTHON_VERSION="3.12.10"
+PYTHON_PACKAGE_INPUT=""
+PYTHON_PACKAGE_SHA256="8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4"
 PRODUCT_TITLE="SPX Tools"
 
 while [[ $# -gt 0 ]]; do
@@ -196,6 +299,18 @@ while [[ $# -gt 0 ]]; do
       NOTARYTOOL_PROFILE="$2"
       shift 2
       ;;
+    --python-version)
+      PYTHON_VERSION="$2"
+      shift 2
+      ;;
+    --python-package)
+      PYTHON_PACKAGE_INPUT="$2"
+      shift 2
+      ;;
+    --python-sha256)
+      PYTHON_PACKAGE_SHA256="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -217,14 +332,27 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
 STAGING_ROOT="${REPO_ROOT}/${STAGING_DIR}"
 APP_ROOT="${STAGING_ROOT}/root"
+PYTHON_FRAMEWORK_VERSION="${PYTHON_VERSION%.*}"
+PYTHON_PACKAGE_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
+PYTHON_COMPONENT_ID="com.hammerheadsengineers.spx.python"
 APP_OUTPUT_DIR="${STAGING_DIR}/root/${TOOLS_DIR_NAME}"
 APP_INSTALL_ROOT="${APP_ROOT}/${TOOLS_DIR_NAME}"
+PYTHON_FRAMEWORK_ROOT="${STAGING_ROOT}/python-framework-root"
 PKG_SCRIPTS_DIR="${STAGING_ROOT}/pkg-scripts"
 MACOS_RESOURCES_DIR="${REPO_ROOT}/packaging/macos/resources"
 
 if [[ -z "${VERSION}" ]]; then
   VERSION="$(resolve_version)"
 fi
+if [[ ! "${PYTHON_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Python version must use the X.Y.Z format: ${PYTHON_VERSION}" >&2
+  exit 1
+fi
+if [[ ! "${PYTHON_PACKAGE_SHA256}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  echo "Python package SHA-256 must contain exactly 64 hexadecimal characters." >&2
+  exit 1
+fi
+PYTHON_COMPONENT_PKG_PATH="${STAGING_ROOT}/${PKG_NAME}-${VERSION}-python-component.pkg"
 
 if [[ -n "${NOTARYTOOL_PROFILE}" && -z "${SIGN_IDENTITY}" ]]; then
   echo "--notarytool-profile requires --sign with a Developer ID Installer identity." >&2
@@ -243,6 +371,10 @@ fi
 require_command pkgbuild
 require_command productbuild
 require_command pkgutil
+require_command rsync
+require_command shasum
+require_command file
+require_command codesign
 require_command sed
 require_command /usr/libexec/PlistBuddy
 require_command chflags
@@ -255,6 +387,8 @@ fi
 
 mkdir -p "${DEST_DIR}"
 rm -rf "${APP_ROOT}"
+rm -rf "${PYTHON_FRAMEWORK_ROOT}"
+rm -rf "${STAGING_ROOT}/python-scripts"
 rm -rf "${PKG_SCRIPTS_DIR}"
 mkdir -p "${APP_INSTALL_ROOT}"
 
@@ -349,6 +483,7 @@ DISTRIBUTION_PATH="${STAGING_ROOT}/Distribution.xml"
 rm -f "${PKG_PATH}"
 rm -f "${COMPONENT_PLIST}"
 rm -f "${COMPONENT_PKG_PATH}"
+rm -f "${PYTHON_COMPONENT_PKG_PATH}"
 rm -f "${DISTRIBUTION_PATH}"
 
 pkgbuild --analyze --root "${APP_ROOT}" "${COMPONENT_PLIST}"
@@ -378,10 +513,15 @@ fi
 
 pkgbuild "${pkgbuild_args[@]}" "${COMPONENT_PKG_PATH}"
 
+prepare_python_component
+
 write_distribution_file \
   "${DISTRIBUTION_PATH}" \
   "${IDENTIFIER}" \
   "$(basename "${COMPONENT_PKG_PATH}")" \
+  "${PYTHON_COMPONENT_ID}" \
+  "$(basename "${PYTHON_COMPONENT_PKG_PATH}")" \
+  "${PYTHON_VERSION}" \
   "${VERSION}" \
   "${PRODUCT_TITLE}"
 
@@ -402,6 +542,7 @@ fi
 productbuild "${productbuild_args[@]}" "${PKG_PATH}"
 
 echo "Created macOS package: ${PKG_PATH}"
+echo "Bundled universal2 Python runtime: ${PYTHON_VERSION}"
 
 if [[ -n "${SIGN_IDENTITY}" ]]; then
   echo ""
