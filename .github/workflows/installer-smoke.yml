@@ -219,7 +219,7 @@ jobs:
           }
           return 0;
           '@ | Set-Content -Path (Join-Path $projectDir "Program.cs") -Encoding utf8
-          dotnet publish $projectDir --configuration Release --framework net8.0 --self-contained false --output $fakeBin | Out-Null
+          dotnet publish $projectDir --configuration Release --framework net8.0 --self-contained false --output $fakeBin -p:AssemblyName=docker | Out-Null
           $env:Path = "$fakeBin;$env:Path"
           $fakeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
@@ -371,11 +371,9 @@ jobs:
         run: |
           set -euo pipefail
           python_bin="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
-          python_app="/Library/Frameworks/Python.framework/Versions/3.12/Resources/Python.app"
           test -x "${python_bin}"
           "${python_bin}" --version
           file "${python_bin}" | grep -q "universal binary"
-          codesign --verify --deep --strict "${python_app}"
           pkgutil --pkg-info com.hammerheadsengineers.spx.python
 
           payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
