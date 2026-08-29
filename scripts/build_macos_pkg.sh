@@ -171,6 +171,51 @@ prepare_python_component() {
   mkdir -p "${PYTHON_FRAMEWORK_ROOT}"
   rsync -a --delete --exclude '._*' "${framework_payload}/" "${PYTHON_FRAMEWORK_ROOT}/"
 
+  # The official package includes development-only LLVM object files in the
+  # framework config directory. They are not needed by the runtime and Apple
+  # rejects them during notarization because they cannot carry a code signature.
+  local python_object_paths
+  python_object_paths="$(find "${PYTHON_FRAMEWORK_ROOT}" -type f -name '*.o' -print)"
+  if [[ -n "${python_object_paths}" ]]; then
+    echo "Removing development object files from bundled Python runtime..."
+    while IFS= read -r object_path; do
+      [[ -z "${object_path}" ]] || rm -f "${object_path}"
+    done <<< "${python_object_paths}"
+  fi
+  python_object_paths="$(find "${PYTHON_FRAMEWORK_ROOT}" -type f -name '*.o' -print -quit)"
+  if [[ -n "${python_object_paths}" ]]; then
+    echo "Bundled Python runtime contains an unsupported object file: ${python_object_paths}" >&2
+    exit 1
+  fi
+
+  # Removing python.o changes the sealed resource list of the framework's
+  # shared library. Re-sign that library after the cleanup; otherwise the
+  # vendor signature remains cryptographically valid only for the original
+  # file set and notarization rejects both universal2 slices. The launcher
+  # apps and the package keep their existing signing flow below.
+  local python_library="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/Python"
+  if [[ ! -f "${python_library}" ]]; then
+    echo "Bundled Python framework library is missing: ${python_library}" >&2
+    exit 1
+  fi
+  if [[ -n "${APP_SIGN_IDENTITY}" ]]; then
+    local python_codesign_args=(
+      --force
+      --sign "${APP_SIGN_IDENTITY}"
+      --timestamp
+      --options runtime
+    )
+    if [[ -n "${KEYCHAIN_PATH}" ]]; then
+      python_codesign_args+=(--keychain "${KEYCHAIN_PATH}")
+    fi
+    codesign "${python_codesign_args[@]}" "${python_library}"
+  else
+    # An unsigned local package may still contain the vendor signature, but
+    # it cannot remain valid after removing the sealed development object.
+    codesign --force --sign - "${python_library}"
+  fi
+  codesign --verify --strict --verbose=2 "${python_library}"
+
   local python_bin="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/bin/python${PYTHON_FRAMEWORK_VERSION}"
   if [[ ! -x "${python_bin}" ]]; then
     echo "Bundled Python executable is missing: ${python_bin}" >&2
@@ -219,6 +264,11 @@ EOF
   fi
 
   pkgbuild "${python_pkgbuild_args[@]}" "${PYTHON_COMPONENT_PKG_PATH}"
+
+  if [[ -n "${SIGN_IDENTITY}" ]]; then
+    echo "Python component signature:"
+    pkgutil --check-signature "${PYTHON_COMPONENT_PKG_PATH}"
+  fi
 }
 
 OUTPUT_DIR="dist"
@@ -344,6 +394,8 @@ APP_INSTALL_ROOT="${APP_ROOT}/${TOOLS_DIR_NAME}"
 PYTHON_FRAMEWORK_ROOT="${STAGING_ROOT}/python-framework-root"
 PKG_SCRIPTS_DIR="${STAGING_ROOT}/pkg-scripts"
 MACOS_RESOURCES_DIR="${REPO_ROOT}/packaging/macos/resources"
+# shellcheck source=scripts/macos_notarization.sh
+source "${REPO_ROOT}/scripts/macos_notarization.sh"
 
 if [[ -z "${VERSION}" ]]; then
   VERSION="$(resolve_version)"
@@ -517,6 +569,11 @@ fi
 
 pkgbuild "${pkgbuild_args[@]}" "${COMPONENT_PKG_PATH}"
 
+if [[ -n "${SIGN_IDENTITY}" ]]; then
+  echo "SPX component signature:"
+  pkgutil --check-signature "${COMPONENT_PKG_PATH}"
+fi
+
 prepare_python_component
 
 write_distribution_file \
@@ -556,34 +613,7 @@ fi
 
 if [[ -n "${NOTARYTOOL_PROFILE}" ]]; then
   require_command xcrun
-
-  notarytool_args=(
-    notarytool
-    submit
-    "${PKG_PATH}"
-    --keychain-profile "${NOTARYTOOL_PROFILE}"
-    --wait
-  )
-
-  if [[ -n "${KEYCHAIN_PATH}" ]]; then
-    notarytool_args+=(--keychain "${KEYCHAIN_PATH}")
-  fi
-
-  echo ""
-  echo "Submitting package for notarization..."
-  xcrun "${notarytool_args[@]}"
-
-  echo ""
-  echo "Stapling notarization ticket..."
-  xcrun stapler staple "${PKG_PATH}"
-
-  echo ""
-  echo "Validating stapled ticket..."
-  xcrun stapler validate -v "${PKG_PATH}"
-
-  echo ""
-  echo "Gatekeeper assessment:"
-  spctl -a -vv -t install "${PKG_PATH}"
+  notarize_package "${PKG_PATH}" "${STAGING_ROOT}" "${NOTARYTOOL_PROFILE}" "${KEYCHAIN_PATH}"
 elif [[ -z "${SIGN_IDENTITY}" ]]; then
   echo ""
   echo "Package is unsigned. Gatekeeper will reject it until you rebuild with:"

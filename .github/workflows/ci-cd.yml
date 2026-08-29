@@ -570,8 +570,12 @@ jobs:
           python_component="$(find "${inspection_dir}" -maxdepth 1 -name '*-python-component.pkg' -print -quit)"
           test -n "${spx_component}"
           test -n "${python_component}"
-          pkgutil --check-signature "${spx_component}"
-          pkgutil --check-signature "${python_component}"
+          object_files="$(find "${inspection_dir}" -type f -name '*.o' -print)"
+          if [[ -n "${object_files}" ]]; then
+            echo "Expanded macOS package contains development object files:" >&2
+            echo "${object_files}" >&2
+            exit 1
+          fi
           xcrun stapler validate "${{ steps.macos_package.outputs.path }}"
           spctl -a -vv -t install "${{ steps.macos_package.outputs.path }}"
 
