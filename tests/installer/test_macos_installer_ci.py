@@ -1,9 +1,16 @@
 # SPDX-License-Identifier: MIT
 
+import os
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
+MACOS_PACKAGE_SCRIPT = REPO_ROOT / "scripts" / "build_macos_pkg.sh"
+MACOS_NOTARIZATION_SCRIPT = REPO_ROOT / "scripts" / "macos_notarization.sh"
 
 
 def _macos_job() -> str:
@@ -36,7 +43,7 @@ def test_macos_installer_job_builds_signed_native_package() -> None:
 
 
 def test_macos_package_bundles_verified_universal_python_runtime() -> None:
-    script = (REPO_ROOT / "scripts" / "build_macos_pkg.sh").read_text(encoding="utf-8")
+    script = MACOS_PACKAGE_SCRIPT.read_text(encoding="utf-8")
 
     assert 'if [[ "${OUTPUT_DIR}" = /* ]]; then' in script
     assert 'DEST_DIR="${OUTPUT_DIR}"' in script
@@ -56,6 +63,98 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     assert 'python_pkgbuild_args+=(--keychain "${KEYCHAIN_PATH}")' in script
     assert "--python-version" in script
     assert "--python-package" in script
+    assert "find \"${PYTHON_FRAMEWORK_ROOT}\" -type f -name '*.o' -print" in script
+    assert 'rm -f "${object_path}"' in script
+    assert "Bundled Python runtime contains an unsupported object file" in script
+    assert (
+        'local python_library="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/Python"'
+        in script
+    )
+    assert 'codesign "${python_codesign_args[@]}" "${python_library}"' in script
+    assert 'codesign --force --sign - "${python_library}"' in script
+    assert 'codesign --verify --strict --verbose=2 "${python_library}"' in script
+    assert 'pkgutil --check-signature "${COMPONENT_PKG_PATH}"' in script
+    assert 'pkgutil --check-signature "${PYTHON_COMPONENT_PKG_PATH}"' in script
+
+
+def test_macos_notarization_reports_apple_log_before_stapling() -> None:
+    script = MACOS_NOTARIZATION_SCRIPT.read_text(encoding="utf-8")
+
+    assert "notarytool" in script
+    assert "log" in script
+    assert "--output-format json" in script
+    assert (
+        'if [[ "${notarytool_exit}" -ne 0 || "${notary_status}" != "Accepted" ]]'
+        in script
+    )
+    assert 'echo "Apple notarization report:" >&2' in script
+    assert script.index("return 1") < script.index(
+        'xcrun stapler staple "${package_path}"'
+    )
+
+
+@pytest.mark.skipif(
+    shutil.which("bash") is None, reason="bash is required for the shell flow test"
+)
+def test_macos_notarization_does_not_staple_an_invalid_submission(
+    tmp_path: Path,
+) -> None:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    xcrun = fake_bin / "xcrun"
+    xcrun.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+if [[ "$1" == "notarytool" && "$2" == "submit" ]]; then
+  echo "  id: test-submission"
+  echo "  status: Invalid"
+elif [[ "$1" == "notarytool" && "$2" == "log" ]]; then
+  echo '{"status":"Invalid","issues":[{"message":"The binary is not signed."}]}'
+elif [[ "$1" == "stapler" ]]; then
+  echo "stapler must not be called for an invalid submission" >&2
+  exit 42
+else
+  echo "unexpected xcrun invocation: $*" >&2
+  exit 43
+fi
+""",
+        encoding="utf-8",
+    )
+    xcrun.chmod(0o755)
+    harness = tmp_path / "harness.sh"
+    harness.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+source "$1"
+if notarize_package "$2" "$3" "test-profile" ""; then
+  echo "invalid submission unexpectedly succeeded" >&2
+  exit 44
+fi
+""",
+        encoding="utf-8",
+    )
+    harness.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+    result = subprocess.run(
+        [
+            "bash",
+            str(harness),
+            str(MACOS_NOTARIZATION_SCRIPT),
+            str(tmp_path / "installer.pkg"),
+            str(tmp_path),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "Apple notarization report:" in result.stderr
+    assert "The binary is not signed." in result.stderr
+    assert "stapler must not be called" not in result.stderr
 
 
 def test_macos_installer_job_prepares_ephemeral_signing_keychain() -> None:
@@ -76,7 +175,8 @@ def test_macos_installer_job_validates_and_publishes_package() -> None:
     assert 'pkgutil --check-signature "${{ steps.macos_package.outputs.path }}"' in job
     assert "pkgutil --expand-full" in job
     assert "name '*-python-component.pkg'" in job
-    assert 'pkgutil --check-signature "${python_component}"' in job
+    assert "find \"${inspection_dir}\" -type f -name '*.o' -print" in job
+    assert 'pkgutil --check-signature "${python_component}"' not in job
     assert "xcrun stapler validate" in job
     assert "spctl -a -vv -t install" in job
     assert "actions/upload-artifact@v4" in job
