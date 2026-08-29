@@ -549,6 +549,7 @@ jobs:
           fi
           scripts/build_macos_pkg.sh \
             --version "${version}" \
+            --python-version "3.12.10" \
             --app-sign "${MACOS_APP_SIGN_IDENTITY}" \
             --sign "${MACOS_INSTALLER_SIGN_IDENTITY}" \
             --keychain "${MACOS_SIGNING_KEYCHAIN}" \
@@ -561,6 +562,16 @@ jobs:
           set -euo pipefail
           test -f "${{ steps.macos_package.outputs.path }}"
           pkgutil --check-signature "${{ steps.macos_package.outputs.path }}"
+          inspection_dir="${RUNNER_TEMP}/spx-macos-package-inspection"
+          pkgutil --expand-full \
+            "${{ steps.macos_package.outputs.path }}" \
+            "${inspection_dir}"
+          spx_component="$(find "${inspection_dir}" -maxdepth 1 -name '*-component.pkg' ! -name '*-python-component.pkg' -print -quit)"
+          python_component="$(find "${inspection_dir}" -maxdepth 1 -name '*-python-component.pkg' -print -quit)"
+          test -n "${spx_component}"
+          test -n "${python_component}"
+          pkgutil --check-signature "${spx_component}"
+          pkgutil --check-signature "${python_component}"
           xcrun stapler validate "${{ steps.macos_package.outputs.path }}"
           spctl -a -vv -t install "${{ steps.macos_package.outputs.path }}"
 

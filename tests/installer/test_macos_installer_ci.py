@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
 
@@ -33,6 +32,30 @@ def test_macos_installer_job_builds_signed_native_package() -> None:
     assert '--keychain "${MACOS_SIGNING_KEYCHAIN}"' in job
     assert '--notarytool-profile "${MACOS_NOTARY_PROFILE}"' in job
     assert "path=dist/spx-installer-macos-${version}.pkg" in job
+    assert '--python-version "3.12.10"' in job
+
+
+def test_macos_package_bundles_verified_universal_python_runtime() -> None:
+    script = (REPO_ROOT / "scripts" / "build_macos_pkg.sh").read_text(encoding="utf-8")
+
+    assert 'if [[ "${OUTPUT_DIR}" = /* ]]; then' in script
+    assert 'DEST_DIR="${OUTPUT_DIR}"' in script
+    assert "python-${PYTHON_VERSION}-macos11.pkg" in script
+    assert "8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4" in script
+    assert "pkgutil --expand-full" in script
+    assert "Python_Framework.pkg/Payload" in script
+    assert "com.hammerheadsengineers.spx.python" in script
+    assert "Library/Frameworks/Python.framework" in script
+    assert '--install-location "/Library/Frameworks/Python.framework"' in script
+    assert "codesign --verify --deep --strict" in script
+    assert "python_version" in script
+    assert "--exclude '._*'" in script
+    assert '"${python_scripts_dir}/postinstall"' in script
+    assert '--scripts "${python_scripts_dir}"' in script
+    assert 'python_pkgbuild_args+=(--sign "${SIGN_IDENTITY}")' in script
+    assert 'python_pkgbuild_args+=(--keychain "${KEYCHAIN_PATH}")' in script
+    assert "--python-version" in script
+    assert "--python-package" in script
 
 
 def test_macos_installer_job_prepares_ephemeral_signing_keychain() -> None:
@@ -50,10 +73,10 @@ def test_macos_installer_job_prepares_ephemeral_signing_keychain() -> None:
 def test_macos_installer_job_validates_and_publishes_package() -> None:
     job = _macos_job()
 
-    assert (
-        'pkgutil --check-signature "${{ steps.macos_package.outputs.path }}"'
-        in job
-    )
+    assert 'pkgutil --check-signature "${{ steps.macos_package.outputs.path }}"' in job
+    assert "pkgutil --expand-full" in job
+    assert "name '*-python-component.pkg'" in job
+    assert 'pkgutil --check-signature "${python_component}"' in job
     assert "xcrun stapler validate" in job
     assert "spctl -a -vv -t install" in job
     assert "actions/upload-artifact@v4" in job

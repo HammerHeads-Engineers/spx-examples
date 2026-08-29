@@ -176,8 +176,10 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert stop_path.exists()
     runner_path = output_dir / "bootstrap_runner.py"
     runtime_path = output_dir / "runtime_bootstrap.py"
+    macos_python_helper_path = output_dir / "macos_python_runtime.sh"
     assert runner_path.exists()
     assert runtime_path.exists()
+    assert macos_python_helper_path.exists()
     start_content = start_path.read_text(encoding="utf-8")
     stop_content = stop_path.read_text(encoding="utf-8")
     assert "BLE_ADAPTER_PID" in start_content
@@ -186,6 +188,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "docker compose" in start_content
     assert "bootstrap_runner.py" in start_content
     assert "runtime_bootstrap.py" in start_content
+    assert "macos_python_runtime.sh" in start_content
     assert "pip install --user" not in start_content
     assert "pkill -f spx-ble-adapter" in stop_content
     start_ps_path = output_dir / "spx-start.ps1"

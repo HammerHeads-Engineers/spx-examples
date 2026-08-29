@@ -3,6 +3,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/installer/macos/python_runtime.sh"
+
+if [[ -f "${MACOS_PYTHON_HELPER}" ]]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
 WORKSPACE_DIR="${SPX_MCP_WORKSPACE_DIR:-}"
 SERVER_NAME="${SPX_MCP_SERVER_NAME:-spx}"
 WORK_MODE="${SPX_MCP_WORK_MODE:-}"
@@ -133,6 +139,14 @@ resolve_mcp_python() {
   if [[ -n "${PYTHON_BIN:-}" ]]; then
     candidates+=("${PYTHON_BIN}")
   fi
+
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    resolved="$(spx_resolve_macos_python || true)"
+    if [[ -n "${resolved}" ]]; then
+      candidates+=("${resolved}")
+    fi
+  fi
+
   candidates+=(python3.13 python3.12 python3.11 python3.10 python3 python)
 
   for candidate in "${candidates[@]}"; do
