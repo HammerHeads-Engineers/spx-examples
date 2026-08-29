@@ -1181,6 +1181,7 @@ def write_workspace_marker(
     *,
     source_root: Path,
     repo_root: Path,
+    bootstrap_python: str,
     workspace_python: Path,
     server_name: str,
     allow_write: bool,
@@ -1194,6 +1195,7 @@ def write_workspace_marker(
         "metadata_version": WORKSPACE_MARKER_VERSION,
         "source_root": str(source_root),
         "repo_root": str(repo_root),
+        "bootstrap_python": str(bootstrap_python),
         "workspace_python": str(workspace_python),
         "server_name": server_name,
         "allow_write": allow_write,
@@ -1302,6 +1304,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         workspace_dir,
         source_root=source_root,
         repo_root=repo_root,
+        bootstrap_python=args.python,
         workspace_python=venv_python,
         server_name=args.server_name,
         allow_write=allow_write,
@@ -1320,6 +1323,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"[spx-mcp-workspace] Workspace directory: {workspace_dir}")
     print(f"[spx-mcp-workspace] Workspace kind: {workspace_kind}")
     print(f"[spx-mcp-workspace] Default work mode: {work_mode}")
+    print(f"[spx-mcp-workspace] Bootstrap Python: {args.python}")
     print(f"[spx-mcp-workspace] Local venv python: {venv_python}")
     print(f"[spx-mcp-workspace] Codex config: {workspace_dir / '.codex' / 'config.toml'}")
     print(f"[spx-mcp-workspace] Claude Code config: {workspace_dir / '.mcp.json'}")

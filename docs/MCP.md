@@ -48,6 +48,11 @@ Agents should resolve work mode in this order:
 - `SPX_PRODUCT_KEY` for live server access
 - `SPX_BASE_URL` if the server is not running at `http://localhost:8000`
 
+The native Windows `.exe` and macOS `.pkg` installers select their bundled
+Python 3.12 runtime when creating the MCP workspace. The MCP client then
+launches the workspace `.venv` directly. Portable Linux `.run`/`.tgz` flows use
+the host Python and require Python 3.10 or newer for MCP.
+
 Example setup on Windows:
 
 ```powershell

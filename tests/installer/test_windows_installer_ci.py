@@ -6,6 +6,7 @@ from typing import Optional
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
+LAUNCHER_PATH = REPO_ROOT / "packaging" / "windows" / "launcher" / "Program.cs"
 
 
 def _workflow() -> str:
@@ -38,7 +39,10 @@ def test_windows_installer_job_provisions_native_build_dependencies() -> None:
     assert "actions/setup-dotnet@v4" in job
     assert 'dotnet-version: "8.0.x"' in job
     assert 'dotnet tool install --global wix --version "6.*"' in job
-    assert 'wix extension add --global "WixToolset.BootstrapperApplications.wixext/$wixVersion"' in job
+    assert (
+        'wix extension add --global "WixToolset.BootstrapperApplications.wixext/$wixVersion"'
+        in job
+    )
     assert 'wix extension add --global "WixToolset.Util.wixext/$wixVersion"' in job
     assert "wix extension list --global" in job
     assert "poetry install --with=dev --no-root" in job
@@ -62,3 +66,15 @@ def test_windows_packaging_docs_describe_ci_artifact() -> None:
     assert "spx-installer-<version>.exe" in docs
     assert "unsigned" in docs
     assert "bundle" in docs
+
+
+def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
+    launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
+
+    assert "Microsoft.Win32" in launcher
+    assert "SOFTWARE\\Python\\PythonCore\\" in launcher
+    assert "RegistryHive.CurrentUser" in launcher
+    assert "RegistryHive.LocalMachine" in launcher
+    assert "requiredVersion: (3, 12)" in launcher
+    assert "new PythonCandidate" not in launcher
+    assert "The bundled Python 3.12 runtime was not found" in launcher

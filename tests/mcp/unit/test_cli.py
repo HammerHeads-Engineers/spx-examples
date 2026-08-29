@@ -1,9 +1,31 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import os
 from pathlib import Path
 
+import pytest
+
 from spx_mcp import cli
+
+
+def test_mcp_stdio_smoke_keeps_virtualenv_python_symlink(tmp_path: Path) -> None:
+    pytest.importorskip("mcp")
+    from tools.verify_mcp_stdio import absolute_path_without_resolving_symlinks
+
+    target = tmp_path / "host-python"
+    target.write_text("", encoding="utf-8")
+    selected = tmp_path / "venv" / "bin" / "python"
+    selected.parent.mkdir(parents=True)
+    try:
+        selected.symlink_to(target)
+    except OSError:
+        pytest.skip("symlinks are unavailable on this platform")
+
+    resolved_for_spawn = absolute_path_without_resolving_symlinks(os.fspath(selected))
+
+    assert resolved_for_spawn == Path(os.path.abspath(os.fspath(selected)))
+    assert resolved_for_spawn != target.resolve()
 
 
 def test_list_tools_excludes_write_tools_by_default(capsys) -> None:

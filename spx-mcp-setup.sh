@@ -9,6 +9,13 @@ if [[ -f "${MACOS_PYTHON_HELPER}" ]]; then
   # shellcheck source=/dev/null
   . "${MACOS_PYTHON_HELPER}"
 fi
+
+# The native macOS package marks the embedded payload so MCP can require its
+# bundled Python. Portable archives deliberately keep the system-Python
+# fallback for compatibility.
+if [[ -f "${SCRIPT_DIR}/.spx-macos-bundled-python" ]]; then
+  SPX_MACOS_BUNDLED_ONLY="1"
+fi
 WORKSPACE_DIR="${SPX_MCP_WORKSPACE_DIR:-}"
 SERVER_NAME="${SPX_MCP_SERVER_NAME:-spx}"
 WORK_MODE="${SPX_MCP_WORK_MODE:-}"
@@ -144,7 +151,27 @@ resolve_mcp_python() {
     resolved="$(spx_resolve_macos_python || true)"
     if [[ -n "${resolved}" ]]; then
       candidates+=("${resolved}")
+    elif [[ "${SPX_MACOS_BUNDLED_ONLY:-0}" == "1" ]]; then
+      return 1
     fi
+  fi
+
+  if [[ "${SPX_MACOS_BUNDLED_ONLY:-0}" == "1" ]]; then
+    for candidate in "${candidates[@]}"; do
+      resolved="$(resolve_candidate_path "${candidate}" || true)"
+      if [[ -z "${resolved}" ]]; then
+        continue
+      fi
+      if [[ "${seen}" == *"|${resolved}|"* ]]; then
+        continue
+      fi
+      seen="${seen}${resolved}|"
+      if python_supports_mcp "${resolved}"; then
+        printf '%s\n' "${resolved}"
+        return 0
+      fi
+    done
+    return 1
   fi
 
   candidates+=(python3.13 python3.12 python3.11 python3.10 python3 python)

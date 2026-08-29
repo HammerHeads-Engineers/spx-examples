@@ -143,6 +143,7 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
     stamp_path = venv_dir / ".spx-runtime.json"
     desired_state = {
         "packages": packages,
+        "python_executable": str(Path(sys.executable).resolve()),
         "python_version": sys.version,
     }
 

@@ -19,6 +19,8 @@ Options:
   --script-source P   AppleScript source used to build the app (default: installer/macos/spx_setup_launcher.applescript)
   --icon-source P     PNG or ICNS used as the app icon (default: packaging/windows/assets/spx.png)
   --skip-payload      Build the launcher without embedding the installer payload
+  --native-macos-runtime
+                      Mark the embedded payload as requiring the bundled macOS Python runtime
   --version VERSION   App version (default: pyproject.toml version or dev)
   --sign IDENTITY     Sign with this Developer ID Application identity
   -h, --help          Show this help
@@ -102,6 +104,7 @@ BUNDLE_ID="com.hammerheadsengineers.spx.setup"
 SCRIPT_SOURCE_REL="installer/macos/spx_setup_launcher.applescript"
 ICON_SOURCE_INPUT="packaging/windows/assets/spx.png"
 SKIP_PAYLOAD=0
+NATIVE_MACOS_RUNTIME=0
 VERSION=""
 SIGN_IDENTITY=""
 PAYLOAD_NAME="spx-installer"
@@ -134,6 +137,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-payload)
       SKIP_PAYLOAD=1
+      shift
+      ;;
+    --native-macos-runtime)
+      NATIVE_MACOS_RUNTIME=1
       shift
       ;;
     --version)
@@ -212,6 +219,9 @@ if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
   RESOURCE_PAYLOAD_DIR="${APP_PATH}/Contents/Resources/${PAYLOAD_NAME}"
   mkdir -p "${RESOURCE_PAYLOAD_DIR}"
   rsync -a --delete "${PAYLOAD_DIR}/" "${RESOURCE_PAYLOAD_DIR}/"
+  if [[ "${NATIVE_MACOS_RUNTIME}" -eq 1 ]]; then
+    touch "${RESOURCE_PAYLOAD_DIR}/.spx-macos-bundled-python"
+  fi
 fi
 
 plist="${APP_PATH}/Contents/Info.plist"

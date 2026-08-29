@@ -10,6 +10,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
 MACOS_PACKAGE_SCRIPT = REPO_ROOT / "scripts" / "build_macos_pkg.sh"
+MACOS_SETUP_APP_SCRIPT = REPO_ROOT / "scripts" / "build_macos_setup_app.sh"
 MACOS_NOTARIZATION_SCRIPT = REPO_ROOT / "scripts" / "macos_notarization.sh"
 
 
@@ -75,6 +76,17 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     assert 'codesign --verify --strict --verbose=2 "${python_library}"' in script
     assert 'pkgutil --check-signature "${COMPONENT_PKG_PATH}"' in script
     assert 'pkgutil --check-signature "${PYTHON_COMPONENT_PKG_PATH}"' in script
+
+
+def test_native_macos_setup_payload_marks_bundled_python_requirement() -> None:
+    package_script = MACOS_PACKAGE_SCRIPT.read_text(encoding="utf-8")
+    setup_app_script = MACOS_SETUP_APP_SCRIPT.read_text(encoding="utf-8")
+
+    assert "--native-macos-runtime" in package_script
+    assert "NATIVE_MACOS_RUNTIME=0" in setup_app_script
+    assert (
+        'touch "${RESOURCE_PAYLOAD_DIR}/.spx-macos-bundled-python"' in setup_app_script
+    )
 
 
 def test_macos_notarization_reports_apple_log_before_stapling() -> None:

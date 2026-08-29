@@ -724,6 +724,7 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_managed_work
         workspace,
         source_root=tmp_path / "source",
         repo_root=workspace,
+        bootstrap_python="/opt/python3.12/bin/python3.12",
         workspace_python=workspace / ".venv" / "bin" / "python",
         server_name="spx",
         allow_write=False,
@@ -736,6 +737,7 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_managed_work
     marker = mcp_workspace.read_workspace_marker(workspace)
 
     assert marker is not None
+    assert marker["bootstrap_python"] == "/opt/python3.12/bin/python3.12"
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_MANAGED
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_RUNTIME_MCP
@@ -752,6 +754,7 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_git_workspac
         workspace,
         source_root=tmp_path / "source",
         repo_root=workspace,
+        bootstrap_python="/opt/python3.12/bin/python3.12",
         workspace_python=workspace / ".venv" / "bin" / "python",
         server_name="spx",
         allow_write=False,
@@ -764,6 +767,7 @@ def test_write_workspace_marker_and_mode_file_remain_consistent_for_git_workspac
     marker = mcp_workspace.read_workspace_marker(workspace)
 
     assert marker is not None
+    assert marker["bootstrap_python"] == "/opt/python3.12/bin/python3.12"
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_GIT
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_REPO_DEV
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_REPO_DEV
@@ -849,6 +853,7 @@ def test_main_managed_bootstrap_is_idempotent(tmp_path: Path, monkeypatch) -> No
     marker = mcp_workspace.read_workspace_marker(workspace)
     assert marker is not None
     assert marker["allow_write"] is True
+    assert marker["bootstrap_python"] == "python3.11"
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_MANAGED
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_RUNTIME_MCP
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_RUNTIME_MCP
@@ -908,6 +913,7 @@ def test_main_managed_bootstrap_respects_explicit_read_only(tmp_path: Path, monk
     marker = mcp_workspace.read_workspace_marker(workspace)
     assert marker is not None
     assert marker["allow_write"] is False
+    assert marker["bootstrap_python"] == "python3.11"
     assert "--allow-write" not in mcp_workspace.read_claude_server_args(workspace / ".mcp.json", "spx")
     assert bootstrap_codex_calls == [False]
 
@@ -974,6 +980,7 @@ def test_main_git_bootstrap_sets_repo_dev_and_does_not_sync_managed_copy(
     marker = mcp_workspace.read_workspace_marker(workspace)
     assert marker is not None
     assert marker["allow_write"] is True
+    assert marker["bootstrap_python"] == "python3.11"
     assert marker["workspace_kind"] == mcp_workspace.WORKSPACE_KIND_GIT
     assert marker["default_work_mode"] == mcp_workspace.WORK_MODE_REPO_DEV
     assert mcp_workspace.read_workspace_mode_file(workspace) == mcp_workspace.WORK_MODE_REPO_DEV
