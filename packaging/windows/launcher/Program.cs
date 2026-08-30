@@ -242,6 +242,11 @@ internal static class Program
 
     private static string? ResolveBundledPythonExecutable()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
         foreach (var (hive, view) in new[]
                  {
                      (RegistryHive.CurrentUser, RegistryView.Default),

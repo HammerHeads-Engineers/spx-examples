@@ -58,7 +58,7 @@ def test_linux_smoke_builds_and_runs_self_extractor_without_starting_stack() -> 
     assert "tools/verify_mcp_stdio.py" in job
     assert "sys.version_info[:2] >= (3, 10)" in job
     assert 'fake_bin}/docker"' in job
-    assert "actions/upload-artifact@v4" in job
+    assert "actions/upload-artifact@v7" in job
 
 
 def test_windows_smoke_installs_bundle_and_runs_installed_launcher() -> None:

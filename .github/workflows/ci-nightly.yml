@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -29,7 +29,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: poetry
@@ -79,7 +79,7 @@ jobs:
 
       - name: Checkout repository
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Poetry
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -87,7 +87,7 @@ jobs:
 
       - name: Set up Python 3.12.10
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: 3.12.10
           cache: poetry
