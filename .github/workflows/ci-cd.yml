@@ -49,13 +49,11 @@ jobs:
   tests:
     needs: pr-title-gate
     runs-on: ubuntu-latest
-    env:
-      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-      SPX_BASE_URL: http://localhost:8000
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.9.19, 3.10.14, 3.11.9, 3.12.4]
+        python-version: [3.9.19, 3.12.10]
 
     steps:
       - name: Checkout repository
@@ -63,13 +61,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Poetry
+        run: pipx install poetry
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install Poetry
-        run: pipx install poetry
+          cache: poetry
 
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
@@ -83,12 +82,59 @@ jobs:
       - name: Validate model definitions
         run: poetry run python tools/validate_models.py
 
+      - name: Run fast unit tests
+        shell: bash
+        run: |
+          poetry run pytest -q \
+            tests/core/unit \
+            tests/installer \
+            tests/mcp/unit \
+            tests/packs/*/unit
+
+  core-integration:
+    needs: pr-title-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+    steps:
+      - name: Gate integration tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SPX_PRODUCT_KEY is required for core integration tests."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Set up Python 3.12.10
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.10
+          cache: poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
       - name: Start SPX server (Docker Compose)
-        if: ${{ env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: docker compose up -d
 
       - name: Wait for SPX server health
-        if: ${{ env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         run: |
           for i in {1..24}; do
@@ -96,19 +142,14 @@ jobs:
               echo "SPX server is healthy"; exit 0; fi
             echo "Waiting for SPX server to be healthy... ($i/24)"; sleep 5;
           done
-          echo "SPX server failed to become healthy"; docker compose logs --no-color; exit 1
+          echo "SPX server failed to become healthy"; exit 1
 
-      - name: Run unit tests
-        shell: bash
-        run: |
-          if [ -f pytest.ini ] || [ -d tests ] || grep -q "\[tool.pytest.ini_options\]" pyproject.toml 2>/dev/null; then
-            poetry run pytest -q
-          else
-            poetry run python -m unittest discover -s tests -p "test_*.py"
-          fi
+      - name: Run core integration tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry run pytest -q tests/core/integration
 
       - name: Show server logs on failure
-        if: ${{ failure() && env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
         run: docker compose logs --no-color
 
       - name: Stop SPX server
@@ -116,8 +157,13 @@ jobs:
         run: docker compose down --remove-orphans
 
   pack-tests:
-    needs: tests
+    needs: pr-title-gate
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
       SPX_BASE_URL: http://localhost:8000
@@ -129,7 +175,6 @@ jobs:
       matrix:
         pack:
           - industrial_iiot_pack
-          - embedded_lab_pack
           - energy_pack
           - smart_building_pack
 
@@ -149,15 +194,16 @@ jobs:
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
 
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
       - name: Set up Python
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/setup-python@v5
         with:
-          python-version: 3.10.14
-
-      - name: Install Poetry
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        run: pipx install poetry
+          python-version: 3.12.10
+          cache: poetry
 
       - name: Install dependencies
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -246,14 +292,136 @@ jobs:
         run: |
           "${OUT_DIR}/spx-stop.sh"
 
+  embedded-lab-smoke:
+    needs: pr-title-gate
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+      MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
+    steps:
+      - name: Gate embedded smoke tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SPX_PRODUCT_KEY is required for embedded smoke tests."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Set up Python 3.12.10
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.10
+          cache: poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Generate embedded bundle (non-interactive)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          mkdir -p "${OUT_DIR}"
+          poetry run python -m installer generate \
+            --packages embedded_lab_pack \
+            --output "${OUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            --print-selection json > "${OUT_DIR}/selection.json"
+
+      - name: Start embedded stack
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
+          export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
+          mkdir -p "${NPM_CONFIG_PREFIX}"
+          export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
+          "${OUT_DIR}/spx-start.sh"
+
+      - name: Wait for SPX server health
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/36)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; exit 1
+
+      - name: Wait for MQTT broker port
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/1883) >/dev/null 2>&1; then
+              echo "MQTT broker is reachable"; exit 0; fi
+            echo "Waiting for MQTT broker... ($i/30)"; sleep 2;
+          done
+          echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
+
+      - name: Run embedded smoke tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: |
+          poetry run pytest -q \
+            tests/packs/embedded_lab_pack/integration/test_scpi_ascii_port_override.py \
+            tests/packs/embedded_lab_pack/integration/test_modbus_prevac_bcu14_smoke.py
+
+      - name: Show embedded stack logs on failure
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
+
+      - name: Stop embedded stack
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          "${OUT_DIR}/spx-stop.sh"
+
   release:
     outputs:
       released: ${{ steps.release_result.outputs.released }}
       tag: ${{ steps.release_result.outputs.tag }}
     runs-on: ubuntu-latest
     concurrency: release
-    needs: pack-tests
-    if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+    needs: [tests, core-integration, pack-tests, embedded-lab-smoke]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      needs.tests.result == 'success' &&
+      needs.core-integration.result == 'success' &&
+      needs.pack-tests.result == 'success' &&
+      needs.embedded-lab-smoke.result == 'success'
     env:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
     steps:

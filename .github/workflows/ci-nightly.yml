@@ -1,0 +1,158 @@
+# SPDX-License-Identifier: MIT
+name: CI nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-compatibility:
+    name: Python ${{ matrix.python-version }} unit compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.9.19, 3.10.14, 3.11.9, 3.12.10]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Fetch develop baseline
+        run: git fetch origin develop
+
+      - name: Guard model-yaml branch against duplicate/replay additions
+        run: poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
+
+      - name: Validate model definitions
+        run: poetry run python tools/validate_models.py
+
+      - name: Run fast unit tests
+        shell: bash
+        run: |
+          poetry run pytest -q \
+            tests/core/unit \
+            tests/installer \
+            tests/mcp/unit \
+            tests/packs/*/unit
+
+  embedded-lab-full:
+    name: Full embedded lab pack integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+      MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
+      OUT_DIR: build/ci/embedded_lab_pack
+
+    steps:
+      - name: Gate embedded integration on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SPX_PRODUCT_KEY is required for full embedded integration."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v4
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Set up Python 3.12.10
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12.10
+          cache: poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Generate embedded bundle (non-interactive)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          mkdir -p "${OUT_DIR}"
+          poetry run python -m installer generate \
+            --packages embedded_lab_pack \
+            --output "${OUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            --print-selection json > "${OUT_DIR}/selection.json"
+
+      - name: Start embedded stack
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
+          export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
+          mkdir -p "${NPM_CONFIG_PREFIX}"
+          export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
+          "${OUT_DIR}/spx-start.sh"
+
+      - name: Wait for SPX server health
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/36)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; exit 1
+
+      - name: Wait for MQTT broker port
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/1883) >/dev/null 2>&1; then
+              echo "MQTT broker is reachable"; exit 0; fi
+            echo "Waiting for MQTT broker... ($i/30)"; sleep 2;
+          done
+          echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
+
+      - name: Run full embedded lab pack
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry run pytest -q tests/packs/embedded_lab_pack --durations=20
+
+      - name: Show embedded stack logs on failure
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
+
+      - name: Stop embedded stack
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          "${OUT_DIR}/spx-stop.sh"
