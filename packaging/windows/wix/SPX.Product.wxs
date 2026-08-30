@@ -46,6 +46,12 @@
           Type="integer"
           Value="1"
           KeyPath="yes" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\HammerHeads Engineers\SPX"
+          Name="BundledPython312Installed"
+          Type="integer"
+          Value="1" />
       </Component>
     </DirectoryRef>
   </Fragment>

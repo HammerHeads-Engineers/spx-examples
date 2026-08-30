@@ -454,6 +454,7 @@ build_app_args=(
   --app-name "${APP_NAME}"
   --bundle-id "${APP_BUNDLE_ID}"
   --version "${VERSION}"
+  --native-macos-runtime
 )
 
 if [[ -n "${APP_SIGN_IDENTITY}" ]]; then

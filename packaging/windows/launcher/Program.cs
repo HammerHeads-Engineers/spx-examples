@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
 using System.Diagnostics;
+using System.Security;
+using Microsoft.Win32;
 
 namespace SpxLauncher;
 
@@ -9,6 +11,9 @@ internal static class Program
     private const string GeneratedDirectoryName = "generated";
     private const string WorkspaceDirectoryName = "workspace";
     private const string PauseOnErrorArgument = "--pause-on-error";
+    private const string BundledPythonVersion = "3.12";
+    private const string BundledPythonInstallPathKey =
+        @"SOFTWARE\Python\PythonCore\" + BundledPythonVersion + @"\InstallPath";
 
     public static int Main(string[] args)
     {
@@ -222,32 +227,70 @@ internal static class Program
             );
         }
 
-        foreach (var candidate in new[]
-                 {
-                     new PythonCandidate("py", new[] { "-3.12" }),
-                     new PythonCandidate("py", new[] { "-3" }),
-                     new PythonCandidate("python", Array.Empty<string>()),
-                     new PythonCandidate("python3", Array.Empty<string>()),
-                 })
+        var bundledPython = ResolveBundledPythonExecutable();
+        if (bundledPython is not null)
         {
-            var resolved = TryResolvePythonExecutable(candidate.FileName, candidate.PrefixArguments);
-            if (resolved is not null)
-            {
-                return resolved;
-            }
+            return bundledPython;
         }
 
         throw new InvalidOperationException(
-            "Python 3.10+ is required for 'mcp-setup'. Install Python 3.12 and retry."
+            "The bundled Python 3.12 runtime was not found. "
+            + "Repair or reinstall SPX Tools, then retry. "
+            + "For a development override, set PYTHON_BIN to a Python 3.10+ executable."
         );
     }
 
-    private static string? TryResolvePythonExecutable(string fileName, IReadOnlyList<string> prefixArguments)
+    private static string? ResolveBundledPythonExecutable()
     {
+        foreach (var (hive, view) in new[]
+                 {
+                     (RegistryHive.CurrentUser, RegistryView.Default),
+                     (RegistryHive.LocalMachine, RegistryView.Registry64),
+                 })
+        {
+            try
+            {
+                using var baseKey = RegistryKey.OpenBaseKey(hive, view);
+                using var installPathKey = baseKey.OpenSubKey(BundledPythonInstallPathKey);
+                var installPath = installPathKey?.GetValue(null) as string;
+                if (string.IsNullOrWhiteSpace(installPath))
+                {
+                    continue;
+                }
+
+                var candidate = Path.Combine(installPath.Trim(), "python.exe");
+                var resolved = TryResolvePythonExecutable(
+                    candidate,
+                    Array.Empty<string>(),
+                    requiredVersion: (3, 12)
+                );
+                if (resolved is not null)
+                {
+                    return resolved;
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException)
+            {
+                // Try the next registry view/location and report one stable error if none works.
+            }
+        }
+
+        return null;
+    }
+
+    private static string? TryResolvePythonExecutable(
+        string fileName,
+        IReadOnlyList<string> prefixArguments,
+        (int Major, int Minor)? requiredVersion = null
+    )
+    {
+        var versionPredicate = requiredVersion is { } version
+            ? $"sys.version_info[:2] == ({version.Major}, {version.Minor})"
+            : "sys.version_info[:2] >= (3, 10)";
         var versionCheck = new List<string>(prefixArguments)
         {
             "-c",
-            "import sys; print(sys.executable); raise SystemExit(0 if sys.version_info[:2] >= (3, 10) else 1)",
+            $"import sys; print(sys.executable); raise SystemExit(0 if {versionPredicate} else 1)",
         };
 
         var startInfo = new ProcessStartInfo
@@ -395,5 +438,4 @@ internal static class Program
         return process.ExitCode;
     }
 
-    private sealed record PythonCandidate(string FileName, IReadOnlyList<string> PrefixArguments);
 }

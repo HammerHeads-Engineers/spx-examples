@@ -105,6 +105,26 @@ jobs:
             "${DIST_DIR}/spx-installer-${VERSION}.run" wizard \
             2>&1 | tee "${RUNNER_TEMP}/spx-linux-wizard.log"
 
+      - name: Bootstrap MCP workspace with the Linux host Python
+        shell: bash
+        env:
+          SPX_PRODUCT_KEY: CI-MCP-TEST-KEY
+          SPX_MCP_WORK_MODE: runtime_mcp
+          SPX_MCP_WORKSPACE_DIR: ${{ runner.temp }}/spx-linux-mcp-workspace
+        run: |
+          set -euo pipefail
+          "${DIST_DIR}/spx-installer/spx-mcp-setup.sh" \
+            --allow-write \
+            2>&1 | tee "${RUNNER_TEMP}/spx-linux-mcp.log"
+          python_bin="${SPX_MCP_WORKSPACE_DIR}/.venv/bin/python"
+          test -x "${python_bin}"
+          "${python_bin}" -c 'import sys; assert sys.version_info[:2] >= (3, 10)'
+          "${python_bin}" tools/verify_mcp_stdio.py \
+            --python "${python_bin}" \
+            --repo-root "${SPX_MCP_WORKSPACE_DIR}" \
+            --allow-write \
+            2>&1 | tee "${RUNNER_TEMP}/spx-linux-mcp-stdio.log"
+
       - name: Validate generated Linux bundle
         shell: bash
         run: |
@@ -134,6 +154,7 @@ jobs:
           name: installer-smoke-linux-${{ matrix.os }}
           path: |
             ${{ runner.temp }}/spx-linux-*.log
+            ${{ runner.temp }}/spx-linux-mcp*.log
             ${{ runner.temp }}/spx-linux-generated
           if-no-files-found: ignore
 
@@ -237,6 +258,78 @@ jobs:
             throw "Windows installer failed with exit code $($process.ExitCode)."
           }
 
+      - name: Bootstrap MCP workspace with the bundled Windows Python
+        shell: pwsh
+        run: |
+          $launcher = Join-Path $env:LOCALAPPDATA "SPX\app\SpxLauncher.exe"
+          if (-not (Test-Path $launcher -PathType Leaf)) {
+            throw "Installed SPX launcher not found at $launcher."
+          }
+          Remove-Item Env:PYTHON_BIN -ErrorAction SilentlyContinue
+          $env:SPX_PRODUCT_KEY = "CI-MCP-TEST-KEY"
+          $env:SPX_MCP_WORK_MODE = "runtime_mcp"
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\Wbem"
+          $workspace = Join-Path $env:LOCALAPPDATA "SPX\workspace"
+          $process = Start-Process `
+            -FilePath $launcher `
+            -ArgumentList @("mcp-setup", "--allow-write") `
+            -Wait `
+            -PassThru `
+            -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            throw "Installed MCP setup launcher failed with exit code $($process.ExitCode)."
+          }
+          $venvPython = Join-Path $workspace ".venv\Scripts\python.exe"
+          if (-not (Test-Path $venvPython -PathType Leaf)) {
+            throw "MCP workspace Python was not created at $venvPython."
+          }
+          $version = & $venvPython -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+          if ($version -notmatch '^3\.12\.') {
+            throw "MCP workspace is not based on bundled Python 3.12: $version"
+          }
+          $spxKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\HammerHeads Engineers\SPX")
+          if ($null -eq $spxKey) {
+            throw "SPX installation marker was not found."
+          }
+          try {
+            $bundledPythonMarker = $spxKey.GetValue("BundledPython312Installed")
+          } finally {
+            $spxKey.Dispose()
+          }
+          if ([string]$bundledPythonMarker -ne "1") {
+            throw "SPX bundled Python installation marker was not found."
+          }
+          $registryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("SOFTWARE\Python\PythonCore\3.12\InstallPath")
+          if ($null -eq $registryKey) {
+            throw "Bundled Python registry key was not found."
+          }
+          try {
+            $registryInstallPath = $registryKey.GetValue("")
+          } finally {
+            $registryKey.Dispose()
+          }
+          if ([string]::IsNullOrWhiteSpace([string]$registryInstallPath)) {
+            throw "Bundled Python registry key has no InstallPath value."
+          }
+          $marker = Get-Content (Join-Path $workspace ".spx-mcp-workspace.json") -Raw | ConvertFrom-Json
+          $registryPython = [IO.Path]::GetFullPath((Join-Path ([string]$registryInstallPath) "python.exe"))
+          $bootstrapPython = [IO.Path]::GetFullPath([string]$marker.bootstrap_python)
+          if ($bootstrapPython -ine $registryPython) {
+            throw "MCP did not use the bundled Python from the registry: $bootstrapPython"
+          }
+          $toolCachePython = [IO.Path]::GetFullPath((Join-Path ([string]$env:pythonLocation) "python.exe"))
+          if ($bootstrapPython -ieq $toolCachePython) {
+            throw "MCP incorrectly used the build runner Python instead of the bundled runtime: $bootstrapPython"
+          }
+          & $venvPython (Join-Path $workspace "tools\verify_mcp_stdio.py") `
+            --python $venvPython `
+            --repo-root $workspace `
+            --allow-write `
+            2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP "spx-windows-mcp-stdio.log")
+          if ($LASTEXITCODE -ne 0) {
+            throw "MCP stdio smoke test failed with exit code $LASTEXITCODE."
+          }
+
       - name: Run installed Windows setup launcher
         shell: pwsh
         run: |
@@ -290,6 +383,7 @@ jobs:
           name: installer-smoke-windows-${{ matrix.os }}
           path: |
             ${{ runner.temp }}/spx-windows-*.log
+            ${{ runner.temp }}/spx-windows-mcp*.log
             ${{ runner.temp }}/spx-windows-generated
           if-no-files-found: ignore
 
@@ -389,6 +483,42 @@ jobs:
             --no-start \
             2>&1 | tee "${RUNNER_TEMP}/spx-macos-generate.log"
 
+      - name: Bootstrap MCP workspace with the bundled macOS Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          python_bin="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+          payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
+          mcp_workspace="${RUNNER_TEMP}/spx-macos-mcp-workspace"
+          test -f "${payload}/.spx-macos-bundled-python"
+          rm -rf "${mcp_workspace}"
+          env -u PYTHON_BIN -u SPX_MACOS_PYTHON_BIN \
+            PATH="${RUNNER_TEMP}/spx-fake-bin:/usr/bin:/bin" \
+            SPX_MACOS_BUNDLED_ONLY=1 \
+            SPX_MCP_WORK_MODE=runtime_mcp \
+            SPX_MCP_WORKSPACE_DIR="${mcp_workspace}" \
+            SPX_PRODUCT_KEY=CI-MCP-TEST-KEY \
+            "${payload}/spx-mcp-setup.sh" \
+            --allow-write \
+            2>&1 | tee "${RUNNER_TEMP}/spx-macos-mcp.log"
+          venv_python="${mcp_workspace}/.venv/bin/python"
+          test -x "${venv_python}"
+          test "$("${venv_python}" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = "3.12.10"
+          /usr/bin/python3 - "${mcp_workspace}/.spx-mcp-workspace.json" "${python_bin}" "${venv_python}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          marker = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          assert Path(marker["bootstrap_python"]).resolve() == Path(sys.argv[2]).resolve()
+          assert Path(marker["workspace_python"]).resolve() == Path(sys.argv[3]).resolve()
+          PY
+          "${venv_python}" "${mcp_workspace}/tools/verify_mcp_stdio.py" \
+            --python "${venv_python}" \
+            --repo-root "${mcp_workspace}" \
+            --allow-write \
+            2>&1 | tee "${RUNNER_TEMP}/spx-macos-mcp-stdio.log"
+
       - name: Validate generated macOS bundle
         shell: bash
         run: |
@@ -415,6 +545,7 @@ jobs:
           name: installer-smoke-macos-${{ matrix.arch }}
           path: |
             ${{ runner.temp }}/spx-macos-*.log
+            ${{ runner.temp }}/spx-macos-mcp*.log
             ${{ runner.temp }}/spx-macos-generated
           if-no-files-found: ignore
 

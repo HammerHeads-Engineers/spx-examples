@@ -23,7 +23,7 @@ The current scaffold does the following:
 - builds an MSI that installs the payload under `%LocalAppData%\SPX\app`,
 - builds a Burn bundle EXE that chains the Python prerequisite and the MSI.
 
-The current scaffold still does not install Docker. `SpxLauncher.exe` delegates into the existing PowerShell/Python flows after installation, but `setup` now exports `PYTHON_BIN` explicitly so the installed flow uses the resolved Python interpreter instead of relying on `PATH` ordering.
+The current scaffold still does not install Docker. `SpxLauncher.exe` delegates into the existing PowerShell/Python flows after installation. It resolves the Python 3.12 interpreter installed by the Burn prerequisite from the Python registry keys and passes that exact executable to both `setup` and `mcp-setup`; it does not fall back to an unrelated Python on `PATH`. An explicit `PYTHON_BIN` remains available as a development/test override.
 Start Menu shortcuts are grouped under `SPX Tools` and append `--pause-on-error`, so user-visible failures stay on screen until ENTER is pressed instead of closing immediately.
 The launcher, Burn bundle, and Windows Apps entry reuse the shared icon at `packaging/windows/assets/spx.ico`. The bundle window uses the square logo `packaging/windows/assets/spx.png` and a custom theme under `packaging/windows/wix/theme/` so the product title can sit a bit lower and align visually with the logo.
 Installer-managed SPX content now lives under one user-writable root:

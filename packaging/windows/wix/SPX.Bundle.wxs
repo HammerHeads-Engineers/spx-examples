@@ -12,17 +12,11 @@
     UpgradeCode="229427D2-B3F9-4DFD-9DEF-9BF45CBE80B8"
     Compressed="yes">
     <util:RegistrySearch
-      Id="Python312InstallPathPerUserSearch"
+      Id="SpxBundledPython312InstalledSearch"
       Root="HKCU"
-      Key="SOFTWARE\Python\PythonCore\3.12\InstallPath"
-      Variable="Python312InstallPathPerUser"
-      Result="value"
-      Bitness="always64" />
-    <util:RegistrySearch
-      Id="Python312InstallPathPerMachineSearch"
-      Root="HKLM"
-      Key="SOFTWARE\Python\PythonCore\3.12\InstallPath"
-      Variable="Python312InstallPathPerMachine"
+      Key="Software\HammerHeads Engineers\SPX"
+      Value="BundledPython312Installed"
+      Variable="SpxBundledPython312Installed"
       Result="value"
       Bitness="always64" />
     <util:RegistrySearch
@@ -54,7 +48,7 @@
         DisplayName="$(var.PythonPackageDisplayName)"
         SourceFile="$(var.PythonInstallerPath)"
         InstallArguments="/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 InstallLauncherAllUsers=0 Include_test=0"
-        DetectCondition="Python312InstallPathPerMachine OR Python312InstallPathPerUser"
+        DetectCondition="SpxBundledPython312Installed = 1"
         Compressed="yes"
         Cache="keep"
         PerMachine="no"

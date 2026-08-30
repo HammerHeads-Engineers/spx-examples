@@ -49,6 +49,7 @@ def test_ensure_runtime_recreates_broken_virtualenv(tmp_path: Path, monkeypatch)
     assert (venv_dir / "pyvenv.cfg").exists() is True
     assert json.loads((venv_dir / ".spx-runtime.json").read_text(encoding="utf-8")) == {
         "packages": [],
+        "python_executable": str(Path(runtime_bootstrap.sys.executable).resolve()),
         "python_version": runtime_bootstrap.sys.version,
     }
 
@@ -66,6 +67,7 @@ def test_ensure_runtime_reuses_healthy_virtualenv_without_recreate(
         json.dumps(
             {
                 "packages": [],
+                "python_executable": str(Path(runtime_bootstrap.sys.executable).resolve()),
                 "python_version": runtime_bootstrap.sys.version,
             }
         ),
