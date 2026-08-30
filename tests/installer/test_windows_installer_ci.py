@@ -74,6 +74,7 @@ def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
     launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
 
     assert "Microsoft.Win32" in launcher
+    assert "if (!OperatingSystem.IsWindows())" in launcher
     assert "SOFTWARE\\Python\\PythonCore\\" in launcher
     assert "RegistryHive.CurrentUser" in launcher
     assert "RegistryHive.LocalMachine" in launcher
