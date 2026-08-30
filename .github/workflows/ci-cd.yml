@@ -57,7 +57,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -65,7 +65,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: poetry
@@ -112,7 +112,7 @@ jobs:
 
       - name: Checkout repository
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Poetry
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Set up Python 3.12.10
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: 3.12.10
           cache: poetry
@@ -192,7 +192,7 @@ jobs:
 
       - name: Checkout repository
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Poetry
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -200,7 +200,7 @@ jobs:
 
       - name: Set up Python
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: 3.12.10
           cache: poetry
@@ -318,7 +318,7 @@ jobs:
 
       - name: Checkout repository
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Poetry
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -326,7 +326,7 @@ jobs:
 
       - name: Set up Python 3.12.10
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: 3.12.10
           cache: poetry
@@ -426,7 +426,7 @@ jobs:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
     steps:
       - name: Setup | Checkout Repository at workflow sha
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -442,7 +442,7 @@ jobs:
         run: pipx install poetry
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
@@ -531,17 +531,17 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout release revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
 
       - name: Set up .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
 
@@ -584,7 +584,7 @@ jobs:
           "path=build/windows/artifacts/$($artifacts[0].Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload Windows installer as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: spx-installer-${{ needs.release.outputs.tag }}-windows
           path: ${{ steps.windows_artifact.outputs.path }}
@@ -608,12 +608,12 @@ jobs:
     environment: macos-signing
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.release.outputs.tag }}
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
 
@@ -748,7 +748,7 @@ jobs:
           spctl -a -vv -t install "${{ steps.macos_package.outputs.path }}"
 
       - name: Upload macOS installer as workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: spx-installer-${{ needs.release.outputs.tag }}-macos
           path: ${{ steps.macos_package.outputs.path }}

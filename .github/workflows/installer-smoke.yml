@@ -35,7 +35,7 @@ jobs:
       VERSION: 0.0.0-ci.${{ github.run_id }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build portable Linux installer artifacts
         shell: bash
@@ -149,7 +149,7 @@ jobs:
 
       - name: Upload Linux smoke diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installer-smoke-linux-${{ matrix.os }}
           path: |
@@ -174,15 +174,15 @@ jobs:
       BUILD_ROOT: build/windows-smoke
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
 
       - name: Set up .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
 
@@ -378,7 +378,7 @@ jobs:
 
       - name: Upload Windows smoke diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installer-smoke-windows-${{ matrix.os }}
           path: |
@@ -404,10 +404,10 @@ jobs:
       VERSION: 0.0.0-ci.${{ github.run_id }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
 
@@ -540,7 +540,7 @@ jobs:
 
       - name: Upload macOS smoke diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installer-smoke-macos-${{ matrix.arch }}
           path: |
@@ -560,7 +560,7 @@ jobs:
       VERSION: 0.0.0-ci.${{ github.run_id }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Require a dedicated test product key
         shell: bash
@@ -572,7 +572,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10.14"
 
@@ -660,7 +660,7 @@ jobs:
 
       - name: Upload full-stack diagnostics
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installer-full-stack-diagnostics
           path: |

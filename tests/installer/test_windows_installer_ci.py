@@ -36,9 +36,9 @@ def test_windows_installer_job_runs_after_semantic_release() -> None:
 def test_windows_installer_job_provisions_native_build_dependencies() -> None:
     job = _job("build-windows-installer", "build-macos-installer")
 
-    assert "actions/setup-python@v5" in job
+    assert "actions/setup-python@v7" in job
     assert 'python-version: "3.12.10"' in job
-    assert "actions/setup-dotnet@v4" in job
+    assert "actions/setup-dotnet@v6" in job
     assert 'dotnet-version: "8.0.x"' in job
     assert 'dotnet tool install --global wix --version "6.*"' in job
     assert (
@@ -55,7 +55,7 @@ def test_windows_installer_job_builds_validates_and_publishes_bundle() -> None:
 
     assert ".\\packaging\\windows\\Build.ps1" in job
     assert 'Filter "spx-installer-*.exe"' in job
-    assert "actions/upload-artifact@v4" in job
+    assert "actions/upload-artifact@v7" in job
     assert "gh release upload" in job
     assert "steps.windows_artifact.outputs.path" in job
 

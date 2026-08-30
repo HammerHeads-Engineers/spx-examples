@@ -33,7 +33,7 @@ def test_macos_installer_job_runs_after_semantic_release() -> None:
 def test_macos_installer_job_builds_signed_native_package() -> None:
     job = _macos_job()
 
-    assert "actions/setup-python@v5" in job
+    assert "actions/setup-python@v7" in job
     assert 'python-version: "3.12.10"' in job
     assert '--app-sign "${MACOS_APP_SIGN_IDENTITY}"' in job
     assert '--sign "${MACOS_INSTALLER_SIGN_IDENTITY}"' in job
@@ -191,7 +191,7 @@ def test_macos_installer_job_validates_and_publishes_package() -> None:
     assert 'pkgutil --check-signature "${python_component}"' not in job
     assert "xcrun stapler validate" in job
     assert "spctl -a -vv -t install" in job
-    assert "actions/upload-artifact@v4" in job
+    assert "actions/upload-artifact@v7" in job
     assert "gh release upload" in job
     assert "steps.macos_package.outputs.path" in job
     assert "Clean up macOS signing material" in job

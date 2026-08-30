@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: MIT
 
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -7,10 +8,41 @@ from typing import Optional
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
 NIGHTLY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-nightly.yml"
+INSTALLER_SMOKE_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "installer-smoke.yml"
+
+NODE_24_ACTIONS = {
+    "actions/checkout": "v7",
+    "actions/setup-python": "v7",
+    "actions/setup-dotnet": "v6",
+    "actions/upload-artifact": "v7",
+}
 
 
 def _workflow(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def test_all_workflows_use_node24_first_party_actions() -> None:
+    seen_actions: set[str] = set()
+    for path in (
+        CI_WORKFLOW_PATH,
+        NIGHTLY_WORKFLOW_PATH,
+        INSTALLER_SMOKE_WORKFLOW_PATH,
+    ):
+        workflow = _workflow(path)
+        for action, expected_major in NODE_24_ACTIONS.items():
+            matches = re.findall(
+                rf"uses:\s*{re.escape(action)}@(v\d+)",
+                workflow,
+            )
+            if not matches:
+                continue
+            seen_actions.add(action)
+            assert set(matches) == {expected_major}, (
+                f"{path.name} uses {action} with unexpected versions: {matches}"
+            )
+
+    assert seen_actions == set(NODE_24_ACTIONS)
 
 
 def _job(workflow: str, name: str, next_name: Optional[str] = None) -> str:
