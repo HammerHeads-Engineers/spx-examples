@@ -29,6 +29,7 @@ def test_pr_tests_are_limited_to_supported_boundary_and_bundled_python() -> None
     assert "3.10.14" not in job
     assert "3.11.9" not in job
     assert "cache: poetry" in job
+    assert job.index("- name: Install Poetry") < job.index("- name: Set up Python")
     assert "tests/core/unit" in job
     assert "tests/installer" in job
     assert "tests/mcp/unit" in job
@@ -45,6 +46,7 @@ def test_core_integration_is_a_separate_parallel_python_312_job() -> None:
     assert "needs: pr-title-gate" in job
     assert "python-version: 3.12.10" in job
     assert "cache: poetry" in job
+    assert job.index("- name: Install Poetry") < job.index("- name: Set up Python 3.12.10")
     assert "docker compose up -d" in job
     assert "tests/core/integration" in job
     assert "tests" not in job.split("needs:", 1)[0]
@@ -57,6 +59,7 @@ def test_pack_tests_run_in_parallel_without_full_embedded_pack() -> None:
     assert "needs: pr-title-gate" in job
     assert "needs: tests" not in job
     assert "python-version: 3.12.10" in job
+    assert job.index("- name: Install Poetry") < job.index("- name: Set up Python")
     for pack in ("industrial_iiot_pack", "energy_pack", "smart_building_pack"):
         assert pack in job
     assert "embedded_lab_pack" not in job
@@ -69,6 +72,7 @@ def test_embedded_smoke_runs_only_the_two_representative_tests() -> None:
 
     assert "needs: pr-title-gate" in job
     assert "python-version: 3.12.10" in job
+    assert job.index("- name: Install Poetry") < job.index("- name: Set up Python 3.12.10")
     assert "test_scpi_ascii_port_override.py" in job
     assert "test_modbus_prevac_bcu14_smoke.py" in job
     assert "poetry run pytest -q tests/packs/embedded_lab_pack" not in job
@@ -104,6 +108,7 @@ def test_nightly_keeps_full_python_compatibility_and_embedded_validation() -> No
     assert "tests/core/unit" in compatibility
     assert "tests/packs/*/unit" in compatibility
     assert "python-version: 3.12.10" in embedded
+    assert embedded.index("- name: Install Poetry") < embedded.index("- name: Set up Python 3.12.10")
     assert "tests/packs/embedded_lab_pack --durations=20" in embedded
     assert "SPX_PRODUCT_KEY" in embedded
     assert "semantic-release" not in workflow

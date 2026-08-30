@@ -25,14 +25,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Poetry
+        run: pipx install poetry
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: poetry
-
-      - name: Install Poetry
-        run: pipx install poetry
 
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
@@ -81,16 +81,16 @@ jobs:
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v4
 
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
       - name: Set up Python 3.12.10
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: 3.12.10
           cache: poetry
-
-      - name: Install Poetry
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        run: pipx install poetry
 
       - name: Install dependencies
         if: ${{ steps.gate.outputs.enabled == 'true' }}
