@@ -11,6 +11,7 @@ internal static class Program
     private const string GeneratedDirectoryName = "generated";
     private const string WorkspaceDirectoryName = "workspace";
     private const string PauseOnErrorArgument = "--pause-on-error";
+    private const string PauseOnExitArgument = "--pause-on-exit";
     private const string BundledPythonVersion = "3.12";
     private const string BundledPythonInstallPathKey =
         @"SOFTWARE\Python\PythonCore\" + BundledPythonVersion + @"\InstallPath";
@@ -18,14 +19,20 @@ internal static class Program
     public static int Main(string[] args)
     {
         var pauseOnError = HasPauseOnError(args);
+        var pauseOnExit = HasPauseOnExit(args);
         try
         {
-            return Run(args);
+            var exitCode = Run(args);
+            if (pauseOnExit)
+            {
+                PauseBeforeExit();
+            }
+            return exitCode;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[spx-launcher] {ex.Message}");
-            if (pauseOnError)
+            if (pauseOnError || pauseOnExit)
             {
                 PauseBeforeExit();
             }
@@ -36,7 +43,11 @@ internal static class Program
     private static int Run(string[] args)
     {
         var filteredArgs = args
-            .Where(argument => !string.Equals(argument, PauseOnErrorArgument, StringComparison.OrdinalIgnoreCase))
+            .Where(
+                argument =>
+                    !string.Equals(argument, PauseOnErrorArgument, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(argument, PauseOnExitArgument, StringComparison.OrdinalIgnoreCase)
+            )
             .ToArray();
         var mode = filteredArgs.Length == 0 ? "setup" : filteredArgs[0].Trim().ToLowerInvariant();
         var extraArgs = filteredArgs.Skip(1).ToArray();
@@ -58,7 +69,9 @@ internal static class Program
 
     private static int ShowHelp()
     {
-        Console.WriteLine("Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup] [--pause-on-error]");
+        Console.WriteLine(
+            "Usage: SpxLauncher.exe [setup|mcp-setup|start|stop|cleanup] [--pause-on-error|--pause-on-exit]"
+        );
         Console.WriteLine();
         Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
         Console.WriteLine("  mcp-setup  Create or refresh the SPX MCP workspace.");
@@ -66,6 +79,7 @@ internal static class Program
         Console.WriteLine("  stop       Run the generated SPX stop script.");
         Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");
         Console.WriteLine("  --pause-on-error  Wait for ENTER before closing after an error.");
+        Console.WriteLine("  --pause-on-exit   Wait for ENTER before closing after success or error.");
         return 0;
     }
 
@@ -73,6 +87,13 @@ internal static class Program
     {
         return args.Any(
             argument => string.Equals(argument, PauseOnErrorArgument, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    private static bool HasPauseOnExit(IEnumerable<string> args)
+    {
+        return args.Any(
+            argument => string.Equals(argument, PauseOnExitArgument, StringComparison.OrdinalIgnoreCase)
         );
     }
 
