@@ -467,6 +467,30 @@ GitHub Release assets are the canonical public distribution channel; their
 copied by a follow-up job into Supabase Storage. No GitHub Packages registry
 token is required for installer distribution.
 
+After release verification, the `sync-release-to-www` job can notify both SPX
+WWW environments that the complete release is ready. GitHub Releases remain
+the canonical distribution channel; SPX WWW receives only release metadata and
+can fetch the release and its assets from GitHub API.
+
+Enable the integration with the `SPX_WWW_DOWNLOAD_SYNC_ENABLED` repository
+variable set to `true`. Configure the staging URL and token with
+`SPX_WWW_STAGING_DOWNLOAD_SYNC_URL` and
+`SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN`. Configure the production URL and token
+with the existing `SPX_WWW_DOWNLOAD_SYNC_URL` and
+`SPX_WWW_DOWNLOAD_SYNC_TOKEN` names. URLs are repository variables; tokens are
+repository secrets.
+
+The notification is sent only after portable, Windows, and macOS assets have
+been verified. Staging and production are notified independently, and a
+failure is retried and reported as a failed synchronization job without
+unpublishing the GitHub Release. The payload is idempotent for each
+`repository + tag` pair, so it is safe to retry.
+
+The manual `Sync release to SPX WWW` workflow accepts an existing release tag,
+verifies its complete asset set, and replays the notification. It can be used
+to synchronize releases created before this integration was enabled, such as
+`v1.1.0-rc.62`.
+
 ### 9. Produce Unix self-extractor (optional)
 
 Convert the portable package into self-extracting artifacts. For end-user

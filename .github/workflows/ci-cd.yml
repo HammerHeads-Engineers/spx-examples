@@ -820,3 +820,31 @@ jobs:
               exit 1
             fi
           done
+
+  sync-release-to-www:
+    needs: [release, release-verification]
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true' &&
+      needs.release-verification.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+      SPX_WWW_DOWNLOAD_SYNC_ENABLED: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_ENABLED }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_STAGING_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN }}
+      SPX_WWW_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_DOWNLOAD_SYNC_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Notify SPX WWW environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/sync_release_to_www.sh \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${RELEASE_TAG}"
