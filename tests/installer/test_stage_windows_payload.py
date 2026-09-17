@@ -47,8 +47,15 @@ def test_render_wix_fragment_adds_launcher_shortcuts_and_subdirectories(tmp_path
     assert 'ComponentGroup Id="PayloadComponents" Directory="INSTALLFOLDER"' in fragment
     assert 'File Id="filSpxLauncherExe"' in fragment
     assert 'Shortcut Id="shortcutSpxSetup"' in fragment
-    assert 'Arguments="setup --pause-on-error"' in fragment
-    assert 'Arguments="mcp-setup --pause-on-error"' in fragment
+    for arguments in (
+        "setup --pause-on-exit",
+        "mcp-setup --pause-on-exit",
+        "start --pause-on-exit",
+        "stop --pause-on-exit",
+        "cleanup --pause-on-exit",
+    ):
+        assert f'Arguments="{arguments}"' in fragment
+    assert "--pause-on-error" not in fragment
     assert 'Subdirectory="installer"' in fragment
 
 

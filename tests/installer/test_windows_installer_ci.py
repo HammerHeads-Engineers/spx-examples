@@ -83,6 +83,30 @@ def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
     assert "The bundled Python 3.12 runtime was not found" in launcher
 
 
+def test_windows_launcher_supports_success_pause_without_changing_legacy_error_pause() -> None:
+    launcher = LAUNCHER_PATH.read_text(encoding="utf-8")
+
+    assert 'PauseOnExitArgument = "--pause-on-exit"' in launcher
+    assert "HasPauseOnExit" in launcher
+    assert "--pause-on-error|--pause-on-exit" in launcher
+    assert "Wait for ENTER before closing after success or error." in launcher
+    assert "!string.Equals(argument, PauseOnExitArgument" in launcher
+    assert "if (pauseOnError || pauseOnExit)" in launcher
+
+    success_path = launcher[launcher.index("try\n        {") : launcher.index("catch (Exception ex)")]
+    assert "if (pauseOnExit)" in success_path
+
+
+def test_windows_ci_launcher_invocations_do_not_request_interactive_pause() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "installer-smoke.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"mcp-setup", "--allow-write"' in workflow
+    assert '"setup",' in workflow
+    assert "--pause-on-exit" not in workflow
+
+
 def test_windows_bundle_uses_an_spx_owned_python_marker() -> None:
     bundle = BUNDLE_WXS_PATH.read_text(encoding="utf-8")
     product = PRODUCT_WXS_PATH.read_text(encoding="utf-8")

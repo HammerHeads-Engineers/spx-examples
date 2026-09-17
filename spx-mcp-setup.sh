@@ -2,6 +2,39 @@
 # SPDX-License-Identifier: MIT
 set -euo pipefail
 
+PAUSE_ON_EXIT=0
+FORWARDED_ARGS=()
+for argument in "$@"; do
+  if [ "$argument" = "--pause-on-exit" ]; then
+    PAUSE_ON_EXIT=1
+  else
+    FORWARDED_ARGS+=("$argument")
+  fi
+done
+if [ ${#FORWARDED_ARGS[@]} -gt 0 ]; then
+  set -- "${FORWARDED_ARGS[@]}"
+else
+  set --
+fi
+
+pause_before_exit() {
+  if [ "$PAUSE_ON_EXIT" -ne 1 ] || [ ! -t 0 ]; then
+    return 0
+  fi
+
+  echo ""
+  read -r -p "Press ENTER to close..." _ || true
+}
+
+finish_with_optional_pause() {
+  local status=$?
+  trap - EXIT
+  pause_before_exit
+  exit "$status"
+}
+
+trap finish_with_optional_pause EXIT
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MACOS_PYTHON_HELPER="${SCRIPT_DIR}/installer/macos/python_runtime.sh"
 
@@ -29,11 +62,12 @@ CLI_ALLOW_WRITE=""
 
 print_usage() {
   cat <<'EOF'
-Usage: spx-mcp-setup.sh [--allow-write | --read-only]
+Usage: spx-mcp-setup.sh [--allow-write | --read-only] [--pause-on-exit]
 
 Options:
   --allow-write  Generate the workspace with MCP write tools enabled.
   --read-only    Generate the workspace without MCP write tools.
+  --pause-on-exit Keep the terminal open after setup until ENTER is pressed.
   -h, --help     Show this help message.
 
 Default behavior:

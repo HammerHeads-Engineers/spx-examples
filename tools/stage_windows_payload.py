@@ -48,31 +48,31 @@ SHORTCUTS = (
         "shortcutSpxSetup",
         "SPX Setup",
         "Launch the SPX environment wizard.",
-        "setup --pause-on-error",
+        "setup --pause-on-exit",
     ),
     (
         "shortcutSpxMcpSetup",
         "SPX MCP Setup",
         "Create the local SPX MCP workspace.",
-        "mcp-setup --pause-on-error",
+        "mcp-setup --pause-on-exit",
     ),
     (
         "shortcutSpxStart",
         "SPX Start",
         "Start the generated SPX environment.",
-        "start --pause-on-error",
+        "start --pause-on-exit",
     ),
     (
         "shortcutSpxStop",
         "SPX Stop",
         "Stop the generated SPX environment.",
-        "stop --pause-on-error",
+        "stop --pause-on-exit",
     ),
     (
         "shortcutSpxCleanup",
         "SPX Cleanup",
         "Remove the generated SPX environment and related Docker resources.",
-        "cleanup --pause-on-error",
+        "cleanup --pause-on-exit",
     ),
 )
 
