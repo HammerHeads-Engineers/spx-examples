@@ -50,6 +50,11 @@ default so the runtime `server_*` tools are available immediately in Codex,
 Claude Code, or another MCP-capable client. Use an explicit read-only setup
 only when you want inspection-only MCP access.
 
+Native Windows and macOS installers bootstrap this workspace from their
+bundled Python 3.12 runtime, then launch MCP from the workspace `.venv`.
+Portable Linux `.run`/`.tgz` packages keep using the host Python (3.10+ for
+MCP) and do not bundle a separate interpreter.
+
 ## Work Modes
 
 The repository distinguishes two semantic work modes for MCP-capable LLM
@@ -390,6 +395,27 @@ scripts/build_macos_pkg.sh \
   --notarytool-profile spx-notary
 ```
 
+The native macOS package includes the official universal2 CPython runtime
+(`3.12.10`) as a separate installer component. It is installed at
+`/Library/Frameworks/Python.framework` and is selected by the SPX launchers
+before any Python found on `PATH`. This keeps the `.pkg` independent of
+Homebrew, Xcode Command Line Tools, or a user-managed Python installation.
+The runtime component is checksum-verified during the build; the current
+official download is approximately 44 MB and the installed framework uses
+approximately 106 MB before the SPX virtual environment and its packages.
+Portable `.tgz`, `.run`, and source-checkout flows retain their existing
+system-Python fallback.
+
+To build with a previously downloaded official package while developing
+locally, pass both the package path and its expected checksum:
+
+```bash
+scripts/build_macos_pkg.sh \
+  --python-version 3.12.10 \
+  --python-package /absolute/path/python-3.12.10-macos11.pkg \
+  --python-sha256 8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4
+```
+
 For GitHub Actions, configure the `macos-signing` environment with
 `docs/macos-signing-gh-config.example.sh`. It stores the two P12 exports and
 the App Store Connect `.p8` key as Actions secrets, while certificate
@@ -472,13 +498,15 @@ WWW environments that the complete release is ready. GitHub Releases remain
 the canonical distribution channel; SPX WWW receives only release metadata and
 can fetch the release and its assets from GitHub API.
 
-Enable the integration with the `SPX_WWW_DOWNLOAD_SYNC_ENABLED` repository
-variable set to `true`. Configure the staging URL and token with
+Enable the staging integration with the
+`SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED` repository variable set to `true`.
+Configure the staging URL and token with
 `SPX_WWW_STAGING_DOWNLOAD_SYNC_URL` and
-`SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN`. Configure the production URL and token
-with the existing `SPX_WWW_DOWNLOAD_SYNC_URL` and
-`SPX_WWW_DOWNLOAD_SYNC_TOKEN` names. URLs are repository variables; tokens are
-repository secrets.
+`SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN`. Enable the production integration
+separately with `SPX_WWW_DOWNLOAD_SYNC_ENABLED=true` and configure its URL and
+token with `SPX_WWW_DOWNLOAD_SYNC_URL` and `SPX_WWW_DOWNLOAD_SYNC_TOKEN`.
+URLs are repository variables; tokens are repository secrets. This allows
+staging validation while the production callback remains disabled.
 
 The notification is sent only after portable, Windows, and macOS assets have
 been verified. Staging and production are notified independently, and a
@@ -490,6 +518,22 @@ The manual `Sync release to SPX WWW` workflow accepts an existing release tag,
 verifies its complete asset set, and replays the notification. It can be used
 to synchronize releases created before this integration was enabled, such as
 `v1.1.0-rc.62`.
+
+### 8.2 Automated installer verification
+
+The separate `Installer smoke and integration` GitHub Actions workflow runs
+native installer checks on fresh Linux, Windows, and macOS runners. Pull
+requests execute the smoke suite without production secrets: it builds the
+platform artifact, installs it, verifies the installed runtime, and runs the
+wizard with a controlled no-start scenario. The macOS matrix covers both
+Apple Silicon and Intel runners.
+
+The Docker-backed full-stack check is intentionally separate because it needs a
+dedicated `SPX_TEST_PRODUCT_KEY` repository secret and a running Docker
+daemon. It runs nightly or can be started manually from Actions by enabling
+the `run_full_stack` workflow input. It generates a bundle through the
+installer, starts the generated stack, waits for the SPX health check, runs a
+representative pack suite, and always performs cleanup.
 
 ### 9. Produce Unix self-extractor (optional)
 

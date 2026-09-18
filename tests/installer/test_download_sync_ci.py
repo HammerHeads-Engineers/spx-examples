@@ -47,6 +47,7 @@ def _run_sync_script(tmp_path: Path, fake_curl_body: str, **environment: str) ->
         {
             "PATH": f"{fake_bin}:{env['PATH']}",
             "CURL_LOG": str(curl_log),
+            "SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED": "true",
             "SPX_WWW_DOWNLOAD_SYNC_ENABLED": "true",
             "SPX_WWW_STAGING_DOWNLOAD_SYNC_URL": "https://staging.example.test/sync",
             "SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN": "staging-secret",
@@ -88,6 +89,7 @@ def test_release_sync_configures_both_environments_and_safe_rollout_switch() -> 
     sync_job = _job(workflow, "sync-release-to-www")
 
     for name in (
+        "SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED",
         "SPX_WWW_DOWNLOAD_SYNC_ENABLED",
         "SPX_WWW_STAGING_DOWNLOAD_SYNC_URL",
         "SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN",
@@ -137,6 +139,7 @@ def test_sync_script_skips_cleanly_until_integration_is_enabled(tmp_path: Path) 
         tmp_path,
         "exit 99",
         SPX_WWW_DOWNLOAD_SYNC_ENABLED="false",
+        SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED="false",
         SPX_WWW_STAGING_DOWNLOAD_SYNC_URL="",
         SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN="",
         SPX_WWW_DOWNLOAD_SYNC_URL="",
@@ -148,7 +151,7 @@ def test_sync_script_skips_cleanly_until_integration_is_enabled(tmp_path: Path) 
     assert not (tmp_path / "curl.log").exists()
 
 
-def test_sync_script_requires_all_targets_when_enabled(tmp_path: Path) -> None:
+def test_sync_script_requires_configuration_for_each_enabled_target(tmp_path: Path) -> None:
     result = _run_sync_script(
         tmp_path,
         "exit 0",
@@ -159,6 +162,22 @@ def test_sync_script_requires_all_targets_when_enabled(tmp_path: Path) -> None:
     assert "SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN" in result.stderr
     assert "staging-secret" not in result.stdout + result.stderr
     assert "production-secret" not in result.stdout + result.stderr
+
+
+def test_sync_script_supports_staging_only_rollout(tmp_path: Path) -> None:
+    result = _run_sync_script(
+        tmp_path,
+        "exit 0",
+        SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED="true",
+        SPX_WWW_DOWNLOAD_SYNC_ENABLED="false",
+        SPX_WWW_DOWNLOAD_SYNC_URL="",
+        SPX_WWW_DOWNLOAD_SYNC_TOKEN="",
+    )
+    log = (tmp_path / "curl.log").read_text(encoding="utf-8")
+
+    assert result.returncode == 0
+    assert "staging.example.test" in log
+    assert "production.example.test" not in log
 
 
 def test_manual_sync_workflow_supports_release_replay() -> None:
