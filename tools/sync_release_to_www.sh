@@ -8,6 +8,7 @@ usage() {
 Usage: sync_release_to_www.sh --repository OWNER/REPOSITORY --tag TAG
 
 Environment:
+  SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED
   SPX_WWW_DOWNLOAD_SYNC_ENABLED
   SPX_WWW_STAGING_DOWNLOAD_SYNC_URL
   SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN
@@ -55,23 +56,31 @@ if [[ -z "${repository}" || -z "${tag}" ]]; then
   exit 2
 fi
 
-if [[ "${SPX_WWW_DOWNLOAD_SYNC_ENABLED:-false}" != "true" ]]; then
-  echo "SPX WWW Downloads sync is disabled; set SPX_WWW_DOWNLOAD_SYNC_ENABLED=true after the endpoints are ready."
+staging_enabled="${SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED:-false}"
+production_enabled="${SPX_WWW_DOWNLOAD_SYNC_ENABLED:-false}"
+
+if [[ "${staging_enabled}" != "true" && "${production_enabled}" != "true" ]]; then
+  echo "SPX WWW Downloads sync is disabled; enable staging or production after the endpoints are ready."
   exit 0
 fi
 
-required_configuration=(
-  SPX_WWW_STAGING_DOWNLOAD_SYNC_URL
-  SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN
-  SPX_WWW_DOWNLOAD_SYNC_URL
-  SPX_WWW_DOWNLOAD_SYNC_TOKEN
-)
-for variable_name in "${required_configuration[@]}"; do
+require_configuration() {
+  local variable_name="$1"
   if [[ -z "${!variable_name:-}" ]]; then
     echo "Missing required SPX WWW sync configuration: ${variable_name}" >&2
     exit 1
   fi
-done
+}
+
+if [[ "${staging_enabled}" == "true" ]]; then
+  require_configuration SPX_WWW_STAGING_DOWNLOAD_SYNC_URL
+  require_configuration SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN
+fi
+
+if [[ "${production_enabled}" == "true" ]]; then
+  require_configuration SPX_WWW_DOWNLOAD_SYNC_URL
+  require_configuration SPX_WWW_DOWNLOAD_SYNC_TOKEN
+fi
 
 payload="$(jq -cn \
   --arg event "release_assets_ready" \
@@ -107,14 +116,19 @@ notify_target() {
   fi
 }
 
-notify_target \
-  "staging" \
-  "${SPX_WWW_STAGING_DOWNLOAD_SYNC_URL}" \
-  "${SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN}"
-notify_target \
-  "production" \
-  "${SPX_WWW_DOWNLOAD_SYNC_URL}" \
-  "${SPX_WWW_DOWNLOAD_SYNC_TOKEN}"
+if [[ "${staging_enabled}" == "true" ]]; then
+  notify_target \
+    "staging" \
+    "${SPX_WWW_STAGING_DOWNLOAD_SYNC_URL}" \
+    "${SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN}"
+fi
+
+if [[ "${production_enabled}" == "true" ]]; then
+  notify_target \
+    "production" \
+    "${SPX_WWW_DOWNLOAD_SYNC_URL}" \
+    "${SPX_WWW_DOWNLOAD_SYNC_TOKEN}"
+fi
 
 if ((failures > 0)); then
   echo "SPX WWW sync failed for ${failures} target(s)." >&2
