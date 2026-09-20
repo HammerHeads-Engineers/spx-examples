@@ -282,7 +282,7 @@ plist="\${launch_agents_dir}/\${label}.plist"
 helper="\${console_home}/Library/Application Support/SPX/\${label}.sh"
 
 /bin/mkdir -p "\${launch_agents_dir}" "\$(/usr/bin/dirname "\${helper}")" || exit 0
-/usr/bin/launchctl bootout "gui/\${console_uid}/\${label}" >/dev/null 2>&1 || true
+/bin/launchctl bootout "gui/\${console_uid}/\${label}" >/dev/null 2>&1 || true
 
 /bin/cat > "\${helper}" <<HELPER
 #!/bin/bash
@@ -312,7 +312,7 @@ PLIST
 /bin/chmod 755 "\${helper}" || exit 0
 user_group="\$(/usr/bin/id -gn "\${console_user}" 2>/dev/null || printf 'staff')"
 /usr/sbin/chown "\${console_user}:\${user_group}" "\${plist}" "\${helper}" || exit 0
-/usr/bin/launchctl bootstrap "gui/\${console_uid}" "\${plist}" >/dev/null 2>&1 || {
+/bin/launchctl bootstrap "gui/\${console_uid}" "\${plist}" >/dev/null 2>&1 || {
   /bin/rm -f "\${plist}" "\${helper}"
 }
 EOF

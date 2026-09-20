@@ -18,6 +18,7 @@ def test_native_macos_package_flow_contains_launchers_license_and_notarization()
     assert r'"\${COMMAND_LINE_INSTALL:-}"' in package_script
     assert r'"\${SPX_SKIP_AUTO_SETUP:-}"' in package_script
     assert "Installer.app/Contents/MacOS/Installer" in package_script
+    assert r'/bin/launchctl bootstrap "gui/\${console_uid}"' in package_script
     assert r'launchctl bootstrap "gui/\${console_uid}"' in package_script
     assert 'launchctl asuser' not in package_script
     assert (ROOT / "packaging/macos/resources/English.lproj/License.rtf").is_file()
