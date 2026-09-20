@@ -8,6 +8,9 @@ from typing import Any, Dict, List, Sequence, Set, Tuple
 from .manifest import ManifestIndex
 
 
+COMMUNITY_AUTO_START_LIMIT = 5
+
+
 def resolve_model_ids(
     packages: Sequence[str],
     profiles: Sequence[str],
@@ -133,4 +136,4 @@ def resolve_start_instances(
             seen.add(key)
             start_instances.append(key)
 
-    return start_instances
+    return start_instances[:COMMUNITY_AUTO_START_LIMIT]

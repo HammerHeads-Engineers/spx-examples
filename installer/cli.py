@@ -129,6 +129,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable bootstrap runner in generated start scripts.",
     )
     generate_parser.add_argument(
+        "--instance-limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Limit the number of default instances created/started in non-interactive mode.",
+    )
+    generate_parser.add_argument(
         "--print-selection",
         choices=["json"],
         default=None,
@@ -245,6 +252,14 @@ def _build_noninteractive_selection(
     ):
         allowed = set(start_instances)
         instances = [entry for entry in instances if entry.get("instance_key") in allowed]
+
+    instance_limit = getattr(args, "instance_limit", None)
+    if instance_limit is not None:
+        if instance_limit < 0:
+            raise SystemExit("--instance-limit must be zero or greater")
+        instances = instances[:instance_limit]
+        allowed = {entry.get("instance_key") for entry in instances}
+        start_instances = [key for key in start_instances if key in allowed][:instance_limit]
 
     return WizardSelection(
         packages=packages,

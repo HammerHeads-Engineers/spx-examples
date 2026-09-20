@@ -50,6 +50,19 @@ def test_pack_default_instances_reference_known_models() -> None:
             assert model_id in models_by_id, f"Default instance references unknown model id '{model_id}'"
 
 
+def test_community_auto_start_defaults_do_not_exceed_five() -> None:
+    """The Community installer must never auto-start more than five instances."""
+
+    industry = find_industry(PACK_ID)
+    assert len(industry.get("start_instances", []) or []) <= 5
+
+
+def test_all_community_pack_auto_start_defaults_do_not_exceed_five() -> None:
+    catalog = load_yaml(repo_root() / "library/catalog/industries.yaml")
+    for industry in catalog.get("industries", []) or []:
+        assert len(industry.get("start_instances", []) or []) <= 5
+
+
 def test_pack_profiles_reference_catalog_models() -> None:
     root = repo_root()
     models_by_path = model_index_by_path()

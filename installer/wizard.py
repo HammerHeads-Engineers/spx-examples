@@ -9,7 +9,13 @@ from shutil import get_terminal_size
 from typing import Dict, List, Sequence
 
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
-from .selection import resolve_default_instances, resolve_model_ids, resolve_service_ids
+from .selection import (
+    COMMUNITY_AUTO_START_LIMIT,
+    resolve_default_instances,
+    resolve_model_ids,
+    resolve_service_ids,
+)
+from .compatibility import SPX_SERVER_VERSION, SPX_UI_VERSION
 from . import ui
 
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
@@ -46,7 +52,7 @@ class InstallerWizard:
         self._print_banner()
         packages, protocol_filters = self._prompt_packages(index.industries, index)
         protocol_only = bool(protocol_filters) and not packages
-        profiles: List[str] = []
+        profiles: List[str] = self._prompt_profiles(packages, index) if packages else []
         install_models = False
         install_instances = False
         start_instances: List[str] = []
@@ -260,7 +266,11 @@ class InstallerWizard:
             manifest = index.industries.get(pkg_id)
             if not manifest or not manifest.start_instances:
                 continue
-            start_keys = [str(entry).strip() for entry in manifest.start_instances if str(entry).strip()]
+            start_keys = [
+                str(entry).strip()
+                for entry in manifest.start_instances
+                if str(entry).strip()
+            ][:COMMUNITY_AUTO_START_LIMIT]
             if not start_keys:
                 continue
             instance_models = {
@@ -276,12 +286,33 @@ class InstallerWizard:
                 else:
                     print(f"  • {instance_key}")
             if self._prompt_yes_no("Start these instances after creation? [Y/n]: ", default=True):
-                for instance_key in start_keys:
+                chosen = self._prompt_instance_subset(start_keys)
+                for instance_key in chosen:
                     if instance_key in seen:
                         continue
                     seen.add(instance_key)
                     selected.append(instance_key)
         return selected
+
+    def _prompt_instance_subset(self, instance_keys: Sequence[str]) -> List[str]:
+        if not instance_keys:
+            return []
+        while True:
+            raw = input(
+                "Select instance numbers to auto-start (comma-separated, ENTER for all): "
+            ).strip()
+            self._check_quit(raw)
+            if not raw:
+                return list(instance_keys)
+            try:
+                choices = [int(token.strip()) for token in raw.split(",") if token.strip()]
+            except ValueError:
+                print(ui.warn("  Invalid input. Please enter instance numbers."))
+                continue
+            if not choices or any(choice < 1 or choice > len(instance_keys) for choice in choices):
+                print(ui.warn(f"  Values must be between 1 and {len(instance_keys)}."))
+                continue
+            return [instance_keys[index - 1] for index in sorted(set(choices))]
 
     def _prompt_yes_no(self, prompt: str, *, default: bool) -> bool:
         while True:
@@ -369,7 +400,7 @@ class InstallerWizard:
     def _prompt_license_key(self) -> str:
         env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
         if env_value:
-            print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {env_value}"))
+            print(ui.accent("\nDetected SPX_PRODUCT_KEY in environment."))
             return env_value
 
         print(ui.heading("\nSPX Product Key"))
@@ -452,7 +483,14 @@ class InstallerWizard:
         print(f"Install instances: {ui.success('yes') if install_instances else ui.warn('no')}")
         print(f"Include SPX UI: {ui.success('yes') if install_spx_ui else ui.warn('no')}")
         print(f"Offline bundle: {ui.success('yes') if offline_bundle else ui.warn('no')}")
-        print(f"SPX product key: {ui.heading(license_key or 'N/A')}")
+        print(
+            f"SPX product key: {ui.success('configured') if license_key else ui.warn('not configured')}"
+        )
+        print(f"SPX runtime: server {SPX_SERVER_VERSION}, UI {SPX_UI_VERSION}")
+        print(
+            f"Counts: models={len(model_ids)}, planned instances={len(instances)}, "
+            f"auto-start instances={len(start_instances)}"
+        )
         print("\nModels:")
         for model_id in model_ids:
             manifest = index.models[model_id]

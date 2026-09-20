@@ -166,5 +166,4 @@ industries:
       - spx_eurotherm_3504_pressure
       - spx_g120c_vfd
       - spx_wago_750_8000_io
-      - spx_s7_1500_process_cell
     path: library/industries/industrial_iiot_pack

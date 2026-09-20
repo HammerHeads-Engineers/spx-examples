@@ -95,7 +95,7 @@ def test_wizard_with_inputs(monkeypatch: pytest.MonkeyPatch, manifest_index: Man
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "n", "n"])
+    inputs = iter(["1", "", "", "", "n", "n"])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()

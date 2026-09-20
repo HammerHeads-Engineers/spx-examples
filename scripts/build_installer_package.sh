@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME]
+Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME] [--version VERSION]
 
 Creates a portable installer archive (tgz) with the wizard CLI, manifests,
 and helper scripts so end users can run `spx-setup` without cloning the repo.
@@ -12,11 +12,13 @@ and helper scripts so end users can run `spx-setup` without cloning the repo.
 Options:
   --output-dir DIR     Directory to place the assembled folder and tarball (default: dist)
   --package-name NAME  Name of the folder/tarball (default: spx-installer)
+  --version VERSION    Add VERSION to the archive filename; a leading 'v' is removed
 EOF
 }
 
 OUTPUT_DIR="dist"
 PACKAGE_NAME="spx-installer"
+VERSION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --package-name)
       PACKAGE_NAME="$2"
+      shift 2
+      ;;
+    --version)
+      VERSION="$2"
       shift 2
       ;;
     -h|--help)
@@ -40,10 +46,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -n "${VERSION}" ]]; then
+  VERSION="${VERSION#v}"
+  if [[ -z "${VERSION}" || ! "${VERSION}" =~ ^[0-9A-Za-z][0-9A-Za-z.-]*$ ]]; then
+    echo "Version must contain only letters, numbers, dots, and hyphens." >&2
+    exit 1
+  fi
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+if [[ "${OUTPUT_DIR}" = /* ]]; then
+  DEST_DIR="${OUTPUT_DIR}"
+else
+  DEST_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
+fi
 PACKAGE_DIR="${DEST_DIR}/${PACKAGE_NAME}"
-ARCHIVE_PATH="${DEST_DIR}/${PACKAGE_NAME}.tgz"
+ARCHIVE_NAME="${PACKAGE_NAME}.tgz"
+if [[ -n "${VERSION}" ]]; then
+  ARCHIVE_NAME="${PACKAGE_NAME}-${VERSION}.tgz"
+fi
+ARCHIVE_PATH="${DEST_DIR}/${ARCHIVE_NAME}"
 
 mkdir -p "${DEST_DIR}"
 rm -rf "${PACKAGE_DIR}"
@@ -54,12 +76,17 @@ copy_entries=(
   "library"
   "profiles"
   "extensions"
+  "tools"
+  "docs"
+  "AGENTS.md"
+  "LICENSE"
   "spx-setup.command"
   "spx-setup.desktop"
   "spx-setup.sh"
   "spx-setup.bat"
   "spx-install.sh"
   "spx-install.ps1"
+  "INSTALLER_README.md"
   "README.md"
   "pyproject.toml"
   "poetry.lock"
@@ -84,28 +111,89 @@ for entry in "${copy_entries[@]}"; do
   rsync "${rsync_opts[@]}" "${src}" "${PACKAGE_DIR}/"
 done
 
+normalize_text_line_endings() {
+  local package_dir="$1"
+  python3 - "$package_dir" <<'PY'
+from __future__ import annotations
+
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+extensions = {".sh", ".desktop", ".command", ".ps1", ".md", ".toml", ".yaml", ".yml", ".py"}
+for path in root.rglob("*"):
+    if not path.is_file():
+        continue
+    if path.suffix.lower() not in extensions:
+        continue
+    text = path.read_text(encoding="utf-8", errors="surrogatepass")
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    if normalized != text:
+        path.write_text(normalized, encoding="utf-8", newline="\n")
+PY
+}
+
+normalize_text_line_endings "${PACKAGE_DIR}"
+
+normalize_payload_permissions() {
+  local package_dir="$1"
+
+  find "${package_dir}" -type d -exec chmod 755 {} +
+  find "${package_dir}" -type f -exec chmod 644 {} +
+  find "${package_dir}" -type f \( -name "*.sh" -o -name "*.command" -o -name "*.desktop" \) -exec chmod 755 {} +
+}
+
+normalize_payload_permissions "${PACKAGE_DIR}"
+
 cat > "${PACKAGE_DIR}/INSTALLER_README.md" <<'EOF'
 # SPX Installer Package
 
-This archive contains the interactive installer (launch via `spx-setup.*`),
-the manifest library, and all helper scripts required to generate a deployment bundle
-without cloning the full spx-examples repository.
+This archive contains the portable SPX installer payload, the manifest library,
+and all helper scripts required to generate a deployment bundle without cloning
+the full `spx-examples` repository.
+
+Preferred release artifacts remain:
+
+- Windows: `spx-installer-<version>.exe`
+- macOS: `spx-installer-macos-<version>.pkg`
+- Linux/Unix: `spx-installer-<version>.run`
+
+Use this unpacked archive when you intentionally want the portable payload on
+disk, need to redistribute the installer contents directly, or are working in a
+development/debug flow where the native wrappers are not required.
 
 ## Requirements
 
-- Python 3.10+ with `pip`
+- Python 3.9+ with `pip`
 - Docker Desktop / Docker Engine with Compose V2
+- On Ubuntu/Debian, if the runtime venv cannot bootstrap pip, install `python3-venv` and, if needed, `python3-pip`
+
+## Licensing
+
+- Open-source license notices bundled with this package apply to the corresponding components, including the included `LICENSE` file.
+- Proprietary SPX features, branding, hosted services, and subscription-gated functionality may require separate commercial terms or authorization.
 
 ## Usage
 
 1. Extract this archive (e.g. `tar -xzf spx-installer.tgz`).
-2. Run the installer:
+2. Run the portable installer launcher:
    - macOS: `./spx-setup.command`
    - Linux desktop: `./spx-setup.desktop`
    - Windows: `spx-setup.bat`
    - macOS/Linux shells: `./spx-setup.sh`
-3. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
-4. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
+3. If you unpacked a `.zip` and the shell launchers are not executable, run `chmod +x spx-setup.command spx-setup.sh`.
+4. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
+5. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
+
+The generated start flow performs a Docker/Compose preflight, detects labelled
+and legacy SPX stacks, and asks before replacing one. It uses Compose project
+`spx`, preserves volumes/images, and can restore the previous stack if model or
+instance bootstrap fails. Community defaults auto-start at most five instances.
+The bundle uses SPX Server `v1.0.0-rc.64` with SPX UI `v1.0.0-rc.68`.
+
+New `bundle.json` files do not contain the raw Product Key; bootstrap reads it
+from `.env` or `SPX_PRODUCT_KEY` and still accepts older bundles with
+`license_key`. Profiles remain additive to the selected pack.
 
 You can safely redistribute the extracted folder (including `build/spx-generated`) to teammates.
 EOF

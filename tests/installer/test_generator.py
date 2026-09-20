@@ -8,7 +8,15 @@ from pathlib import Path
 
 import yaml
 
-from installer.generator import DeploymentGenerator, SPX_UI_IMAGE
+from installer.generator import (
+    DeploymentGenerator,
+    SPX_LABEL_INSTALLATION_ID,
+    SPX_LABEL_MANAGED_BY,
+    SPX_LABEL_PROJECT,
+    SPX_LABEL_STACK,
+    SPX_SERVER_IMAGE,
+    SPX_UI_IMAGE,
+)
 from installer.manifest import (
     DomainManifest,
     IndustryManifest,
@@ -124,9 +132,17 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert compose_path.exists()
     data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
     services = data["services"]
+    assert data["name"] == "spx"
     assert "spx-server" in services
     assert "spx-ui" not in services
     assert "mqtt_broker" in services
+    labels = services["spx-server"]["labels"]
+    assert labels[SPX_LABEL_STACK] == "true"
+    assert labels[SPX_LABEL_MANAGED_BY] == "installer"
+    assert labels[SPX_LABEL_PROJECT] == "spx"
+    assert labels[SPX_LABEL_INSTALLATION_ID]
+    assert services["spx-server"]["image"] == SPX_SERVER_IMAGE
+    assert services["spx-server"]["container_name"] == "spx-server"
     assert "8000:8000" in services["spx-server"]["ports"]
     assert "host.docker.internal:host-gateway" in services["spx-server"].get("extra_hosts", [])
     assert "502:502" in services["spx-server"]["ports"]
@@ -142,7 +158,11 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert (output_dir / "extensions").exists()
 
     bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
-    assert bundle["license_key"] == "ABC-123"
+    assert "license_key" not in bundle
+    assert bundle["server_version"] == "v1.0.0-rc.64"
+    assert bundle["ui_version"] == "v1.0.0-rc.68"
+    assert bundle["compose_project"] == "spx"
+    assert {1883, 502, 8000}.issubset(set(bundle["required_ports"]))
     assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway"]
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
@@ -157,23 +177,27 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert runner_path.exists()
     start_content = start_path.read_text(encoding="utf-8")
     stop_content = stop_path.read_text(encoding="utf-8")
-    assert "BLE_ADAPTER_PID" in start_content
     assert "trap cleanup_on_failure ERR INT TERM" in start_content
-    assert "down --remove-orphans" in start_content
-    assert "docker compose" in start_content
+    assert "down --remove-orphans" not in start_content
+    assert "docker compose -p spx" in start_content
+    assert "stack_manager.py" in start_content
+    assert "wait-health" in start_content
+    assert "--installation-id" in start_content
     assert "bootstrap_runner.py" in start_content
-    assert "pkill -f spx-ble-adapter" in stop_content
+    assert "stack_manager.py" in stop_content
+    assert "--installation-id" in stop_content
     start_ps_path = output_dir / "spx-start.ps1"
     stop_ps_path = output_dir / "spx-stop.ps1"
     assert start_ps_path.exists()
     assert stop_ps_path.exists()
     start_ps_content = start_ps_path.read_text(encoding="utf-8")
     stop_ps_content = stop_ps_path.read_text(encoding="utf-8")
-    assert "Cleanup-OnFailure" in start_ps_content
-    assert "Start-Process \"spx-ble-adapter\"" in start_ps_content
-    assert "docker compose -f (Join-Path $ScriptDir \"docker-compose.generated.yml\")" in start_ps_content
+    assert "Invoke-Manager" in start_ps_content
+    assert "wait-health" in start_ps_content
+    assert "docker compose -p spx" in start_ps_content
     assert "bootstrap_runner.py" in start_ps_content
-    assert "Get-CimInstance Win32_Process" in stop_ps_content
+    assert "stack_manager.py" in stop_ps_content
+    assert "--installation-id" in stop_ps_content
 
 
 def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
@@ -204,8 +228,35 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
     assert ui_service["image"] == SPX_UI_IMAGE
     assert ui_service["ports"] == ["3000:3000"]
     assert ui_service["environment"]["SPX_PRODUCT_KEY"] == "${SPX_PRODUCT_KEY}"
-    assert ui_service["command"] == ["--product-key", "${SPX_PRODUCT_KEY}"]
     assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
+    start_content = (output_dir / "spx-start.sh").read_text(encoding="utf-8")
+    assert 'ps --services --status running' in start_content
+    assert 'grep -Fxq "spx-ui"' in start_content
+
+
+def test_generator_uses_runtime_available_healthcheck(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=False,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="KEY-HEALTH",
+        model_ids=[],
+        service_ids=[],
+        instances=[],
+        start_instances=[],
+    )
+
+    output_dir = tmp_path / "out-health"
+    generator.generate(selection, output_dir)
+
+    server = yaml.safe_load((output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8"))["services"]["spx-server"]
+    assert server["healthcheck"]["test"][0:3] == ["CMD", "python", "-c"]
+    assert "/health" in server["healthcheck"]["test"][3]
 
 
 def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:

@@ -90,7 +90,7 @@ Industry packs group models, services, and quickstart profiles around a specific
 
 ## Troubleshooting
 
-- `docker compose up` fails with `Conflict. The container name "/spx-server" is already in use` — stop/remove the existing container (`docker rm -f spx-server`) or tear down the other stack (installer bundles use the same container name).
+- `docker compose up` reports an existing SPX stack — run the generated `spx-start` again and review the preflight summary. The installer identifies labelled and legacy SPX containers, shows their project/configuration/images/ports, and asks for confirmation before replacing them. Unrelated containers are never stopped automatically.
 - `docker compose up` fails to bind port `502` on Linux/rootless Docker — remap the host port in `docker-compose.yml` (e.g. `1502:502`) or run Docker with privileges to bind privileged ports.
 - Modbus slave + HTTP endpoint models use per-model ports defined in their YAML (e.g. `communication.modbus_slave.port`, `communication.http_endpoint.port`) — if you run with plain `docker-compose.yml`, expose those ports manually or use the installer (it auto-exposes Modbus `5020-5120` when Modbus is enabled).
 - Integration tests skip or return 404s — confirm `SPX_PRODUCT_KEY` (available after logging in to [simplephysx.com](https://simplephysx.com) and selecting a subscription type) and `SPX_BASE_URL` if you are not using `http://localhost:8000`.
@@ -128,6 +128,12 @@ The installer engine:
 - launches `python -m installer generate` with the wizard,
 - writes the output to `build/spx-generated` (or another `--output` path you pass through).
 
+The generated stack always uses Compose project `spx` and installer labels. The
+server/UI contract is SPX Server `v1.0.0-rc.64` with SPX UI `v1.0.0-rc.68`;
+unsupported version pairs are rejected during generation. Community defaults
+auto-start at most five instances. A profile is additive to its selected pack,
+not a replacement for the pack.
+
 After the wizard finishes, it will prompt to start the stack now. If you choose yes, it will run the generated start script for you.
 
 ### 2. Inspect the generated directory
@@ -135,8 +141,9 @@ After the wizard finishes, it will prompt to start the stack now. If you choose 
 Inside `build/spx-generated/` you will see:
 
 - `docker-compose.generated.yml` – only the services selected in the wizard.
-- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key from [simplephysx.com](https://simplephysx.com) after selecting a subscription type.
-- `bundle.json` – consumed by `python -m installer bootstrap`.
+- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key from [simplephysx.com](https://simplephysx.com) after selecting a subscription type. New bundles do not duplicate the raw key in `bundle.json`.
+- `bundle.json` – consumed by `bootstrap_runner.py`; older bundles containing `license_key` remain supported.
+- `stack_manager.py` and `.spx-stack-snapshot.json` – used for exact-container preflight, replacement and rollback.
 - `spx-start.sh` / `spx-stop.sh` and `spx-start.ps1` / `spx-stop.ps1` – start/stop helpers for Bash/zsh and PowerShell.
 - `assets/` and `extensions/` – copied resources referenced by the selected services.
 
@@ -153,7 +160,14 @@ From inside the generated folder:
   - macOS/Linux: `./spx-stop.sh`  
   - Windows/pwsh: `pwsh ./spx-stop.ps1`
 
-`spx-start` performs safety checks, installs/updates the BLE adapter if needed, cleans up stale containers with `docker compose down --remove-orphans`, brings the stack up, and runs `python -m installer bootstrap --bundle bundle.json`. `spx-stop` kills the BLE adapter process and tears down the compose project. This makes the workflow approachable for junior engineers: run installer once, then use the generated start/stop scripts.
+`spx-start` performs a Docker/Compose/configuration/port preflight, reports any
+existing SPX stack, and asks before replacement. After confirmation it snapshots
+and temporarily renames the previous containers, starts `docker compose -p spx`,
+waits for health/API readiness, bootstraps models and instances idempotently,
+and starts the selected instances. A failure is reported with its stage and
+restores the previous stack when possible; it never removes volumes/images or
+unrelated containers. `spx-stop` stops only containers carrying the generated
+installation ID.
 
 ### 4. Build a distributable installer (optional)
 
@@ -171,6 +185,14 @@ This creates `dist/spx-installer/` and `dist/spx-installer.tgz` containing:
 - `INSTALLER_README.md` with quickstart instructions
 
 Hand the `.tgz` to teammates; they can extract it anywhere and run the platform launcher (`spx-setup.command`, `spx-setup.desktop`, `spx-setup.sh`, or `spx-setup.bat`) to go through the wizard locally.
+
+For release distribution on macOS, build the native `.pkg` with
+`scripts/build_macos_pkg.sh`. It includes the Setup/Start/Stop/Cleanup/Uninstall
+launchers and a bundled universal2 Python runtime. Use the `.tgz` for a portable
+payload and the `.run` self-extractor for Linux/Unix automation; the signed and
+notarized and stapled `.pkg` is a separate release/manual gate, also available
+as the `macOS installer release gate` workflow on `macos-latest`. The complete
+checklist is in [`docs/MACOS_INSTALLER_RELEASE_GATE.md`](docs/MACOS_INSTALLER_RELEASE_GATE.md).
 
 ### 5. Produce single-file installers (optional)
 
