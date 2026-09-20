@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import yaml
 
@@ -154,6 +157,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
 
     compose_path = output_dir / "docker-compose.generated.yml"
     assert compose_path.exists()
+    transaction_compose_path = output_dir / "docker-compose.transaction.yml"
+    assert transaction_compose_path.exists()
     data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
     services = data["services"]
     assert data["name"] == "spx"
@@ -167,6 +172,14 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert labels[SPX_LABEL_INSTALLATION_ID]
     assert services["spx-server"]["image"] == SPX_SERVER_IMAGE
     assert services["spx-server"]["container_name"] == "spx-server"
+    transaction_services = yaml.safe_load(transaction_compose_path.read_text(encoding="utf-8"))["services"]
+    transaction_server = next(
+        service
+        for name, service in transaction_services.items()
+        if name.endswith("-spx-server")
+    )
+    assert transaction_server["container_name"].startswith("spx-transaction-")
+    assert transaction_server["container_name"] != services["spx-server"]["container_name"]
     assert "8000:8000" in services["spx-server"]["ports"]
     assert "healthcheck" in services["spx-server"]
     assert "host.docker.internal:host-gateway" in services["spx-server"].get(
@@ -215,6 +228,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "trap cleanup_on_failure ERR INT TERM" in start_content
     assert "down --remove-orphans" not in start_content
     assert "docker compose -p spx" in start_content
+    assert "docker-compose.transaction.yml" in start_content
+    assert "--final-name" in start_content
     assert "stack_manager.py" in start_content
     assert "wait-health" in start_content
     assert "--installation-id" in start_content
@@ -224,6 +239,13 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "runtime_bootstrap.py" in start_content
     assert "macos_python_runtime.sh" in start_content
     assert "pip install --user" not in start_content
+    assert 'SYSTEM_PYTHON_BIN="${SPX_SYSTEM_PYTHON_BIN:-}"' in start_content
+    assert 'RUNTIME_PYTHON_BIN=""' in start_content
+    assert "TRANSACTION_PREPARED=0" in start_content
+    assert "TRANSACTION_PREPARED=1" in start_content
+    assert "PREPARE_ARGS=(" in start_content
+    assert "ASSUME_ARGS" not in start_content
+    assert "commit" in start_content
     start_ps_path = output_dir / "spx-start.ps1"
     stop_ps_path = output_dir / "spx-stop.ps1"
     assert start_ps_path.exists()
@@ -242,6 +264,95 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "bootstrap_runner.py" in start_ps_content
     assert "runtime_bootstrap.py" in start_ps_content
     assert "pip install --user" not in start_ps_content
+    assert 'param([string[]]$StartArgs = @())' in start_ps_content
+    assert "$Env:SPX_SYSTEM_PYTHON_BIN" in start_ps_content
+    assert "$RuntimePython" in start_ps_content
+
+
+def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
+    tmp_path: Path,
+) -> None:
+    output_dir = tmp_path / "Library" / "Application Support" / "SPX" / "generated"
+    generator = DeploymentGenerator(build_index())
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=True,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="KEY-SPACE",
+        model_ids=["sensor"],
+        service_ids=["mqtt_broker"],
+        instances=[],
+        start_instances=[],
+    )
+    generator.generate(selection, output_dir)
+
+    runtime_python = output_dir / "Library" / "Application Support" / "SPX" / "runtime" / "bin" / "python"
+    runtime_python.parent.mkdir(parents=True)
+    runtime_python.write_text(
+        "#!/bin/sh\n"
+        "if [ \"$1\" = \"-\" ]; then exit 1; fi\n"
+        "case \"$1\" in\n"
+        "  *stack_manager.py) printf '%s\\n' \"$2 $*\" >> \"$FAKE_RUNTIME_LOG\"; exit 0 ;;\n"
+        "  *bootstrap_runner.py) printf '%s\\n' bootstrap >> \"$FAKE_RUNTIME_LOG\"; exit 0 ;;\n"
+        "esac\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    runtime_python.chmod(0o755)
+    (output_dir / "runtime_bootstrap.py").write_text(
+        "import os\n"
+        "from pathlib import Path\n"
+        "path = Path(os.environ['FAKE_RUNTIME_PYTHON'])\n"
+        "print(path)\n",
+        encoding="utf-8",
+    )
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    (fake_bin / "docker").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (fake_bin / "docker").chmod(0o755)
+    system_python = tmp_path / "Library" / "Application Support" / "system-python"
+    system_python.parent.mkdir(parents=True, exist_ok=True)
+    system_python.write_text(
+        f"#!/bin/sh\nexec {sys.executable!s} \"$@\"\n",
+        encoding="utf-8",
+    )
+    system_python.chmod(0o755)
+    log_path = tmp_path / "runtime.log"
+    environment = {
+        **os.environ,
+        "PATH": f"{fake_bin}:/usr/bin:/bin",
+        "FAKE_RUNTIME_PYTHON": str(runtime_python),
+        "FAKE_RUNTIME_LOG": str(log_path),
+        "SPX_SYSTEM_PYTHON_BIN": str(system_python),
+        "PYTHON_BIN": str(tmp_path / "Library" / "Application Support" / "installer-python"),
+    }
+
+    first = subprocess.run(
+        [str(output_dir / "spx-start.sh")],
+        cwd=output_dir,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    second = subprocess.run(
+        [str(output_dir / "spx-start.sh"), "--yes"],
+        cwd=output_dir,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
+    assert "unbound variable" not in (first.stdout + first.stderr + second.stdout + second.stderr)
+    log = log_path.read_text(encoding="utf-8")
+    assert "prepare" in log
+    assert "--yes" in log
 
 
 def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
@@ -276,7 +387,11 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
     assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
     start_content = (output_dir / "spx-start.sh").read_text(encoding="utf-8")
     assert 'ps --services --status running' in start_content
-    assert 'grep -Fxq "spx-ui"' in start_content
+    assert 'grep -Fxq "$TRANSACTION_UI_SERVICE"' in start_content
+    transaction_services = yaml.safe_load(
+        (output_dir / "docker-compose.transaction.yml").read_text(encoding="utf-8")
+    )["services"]
+    assert any("__TRANSACTION_TOKEN__" in name for name in transaction_services)
 
 
 def test_generator_uses_runtime_available_healthcheck(tmp_path: Path) -> None:

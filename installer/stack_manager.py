@@ -41,6 +41,7 @@ EXPECTED_IMAGES = {
     "spx-ui-server": ("simplephysx/spx-ui", "spx-ui-server"),
     "mosquitto-server": ("eclipse-mosquitto", "mosquitto"),
 }
+SNAPSHOT_PREFIXES = ("spx-snapshot-", "spx-rollback-")
 
 _SECRET_PATTERNS = (
     re.compile(r"(?i)(spx[_-]?product[_-]?key\s*[=:]\s*)[^\s,;]+"),
@@ -328,7 +329,13 @@ class StackManager:
         if labels.get(LABEL_STACK) == "true" and labels.get(LABEL_MANAGED_BY) == "installer":
             return True
         if labels.get("com.docker.compose.project") == self.project:
-            return True
+            # A Compose project name is not an ownership proof by itself:
+            # unrelated services can share the same project on a developer
+            # machine. Require an expected SPX image before acting on it.
+            return any(
+                self._image_compatible_with_service(container.image, service)
+                for service in EXPECTED_IMAGES
+            )
         compose_service = labels.get("com.docker.compose.service", "")
         if compose_service in EXPECTED_IMAGES and self._image_compatible_with_service(
             container.image, compose_service
@@ -336,6 +343,15 @@ class StackManager:
             return True
         if container.name in EXPECTED_IMAGES and self._legacy_image_compatible(container):
             return True
+        # RC65 used spx-rollback-* for temporary backups. Treat those names as
+        # installer-owned only when the image is one of the known SPX services,
+        # so a stale RC65 snapshot can be replaced safely without broad Docker
+        # cleanup. spx-snapshot-* is the current temporary name.
+        if any(container.name.startswith(prefix) for prefix in SNAPSHOT_PREFIXES):
+            return any(
+                self._image_compatible_with_service(container.image, service)
+                for service in EXPECTED_IMAGES
+            )
         return False
 
     def _image_compatible_with_service(self, image: str, service: str) -> bool:
@@ -358,7 +374,10 @@ class StackManager:
             if not self.is_managed_container(container):
                 continue
             project = container.project or "legacy"
-            source = "labels" if container.labels.get(LABEL_STACK) == "true" else "compose/legacy"
+            if any(container.name.startswith(prefix) for prefix in SNAPSHOT_PREFIXES):
+                source = "snapshot"
+            else:
+                source = "labels" if container.labels.get(LABEL_STACK) == "true" else "compose/legacy"
             key = (project, source)
             stack = grouped.setdefault(key, ExistingStack(project=project, source=source))
             stack.containers.append(container)
@@ -467,13 +486,20 @@ class StackManager:
     def snapshot_existing(self, stack: ExistingStack, snapshot_path: Path) -> StackSnapshot:
         snapshot = StackSnapshot.empty(self.project, self.installation_id)
         for container in stack.containers:
+            original_name = container.name
             if container.running:
                 self._run(["docker", "stop", container.id])
-            rollback_name = f"spx-rollback-{container.id[:12]}"
-            if container.name != rollback_name:
-                self._run(["docker", "rename", container.id, rollback_name])
+            snapshot_name = f"spx-snapshot-{container.id[:12]}"
+            if original_name != snapshot_name:
+                self._run(["docker", "rename", container.id, snapshot_name])
             self._detach_snapshot_container(container.id)
-            snapshot.containers.append({"id": container.id, "name": container.name, "rollback_name": rollback_name})
+            snapshot.containers.append(
+                {
+                    "id": container.id,
+                    "name": original_name,
+                    "snapshot_name": snapshot_name,
+                }
+            )
         snapshot.save(snapshot_path)
         return snapshot
 
@@ -512,22 +538,92 @@ class StackManager:
     def transaction_containers(self) -> list[ContainerInfo]:
         if not self.installation_id:
             return []
-        return [container for container in self.list_containers() if container.installation_id == self.installation_id]
+        return [
+            container
+            for container in self.list_containers()
+            if container.installation_id == self.installation_id
+            and container.name.startswith("spx-transaction-")
+        ]
 
-    def stop_transaction(self) -> None:
-        for container in self.transaction_containers():
+    def stop_stack(self) -> None:
+        current = [
+            container
+            for container in self.list_containers()
+            if container.installation_id == self.installation_id
+            and (
+                container.name in EXPECTED_IMAGES
+                or container.name.startswith("spx-transaction-")
+            )
+        ]
+        for container in current:
             if container.running:
                 self._run(["docker", "stop", container.id], check=False)
 
-    def rollback(self, snapshot_path: Path) -> None:
-        self.stop_transaction()
-        # Current transaction containers still own the compatibility names.
+    def stop_transaction(self) -> None:
+        """Backward-compatible alias for stopping the current stack."""
+
+        self.stop_stack()
+
+    def commit(self, snapshot_path: Path, final_names: Mapping[str, str] | None = None) -> None:
+        """Commit a successful replacement and remove only exact old IDs."""
+
+        final_names = dict(final_names or {})
         for container in self.transaction_containers():
-            self._run(["docker", "rename", container.id, f"spx-failed-{container.id[:12]}"], check=False)
-            self._detach_snapshot_container(container.id)
+            target_name = final_names.get(container.service)
+            if not target_name:
+                target_name = next(
+                    (
+                        final_name
+                        for service_name, final_name in final_names.items()
+                        if container.service.endswith(f"-{service_name}")
+                    ),
+                    None,
+                )
+            if not target_name or container.name == target_name:
+                continue
+            result = self._run(["docker", "rename", container.id, target_name], check=False)
+            if result.returncode != 0:
+                raise StackManagerError(
+                    f"Could not assign stable name {target_name} to transaction container {container.id[:12]}"
+                )
+
         if not snapshot_path.exists():
             return
         snapshot = StackSnapshot.load(snapshot_path)
+        for entry in snapshot.containers:
+            container_id = str(entry.get("id", ""))
+            if not container_id:
+                continue
+            # The snapshot containers are stopped before Compose starts the new
+            # stack. Keep the operation exact and never pass -v: volumes and
+            # images are intentionally outside the installer's cleanup scope.
+            self._run(["docker", "stop", container_id], check=False)
+            # -f is scoped to this exact, already-snapshotted container. It
+            # handles Docker Desktop races where a stopped snapshot transitions
+            # state between stop and rm; omitting -v preserves its volumes.
+            result = self._run(["docker", "rm", "-f", container_id], check=False)
+            if result.returncode != 0:
+                raise StackManagerError(
+                    f"Could not remove committed snapshot container {container_id[:12]}"
+                )
+        snapshot_path.unlink(missing_ok=True)
+
+    def rollback(self, snapshot_path: Path) -> None:
+        current = self.transaction_containers()
+        for container in current:
+            if container.running:
+                self._run(["docker", "stop", container.id], check=False)
+        # Current transaction containers still own the compatibility names.
+        for container in current:
+            self._run(["docker", "rename", container.id, f"spx-failed-{container.id[:12]}"], check=False)
+            self._detach_snapshot_container(container.id)
+            # Remove only the failed transaction container. Docker volumes are
+            # preserved because this command deliberately omits -v.
+            self._run(["docker", "rm", "-f", container.id], check=False)
+        if not snapshot_path.exists():
+            return
+        snapshot = StackSnapshot.load(snapshot_path)
+        restored = True
         for entry in snapshot.containers:
             container_id = str(entry.get("id", ""))
             original_name = str(entry.get("name", ""))
@@ -535,13 +631,28 @@ class StackManager:
                 continue
             result = self._run(["docker", "rename", container_id, original_name], check=False)
             if result.returncode == 0:
-                self._run(["docker", "start", container_id], check=False)
+                if self._run(["docker", "start", container_id], check=False).returncode != 0:
+                    restored = False
+            else:
+                restored = False
+        if restored:
+            snapshot_path.unlink(missing_ok=True)
 
     def wait_health(self, api_url: str = "http://localhost:8000", timeout: float = 120.0) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             containers = self.transaction_containers()
-            server = next((item for item in containers if item.name == "spx-server" or item.service == "spx-server"), None)
+            server = next(
+                (
+                    item
+                    for item in containers
+                    if item.name == "spx-server"
+                    or item.service == "spx-server"
+                    or item.service.endswith("-spx-server")
+                    or self._image_compatible_with_service(item.image, "spx-server")
+                ),
+                None,
+            )
             if server and server.running and (not server.health or server.health == "healthy") and self._api_healthy(api_url):
                 return
             time.sleep(2.0)
@@ -566,7 +677,7 @@ def _parse_ports(raw: str) -> list[int]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Safely manage an installer-owned SPX Docker stack")
-    parser.add_argument("command", choices=["preflight", "prepare", "rollback", "stop", "wait-health"])
+    parser.add_argument("command", choices=["preflight", "prepare", "rollback", "commit", "stop", "wait-health"])
     parser.add_argument("--compose-file", required=True)
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--project", default=PROJECT)
@@ -576,6 +687,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--yes", action="store_true", help="Accept replacement of an existing stack")
     parser.add_argument("--api-url", default="http://localhost:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
+    parser.add_argument("--final-name", action="append", default=[], metavar="SERVICE=CONTAINER")
     return parser
 
 
@@ -600,8 +712,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "rollback":
         manager.rollback(snapshot_path)
         return 0
+    if args.command == "commit":
+        final_names = {}
+        for raw in args.final_name:
+            if "=" not in raw:
+                raise StackManagerError(f"Invalid final container name mapping: {raw}")
+            service, container = raw.split("=", 1)
+            if service and container:
+                final_names[service] = container
+        manager.commit(snapshot_path, final_names)
+        return 0
     if args.command == "stop":
-        manager.stop_transaction()
+        manager.stop_stack()
         return 0
     if args.command == "wait-health":
         manager.wait_health(args.api_url, args.timeout)

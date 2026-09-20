@@ -311,12 +311,21 @@ From inside the generated folder:
 
 `spx-start` performs a Docker/Compose/configuration/port preflight, reports any
 existing SPX stack, and asks before replacement. After confirmation it snapshots
-and temporarily renames the previous containers, starts `docker compose -p spx`,
-waits for health/API readiness, bootstraps models and instances idempotently,
-and starts the selected instances. A failure is reported with its stage and
-restores the previous stack when possible; it never removes volumes/images or
-unrelated containers. `spx-stop` stops only containers carrying the generated
-installation ID.
+the previous containers under temporary `spx-snapshot-*` names, starts a
+transaction-scoped `docker compose -p spx` stack, waits for health/API
+readiness, bootstraps models and instances idempotently, and commits the update
+under the stable production container names by removing only the exact old
+container IDs. A failure is reported with its stage and restores the previous
+stack when possible; it never removes
+volumes/images or unrelated containers. Legacy `spx-rollback-*` containers from
+RC65 are detected as SPX snapshots and are not left behind after a successful
+rerun. `spx-stop` stops only containers carrying the generated installation ID.
+
+The installer launcher uses a private Python interpreter, while generated
+start/stop scripts use their own runtime. This separation keeps paths with
+spaces working on macOS. To select a system interpreter for a generated
+script, set `SPX_SYSTEM_PYTHON_BIN`; do not rely on `PYTHON_BIN` being forwarded
+from the installer process.
 
 ### 5. Portable archive fallback (`.tgz` / `.zip`)
 

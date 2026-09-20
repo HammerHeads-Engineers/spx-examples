@@ -153,6 +153,18 @@ def test_existing_instance_with_same_model_is_skipped() -> None:
     assert report.instances_created == 0
 
 
+def test_missing_collection_child_uses_membership_without_noisy_item_404() -> None:
+    class Collection:
+        def __contains__(self, key: str) -> bool:
+            assert key == "missing"
+            return False
+
+        def __getitem__(self, key: str):
+            raise AssertionError("a missing child must not be fetched by item lookup")
+
+    assert bootstrap._lookup_collection_item(Collection(), "missing") is None
+
+
 def test_existing_instance_with_different_model_is_a_conflict() -> None:
     class Instances:
         def __getitem__(self, key: str):

@@ -176,6 +176,31 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     assert (output_dir / "runtime_bootstrap.py").exists()
 
 
+def test_launch_stack_does_not_forward_installer_python_path_with_spaces(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "Application Support" / "SPX" / "generated"
+    output_dir.mkdir(parents=True)
+    marker = tmp_path / "child-env.txt"
+    script = output_dir / "spx-start.sh"
+    script.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "if [[ -n \"${PYTHON_BIN+x}\" ]]; then exit 17; fi\n"
+        "printf '%s' \"${SPX_SYSTEM_PYTHON_BIN:-}\" > \""
+        + str(marker)
+        + "\"\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+    monkeypatch.setenv("PYTHON_BIN", str(tmp_path / "Library" / "Application Support" / "installer-python"))
+    monkeypatch.setenv("SPX_SYSTEM_PYTHON_BIN", "/usr/bin/python3")
+
+    assert cli._launch_stack(output_dir)
+    assert marker.read_text(encoding="utf-8") == "/usr/bin/python3"
+
+
 def test_generate_allows_missing_product_key_when_flag_set(
     tmp_path: Path,
     manifest_dirs: dict[str, Path],

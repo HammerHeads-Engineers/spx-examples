@@ -82,7 +82,7 @@ function Resolve-Python {
     throw "[spx-install] Missing required command: python (3.x). Install Python 3 or set PYTHON_BIN."
 }
 
-$PythonBin = Resolve-Python
+$InstallerPythonBin = Resolve-Python
 $RequiredModules = @(
     @{ Module = "yaml"; Package = "pyyaml" },
     @{ Module = "colorama"; Package = "colorama" }
@@ -100,7 +100,7 @@ function Check-PythonModules {
         param([string]$Module)
         $checkCmd = "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$Module') else 1)"
         try {
-            & $PythonBin -c $checkCmd 2>$null | Out-Null
+            & $InstallerPythonBin -c $checkCmd 2>$null | Out-Null
         } catch {
             return $false
         }
@@ -120,7 +120,7 @@ function Check-PythonModules {
     $moduleNames = $missing | ForEach-Object { $_.Module }
     $packages = $missing | ForEach-Object { $_.Package }
     Write-Host "[spx-install] Missing Python modules: $($moduleNames -join ', '). Installing via pip..."
-    & $PythonBin -m pip install --user @($packages)
+    & $InstallerPythonBin -m pip install --user @($packages)
     if ($LASTEXITCODE -ne 0) {
         throw "[spx-install] pip install failed"
     }
@@ -172,7 +172,7 @@ function Check-Docker {
 }
 
 try {
-    Need-Command $PythonBin
+    Need-Command $InstallerPythonBin
     $DockerCompose = Check-Docker
     Check-PythonModules
 
@@ -186,7 +186,7 @@ try {
 
     Write-Host "[spx-install] Running installer CLI with redacted arguments."
 
-    & $PythonBin -m installer @installerArgs
+    & $InstallerPythonBin -m installer @installerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "[spx-install] Installer CLI failed with exit code $LASTEXITCODE"
     }

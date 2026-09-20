@@ -211,10 +211,7 @@ def register_via_sdk(
 
 
 def _lookup_model(client, model_id: str):
-    try:
-        return client["models"][model_id]
-    except Exception:
-        return None
+    return _lookup_collection_item(client["models"], model_id)
 
 
 def _meta_defaults(payload: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
@@ -294,8 +291,31 @@ def create_instance_via_sdk(
 
 
 def _lookup_instance(client, instance_key: str):
+    return _lookup_collection_item(client["instances"], instance_key)
+
+
+def _lookup_collection_item(collection, key: str):
+    """Look up a child without issuing a noisy GET for a missing child.
+
+    Recent spx-python clients implement ``key in collection`` as one GET of
+    the collection followed by a local child-name check. Calling
+    ``collection[key]`` first causes the client to log an expected 404 for
+    every model and instance that bootstrap is about to create. Plain dicts
+    and the small test doubles used by older clients do not necessarily
+    implement membership, so they retain the direct lookup fallback.
+    """
+
+    contains = getattr(collection, "__contains__", None)
+    if contains is not None:
+        try:
+            if key not in collection:
+                return None
+        except Exception:
+            # A non-standard client may not support collection membership;
+            # fall through to its traditional item lookup.
+            pass
     try:
-        return client["instances"][instance_key]
+        return collection[key]
     except Exception:
         return None
 

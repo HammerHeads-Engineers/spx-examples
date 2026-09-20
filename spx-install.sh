@@ -133,7 +133,7 @@ need_cmd "$SYSTEM_PYTHON_BIN"
 check_docker
 BOOTSTRAP_LOG="$(mktemp)"
 trap 'rm -f "$BOOTSTRAP_LOG"' EXIT
-if PYTHON_BIN="$(
+if INSTALLER_PYTHON_BIN="$(
   bootstrap_python_runtime "$SYSTEM_PYTHON_BIN" "$(resolve_runtime_root)" \
     2>"$BOOTSTRAP_LOG"
 )"; then
@@ -143,11 +143,14 @@ else
   print_python_runtime_hint
   exit 1
 fi
-if [ ! -x "${PYTHON_BIN}" ]; then
+if [ ! -x "${INSTALLER_PYTHON_BIN}" ]; then
   echo "[spx-install] Python runtime bootstrap did not return an executable interpreter." >&2
   exit 1
 fi
-export PYTHON_BIN
+# The interpreter used by this launcher is not the interpreter used by the
+# generated Docker stack. Do not leak a path containing spaces into
+# spx-start.sh through the legacy PYTHON_BIN environment variable.
+unset PYTHON_BIN
 
 cd "$REPO_DIR"
 
@@ -158,4 +161,4 @@ if [ $# -eq 0 ]; then
 fi
 
 echo "[spx-install] Running installer CLI with redacted arguments."
-"$PYTHON_BIN" -m installer "$@"
+"$INSTALLER_PYTHON_BIN" -m installer "$@"
