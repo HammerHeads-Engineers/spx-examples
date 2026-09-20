@@ -194,7 +194,12 @@ development/debug flow where the native wrappers are not required.
 The generated start flow performs a Docker/Compose preflight, detects labelled
 and legacy SPX stacks, and asks before replacing one. It uses Compose project
 `spx`, preserves volumes/images, and can restore the previous stack if model or
-instance bootstrap fails. Community defaults auto-start at most five instances.
+instance bootstrap fails. Temporary backups use `spx-snapshot-*` names and are
+removed by exact container ID after a successful update; legacy RC65
+`spx-rollback-*` backups are detected as SPX containers. Community defaults
+auto-start at most five instances. Installer and generated-stack Python
+runtimes are kept separate so paths with spaces work on macOS; use
+`SPX_SYSTEM_PYTHON_BIN` to override the generated script's system interpreter.
 The bundle uses SPX Server `v1.0.0-rc.64` with SPX UI `v1.0.0-rc.68`.
 
 New `bundle.json` files do not contain the raw Product Key; bootstrap reads it

@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
-import os
-import stat
+import copy
 import json
+import os
 import re
 import shutil
 import uuid
+import stat
 from pathlib import Path
 from typing import Dict, List, Set
 
@@ -669,7 +670,51 @@ exit /b %EXITCODE%
         self._write_runtime_bootstrap(output_dir)
         self._write_macos_python_helper(output_dir)
 
+        # Compose cannot remove labels from an existing container. Starting a
+        # replacement under transaction-only names prevents Compose from
+        # adopting the old, snapshotted containers that still carry the old
+        # project metadata. StackManager renames these exact containers to the
+        # stable service names only after the transaction has succeeded.
+        transaction_compose = copy.deepcopy(compose_data)
+        final_name_pairs: list[tuple[str, str]] = []
+        transaction_services: dict[str, dict] = {}
+        service_names = list((transaction_compose.get("services", {}) or {}).keys())
+        transaction_service_names = {
+            service_name: f"transaction-__TRANSACTION_TOKEN__-{service_name}"
+            for service_name in service_names
+        }
+        for service_name in service_names:
+            service = transaction_compose["services"][service_name]
+            final_name = str(service.get("container_name", service_name))
+            transaction_service_name = transaction_service_names[service_name]
+            transaction_name = f"spx-transaction-__TRANSACTION_TOKEN__-{service_name}"
+            service["container_name"] = transaction_name
+            depends_on = service.get("depends_on")
+            if isinstance(depends_on, dict):
+                service["depends_on"] = {
+                    transaction_service_names.get(dependency, dependency): condition
+                    for dependency, condition in depends_on.items()
+                }
+            elif isinstance(depends_on, list):
+                service["depends_on"] = [
+                    transaction_service_names.get(dependency, dependency)
+                    for dependency in depends_on
+                ]
+            transaction_services[transaction_service_name] = service
+            final_name_pairs.append((service_name, final_name))
+        transaction_compose["services"] = transaction_services
+        with (output_dir / "docker-compose.transaction.yml").open("w", encoding="utf-8") as handle:
+            yaml.safe_dump(transaction_compose, handle, sort_keys=False)
+
         required_ports = ",".join(str(port) for port in self._compose_host_ports(compose_data))
+        final_name_bash = "\n".join(
+            f'  "--final-name" "{service_name}={final_name}"'
+            for service_name, final_name in final_name_pairs
+        )
+        final_name_ps = ", ".join(
+            f'"{service_name}={final_name}"'
+            for service_name, final_name in final_name_pairs
+        )
         bash = r'''SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
@@ -679,10 +724,18 @@ fi
 INSTALLATION_ID="__INSTALLATION_ID__"
 SNAPSHOT="$SCRIPT_DIR/.spx-stack-snapshot.json"
 MANAGER="$SCRIPT_DIR/stack_manager.py"
+TRANSACTION_COMPOSE_TEMPLATE="$SCRIPT_DIR/docker-compose.transaction.yml"
+TRANSACTION_TOKEN="$(date +%s)-$$"
+TRANSACTION_COMPOSE="$SCRIPT_DIR/.docker-compose.transaction.${TRANSACTION_TOKEN}.yml"
+TRANSACTION_UI_SERVICE="transaction-${TRANSACTION_TOKEN}-spx-ui"
 STAGE="runtime"
-SYSTEM_PYTHON_BIN="${PYTHON_BIN:-}"
-PYTHON_BIN="$SYSTEM_PYTHON_BIN"
+# The installer launcher and the generated stack deliberately use different
+# environment variables. PYTHON_BIN may point at the installer's private
+# runtime, including a path with spaces, and must never be inherited here.
+SYSTEM_PYTHON_BIN="${SPX_SYSTEM_PYTHON_BIN:-}"
+RUNTIME_PYTHON_BIN=""
 BLE_ADAPTER_PID=""
+TRANSACTION_PREPARED=0
 
 if [ -z "$SYSTEM_PYTHON_BIN" ]; then
   if command -v spx_resolve_macos_python >/dev/null 2>&1; then
@@ -699,13 +752,23 @@ if [ -z "$SYSTEM_PYTHON_BIN" ]; then
     echo "[spx-start] stage=runtime: missing Python 3" >&2
     exit 1
   fi
-  PYTHON_BIN="$SYSTEM_PYTHON_BIN"
 fi
 
-ASSUME_ARGS=()
+PREPARE_ARGS=(
+  "prepare"
+  "--compose-file" "$SCRIPT_DIR/docker-compose.generated.yml"
+  "--env-file" "$SCRIPT_DIR/.env"
+  "--project" "spx"
+  "--installation-id" "$INSTALLATION_ID"
+  "--snapshot" "$SNAPSHOT"
+  "--ports" "__REQUIRED_PORTS__"
+)
+FINAL_NAME_ARGS=(
+__FINAL_NAME_BASH__
+)
 for arg in "$@"; do
   if [ "$arg" = "--yes" ]; then
-    ASSUME_ARGS+=("--yes")
+    PREPARE_ARGS+=("--yes")
   fi
 done
 
@@ -716,14 +779,17 @@ cleanup_on_failure() {
   if [ -n "${BLE_ADAPTER_PID:-}" ] && kill -0 "$BLE_ADAPTER_PID" >/dev/null 2>&1; then
     kill "$BLE_ADAPTER_PID" >/dev/null 2>&1 || true
   fi
-  if [ -x "$MANAGER" ] || [ -f "$MANAGER" ]; then
-    "$PYTHON_BIN" "$MANAGER" rollback \
+  if [ "$TRANSACTION_PREPARED" -eq 1 ] && [ -n "$RUNTIME_PYTHON_BIN" ] && { [ -x "$MANAGER" ] || [ -f "$MANAGER" ]; }; then
+    "$RUNTIME_PYTHON_BIN" "$MANAGER" rollback \
       --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
       --env-file "$SCRIPT_DIR/.env" \
       --project spx \
       --installation-id "$INSTALLATION_ID" \
       --snapshot "$SNAPSHOT" >/dev/null 2>&1 || \
       echo "[spx-start] stage=rollback: automatic restore was not completed" >&2
+  fi
+  if [ -n "${TRANSACTION_COMPOSE:-}" ]; then
+    rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
   fi
   exit "$status"
 }
@@ -742,17 +808,22 @@ if [ ! -f "$SCRIPT_DIR/runtime_bootstrap.py" ]; then
   echo "[spx-start] stage=runtime: missing runtime bootstrap helper" >&2
   exit 1
 fi
-PYTHON_BIN="$($SYSTEM_PYTHON_BIN "$SCRIPT_DIR/runtime_bootstrap.py" \
+RUNTIME_PYTHON_BIN="$("$SYSTEM_PYTHON_BIN" "$SCRIPT_DIR/runtime_bootstrap.py" \
   --venv-dir "$SCRIPT_DIR/.spx-runtime" \
   --package requests \
   --package "__SPX_PYTHON_REQUIREMENT__" \
   --package pyyaml)"
-if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+if [ -z "$RUNTIME_PYTHON_BIN" ] || [ ! -x "$RUNTIME_PYTHON_BIN" ]; then
   echo "[spx-start] stage=runtime: local Python runtime bootstrap failed" >&2
   exit 1
 fi
+if [ ! -f "$TRANSACTION_COMPOSE_TEMPLATE" ]; then
+  echo "[spx-start] stage=runtime: missing transaction Compose template" >&2
+  exit 1
+fi
+sed "s/__TRANSACTION_TOKEN__/${TRANSACTION_TOKEN}/g" "$TRANSACTION_COMPOSE_TEMPLATE" > "$TRANSACTION_COMPOSE"
 
-if "$PYTHON_BIN" - "$SCRIPT_DIR/bundle.json" <<'PY'
+if "$RUNTIME_PYTHON_BIN" - "$SCRIPT_DIR/bundle.json" <<'PY'
 import json
 import sys
 with open(sys.argv[1], encoding="utf-8") as handle:
@@ -772,20 +843,14 @@ then
 fi
 
 STAGE="preflight"
-"$PYTHON_BIN" "$MANAGER" prepare \
-  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
-  --env-file "$SCRIPT_DIR/.env" \
-  --project spx \
-  --installation-id "$INSTALLATION_ID" \
-  --snapshot "$SNAPSHOT" \
-  --ports "__REQUIRED_PORTS__" \
-  "${ASSUME_ARGS[@]}"
+"$RUNTIME_PYTHON_BIN" "$MANAGER" "${PREPARE_ARGS[@]}"
+TRANSACTION_PREPARED=1
 
 STAGE="compose"
-docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
+docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" up -d
 
 STAGE="healthcheck"
-"$PYTHON_BIN" "$MANAGER" wait-health \
+"$RUNTIME_PYTHON_BIN" "$MANAGER" wait-health \
   --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
   --env-file "$SCRIPT_DIR/.env" \
   --project spx \
@@ -794,30 +859,41 @@ STAGE="healthcheck"
 
 if [ "__UI_ENABLED__" = "yes" ]; then
   STAGE="ui"
-  if ! docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps --services --status running | grep -Fxq "spx-ui"; then
+  if ! docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" ps --services --status running | grep -Fxq "$TRANSACTION_UI_SERVICE"; then
     echo "[spx-start] stage=ui: SPX UI is not running" >&2
     exit 1
   fi
 fi
 
 STAGE="bootstrap"
-"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" \
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" \
   --bundle "$SCRIPT_DIR/bundle.json" \
   --api-url "${SPX_BASE_URL:-http://localhost:8000}"
 
 STAGE="start"
-docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps
+docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" ps
+
+STAGE="commit"
+"$RUNTIME_PYTHON_BIN" "$MANAGER" commit \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --env-file "$SCRIPT_DIR/.env" \
+  --project spx \
+  --installation-id "$INSTALLATION_ID" \
+  --snapshot "$SNAPSHOT" \
+  "${FINAL_NAME_ARGS[@]}"
+rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
+
 echo ""
 echo "[spx-start] SPX started successfully."
 echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
-'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement).replace("__FINAL_NAME_BASH__", final_name_bash)
         ui_enabled = SPX_UI_SERVICE_NAME in (compose_data.get("services", {}) or {})
         self._write_script(
             output_dir / "spx-start.sh",
             bash.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
         )
 
-        powershell = r'''param([string[]]$StartArgs)
+        powershell = r'''param([string[]]$StartArgs = @())
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
@@ -825,10 +901,16 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $InstallationId = "__INSTALLATION_ID__"
 $Snapshot = Join-Path $ScriptDir ".spx-stack-snapshot.json"
 $Manager = Join-Path $ScriptDir "stack_manager.py"
+$TransactionComposeTemplate = Join-Path $ScriptDir "docker-compose.transaction.yml"
+$TransactionToken = "{0}-{1}" -f [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(), $PID
+$TransactionCompose = $null
+$TransactionUiService = $null
 $Stage = "runtime"
+$RuntimePython = $null
+$TransactionPrepared = $false
 
 function Resolve-Python {
-    if ($Env:PYTHON_BIN) { return $Env:PYTHON_BIN }
+    if ($Env:SPX_SYSTEM_PYTHON_BIN) { return $Env:SPX_SYSTEM_PYTHON_BIN }
     foreach ($candidate in @("python3", "python")) {
         if (Get-Command $candidate -ErrorAction SilentlyContinue) { return $candidate }
     }
@@ -861,7 +943,7 @@ function Bootstrap-PythonRuntime {
 
 function Invoke-Manager {
     param([string[]]$Arguments)
-    & $PythonBin $Manager @Arguments
+    & $RuntimePython $Manager @Arguments
     if ($LASTEXITCODE -ne 0) { throw "stack manager failed" }
 }
 
@@ -874,7 +956,12 @@ try {
     $SystemPython = Resolve-Python
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Missing Docker CLI" }
     $Stage = "runtime"
-    $PythonBin = Bootstrap-PythonRuntime $SystemPython
+    $RuntimePython = Bootstrap-PythonRuntime $SystemPython
+    if (-not (Test-Path $TransactionComposeTemplate)) { throw "Missing transaction Compose template" }
+    $TransactionCompose = Join-Path $ScriptDir (".docker-compose.transaction.{0}.yml" -f $TransactionToken)
+    $TransactionUiService = "transaction-{0}-spx-ui" -f $TransactionToken
+    (Get-Content $TransactionComposeTemplate -Raw).Replace("__TRANSACTION_TOKEN__", $TransactionToken) |
+        Set-Content -Path $TransactionCompose -Encoding utf8
 
     $bundlePath = Join-Path $ScriptDir "bundle.json"
     $hasBle = $false
@@ -896,9 +983,10 @@ try {
     $prepare = @("prepare", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot, "--ports", "__REQUIRED_PORTS__")
     if ($StartArgs -contains "--yes") { $prepare += "--yes" }
     Invoke-Manager $prepare
+    $TransactionPrepared = $true
 
     $Stage = "compose"
-    docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d
+    docker compose -p spx -f $TransactionCompose --env-file (Join-Path $ScriptDir ".env") up -d
     if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 
     $Stage = "healthcheck"
@@ -906,38 +994,63 @@ try {
 
     if ("__UI_ENABLED__" -eq "yes") {
         $Stage = "ui"
-        $runningServices = docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps --services --status running
-        if ($LASTEXITCODE -ne 0 -or (($runningServices -split "`r?`n") -notcontains "spx-ui")) { throw "SPX UI is not running" }
+        $runningServices = docker compose -p spx -f $TransactionCompose --env-file (Join-Path $ScriptDir ".env") ps --services --status running
+        if ($LASTEXITCODE -ne 0 -or (($runningServices -split "`r?`n") -notcontains $TransactionUiService)) { throw "SPX UI is not running" }
     }
 
     $Stage = "bootstrap"
-    & $PythonBin (Join-Path $ScriptDir "bootstrap_runner.py") --bundle (Join-Path $ScriptDir "bundle.json") --api-url $(if ($Env:SPX_BASE_URL) { $Env:SPX_BASE_URL } else { "http://localhost:8000" })
+    & $RuntimePython (Join-Path $ScriptDir "bootstrap_runner.py") --bundle (Join-Path $ScriptDir "bundle.json") --api-url $(if ($Env:SPX_BASE_URL) { $Env:SPX_BASE_URL } else { "http://localhost:8000" })
     if ($LASTEXITCODE -ne 0) { throw "bootstrap failed" }
 
     $Stage = "start"
-    docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps
+    docker compose -p spx -f $TransactionCompose --env-file (Join-Path $ScriptDir ".env") ps
+
+    $Stage = "commit"
+    $commit = @("commit", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot, "--final-name")
+    $commit += @(__FINAL_NAME_PS__)
+    Invoke-Manager $commit
+    if ($TransactionCompose -and (Test-Path $TransactionCompose)) { Remove-Item -Force $TransactionCompose }
+
     Write-Host ""
     Write-Host "[spx-start] SPX started successfully."
     Write-Host "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
 }
 catch {
     Write-Error ("[spx-start] stage={0}: {1}; attempting rollback" -f $Stage, (Redact-Message $_.Exception.Message))
-    try {
-        Invoke-Manager @("rollback", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot)
-    } catch {
-        Write-Error "[spx-start] stage=rollback: automatic restore was not completed"
+    if ($TransactionPrepared) {
+        try {
+            Invoke-Manager @("rollback", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot)
+        } catch {
+            Write-Error "[spx-start] stage=rollback: automatic restore was not completed"
+        }
     }
+    if ($TransactionCompose -and (Test-Path $TransactionCompose)) { Remove-Item -Force $TransactionCompose }
     exit 1
 }
-'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement).replace("__FINAL_NAME_PS__", final_name_ps)
         self._write_ps_script(
             output_dir / "spx-start.ps1",
             powershell.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
         )
 
         stop_sh = r'''SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-exec "$PYTHON_BIN" "$SCRIPT_DIR/stack_manager.py" stop \
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
+SYSTEM_PYTHON_BIN="${SPX_SYSTEM_PYTHON_BIN:-}"
+if [ -z "$SYSTEM_PYTHON_BIN" ] && command -v spx_resolve_macos_python >/dev/null 2>&1; then
+  SYSTEM_PYTHON_BIN="$(spx_resolve_macos_python || true)"
+fi
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
+  SYSTEM_PYTHON_BIN="$(command -v python3 || command -v python || true)"
+fi
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
+  echo "[spx-stop] Python 3 is required to stop the generated stack." >&2
+  exit 1
+fi
+exec "$SYSTEM_PYTHON_BIN" "$SCRIPT_DIR/stack_manager.py" stop \
   --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
   --env-file "$SCRIPT_DIR/.env" \
   --project spx \
@@ -946,8 +1059,8 @@ exec "$PYTHON_BIN" "$SCRIPT_DIR/stack_manager.py" stop \
         self._write_script(output_dir / "spx-stop.sh", stop_sh.strip() + "\n")
         stop_ps = r'''$ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$PythonBin = if ($Env:PYTHON_BIN) { $Env:PYTHON_BIN } else { "python" }
-& $PythonBin (Join-Path $ScriptDir "stack_manager.py") stop `
+$SystemPython = if ($Env:SPX_SYSTEM_PYTHON_BIN) { $Env:SPX_SYSTEM_PYTHON_BIN } else { "python" }
+& $SystemPython (Join-Path $ScriptDir "stack_manager.py") stop `
   --compose-file (Join-Path $ScriptDir "docker-compose.generated.yml") `
   --env-file (Join-Path $ScriptDir ".env") `
   --project spx `

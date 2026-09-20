@@ -12,6 +12,7 @@ from installer.stack_manager import (
     LABEL_INSTALLATION_ID,
     LABEL_MANAGED_BY,
     LABEL_STACK,
+    ContainerInfo,
     StackManager,
     UserDeclined,
 )
@@ -75,6 +76,21 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
     )
 
 
+def test_same_compose_project_does_not_make_unrelated_image_managed(
+    tmp_path: Path,
+) -> None:
+    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
+    unrelated = ContainerInfo(
+        id="other-id",
+        name="spx-postgres",
+        image="postgres:16",
+        labels={"com.docker.compose.project": "spx"},
+        state="running",
+    )
+
+    assert not manager.is_managed_container(unrelated)
+
+
 def test_prepare_decline_does_not_stop_or_rename(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
     existing = type("Existing", (), {})()
@@ -126,9 +142,159 @@ def test_prepare_snapshots_only_detected_ids_and_never_removes_data(tmp_path: Pa
     snapshot = manager.snapshot_existing(stack, tmp_path / "snapshot.json")
 
     assert snapshot.containers[0]["id"] == "old-id"
+    assert snapshot.containers[0]["name"] == "spx-server"
+    assert snapshot.containers[0]["snapshot_name"] == "spx-snapshot-old-id"
     assert [call[1] for call in calls if len(call) > 1 and call[1] in {"stop", "rename"}] == ["stop", "rename"]
-    assert not any(call[1] in {"rm", "volume", "image"} for call in calls if len(call) > 1)
+    assert not any(call[1] in {"volume", "image"} for call in calls if len(call) > 1)
     assert any(call[:4] == ["docker", "update", "--label-rm", "com.docker.compose.project"] for call in calls)
+
+
+def test_commit_removes_only_snapshot_containers_and_keeps_data_resources(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+    )
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "project": "spx",
+                "installation_id": "new-installation",
+                "containers": [
+                    {"id": "old-id", "name": "spx-server", "snapshot_name": "spx-snapshot-old"}
+                ],
+                "created_at": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manager.commit(snapshot_path)
+
+    assert not snapshot_path.exists()
+    assert [call[1:3] for call in calls if len(call) > 2 and call[1] == "stop"] == [
+        ["stop", "old-id"],
+    ]
+    assert [call[1:4] for call in calls if len(call) > 3 and call[1] == "rm"] == [
+        ["rm", "-f", "old-id"],
+    ]
+    assert not any("-v" in call for call in calls)
+
+
+def test_commit_assigns_stable_names_to_transaction_containers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        installation_id="new-installation",
+        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+    )
+    transaction = ContainerInfo(
+        id="new-id",
+        name="spx-transaction-new-spx-server",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        labels={"com.docker.compose.service": "spx-server"},
+        state="running",
+    )
+    monkeypatch.setattr(manager, "transaction_containers", lambda: [transaction])
+    snapshot_path = tmp_path / "snapshot.json"
+    snapshot_path.write_text(
+        json.dumps(
+            {
+                "project": "spx",
+                "installation_id": "new-installation",
+                "containers": [],
+                "created_at": 0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manager.commit(snapshot_path, {"spx-server": "spx-server"})
+
+    assert [call[1:4] for call in calls if call[1] == "rename"] == [
+        ["rename", "new-id", "spx-server"]
+    ]
+
+
+def test_transaction_containers_excludes_snapshots_with_same_installation_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        installation_id="same-installation",
+        runner=lambda argv, **kwargs: completed(list(argv)),
+    )
+    transaction = ContainerInfo(
+        id="new-id",
+        name="spx-transaction-run-spx-server",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        labels={LABEL_INSTALLATION_ID: "same-installation"},
+        state="running",
+    )
+    snapshot = ContainerInfo(
+        id="old-id",
+        name="spx-snapshot-old-id",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        labels={LABEL_INSTALLATION_ID: "same-installation"},
+        state="running",
+    )
+    monkeypatch.setattr(manager, "list_containers", lambda: [transaction, snapshot])
+
+    assert manager.transaction_containers() == [transaction]
+
+
+def test_stop_stack_stops_stable_names_but_not_snapshots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[list[str]] = []
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        installation_id="same-installation",
+        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+    )
+    stable = ContainerInfo(
+        id="stable-id",
+        name="spx-server",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        labels={LABEL_INSTALLATION_ID: "same-installation"},
+        state="running",
+    )
+    snapshot = ContainerInfo(
+        id="snapshot-id",
+        name="spx-snapshot-old-id",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        labels={LABEL_INSTALLATION_ID: "same-installation"},
+        state="running",
+    )
+    monkeypatch.setattr(manager, "list_containers", lambda: [stable, snapshot])
+
+    manager.stop_stack()
+
+    assert [call[1:3] for call in calls if call[1] == "stop"] == [["stop", "stable-id"]]
+
+
+def test_legacy_rollback_named_container_is_detected_only_for_known_spx_image(
+    tmp_path: Path,
+) -> None:
+    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
+    managed = ContainerInfo(
+        id="old-id",
+        name="spx-rollback-old-id",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        state="running",
+    )
+    unrelated = ContainerInfo(
+        id="other-id",
+        name="spx-rollback-other",
+        image="postgres:16",
+        state="running",
+    )
+
+    assert manager.is_managed_container(managed)
+    assert not manager.is_managed_container(unrelated)
 
 
 def test_rollback_stops_current_transaction_and_restores_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -161,4 +327,6 @@ def test_rollback_stops_current_transaction_and_restores_snapshot(tmp_path: Path
         ["rename", "old-id"],
         ["start", "old-id"],
     ]
-    assert not any("rm" in call or "volume" in call or "image" in call for call in calls)
+    assert [call[1:4] for call in calls if call[1] == "rm"] == [["rm", "-f", "new-id"]]
+    assert not any("volume" in call or "image" in call for call in calls)
+    assert not any("-v" in call for call in calls)

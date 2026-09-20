@@ -20,6 +20,9 @@ def test_mac_shell_launchers_source_and_prefer_packaged_python() -> None:
     )
     assert "installer/macos/python_runtime.sh" in install_script
     assert "spx_resolve_macos_python" in install_script
+    assert "INSTALLER_PYTHON_BIN" in install_script
+    assert "unset PYTHON_BIN" in install_script
+    assert "export PYTHON_BIN" not in install_script
     assert "installer/macos/python_runtime.sh" in mcp_script
     assert 'candidates+=("${resolved}")' in mcp_script
     assert "SPX_MACOS_BUNDLED_ONLY" in helper

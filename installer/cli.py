@@ -362,14 +362,13 @@ def run(args: argparse.Namespace) -> int:
         )
 
         if getattr(args, "start", False):
-            _launch_stack(output_dir, stream=info_stream)
-            return 0
+            return 0 if _launch_stack(output_dir, stream=info_stream) else 1
 
         if noninteractive or getattr(args, "no_start", False):
             return 0
 
         if not selection.offline_bundle:
-            _launch_stack(output_dir, stream=info_stream)
+            return 0 if _launch_stack(output_dir, stream=info_stream) else 1
         return 0
     if args.command == "bootstrap":
         from .bootstrap import bootstrap
@@ -389,35 +388,43 @@ def main(argv: list[str] | None = None) -> int:
     return run(args)
 
 
-def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> None:
+def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     if os.name == "nt":
         script = output_dir / "spx-start.ps1"
         if not script.exists():
             print(f"[spx-installer] Cannot find {script}; skipping start.", file=stream)
-            return
+            return False
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:
             print(
                 "[spx-installer] Neither pwsh nor powershell is available; please start manually.",
                 file=stream,
             )
-            return
+            return False
         cmd = [shell, "-ExecutionPolicy", "Bypass", "-File", str(script)]
     else:
         script = output_dir / "spx-start.sh"
         if not script.exists():
             print(f"[spx-installer] Cannot find {script}; skipping start.", file=stream)
-            return
+            return False
         cmd = [str(script)]
 
     print(f"[spx-installer] Launching stack via {script} ...", file=stream)
+    child_env = os.environ.copy()
+    # spx-install.sh uses a private interpreter to run the wizard. It must not
+    # become the interpreter of the generated stack, especially when its path
+    # contains spaces (for example macOS Application Support).
+    child_env.pop("PYTHON_BIN", None)
+    child_env.pop("SPX_INSTALLER_PYTHON_BIN", None)
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=child_env)
     except subprocess.CalledProcessError as exc:
         print(
             f"[spx-installer] Start script exited with {exc.returncode}. Please inspect the logs.",
             file=stream,
         )
+        return False
+    return True
 
 
 if __name__ == "__main__":
