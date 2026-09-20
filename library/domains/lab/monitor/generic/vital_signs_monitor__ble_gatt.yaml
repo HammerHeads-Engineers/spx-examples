@@ -1,0 +1,477 @@
+# SPDX-License-Identifier: MIT
+
+name: vital_signs_monitor__ble_gatt
+description: >
+  Simulated BLE GATT vital-signs wearable exposing activity-driven temperature,
+  blood pressure, heart rate, oxygen saturation, respiration, and battery
+  telemetry for mobile and firmware validation.
+
+meta_parameters:
+  ble_adapter_base_url:
+    type: str
+    default: http://host.docker.internal:8085
+  ble_device_name:
+    type: str
+    default: "SPX-Sim"
+
+attributes:
+  # Activity state and smoothing factors
+  activityIntensity:
+    type: float
+    default: 0.15
+    unit: ratio
+  activityFiltered:
+    type: float
+    default: 0.15
+    unit: ratio
+  activitySmoothing:
+    type: float
+    default: 0.35
+    unit: ratio
+
+  # Body temperature [degC]
+  bodyTemperatureC:
+    type: float
+    default: 36.6
+    unit: degC
+  temperatureBase:
+    type: float
+    default: 36.4
+    unit: degC
+  temperaturePeak:
+    type: float
+    default: 38.3
+    unit: degC
+  temperatureSmoothing:
+    type: float
+    default: 0.08
+    unit: ratio
+
+  # Arterial pressure [mmHg]
+  systolicPressureMmHg:
+    type: float
+    default: 118.0
+    unit: mmHg
+  systolicBase:
+    type: float
+    default: 110.0
+    unit: mmHg
+  systolicPeak:
+    type: float
+    default: 152.0
+    unit: mmHg
+  systolicSmoothing:
+    type: float
+    default: 0.20
+    unit: ratio
+
+  diastolicPressureMmHg:
+    type: float
+    default: 76.0
+    unit: mmHg
+  diastolicBase:
+    type: float
+    default: 68.0
+    unit: mmHg
+  diastolicPeak:
+    type: float
+    default: 92.0
+    unit: mmHg
+  diastolicSmoothing:
+    type: float
+    default: 0.18
+    unit: ratio
+
+  # Heart rate [bpm]
+  heartRateBpm:
+    type: float
+    default: 68.0
+    unit: bpm
+  heartRateBase:
+    type: float
+    default: 55.0
+    unit: bpm
+  heartRatePeak:
+    type: float
+    default: 185.0
+    unit: bpm
+  heartRateSmoothing:
+    type: float
+    default: 0.32
+    unit: ratio
+
+  # Oxygen saturation [%]
+  bloodOxygenPercent:
+    type: float
+    default: 98.5
+    unit: percent
+  spo2Base:
+    type: float
+    default: 99.2
+    unit: percent
+  spo2Drop:
+    type: float
+    default: 4.5
+    unit: percent
+  spo2Smoothing:
+    type: float
+    default: 0.22
+    unit: ratio
+
+  # Respiration [breaths/min]
+  respirationRate:
+    type: float
+    default: 14.0
+    unit: breaths_per_min
+  respirationBase:
+    type: float
+    default: 12.0
+    unit: breaths_per_min
+  respirationPeak:
+    type: float
+    default: 34.0
+    unit: breaths_per_min
+  respirationSmoothing:
+    type: float
+    default: 0.24
+    unit: ratio
+
+  # Battery state [%]
+  batteryLevelPercent:
+    type: float
+    default: 87.0
+    unit: percent
+  batteryDrainBase:
+    type: float
+    default: 0.015
+  batteryDrainIntensityGain:
+    type: float
+    default: 0.035
+
+actions:
+  - function: $in(activityFiltered)
+    name: update_activity_filtered
+    description: Blend commanded intensity toward a filtered activity level used by other vitals.
+    call: max(
+          0.0,
+          min(
+            1.0,
+            $in(activityFiltered)
+            + (
+              max(0.0, min(1.0, $in(activityIntensity)))
+              - $in(activityFiltered)
+            ) * $in(activitySmoothing)
+          )
+        )
+
+  - function: $in(heartRateBpm)
+    name: update_heart_rate
+    description: Slew heart rate toward the intensity-dependent target with limited inertia.
+    call: max(
+          40.0,
+          min(
+            220.0,
+            $in(heartRateBpm)
+            + (
+              (
+                $in(heartRateBase)
+                + ($in(heartRatePeak) - $in(heartRateBase)) * $in(activityFiltered)
+              )
+              - $in(heartRateBpm)
+            ) * $in(heartRateSmoothing)
+          )
+        )
+
+  - function: $in(respirationRate)
+    name: update_respiration_rate
+    description: Track respiration toward the activity target with moderate smoothing.
+    call: max(
+          8.0,
+          min(
+            45.0,
+            $in(respirationRate)
+            + (
+              (
+                $in(respirationBase)
+                + ($in(respirationPeak) - $in(respirationBase)) * $in(activityFiltered)
+              )
+              - $in(respirationRate)
+            ) * $in(respirationSmoothing)
+          )
+        )
+
+  - function: $in(systolicPressureMmHg)
+    name: update_systolic_pressure
+    description: Increase systolic pressure with activity while keeping values within realistic bounds.
+    call: max(
+          90.0,
+          min(
+            200.0,
+            $in(systolicPressureMmHg)
+            + (
+              (
+                $in(systolicBase)
+                + ($in(systolicPeak) - $in(systolicBase)) * (0.8 * $in(activityFiltered))
+              )
+              - $in(systolicPressureMmHg)
+            ) * $in(systolicSmoothing)
+          )
+        )
+
+  - function: $in(diastolicPressureMmHg)
+    name: update_diastolic_pressure
+    description: Adjust diastolic pressure with slightly reduced sensitivity to activity.
+    call: max(
+          50.0,
+          min(
+            130.0,
+            $in(diastolicPressureMmHg)
+            + (
+              (
+                $in(diastolicBase)
+                + ($in(diastolicPeak) - $in(diastolicBase)) * (0.6 * $in(activityFiltered))
+              )
+              - $in(diastolicPressureMmHg)
+            ) * $in(diastolicSmoothing)
+          )
+        )
+
+  - function: $in(bodyTemperatureC)
+    name: update_body_temperature
+    description: Slowly blend body core temperature toward the activity target.
+    call: max(
+          35.5,
+          min(
+            40.0,
+            $in(bodyTemperatureC)
+            + (
+              (
+                $in(temperatureBase)
+                + ($in(temperaturePeak) - $in(temperatureBase)) * (0.6 * $in(activityFiltered))
+              )
+              - $in(bodyTemperatureC)
+            ) * $in(temperatureSmoothing)
+          )
+        )
+
+  - function: $in(bloodOxygenPercent)
+    name: update_blood_oxygen
+    description: Let oxygen saturation dip slightly as activity increases, then recover.
+    call: max(
+          80.0,
+          min(
+            100.0,
+            $in(bloodOxygenPercent)
+            + (
+              (
+                $in(spo2Base)
+                - $in(spo2Drop) * $in(activityFiltered)
+              )
+              - $in(bloodOxygenPercent)
+            ) * $in(spo2Smoothing)
+          )
+        )
+
+  - function: $in(batteryLevelPercent)
+    name: update_battery_level
+    description: Drain battery faster during high-intensity activity.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            $in(batteryLevelPercent)
+            - (
+              $in(batteryDrainBase)
+              + $in(batteryDrainIntensityGain) * $in(activityFiltered)
+            )
+          )
+        )
+
+communication:
+  - ble:
+      adapter:
+        baseUrl: "$param(ble_adapter_base_url)"
+      device:
+        name: "$param(ble_device_name)"
+      codecs:
+        celsius:
+          format: utf8
+        bloodPressure:
+          format: utf8
+        heartRate:
+          format: utf8
+        percentage:
+          format: utf8
+        respiration:
+          format: utf8
+        intensity:
+          format: utf8
+      bindings:
+        body_temperature:
+          attribute: $out(bodyTemperatureC)
+          codecRef: celsius
+        systolic_pressure:
+          attribute: $out(systolicPressureMmHg)
+          codecRef: bloodPressure
+        diastolic_pressure:
+          attribute: $out(diastolicPressureMmHg)
+          codecRef: bloodPressure
+        heart_rate:
+          attribute: $out(heartRateBpm)
+          codecRef: heartRate
+        blood_oxygen:
+          attribute: $out(bloodOxygenPercent)
+          codecRef: percentage
+        respiration_rate:
+          attribute: $out(respirationRate)
+          codecRef: respiration
+        battery_level:
+          attribute: $out(batteryLevelPercent)
+          codecRef: percentage
+        activity_intensity:
+          attribute: $in(activityIntensity)
+          codecRef: intensity
+          stateKey: activityIntensity
+      services:
+        - uuid: "f0c0a100-8b3a-4e69-bdd0-9f0f613d1a90"
+          name: Vital Signs Service
+          characteristics:
+            - uuid: "f0c0a101-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Body Temperature
+              binding: body_temperature
+              properties: [read, notify]
+              codecRef: celsius
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Body Temperature (°C)"
+            - uuid: "f0c0a102-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Systolic Pressure
+              binding: systolic_pressure
+              properties: [read, notify]
+              codecRef: bloodPressure
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Systolic Pressure (mmHg)"
+            - uuid: "f0c0a103-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Diastolic Pressure
+              binding: diastolic_pressure
+              properties: [read, notify]
+              codecRef: bloodPressure
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Diastolic Pressure (mmHg)"
+            - uuid: "f0c0a104-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Heart Rate
+              binding: heart_rate
+              properties: [read, notify]
+              codecRef: heartRate
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Heart Rate (bpm)"
+            - uuid: "f0c0a105-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Blood Oxygen Saturation
+              binding: blood_oxygen
+              properties: [read, notify]
+              codecRef: percentage
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Blood Oxygen Saturation (%)"
+            - uuid: "f0c0a106-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Respiration Rate
+              binding: respiration_rate
+              properties: [read, notify]
+              codecRef: respiration
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Respiration Rate (breaths per minute)"
+            - uuid: "f0c0a107-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Battery Level
+              binding: battery_level
+              properties: [read, notify]
+              codecRef: percentage
+              notify:
+                triggers: [state]
+              descriptors:
+                - uuid: "2901"
+                  value: "Battery Level (%)"
+            - uuid: "f0c0a108-8b3a-4e69-bdd0-9f0f613d1a91"
+              name: Activity Intensity
+              binding: activity_intensity
+              properties: [read, write, notify]
+              codecRef: intensity
+              notify:
+                triggers: [state]
+              onWrite:
+                - action: parse
+                  type: float
+                  target: state
+                  key: activityIntensity
+                - action: log
+                  template: "[BLE] Activity Intensity -> {{value}}"
+
+scenarios:
+  deep_sleep:
+    name: Deep Sleep
+    display_name: "Deep Sleep"
+    description: Drops activity intensity to resting levels for low-vitals simulation.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.05
+
+  focused_work:
+    name: Focused Work
+    display_name: "Focused Work"
+    description: Simulates sustained desk work with moderate physiological load.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.35
+
+  brisk_walk:
+    name: Brisk Walk
+    display_name: "Brisk Walk"
+    description: Raises vital signs to a light cardio level.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.6
+
+  interval_training:
+    name: Interval Training
+    display_name: "Interval Training"
+    description: Pushes the wearable toward near-peak exercise telemetry.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.9
+
+  acute_stress_event:
+    name: Acute Stress Event
+    display_name: "Acute Stress Event"
+    description: Briefly spikes vitals without reaching full workout intensity.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.8
+
+  cooldown_recovery:
+    name: Cooldown Recovery
+    display_name: "Cooldown Recovery"
+    description: Returns the wearer toward post-exercise recovery values.
+    enabled: true
+    duration: 10.0
+    overrides:
+      activityIntensity: 0.2

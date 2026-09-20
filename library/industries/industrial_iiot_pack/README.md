@@ -5,13 +5,15 @@ factory monitoring. The present iteration links the models we already maintain;
 additional Redfish device twins can land alongside.
 
 - **Protocols**: Modbus TCP, MQTT, HTTP, SCPI, OPC UA.
-- **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, WAGO).
+- **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, Schneider Electric, WAGO, APC Rack PDU).
 - **OPC UA**: process-focused twins:
   * `Process.ProcessCell.OpcUa` – thermal/pressure loop mirroring AsyncUA tests.
   * `Process.Workcell.OpcUa` – robotic/machining gniazdo z pomiarem cykli i alarmami.
   * `Process.PackagingLine.OpcUa` – linia pakująca z wrapperem, kolejką i alarmami.
   * `Process.ProcessCell.SiemensS7_1500.OpcUa` – vendor-specific process cell endpoint.
-- **Quickstart**: `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`.
+- **Quickstarts**:
+  * `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`
+  * `profiles/industrial_iiot_pack/modbus_master_plc_demo.yaml` - generic PLC-style `modbus_master` demo that supervises an Altivar 320 VFD and an iEM3000 energy meter over direct Modbus TCP slave endpoints.
 
 ## Connection matrix
 

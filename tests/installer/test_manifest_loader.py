@@ -20,10 +20,10 @@ def catalog_dir(tmp_path: Path) -> Path:
         textwrap.dedent(
             """\
             domains:
-              - id: iot
-                name: IoT
+              - id: environment
+                name: Environment
                 description: Test domain
-                path: library/domains/iot
+                path: library/domains/environment
             """
         ),
         encoding="utf-8",
@@ -34,8 +34,11 @@ def catalog_dir(tmp_path: Path) -> Path:
             models:
               - id: sensor
                 name: Sensor
-                path: library/domains/iot/sensor.yaml
-                domain: iot
+                path: library/domains/environment/sensor/generic/sensor.yaml
+                domain: environment
+                domain_group: environment
+                device_class: sensor
+                vendor: generic
                 protocols: [mqtt]
                 services:
                   - id: mqtt_broker
@@ -101,7 +104,7 @@ def profiles_dir(tmp_path: Path) -> Path:
             name: test_profile
             description: Profile description
             models:
-              - library/domains/iot/sensor.yaml
+              - library/domains/environment/sensor/generic/sensor.yaml
             services:
               - mqtt_broker
             """
@@ -111,7 +114,9 @@ def profiles_dir(tmp_path: Path) -> Path:
     return base
 
 
-def test_manifest_loader_parses_catalog(tmp_path: Path, catalog_dir: Path, profiles_dir: Path) -> None:
+def test_manifest_loader_parses_catalog(
+    tmp_path: Path, catalog_dir: Path, profiles_dir: Path
+) -> None:
     loader = ManifestLoader(catalog_dir=catalog_dir, profiles_dir=profiles_dir)
     index = loader.load()
 
@@ -122,9 +127,11 @@ def test_manifest_loader_parses_catalog(tmp_path: Path, catalog_dir: Path, profi
 
     assert "sensor" in index.models
     model = index.models["sensor"]
-    assert model.path == Path("library/domains/iot/sensor.yaml")
+    assert model.path == Path("library/domains/environment/sensor/generic/sensor.yaml")
     assert model.services == ["mqtt_broker"]
 
     assert "test_pack" in index.industries
-    assert index.industries["test_pack"].default_instances == [{"model": "sensor", "instance": "pack_sensor_01"}]
+    assert index.industries["test_pack"].default_instances == [
+        {"model": "sensor", "instance": "pack_sensor_01"}
+    ]
     assert "test_profile" in index.profiles

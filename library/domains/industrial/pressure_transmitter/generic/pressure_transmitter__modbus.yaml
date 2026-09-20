@@ -1,0 +1,120 @@
+# SPDX-License-Identifier: MIT
+
+name: pressure_transmitter__modbus
+description: |
+  Simple pressure transmitter with linear response, exposed via Modbus. Useful
+  for testing analog input scaling and alarm handling.
+
+attributes:
+  pressure_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressure_min_bar:
+    type: float
+    default: 0.0
+    unit: bar
+  pressure_max_bar:
+    type: float
+    default: 10.0
+    unit: bar
+  pressure_target_bar:
+    type: float
+    default: 1.0
+    unit: bar
+  pressure_slew_rate_bar:
+    type: float
+    default: 0.35
+
+  alarm_high:
+    type: int
+    default: 0
+  alarm_low:
+    type: int
+    default: 0
+  alarm_high_limit:
+    type: float
+    default: 8.0
+    unit: bar
+  alarm_low_limit:
+    type: float
+    default: 0.5
+    unit: bar
+
+actions:
+  - function: $in(pressure_bar)
+    name: track_process_pressure
+    description: Slew the sensed pressure toward the requested target while clamping to the span.
+    call: max(
+          $in(pressure_min_bar),
+          min(
+            $in(pressure_max_bar),
+            (
+              $in(pressure_target_bar)
+              if abs($in(pressure_target_bar) - $in(pressure_bar)) <= $in(pressure_slew_rate_bar)
+              else (
+                $in(pressure_bar)
+                + (
+                    $in(pressure_slew_rate_bar)
+                    if $in(pressure_target_bar) > $in(pressure_bar)
+                    else -$in(pressure_slew_rate_bar)
+                  )
+              )
+            )
+          )
+        )
+
+  - function: $in(alarm_high)
+    name: detect_high
+    call: 1 if $in(pressure_bar) >= $in(alarm_high_limit) else 0
+
+  - function: $in(alarm_low)
+    name: detect_low
+    call: 1 if $in(pressure_bar) <= $in(alarm_low_limit) else 0
+
+communication:
+  - modbus_tcp:
+      poll_interval: 0.2
+      mapping:
+        pressure_bar:      { address: [0,1], group: h_r, type: float }
+        alarm_high:        { address: [2,2], group: h_r, type: uint_16 }
+        alarm_low:         { address: [3,3], group: h_r, type: uint_16 }
+        alarm_high_limit:  { address: [4,5], group: h_r, type: float }
+        alarm_low_limit:   { address: [6,7], group: h_r, type: float }
+
+scenarios:
+  pressure_ramp_up:
+    enabled: true
+    display_name: "Pressure Ramp Up"
+    description: Ramp the transmitter pressure toward the high alarm region.
+    duration: 12.0
+    overrides:
+      $in(pressure_target_bar): 8.5
+      $in(pressure_slew_rate_bar): 0.45
+
+  pressure_ramp_down:
+    enabled: true
+    display_name: "Pressure Ramp Down"
+    description: Drop the transmitter pressure toward the low alarm region.
+    duration: 10.0
+    overrides:
+      $in(pressure_target_bar): 0.4
+      $in(pressure_slew_rate_bar): 0.35
+
+  pressure_spike:
+    enabled: true
+    display_name: "Pressure Spike"
+    description: Inject a short high-pressure spike to exercise limit handling.
+    duration: 2.0
+    overrides:
+      $in(pressure_target_bar): 9.8
+      $in(pressure_slew_rate_bar): 1.2
+
+  pressure_dropout:
+    enabled: true
+    display_name: "Pressure Dropout"
+    description: Force a brief low-pressure dropout below the configured span.
+    duration: 2.5
+    overrides:
+      $in(pressure_target_bar): 0.1
+      $in(pressure_slew_rate_bar): 1.0

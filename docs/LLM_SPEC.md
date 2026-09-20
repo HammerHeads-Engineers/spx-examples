@@ -4,11 +4,12 @@ Single source of truth for LLM and agent contributions.
 
 ## MUST
 - Keep runtime behavior unchanged unless the change is required for tooling or validation.
-- Place new models under `library/domains/<domain>/<vendor|generic>/`.
+- Place new models under `library/domains/<domain_group>/<device_class>/<vendor|generic>/`.
 - Follow `docs/MODEL_LANGUAGE.md` for YAML structure and expressions; update it if you add new constructs.
 - Update `library/catalog/models.yaml` for every new model.
 - Update `library/catalog/domains.yaml` and `library/catalog/services.yaml` if you add new domains or protocols.
 - Update `library/catalog/industries.yaml` and related `profiles/<pack>/*.yaml` when adding to packs.
+- Regenerate `library/industries/<pack>/MODELS.yaml` with `python tools/render_pack_indexes.py` when pack membership changes.
 - Add or update tests in `tests/` (pack tests in `tests/packs/<pack>/`).
 - Run validation (`python tools/validate_models.py`) and tests before opening a PR.
 
@@ -28,6 +29,154 @@ Single source of truth for LLM and agent contributions.
 ## MAY
 - Add helper tooling in `tools/` if it does not change runtime behavior.
 - Add new packs or profiles with matching catalog updates.
+
+## MCP-only / local-runtime model fast path
+Use this path for agent-driven model work whose goal is local runtime validation on `spx-server`, not release hardening.
+
+- If the user asks for a new local SPX model from a vendor manual and does not explicitly ask for release hardening, automated tests, or pack-wide integration, default to the MCP-only fast path immediately.
+- Do not spend time debating between the full repo flow and the MCP-only flow when the task is clearly local runtime validation.
+- Start from the closest existing behavioral twin and preserve its runtime physics, actions, and scenarios unless the manual clearly requires different behavior. For single-loop thermal controllers and similar devices, adaptation is preferred over re-modeling.
+- For vendor manuals and PDFs, extract only the minimum register subset needed for a useful live model:
+  - PV / measured value
+  - SP / target setpoint
+  - MV / output or manual output
+  - auto/manual or run/stop if available
+  - minimal status only if needed for live validation
+- Avoid broad PDF exploration and avoid implementing a full register map unless explicitly requested.
+- If the protocol exposes command semantics that the SPX runtime does not support 1:1, implement the smallest runtime-compatible bridge that keeps the live control path working, and note that tradeoff in the model description.
+- For local live validation, prefer the simplest reliable registration/bootstrap path. If high-level helpers fail because of optional modules or environment issues, fall back quickly to direct client/API registration instead of debugging helper internals.
+- Validate early, in this order:
+  1. `python tools/validate_models.py`
+  2. register model on the local SPX server
+  3. recreate/start the instance
+  4. verify protocol read of key telemetry
+  5. verify protocol write of the main control input
+  6. verify any implemented mode/command path
+- Do not assume runtime tree shape blindly during live checks. If the object layout is unclear, inspect the live instance document or validate through protocol reads/writes instead of relying on guessed paths.
+
+## Runtime connection intent
+Use this guidance when a user asks an agent to wire behavior between existing live instances.
+
+- Interpret phrases such as "make X affect Y", "connect A to B", "feed A into B", "send this value to that device", or "make this measurement drive that model" as SPX runtime connection requests.
+- Prefer MCP connection tools for this work: `server_list_connections`, `server_get_connection`, `server_upsert_connection`, `server_start_connections`, `server_start_connection`, and `server_run_connection`.
+- Do not start by editing model YAML when the requested behavior can be expressed as an attribute-to-attribute runtime connection.
+- Find exact endpoints with `server_list_instances`, `server_get_instance`, and `server_get_attrs` before creating the connection.
+- The source side is `from` and is read with `$out(instance.attribute)`.
+- The target side is `to` and is written with `$in(instance.attribute)`.
+- As a default rule, use real telemetry or calculated outputs as `from` endpoints and persistent `k__*` simulation/control inputs as `to` endpoints.
+- Avoid continuous connections into `cmd__*` command attributes unless the user clearly wants a trigger-style action.
+- Use `server_upsert_connection` with structured endpoint fields whenever possible:
+
+```text
+connection_name: Source_Attribute_to_Target_Attribute
+source_instance_key: <source instance key>
+source_attr_path: <source attribute>
+target_instance_key: <target instance key>
+target_attr_path: <target attribute>
+replace: true
+start: true
+```
+
+- After creating, restoring, or importing connections, verify lifecycle state. A restored connection can exist while still being `INITIALIZED`; call `server_start_connections` before expecting propagation.
+- A connection task is complete only after the connection exists, is running, reports `propagation_status = ACTIVE` when available, and a source change or `server_run_connection` updates the target.
+
+Canonical smart-building examples:
+
+```text
+Weather brightness -> PV generation:
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__brightness_lux
+  -> PV_Physics_Lux.k__illuminance_lux
+
+PV generation -> Victron ESS:
+PV_Physics_Lux.pv_available_power_w
+  -> Victron_Cerbo_GX_ESS_Modbus.pv_available_power_w
+
+Outdoor temperature -> building physics:
+Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__outdoor_temperature_c
+  -> Building_Physics.k__outdoor_temperature_c
+
+Actual HVAC electric load -> energy aggregator:
+HVAC_Flexit_Nordic_BACnet.heating_coil_electric_power_kw
+  -> Building_Energy_Aggregator.k__hvac_load_kw
+```
+
+## Operational flow for new-device-model generation automations
+Use this flow only for automations whose primary objective is creating a new
+device model YAML (plus required integration updates such as catalog/profile/tests).
+Do not treat this as a mandatory flow for unrelated repository tasks.
+
+1) Input contract
+- Start from a clear objective and acceptance criteria.
+- Confirm target domain/pack and protocol.
+- For vendor/protocol-specific models, require first-party documentation links.
+
+2) Develop-baseline dedupe gate (required)
+- Treat `origin/develop` as the canonical dedupe baseline for candidate discovery and replay checks.
+- Do not treat absence on `main` as a missing-model signal when the model already exists on `develop`.
+- Before selecting a fallback candidate, run `poetry run python tools/check_model_branch_guard.py --base-ref origin/develop`.
+
+3) Reconciler gate on automation branch (required)
+- Before generating or updating a model on `automation/model-yaml`, run the guard above again.
+- If the guard reports duplicate regressions/replay edits, stop and reconcile the branch first.
+- Editing existing model YAML files on `automation/model-yaml` requires explicit override (`SPX_ALLOW_EXISTING_MODEL_EDITS=1`) and a rationale in the PR/issue notes.
+
+4) Implementation scope
+- Add/update model YAML in `library/domains/...`.
+- Keep naming rules (`lower_snake_case`, `name` aligned with file stem).
+- Update catalogs/profiles/pack docs as required by AGENTS.md.
+- Regenerate pack model indexes with `python tools/render_pack_indexes.py`.
+- Register the model in the target pack explicitly:
+  - add `packages: [<target_pack>]` in `library/catalog/models.yaml`,
+  - include the model in at least one target-pack profile in `profiles/<target_pack>/*.yaml`,
+- if one-click sample provisioning is expected for the pack, add `default_instances` (and `start_instances` when needed) in `library/catalog/industries.yaml`.
+- Keep changes additive and backward-compatible.
+
+5) Runtime smoke gate (required)
+- Add a minimal integration smoke test for each new model.
+- Smoke test must load/register the model via `spx_python`, create/reset/start an instance, and assert it reaches `running`.
+- For protocol models, verify at least one protocol-level read/write probe on the exposed endpoint (for Modbus: resolve endpoint and read key registers).
+- On failure, capture diagnostic context from instance state and CI logs.
+- Place the smoke test under the target pack integration suite (`tests/packs/<target_pack>/integration/`).
+
+6) Validation before push
+- Run:
+  - `poetry run python tools/check_model_branch_guard.py --base-ref origin/develop`
+  - `poetry run python tools/render_pack_indexes.py`
+  - `poetry run python tools/validate_models.py`
+  - `poetry run pytest`
+
+7) CI remediation loop
+- After push, monitor CI for the branch.
+- If CI fails: fetch failing job logs, apply targeted fixes, commit, and push on the same branch.
+- Retry CI remediation up to 3 consecutive attempts.
+
+8) Process upgrade gate (required for new-model workflow)
+- Keep or add a CI-visible guard that enforces: new model YAML changes must include runtime smoke coverage in the target pack integration tests.
+- Keep or add a CI-visible guard that enforces: no duplicate-model regression versus `origin/develop` and no replay edits on `automation/model-yaml` without explicit override.
+- The guard may be implemented as a pytest check, validation script check, or equivalent repository-native CI check.
+- If the guard fails, treat it as a blocker and fix it before opening/updating the PR.
+
+9) Success path
+- Open or update a PR with base branch `develop` only.
+- Never target `main` from automation.
+- Include source links, rationale, and test/validation evidence in the PR body.
+
+10) Failure fallback (after 3 failed CI remediation attempts)
+- Stop automated fix attempts.
+- Open an issue in the repository summarizing:
+  - branch and commit,
+  - failing workflow/job URLs,
+  - last observed error signature,
+  - attempted fixes,
+  - explicit blocker and next recommended manual action.
+- Leave merge from `develop` to `main` to a human maintainer.
+
+## Prompt minimization guidance
+- Keep automation prompts short.
+- Put stable process rules in this file and reference them from prompts.
+- Prompt content should focus on task-specific objective, constraints, and deliverables.
+- Avoid repeating generic flow, branch policy, and retry policy in every automation prompt.
+- For new-device-model generation prompts, reference this section instead of duplicating it.
 
 ## Golden examples
 
@@ -76,8 +225,11 @@ Catalog entry:
 ```yaml
   - id: Demo.Sensor.Mqtt
     name: Demo Sensor (MQTT)
-    path: library/domains/iot/generic/demo_sensor__mqtt.yaml
-    domain: iot
+    path: library/domains/environment/sensor/generic/demo_sensor__mqtt.yaml
+    domain: environment
+    domain_group: environment
+    device_class: sensor
+    vendor: generic
     protocols: [mqtt]
     services:
       - id: mqtt_broker
@@ -91,17 +243,17 @@ name: demo_profile
 description: |
   Minimal demo of a single MQTT model.
 models:
-  - library/domains/iot/generic/demo_sensor__mqtt.yaml
+  - library/domains/environment/sensor/generic/demo_sensor__mqtt.yaml
 services:
   - mqtt_broker
 ```
 
 ## Golden standards (reference models)
-- `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`: rich attributes, multi-step actions, BACnet object map with states/units, scenario actions.
-- `library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: dual MQTT connections, availability, Home Assistant discovery payloads, condition-driven scenarios.
-- `library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml`: reusable action params/imports, conditions, and time-step aware control logic.
-- `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`: clear Modbus input/holding register mapping with derived measurements.
-- `library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml`: consistent multi-channel state/action patterns with KNX bindings.
+- `library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml`: rich attributes, multi-step actions, BACnet object map with states/units, scenario actions.
+- `library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: dual MQTT connections, availability, Home Assistant discovery payloads, condition-driven scenarios.
+- `library/domains/industrial/controller/generic/thermal_controller_advanced.yaml`: reusable action params/imports, conditions, and time-step aware control logic.
+- `library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml`: clear Modbus input/holding register mapping with derived measurements.
+- `library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml`: consistent multi-channel state/action patterns with KNX bindings.
 
 ## Modeling language (short rules)
 - Use top-level keys from `docs/MODEL_LANGUAGE.md` (`attributes`, `actions`, `conditions`, `communication`,

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import unittest
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import pytest
-import unittest
 
 from tests.common import spx_utils
 
@@ -54,6 +54,7 @@ class _FakeInstance:
 class _FakeInstances:
     def __init__(self) -> None:
         self._store: Dict[str, _FakeInstance] = {}
+        self.generate_calls: list[Dict[str, Any]] = []
 
     def __getitem__(self, key: str) -> _FakeInstance:
         return self._store[key]
@@ -63,6 +64,24 @@ class _FakeInstances:
 
     def __delitem__(self, key: str) -> None:
         del self._store[key]
+
+    def generate(
+        self,
+        *,
+        template: str,  # noqa: ARG002
+        count: int,  # noqa: ARG002
+        name: str,
+        parameters: Dict[str, Any],
+    ) -> None:
+        self.generate_calls.append(
+            {
+                "template": template,
+                "count": count,
+                "name": name,
+                "parameters": parameters,
+            }
+        )
+        self._store[name] = _FakeInstance()
 
 
 class _FakeClient(dict):
@@ -87,6 +106,100 @@ def _write_minimal_model(path: Path) -> None:
     )
 
 
+def test_resolve_model_path_uses_catalog_entry_for_moved_model(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    catalog_dir = repo_root / "library" / "catalog"
+    model_dir = repo_root / "library" / "domains" / "environment" / "sensor" / "generic"
+    legacy_path = (
+        repo_root
+        / "library"
+        / "domains"
+        / "iot"
+        / "generic"
+        / "environment_sensor__mqtt.yaml"
+    )
+    model_path = model_dir / "environment_sensor__mqtt.yaml"
+
+    catalog_dir.mkdir(parents=True)
+    model_dir.mkdir(parents=True)
+    _write_minimal_model(model_path)
+    (catalog_dir / "models.yaml").write_text(
+        "\n".join(
+            [
+                "models:",
+                "- id: Env.EnvSensor.Mqtt",
+                "  path: library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    resolved = spx_utils.resolve_model_path(
+        legacy_path,
+        model_key="Env.EnvSensor.Mqtt",
+        repo_root=repo_root,
+    )
+
+    assert resolved == model_path
+
+
+def test_load_model_definition_falls_back_to_unique_catalog_filename(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    catalog_dir = repo_root / "library" / "catalog"
+    model_dir = repo_root / "library" / "domains" / "lab" / "instrument" / "siglent"
+    legacy_path = (
+        repo_root
+        / "library"
+        / "domains"
+        / "measurement_instruments"
+        / "siglent"
+        / "siglent_sdm3055__scpi.yaml"
+    )
+    model_path = model_dir / "siglent_sdm3055__scpi.yaml"
+
+    catalog_dir.mkdir(parents=True)
+    model_dir.mkdir(parents=True)
+    _write_minimal_model(model_path)
+    (catalog_dir / "models.yaml").write_text(
+        "\n".join(
+            [
+                "models:",
+                "- id: Lab.Multimeter.SiglentSdm3055.Scpi",
+                "  path: library/domains/lab/instrument/siglent/siglent_sdm3055__scpi.yaml",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    model_def = spx_utils.load_model_definition(
+        legacy_path,
+        model_key=None,
+        repo_root=repo_root,
+    )
+
+    assert model_def["name"] == "example"
+
+
+def test_resolve_model_path_raises_when_no_catalog_replacement_exists(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    catalog_dir = repo_root / "library" / "catalog"
+    catalog_dir.mkdir(parents=True)
+    (catalog_dir / "models.yaml").write_text("models: []\n", encoding="utf-8")
+
+    missing_path = (
+        repo_root / "library" / "domains" / "iot" / "generic" / "missing.yaml"
+    )
+
+    with pytest.raises(FileNotFoundError, match="no replacement was found"):
+        spx_utils.resolve_model_path(missing_path, repo_root=repo_root)
+
+
 def test_ensure_instance_applies_overrides_after_reset_on_create() -> None:
     client = _FakeClient()
     instance = spx_utils.ensure_instance(
@@ -105,7 +218,9 @@ def test_ensure_instance_applies_overrides_after_reset_on_create() -> None:
     assert calls.index("reset") < calls.index("put_attr")
 
 
-def test_bootstrap_model_instance_resets_and_applies_overrides_after_reset(tmp_path: Path) -> None:
+def test_bootstrap_model_instance_resets_and_applies_overrides_after_reset(
+    tmp_path: Path,
+) -> None:
     model_path = tmp_path / "model.yaml"
     _write_minimal_model(model_path)
 
@@ -144,6 +259,120 @@ def test_bootstrap_model_instance_resets_and_applies_overrides_after_reset(tmp_p
     names_after = [name for name, _payload in instance.calls]
     assert names_after.count("reset") == 2
     assert names_after.count("start") == 2
+
+
+def test_ensure_instance_uses_generate_for_meta_parameter_defaults() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+            "modbus_unit_id": {"type": "int", "default": 1},
+        }
+    }
+
+    instance = spx_utils.ensure_instance(
+        client,
+        "inst",
+        "model",
+        model_def=model_def,
+        recreate=True,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
+    )
+
+    assert instance is client["instances"]["inst"]
+    assert client["instances"].generate_calls == [
+        {
+            "template": "model",
+            "count": 1,
+            "name": "inst",
+            "parameters": {
+                "modbus_port": {"cycle": [5023]},
+                "modbus_unit_id": {"cycle": [1]},
+            },
+        }
+    ]
+
+
+def test_ensure_instance_uses_generate_for_meta_parameter_overrides() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+            "modbus_unit_id": {"type": "int", "default": 1},
+        }
+    }
+
+    instance = spx_utils.ensure_instance(
+        client,
+        "inst",
+        "model",
+        model_def=model_def,
+        meta_parameters={"modbus_port": 5601, "modbus_unit_id": 11},
+        recreate=True,
+        ensure_running=False,
+        reset_on_create=False,
+        start_on_create=False,
+    )
+
+    assert instance is client["instances"]["inst"]
+    assert client["instances"].generate_calls == [
+        {
+            "template": "model",
+            "count": 1,
+            "name": "inst",
+            "parameters": {
+                "modbus_port": {"cycle": [5601]},
+                "modbus_unit_id": {"cycle": [11]},
+            },
+        }
+    ]
+
+
+def test_ensure_instance_errors_when_required_meta_default_missing() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "required": True},
+        }
+    }
+
+    with pytest.raises(
+        RuntimeError, match="Missing defaults for required meta_parameters"
+    ):
+        spx_utils.ensure_instance(
+            client,
+            "inst",
+            "model",
+            model_def=model_def,
+            recreate=True,
+            ensure_running=False,
+            reset_on_create=False,
+            start_on_create=False,
+        )
+
+
+def test_ensure_instance_errors_when_unknown_meta_override_is_provided() -> None:
+    client = _FakeClient()
+    model_def = {
+        "meta_parameters": {
+            "modbus_port": {"type": "int", "default": 5023},
+        }
+    }
+
+    with pytest.raises(RuntimeError, match="Unknown meta_parameters provided"):
+        spx_utils.ensure_instance(
+            client,
+            "inst",
+            "model",
+            model_def=model_def,
+            meta_parameters={"modbus_unit_id": 11},
+            recreate=True,
+            ensure_running=False,
+            reset_on_create=False,
+            start_on_create=False,
+        )
 
 
 def test_require_existing_instance_skips_when_missing() -> None:

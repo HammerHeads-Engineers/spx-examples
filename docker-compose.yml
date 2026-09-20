@@ -131,7 +131,7 @@ services:
       ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
 
   # spx-ui:
-  #   image: simplephysx/spx-ui:trial   # or use `build: .` to build from the local repo
+  #   image: simplephysx/spx-ui:v1.0.0-rc.55   # or use `build: .` to build from the local repo
   #   container_name: spx-ui-server
   #   depends_on:
   #     spx-server:

@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "minor_version": 1,
+  "key": "person",
+  "data": {
+    "items": [
+      {
+        "id": "spx_user",
+        "name": "SPX_USER",
+        "user_id": "4b54e47483844ea2b869af9fd991f0a3",
+        "device_trackers": []
+      }
+    ]
+  }
+}

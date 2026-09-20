@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: MIT
+name: Sync release to SPX WWW
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Git tag of the already published release to synchronize
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Verify complete GitHub Release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          assets="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')"
+          printf '%s\n' "${assets}"
+
+          expected_assets=(
+            "spx-installer-${version}.tgz"
+            "spx-installer-${version}.run"
+            "spx-installer-${version}.ps1"
+            "spx-installer-${version}.exe"
+            "spx-installer-macos-${version}.pkg"
+          )
+          for expected in "${expected_assets[@]}"; do
+            if ! grep -Fxq "${expected}" <<<"${assets}"; then
+              echo "Missing release asset: ${expected}" >&2
+              exit 1
+            fi
+          done
+
+  sync-release-to-www:
+    needs: verify-release
+    if: needs.verify-release.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED: ${{ vars.SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED }}
+      SPX_WWW_DOWNLOAD_SYNC_ENABLED: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_ENABLED }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_STAGING_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN }}
+      SPX_WWW_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_DOWNLOAD_SYNC_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Notify SPX WWW environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/sync_release_to_www.sh \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${RELEASE_TAG}"

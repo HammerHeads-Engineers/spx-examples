@@ -19,7 +19,9 @@ def load_catalog_models(*, root: Optional[Path] = None) -> List[Dict[str, Any]]:
     root = root or repo_root()
     doc = load_yaml(root / "library" / "catalog" / "models.yaml")
     if not isinstance(doc, dict):
-        raise TypeError("library/catalog/models.yaml must contain a YAML mapping at the top level")
+        raise TypeError(
+            "library/catalog/models.yaml must contain a YAML mapping at the top level"
+        )
     models = doc.get("models", [])
     if not isinstance(models, list):
         raise TypeError("library/catalog/models.yaml must contain a 'models' list")
@@ -30,7 +32,9 @@ def load_catalog_services(*, root: Optional[Path] = None) -> List[Dict[str, Any]
     root = root or repo_root()
     doc = load_yaml(root / "library" / "catalog" / "services.yaml")
     if not isinstance(doc, dict):
-        raise TypeError("library/catalog/services.yaml must contain a YAML mapping at the top level")
+        raise TypeError(
+            "library/catalog/services.yaml must contain a YAML mapping at the top level"
+        )
     services = doc.get("services", [])
     if not isinstance(services, list):
         raise TypeError("library/catalog/services.yaml must contain a 'services' list")
@@ -41,10 +45,14 @@ def load_catalog_industries(*, root: Optional[Path] = None) -> List[Dict[str, An
     root = root or repo_root()
     doc = load_yaml(root / "library" / "catalog" / "industries.yaml")
     if not isinstance(doc, dict):
-        raise TypeError("library/catalog/industries.yaml must contain a YAML mapping at the top level")
+        raise TypeError(
+            "library/catalog/industries.yaml must contain a YAML mapping at the top level"
+        )
     industries = doc.get("industries", [])
     if not isinstance(industries, list):
-        raise TypeError("library/catalog/industries.yaml must contain an 'industries' list")
+        raise TypeError(
+            "library/catalog/industries.yaml must contain an 'industries' list"
+        )
     return [i for i in industries if isinstance(i, dict)]
 
 
@@ -53,6 +61,26 @@ def find_industry(pack_id: str, *, root: Optional[Path] = None) -> Dict[str, Any
         if industry.get("id") == pack_id:
             return industry
     raise KeyError(f"Pack '{pack_id}' is missing from library/catalog/industries.yaml")
+
+
+def load_pack_index(
+    pack_id: str, *, root: Optional[Path] = None
+) -> List[Dict[str, Any]]:
+    root = root or repo_root()
+    industry = find_industry(pack_id, root=root)
+    pack_path = industry.get("path")
+    if not isinstance(pack_path, str) or not pack_path:
+        raise TypeError(f"Pack '{pack_id}' is missing a valid 'path'")
+
+    doc = load_yaml(root / pack_path / "MODELS.yaml")
+    if not isinstance(doc, dict):
+        raise TypeError(
+            f"{pack_path}/MODELS.yaml must contain a YAML mapping at the top level"
+        )
+    models = doc.get("models", [])
+    if not isinstance(models, list):
+        raise TypeError(f"{pack_path}/MODELS.yaml must contain a 'models' list")
+    return [model for model in models if isinstance(model, dict)]
 
 
 def model_index_by_id(*, root: Optional[Path] = None) -> Dict[str, Dict[str, Any]]:
@@ -73,7 +101,9 @@ def model_index_by_path(*, root: Optional[Path] = None) -> Dict[str, Dict[str, A
     return index
 
 
-def models_for_pack(pack_id: str, *, root: Optional[Path] = None) -> List[Dict[str, Any]]:
+def models_for_pack(
+    pack_id: str, *, root: Optional[Path] = None
+) -> List[Dict[str, Any]]:
     result: List[Dict[str, Any]] = []
     for model in load_catalog_models(root=root):
         packages = model.get("packages", [])

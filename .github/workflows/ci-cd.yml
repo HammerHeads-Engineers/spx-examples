@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 name: CI
 
 on:
@@ -11,8 +12,6 @@ on:
       - perf/**
       - performance/**
       - ci/**
-    tags:
-      - "*"
   pull_request:
     branches:
       - main
@@ -20,43 +19,122 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
-  tests:
+  pr-title-gate:
     runs-on: ubuntu-latest
-    env:
-      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-      SPX_BASE_URL: http://localhost:8000
+    steps:
+      - name: Validate PR title (Conventional Commits)
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(feat|fix|perf|refactor|docs|test|chore|ci|build|style|revert)(\([a-z0-9._/-]+\))?!?: .+'
+          if [[ ! "${PR_TITLE}" =~ ${pattern} ]]; then
+            echo "PR title must follow Conventional Commits."
+            echo "Expected: type(scope): subject"
+            echo "Examples:"
+            echo "  feat(models): add abb m1m modbus smoke coverage"
+            echo "  fix(ci): skip semantic release when no releasable commits"
+            echo "Current title: ${PR_TITLE}"
+            exit 1
+          fi
+
+      - name: Skip PR title validation for non-PR events
+        if: ${{ github.event_name != 'pull_request' }}
+        run: echo "Skipping PR title validation for event '${{ github.event_name }}'."
+
+  tests:
+    needs: pr-title-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.9.19, 3.10.14, 3.11.9, 3.12.4]
+        python-version: [3.9.19, 3.12.10]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/checkout@v7
         with:
-          python-version: ${{ matrix.python-version }}
+          fetch-depth: 0
 
       - name: Install Poetry
         run: pipx install poetry
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: poetry
+
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Fetch develop baseline
+        run: git fetch origin develop
+
+      - name: Guard model-yaml branch against duplicate/replay additions
+        run: poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
 
       - name: Validate model definitions
         run: poetry run python tools/validate_models.py
 
+      - name: Run fast unit tests
+        shell: bash
+        run: |
+          poetry run pytest -q \
+            tests/core/unit \
+            tests/installer \
+            tests/mcp/unit \
+            tests/packs/*/unit
+
+  core-integration:
+    needs: pr-title-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+    steps:
+      - name: Gate integration tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
+        run: |
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "SPX_PRODUCT_KEY is required for core integration tests."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v7
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Set up Python 3.12.10
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.12.10
+          cache: poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
       - name: Start SPX server (Docker Compose)
-        if: ${{ env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: docker compose up -d
 
       - name: Wait for SPX server health
-        if: ${{ env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
         shell: bash
         run: |
           for i in {1..24}; do
@@ -64,19 +142,14 @@ jobs:
               echo "SPX server is healthy"; exit 0; fi
             echo "Waiting for SPX server to be healthy... ($i/24)"; sleep 5;
           done
-          echo "SPX server failed to become healthy"; docker compose logs --no-color; exit 1
+          echo "SPX server failed to become healthy"; exit 1
 
-      - name: Run unit tests
-        shell: bash
-        run: |
-          if [ -f pytest.ini ] || [ -d tests ] || grep -q "\[tool.pytest.ini_options\]" pyproject.toml 2>/dev/null; then
-            poetry run pytest -q
-          else
-            poetry run python -m unittest discover -s tests -p "test_*.py"
-          fi
+      - name: Run core integration tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry run pytest -q tests/core/integration
 
       - name: Show server logs on failure
-        if: ${{ failure() && env.SPX_PRODUCT_KEY != '' }}
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
         run: docker compose logs --no-color
 
       - name: Stop SPX server
@@ -84,8 +157,13 @@ jobs:
         run: docker compose down --remove-orphans
 
   pack-tests:
-    needs: tests
+    needs: pr-title-gate
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
       SPX_BASE_URL: http://localhost:8000
@@ -97,7 +175,6 @@ jobs:
       matrix:
         pack:
           - industrial_iiot_pack
-          - embedded_lab_pack
           - energy_pack
           - smart_building_pack
 
@@ -115,17 +192,18 @@ jobs:
 
       - name: Checkout repository
         if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.14
+        uses: actions/checkout@v7
 
       - name: Install Poetry
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: pipx install poetry
+
+      - name: Set up Python
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.12.10
+          cache: poetry
 
       - name: Install dependencies
         if: ${{ steps.gate.outputs.enabled == 'true' }}
@@ -151,7 +229,8 @@ jobs:
         env:
           OUT_DIR: build/ci/${{ matrix.pack }}
         run: |
-          export PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
           export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
           mkdir -p "${NPM_CONFIG_PREFIX}"
           export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
@@ -213,54 +292,145 @@ jobs:
         run: |
           "${OUT_DIR}/spx-stop.sh"
 
-  build-installer:
-    needs: pack-tests
-    if: startsWith(github.ref, 'refs/tags/')
+  embedded-lab-smoke:
+    needs: pr-title-gate
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+      SPX_BASE_URL: http://localhost:8000
+      MQTT_TEST_BROKER_HOST_CONTAINER: mqtt_broker
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Build installer package
+      - name: Gate embedded smoke tests on SPX_PRODUCT_KEY
+        id: gate
+        shell: bash
         run: |
-          chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
-          scripts/build_installer_package.sh --package-name "spx-installer"
-          scripts/build_self_extractors.sh --version "${{ github.ref_name }}"
-
-      - name: Upload installer assets to GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="${{ github.ref_name }}"
-          if gh release view "${tag}" >/dev/null 2>&1; then
-            gh release upload "${tag}" \
-              "dist/spx-installer.tgz" \
-              "dist/spx-installer-${tag}.run" \
-              "dist/spx-installer-${tag}.ps1" \
-              --clobber
+          if [ -n "${SPX_PRODUCT_KEY:-}" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            gh release create "${tag}" \
-              "dist/spx-installer.tgz" \
-              "dist/spx-installer-${tag}.run" \
-              "dist/spx-installer-${tag}.ps1" \
-              --title "SPX Installer ${tag}" \
-              --generate-notes
+            echo "SPX_PRODUCT_KEY is required for embedded smoke tests."
+            exit 1
           fi
 
+      - name: Checkout repository
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/checkout@v7
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: pipx install poetry
+
+      - name: Set up Python 3.12.10
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: 3.12.10
+          cache: poetry
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Generate embedded bundle (non-interactive)
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          mkdir -p "${OUT_DIR}"
+          poetry run python -m installer generate \
+            --packages embedded_lab_pack \
+            --output "${OUT_DIR}" \
+            --product-key "${SPX_PRODUCT_KEY}" \
+            --no-start \
+            --print-selection json > "${OUT_DIR}/selection.json"
+
+      - name: Start embedded stack
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          PYTHON_BIN="$(poetry run python -c 'import sys; print(sys.executable)')"
+          export PYTHON_BIN
+          export NPM_CONFIG_PREFIX="${HOME}/.npm-global"
+          mkdir -p "${NPM_CONFIG_PREFIX}"
+          export PATH="${NPM_CONFIG_PREFIX}/bin:${PATH}"
+          "${OUT_DIR}/spx-start.sh"
+
+      - name: Wait for SPX server health
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..36}; do
+            if curl -fsS http://localhost:8000/ > /dev/null; then
+              echo "SPX server is healthy"; exit 0; fi
+            echo "Waiting for SPX server to be healthy... ($i/36)"; sleep 5;
+          done
+          echo "SPX server failed to become healthy"; exit 1
+
+      - name: Wait for MQTT broker port
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/1883) >/dev/null 2>&1; then
+              echo "MQTT broker is reachable"; exit 0; fi
+            echo "Waiting for MQTT broker... ($i/30)"; sleep 2;
+          done
+          echo "MQTT broker did not become reachable on 127.0.0.1:1883"; exit 1
+
+      - name: Run embedded smoke tests
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: |
+          poetry run pytest -q \
+            tests/packs/embedded_lab_pack/integration/test_scpi_ascii_port_override.py \
+            tests/packs/embedded_lab_pack/integration/test_modbus_prevac_bcu14_smoke.py
+
+      - name: Show embedded stack logs on failure
+        if: ${{ failure() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          docker compose -f "${OUT_DIR}/docker-compose.generated.yml" --env-file "${OUT_DIR}/.env" logs --no-color
+
+      - name: Stop embedded stack
+        if: ${{ always() && steps.gate.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          OUT_DIR: build/ci/embedded_lab_smoke
+        run: |
+          "${OUT_DIR}/spx-stop.sh"
+
   release:
+    outputs:
+      released: ${{ steps.release_result.outputs.released }}
+      tag: ${{ steps.release_result.outputs.tag }}
     runs-on: ubuntu-latest
     concurrency: release
-    needs: pack-tests
-    if: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
+    needs: [tests, core-integration, pack-tests, embedded-lab-smoke]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+      needs.tests.result == 'success' &&
+      needs.core-integration.result == 'success' &&
+      needs.pack-tests.result == 'success' &&
+      needs.embedded-lab-smoke.result == 'success'
     env:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
-      SPX_PACKAGES_TOKEN: ${{ secrets.SPX_PACKAGES_TOKEN }}
     steps:
       - name: Setup | Checkout Repository at workflow sha
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
+          token: ${{ secrets.SPX_RELEASE_TOKEN }}
           ref: ${{ github.sha }}
 
       - name: Setup | Force correct release branch on workflow sha
@@ -272,27 +442,61 @@ jobs:
         run: pipx install poetry
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v7
         with:
           python-version: "3.10"
 
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
-      - name: Action | Semantic Version Release
+      - name: Precheck releasable commits
+        id: release_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+          if [ -n "${last_tag}" ]; then
+            range="${last_tag}..HEAD"
+          else
+            root="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            range="${root}..HEAD"
+          fi
+
+          echo "Checking releasable commits in range: ${range}"
+          if git log --format='%s%n%b' "${range}" | grep -Eiq '^(feat|fix|perf)(\([^)]+\))?!?: |BREAKING CHANGE:'; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Detected releasable commit."
+          else
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "No releasable commit found (feat/fix/perf/BREAKING CHANGE)."
+          fi
+
+      - name: Skip release (no releasable commits)
+        if: steps.release_gate.outputs.should_release != 'true'
+        run: |
+          echo "Skipping semantic-release: no releasable commits since latest tag."
+
+      - name: Semantic Version Release
         id: release
-        uses: python-semantic-release/python-semantic-release@v10.4.1
-        with:
-          github_token: ${{ secrets.SPX_RELEASE_TOKEN }}
-          git_committer_name: "github-actions"
-          git_committer_email: "actions@users.noreply.github.com"
+        if: steps.release_gate.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+          GIT_COMMIT_AUTHOR: "github-actions <actions@users.noreply.github.com>"
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          poetry run semantic-release -v version
 
       - name: Build installer artifacts
         if: steps.release.outputs.released == 'true'
         run: |
           chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
-          scripts/build_installer_package.sh --package-name "spx-installer"
-          scripts/build_self_extractors.sh --version "${{ steps.release.outputs.tag }}"
+          tag="${{ steps.release.outputs.tag }}"
+          version="${tag#v}"
+          scripts/build_installer_package.sh --package-name "spx-installer" --version "${version}"
+          scripts/build_self_extractors.sh --version "${version}"
 
       - name: Upload installer assets to GitHub Release
         if: steps.release.outputs.released == 'true'
@@ -300,37 +504,348 @@ jobs:
           GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
         run: |
           tag="${{ steps.release.outputs.tag }}"
+          version="${tag#v}"
           gh release upload "${tag}" \
-            "dist/spx-installer.tgz" \
-            "dist/spx-installer-${tag}.run" \
-            "dist/spx-installer-${tag}.ps1" \
+            "dist/spx-installer-${version}.tgz" \
+            "dist/spx-installer-${version}.run" \
+            "dist/spx-installer-${version}.ps1" \
             --clobber
 
-      - name: Ensure SPX_PACKAGES_TOKEN is set
-        if: steps.release.outputs.released == 'true'
+      - name: Export release result for downstream artifact jobs
+        id: release_result
+        if: always()
         shell: bash
         run: |
-          if [ -z "${SPX_PACKAGES_TOKEN}" ]; then
-            echo "SPX_PACKAGES_TOKEN is required to publish GitHub Packages."
+          if [[ "${{ steps.release.outputs.released }}" == "true" ]]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${{ steps.release.outputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows-installer:
+    needs: release
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
+    runs-on: windows-latest
+    steps:
+      - name: Checkout release revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install Poetry
+        shell: pwsh
+        run: python -m pip install --upgrade pip poetry
+
+      - name: Install repository dependencies
+        shell: pwsh
+        run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Install WiX Toolset v6 CLI
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version "6.*"
+          $toolPath = "$env:USERPROFILE\.dotnet\tools"
+          $env:Path = "$toolPath;$env:Path"
+          $toolPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $wixVersion = ((wix --version) -split '\+')[0].Trim()
+          wix extension add --global "WixToolset.BootstrapperApplications.wixext/$wixVersion"
+          wix extension add --global "WixToolset.Util.wixext/$wixVersion"
+          wix extension list --global
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          & .\packaging\windows\Build.ps1 `
+            -Configuration Release `
+            -RuntimeIdentifier win-x64 `
+            -BuildRoot build/windows
+
+      - name: Validate Windows installer artifact
+        id: windows_artifact
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem -Path "build/windows/artifacts" -Filter "spx-installer-*.exe" -File)
+          if ($artifacts.Count -ne 1) {
+            throw "Expected exactly one Windows installer bundle, found $($artifacts.Count)."
+          }
+          "path=build/windows/artifacts/$($artifacts[0].Name)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload Windows installer as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: spx-installer-${{ needs.release.outputs.tag }}-windows
+          path: ${{ steps.windows_artifact.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload Windows installer to GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release.outputs.tag }}" `
+            "${{ steps.windows_artifact.outputs.path }}" `
+            --clobber
+
+  build-macos-installer:
+    needs: release
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
+    runs-on: macos-latest
+    environment: macos-signing
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12.10"
+
+      - name: Prepare macOS signing and notarization
+        shell: bash
+        env:
+          MACOS_APP_SIGN_IDENTITY: ${{ vars.MACOS_APP_SIGN_IDENTITY }}
+          MACOS_INSTALLER_SIGN_IDENTITY: ${{ vars.MACOS_INSTALLER_SIGN_IDENTITY }}
+          MACOS_NOTARY_KEY_ID: ${{ vars.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ vars.MACOS_NOTARY_ISSUER_ID }}
+          MACOS_NOTARY_PROFILE: ${{ vars.MACOS_NOTARY_PROFILE }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_APP_CERT_P12_BASE64: ${{ secrets.MACOS_APP_CERT_P12_BASE64 }}
+          MACOS_INSTALLER_CERT_P12_BASE64: ${{ secrets.MACOS_INSTALLER_CERT_P12_BASE64 }}
+          MACOS_NOTARY_KEY_BASE64: ${{ secrets.MACOS_NOTARY_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+
+          : "${MACOS_APP_SIGN_IDENTITY:?Missing MACOS_APP_SIGN_IDENTITY}"
+          : "${MACOS_INSTALLER_SIGN_IDENTITY:?Missing MACOS_INSTALLER_SIGN_IDENTITY}"
+          : "${MACOS_NOTARY_KEY_ID:?Missing MACOS_NOTARY_KEY_ID}"
+          : "${MACOS_NOTARY_ISSUER_ID:?Missing MACOS_NOTARY_ISSUER_ID}"
+          : "${MACOS_NOTARY_PROFILE:?Missing MACOS_NOTARY_PROFILE}"
+          : "${MACOS_CERT_PASSWORD:?Missing MACOS_CERT_PASSWORD}"
+          : "${MACOS_APP_CERT_P12_BASE64:?Missing MACOS_APP_CERT_P12_BASE64}"
+          : "${MACOS_INSTALLER_CERT_P12_BASE64:?Missing MACOS_INSTALLER_CERT_P12_BASE64}"
+          : "${MACOS_NOTARY_KEY_BASE64:?Missing MACOS_NOTARY_KEY_BASE64}"
+
+          keychain_path="${RUNNER_TEMP}/spx-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 32)"
+          app_p12_path="${RUNNER_TEMP}/developer-id-application.p12"
+          installer_p12_path="${RUNNER_TEMP}/developer-id-installer.p12"
+          notary_key_path="${RUNNER_TEMP}/AuthKey_${MACOS_NOTARY_KEY_ID}.p8"
+
+          printf '%s' "${MACOS_APP_CERT_P12_BASE64}" | base64 -D > "${app_p12_path}"
+          printf '%s' "${MACOS_INSTALLER_CERT_P12_BASE64}" | base64 -D > "${installer_p12_path}"
+          printf '%s' "${MACOS_NOTARY_KEY_BASE64}" | base64 -D > "${notary_key_path}"
+          chmod 600 "${app_p12_path}" "${installer_p12_path}" "${notary_key_path}"
+
+          security create-keychain -p "${keychain_password}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
+          security list-keychains -d user -s "${keychain_path}"
+          security default-keychain -d user -s "${keychain_path}"
+
+          for certificate_path in "${app_p12_path}" "${installer_p12_path}"; do
+            security import "${certificate_path}" \
+              -f pkcs12 \
+              -k "${keychain_path}" \
+              -P "${MACOS_CERT_PASSWORD}" \
+              -T /usr/bin/codesign \
+              -T /usr/bin/pkgbuild \
+              -T /usr/bin/productbuild
+          done
+
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "${keychain_password}" \
+            "${keychain_path}"
+
+          app_identity_output="$(security find-identity -v -p codesigning "${keychain_path}")"
+          if [[ "${app_identity_output}" != *"${MACOS_APP_SIGN_IDENTITY}"* ]]; then
+            echo "Developer ID Application identity was not imported." >&2
+            exit 1
+          fi
+          installer_identity_output="$(security find-identity -v -p basic "${keychain_path}")"
+          if [[ "${installer_identity_output}" != *"${MACOS_INSTALLER_SIGN_IDENTITY}"* ]]; then
+            echo "Developer ID Installer identity was not imported." >&2
             exit 1
           fi
 
-      - name: Publish installer to GitHub Packages
-        if: steps.release.outputs.released == 'true'
+          xcrun notarytool store-credentials "${MACOS_NOTARY_PROFILE}" \
+            --key "${notary_key_path}" \
+            --key-id "${MACOS_NOTARY_KEY_ID}" \
+            --issuer "${MACOS_NOTARY_ISSUER_ID}" \
+            --keychain "${keychain_path}"
+
+          {
+            echo "MACOS_SIGNING_KEYCHAIN=${keychain_path}"
+            echo "MACOS_SIGNING_APP_P12=${app_p12_path}"
+            echo "MACOS_SIGNING_INSTALLER_P12=${installer_p12_path}"
+            echo "MACOS_SIGNING_NOTARY_KEY=${notary_key_path}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Build macOS installer package
+        id: macos_package
+        shell: bash
         env:
-          PACKAGES_TOKEN: ${{ env.SPX_PACKAGES_TOKEN }}
+          MACOS_APP_SIGN_IDENTITY: ${{ vars.MACOS_APP_SIGN_IDENTITY }}
+          MACOS_INSTALLER_SIGN_IDENTITY: ${{ vars.MACOS_INSTALLER_SIGN_IDENTITY }}
+          MACOS_NOTARY_PROFILE: ${{ vars.MACOS_NOTARY_PROFILE }}
         run: |
-          PKG_NAME="spx-installer"
-          VERSION="${{ steps.release.outputs.tag }}"
-          upload_pkg() {
-            local file="$1"
-            curl -L \
-              -X PUT \
-              -H "Authorization: Bearer ${PACKAGES_TOKEN}" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary @"${file}" \
-              "https://uploads.github.com/repos/${{ github.repository }}/packages/generic/${PKG_NAME}/${VERSION}/$(basename "${file}")"
-          }
-          upload_pkg "dist/spx-installer.tgz"
-          upload_pkg "dist/spx-installer-${VERSION}.run"
-          upload_pkg "dist/spx-installer-${VERSION}.ps1"
+          set -euo pipefail
+          chmod +x scripts/build_macos_pkg.sh
+          tag="${{ needs.release.outputs.tag }}"
+          version="${tag#v}"
+          if [[ -z "${version}" ]]; then
+            echo "Unable to resolve package version from release tag." >&2
+            exit 1
+          fi
+          scripts/build_macos_pkg.sh \
+            --version "${version}" \
+            --python-version "3.12.10" \
+            --app-sign "${MACOS_APP_SIGN_IDENTITY}" \
+            --sign "${MACOS_INSTALLER_SIGN_IDENTITY}" \
+            --keychain "${MACOS_SIGNING_KEYCHAIN}" \
+            --notarytool-profile "${MACOS_NOTARY_PROFILE}"
+          echo "path=dist/spx-installer-macos-${version}.pkg" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate macOS installer artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${{ steps.macos_package.outputs.path }}"
+          pkgutil --check-signature "${{ steps.macos_package.outputs.path }}"
+          inspection_dir="${RUNNER_TEMP}/spx-macos-package-inspection"
+          pkgutil --expand-full \
+            "${{ steps.macos_package.outputs.path }}" \
+            "${inspection_dir}"
+          spx_component="$(find "${inspection_dir}" -maxdepth 1 -name '*-component.pkg' ! -name '*-python-component.pkg' -print -quit)"
+          python_component="$(find "${inspection_dir}" -maxdepth 1 -name '*-python-component.pkg' -print -quit)"
+          test -n "${spx_component}"
+          test -n "${python_component}"
+          object_files="$(find "${inspection_dir}" -type f -name '*.o' -print)"
+          if [[ -n "${object_files}" ]]; then
+            echo "Expanded macOS package contains development object files:" >&2
+            echo "${object_files}" >&2
+            exit 1
+          fi
+          xcrun stapler validate "${{ steps.macos_package.outputs.path }}"
+          spctl -a -vv -t install "${{ steps.macos_package.outputs.path }}"
+
+      - name: Upload macOS installer as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: spx-installer-${{ needs.release.outputs.tag }}-macos
+          path: ${{ steps.macos_package.outputs.path }}
+          if-no-files-found: error
+
+      - name: Upload macOS installer to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release.outputs.tag }}" \
+            "${{ steps.macos_package.outputs.path }}" \
+            --clobber
+
+      - name: Clean up macOS signing material
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          security delete-keychain "${MACOS_SIGNING_KEYCHAIN:-${RUNNER_TEMP}/spx-signing.keychain-db}" \
+            >/dev/null 2>&1
+          rm -f \
+            "${MACOS_SIGNING_APP_P12:-${RUNNER_TEMP}/developer-id-application.p12}" \
+            "${MACOS_SIGNING_INSTALLER_P12:-${RUNNER_TEMP}/developer-id-installer.p12}" \
+            "${MACOS_SIGNING_NOTARY_KEY:-${RUNNER_TEMP}/AuthKey_${{ vars.MACOS_NOTARY_KEY_ID }}.p8}"
+
+  release-verification:
+    needs: [release, build-windows-installer, build-macos-installer]
+    if: >-
+      always() &&
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+    steps:
+      - name: Verify platform build jobs succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.build-windows-installer.result }}" != "success" ]]; then
+            echo "Windows installer job did not succeed: ${{ needs.build-windows-installer.result }}" >&2
+            exit 1
+          fi
+          if [[ "${{ needs.build-macos-installer.result }}" != "success" ]]; then
+            echo "macOS installer job did not succeed: ${{ needs.build-macos-installer.result }}" >&2
+            exit 1
+          fi
+
+      - name: Verify complete GitHub Release asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          assets="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')"
+          printf '%s\n' "${assets}"
+
+          expected_assets=(
+            "spx-installer-${version}.tgz"
+            "spx-installer-${version}.run"
+            "spx-installer-${version}.ps1"
+            "spx-installer-${version}.exe"
+            "spx-installer-macos-${version}.pkg"
+          )
+          for expected in "${expected_assets[@]}"; do
+            if ! grep -Fxq "${expected}" <<<"${assets}"; then
+              echo "Missing release asset: ${expected}" >&2
+              exit 1
+            fi
+          done
+
+  sync-release-to-www:
+    needs: [release, release-verification]
+    if: >-
+      needs.release.result == 'success' &&
+      needs.release.outputs.released == 'true' &&
+      needs.release-verification.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release.outputs.tag }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED: ${{ vars.SPX_WWW_STAGING_DOWNLOAD_SYNC_ENABLED }}
+      SPX_WWW_DOWNLOAD_SYNC_ENABLED: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_ENABLED }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_STAGING_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_STAGING_DOWNLOAD_SYNC_TOKEN }}
+      SPX_WWW_DOWNLOAD_SYNC_URL: ${{ vars.SPX_WWW_DOWNLOAD_SYNC_URL }}
+      SPX_WWW_DOWNLOAD_SYNC_TOKEN: ${{ secrets.SPX_WWW_DOWNLOAD_SYNC_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Notify SPX WWW environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/sync_release_to_www.sh \
+            --repository "${GITHUB_REPOSITORY}" \
+            --tag "${RELEASE_TAG}"

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "auth_provider.homeassistant",
+  "data": {
+    "users": [
+      {
+        "username": "spx_user",
+        "password": "JDJiJDEyJFNKRlBqR1k2NmxmL0lybUtYdU5DVS5XUmpMZWgzWjBtVDlmbURmVm04QW05Y3cxWERDSm11"
+      }
+    ]
+  }
+}

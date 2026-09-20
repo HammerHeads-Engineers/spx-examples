@@ -72,7 +72,7 @@ on uninstallShell(appsDirPath, packageId)
   set end of commandLines to "set -euo pipefail"
   set end of commandLines to "APPS_DIR=" & quoted form of appsDirPath
   set end of commandLines to "PACKAGE_ID=" & quoted form of packageId
-  set end of commandLines to "for app_name in 'SPX Setup.app' 'SPX Start.app' 'SPX Stop.app' 'SPX Cleanup.app' 'SPX Uninstall.app'; do"
+  set end of commandLines to "for app_name in 'SPX Setup.app' 'SPX MCP Setup.app' 'SPX Start.app' 'SPX Stop.app' 'SPX Cleanup.app' 'SPX Uninstall.app'; do"
   set end of commandLines to "  rm -rf \"$APPS_DIR/$app_name\""
   set end of commandLines to "done"
   set end of commandLines to "if [ \"$(/usr/bin/basename \"$APPS_DIR\")\" = 'SPX Tools' ]; then"

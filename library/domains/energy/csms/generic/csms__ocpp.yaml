@@ -1,0 +1,225 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: csms__ocpp
+description: |
+  Simulated OCPP 1.6 central system (CSMS) responding to a single charge point.
+  Implements BootNotification + Heartbeat responses per the spx-server integration
+  tests and records StatusNotification/MeterValues telemetry for dashboards.
+
+meta_parameters:
+  ocpp_server_host:
+    type: str
+    default: "0.0.0.0"
+  ocpp_server_port:
+    type: int
+    default: 9000
+  ocpp_server_path:
+    type: str
+    default: "/ocpp"
+  ocpp_subprotocol:
+    type: str
+    default: "ocpp1.6"
+  ocpp_charge_point_id:
+    type: str
+    default: "spx-csms"
+
+attributes:
+  csms_current_time:
+    type: str
+    default: "2025-01-01T00:00:00Z"
+  heartbeat_interval_s:
+    type: int
+    default: 30
+    unit: s
+  registration_status:
+    type: str
+    default: "Accepted"
+
+  last_boot_vendor:
+    type: str
+    default: ""
+  last_boot_model:
+    type: str
+    default: ""
+  last_boot_serial:
+    type: str
+    default: ""
+
+  last_connector_id:
+    type: int
+    default: 1
+  last_connector_status:
+    type: str
+    default: "Available"
+  last_error_code:
+    type: str
+    default: "NoError"
+  last_status_info:
+    type: str
+    default: ""
+  last_vendor_id:
+    type: str
+    default: ""
+  last_transaction_id:
+    type: int
+    default: 0
+
+  last_meter_values:
+    type: list
+    default: []
+  last_energy_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  last_power_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  status_text:
+    type: str
+    default: "CSMS idle"
+
+actions:
+  - function: $in(last_energy_wh)
+    name: derive_energy_from_meter_values
+    description: Extract energy register from the most recent MeterValues payload.
+    call: (
+          float($in(last_meter_values)[0]["sampledValue"][0]["value"])
+          if (
+            isinstance($in(last_meter_values), list)
+            and len($in(last_meter_values)) > 0
+            and isinstance($in(last_meter_values)[0], dict)
+            and "sampledValue" in $in(last_meter_values)[0]
+            and len($in(last_meter_values)[0]["sampledValue"]) > 0
+            and isinstance($in(last_meter_values)[0]["sampledValue"][0], dict)
+            and "value" in $in(last_meter_values)[0]["sampledValue"][0]
+          )
+          else $in(last_energy_wh)
+        )
+
+  - function: $in(last_power_w)
+    name: derive_power_from_meter_values
+    description: Capture instantaneous power from the latest sampled value list.
+    call: (
+          float(
+            next(
+              (
+                entry.get("value")
+                for entry in $in(last_meter_values)[0].get("sampledValue", [])
+                if entry.get("measurand") == "Power.Active.Import"
+              ),
+              $in(last_power_w),
+            )
+          )
+          if (
+            isinstance($in(last_meter_values), list)
+            and len($in(last_meter_values)) > 0
+            and isinstance($in(last_meter_values)[0], dict)
+          )
+          else $in(last_power_w)
+        )
+
+  - function: $in(status_text)
+    name: render_status_text
+    description: Summarise latest CP state for dashboards.
+    call: (
+          "Accepted CP boot from " + ($in(last_boot_serial) or "unknown")
+          + " / status=" + $in(last_connector_status)
+          + " / error=" + $in(last_error_code)
+        )
+
+communication:
+  - ocpp:
+      role: central_system
+      charge_point_id: "$param(ocpp_charge_point_id)"
+      server:
+        host: "$param(ocpp_server_host)"
+        port: "$param(ocpp_server_port)"
+        path: "$param(ocpp_server_path)"
+        subprotocol: "$param(ocpp_subprotocol)"
+      bindings:
+        boot_request:
+          direction: inbound
+          frame_type: call
+          action: BootNotification
+          payload:
+            chargePointVendor: "#attr(last_boot_vendor)"
+            chargePointModel: "#attr(last_boot_model)"
+            chargePointSerialNumber: "#attr(last_boot_serial)"
+        boot_response:
+          direction: outbound
+          frame_type: call_result
+          action: BootNotification
+          payload:
+            status: "#attr(registration_status)"
+            currentTime: "#attr(csms_current_time)"
+            heartbeatInterval: "#attr(heartbeat_interval_s)"
+        heartbeat_request:
+          direction: inbound
+          frame_type: call
+          action: Heartbeat
+          payload: {}
+        heartbeat_response:
+          direction: outbound
+          frame_type: call_result
+          action: Heartbeat
+          payload:
+            currentTime: "#attr(csms_current_time)"
+        status_notification_request:
+          direction: inbound
+          frame_type: call
+          action: StatusNotification
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            status: "#attr(last_connector_status)"
+            errorCode: "#attr(last_error_code)"
+            info: "#attr(last_status_info)"
+            vendorId: "#attr(last_vendor_id)"
+        status_notification_response:
+          direction: outbound
+          frame_type: call_result
+          action: StatusNotification
+          payload: {}
+        meter_values_request:
+          direction: inbound
+          frame_type: call
+          action: MeterValues
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            transactionId: "#attr(last_transaction_id)"
+            meterValue: "#attr(last_meter_values)"
+        meter_values_response:
+          direction: outbound
+          frame_type: call_result
+          action: MeterValues
+          payload: {}
+
+scenarios:
+  accept_evse:
+    enabled: true
+    display_name: "Accept EVSE Registration"
+    description: Accept the charge-point boot request with the nominal heartbeat interval.
+    duration: 15.0
+    overrides:
+      $in(registration_status): "Accepted"
+      $in(heartbeat_interval_s): 30
+      $in(csms_current_time): "2025-01-01T00:00:00Z"
+  reject_evse:
+    enabled: true
+    display_name: "Reject EVSE Registration"
+    description: Reject the boot request to exercise charge-point onboarding failure handling.
+    duration: 10.0
+    overrides:
+      $in(registration_status): "Rejected"
+      $in(heartbeat_interval_s): 0
+  fast_heartbeat:
+    enabled: true
+    display_name: "Fast Heartbeat"
+    description: Shorten the heartbeat interval for a more chatty demo session.
+    duration: 20.0
+    overrides:
+      $in(heartbeat_interval_s): 10
+      $in(csms_current_time): "2025-01-01T00:00:00Z"

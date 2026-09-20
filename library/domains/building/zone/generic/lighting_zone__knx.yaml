@@ -1,0 +1,217 @@
+# SPDX-License-Identifier: MIT
+
+name: lighting_zone__knx
+description: |
+  KNX lighting zone with two dimming circuits, scenes, daylight sensor and emergency override.
+  Lets KNX clients drive percentage setpoints, monitor occupancy and simulate alarm states.
+
+meta_parameters:
+  knx_router_host:
+    type: str
+    default: knx_gateway
+  knx_router_port:
+    type: int
+    default: 3671
+  knx_poll_interval:
+    type: float
+    default: 0.3
+  ga_main:
+    type: str
+    default: "1"
+
+attributes:
+  k__zone_state:
+    type: str
+    default: "automatic"
+  k__scene_active:
+    type: str
+    default: "default"
+  k__occupancy_detected:
+    type: int
+    default: 1
+  k__daylight_lux:
+    type: float
+    default: 280.0
+    unit: lx
+
+  circuit_a_level_percent:
+    type: float
+    default: 65.0
+    unit: percent
+  k__circuit_a_target_percent:
+    type: float
+    default: 70.0
+    unit: percent
+  circuit_b_level_percent:
+    type: float
+    default: 25.0
+    unit: percent
+  k__circuit_b_target_percent:
+    type: float
+    default: 30.0
+    unit: percent
+
+  k__emergency_override:
+    type: int
+    default: 0
+  alarm_emergency:
+    type: int
+    default: 0
+  alarm_failure:
+    type: int
+    default: 0
+
+  energy_today_kwh:
+    type: float
+    default: 4.2
+    unit: kWh
+  cycle_time_s:
+    type: float
+    default: 0.5
+    unit: s
+
+actions:
+  - function: $in(circuit_a_level_percent)
+    name: track_circuit_a
+    description: Circuit A level follows the target with mode gating.
+    call: (
+          0.0 if $in(k__zone_state) == "off"
+          else (
+            $in(k__circuit_a_target_percent)
+            if abs($in(k__circuit_a_target_percent) - $in(circuit_a_level_percent)) <= 4.0
+            else (
+              $in(circuit_a_level_percent)
+              + (4.0 if $in(k__circuit_a_target_percent) > $in(circuit_a_level_percent) else -4.0)
+            )
+          )
+        )
+
+  - function: $in(circuit_b_level_percent)
+    name: track_circuit_b
+    call: (
+          0.0 if $in(k__zone_state) == "off"
+          else (
+            $in(k__circuit_b_target_percent)
+            if abs($in(k__circuit_b_target_percent) - $in(circuit_b_level_percent)) <= 4.0
+            else (
+              $in(circuit_b_level_percent)
+              + (4.0 if $in(k__circuit_b_target_percent) > $in(circuit_b_level_percent) else -4.0)
+            )
+          )
+        )
+
+  - function: $in(k__daylight_lux)
+    name: update_daylight
+    description: Daylight reacts to occupancy and circuit levels.
+    call: max(
+          30.0,
+          min(
+            900.0,
+            $in(k__daylight_lux)
+            + 0.5 * ($in(circuit_a_level_percent) + $in(circuit_b_level_percent))
+            + 10.0 * ($in(k__occupancy_detected) - 0.5)
+            - 15.0 * $in(k__emergency_override)
+          )
+        )
+
+  - function: $in(energy_today_kwh)
+    name: integrate_energy
+    description: Basic energy counter for both circuits.
+    call: $in(energy_today_kwh) + ($in(circuit_a_level_percent) + $in(circuit_b_level_percent)) * cycle_time_s / 20000.0
+
+  - function: $in(alarm_emergency)
+    name: detect_emergency_alarm
+    call: 1 if $in(k__emergency_override) == 1 else 0
+
+  - function: $in(alarm_failure)
+    name: detect_failure_alarm
+    call: 1 if ($in(k__zone_state) == "automatic" and $in(circuit_a_level_percent) < 1.0 and $in(k__circuit_a_target_percent) > 40.0) else 0
+
+communication:
+  - knx_ip:
+      router:
+        host: "$param(knx_router_host)"
+        port: "$param(knx_router_port)"
+        route_back: true
+      poll_interval: "$param(knx_poll_interval)"
+      bindings:
+        - name: circuit_a_level
+          direction: bidirectional
+          group_address: "$param(ga_main)/1/10"
+          value_codec: uint8
+          read_attribute: "#attr(circuit_a_level_percent)"
+          write_attribute: "#attr(k__circuit_a_target_percent)"
+        - name: circuit_b_level
+          direction: bidirectional
+          group_address: "$param(ga_main)/1/11"
+          value_codec: uint8
+          read_attribute: "#attr(circuit_b_level_percent)"
+          write_attribute: "#attr(k__circuit_b_target_percent)"
+        - name: k__zone_state
+          direction: bidirectional
+          group_address: "$param(ga_main)/1/12"
+          value_codec: string
+          read_attribute: "#attr(k__zone_state)"
+          write_attribute: "#attr(k__zone_state)"
+          payload_length: 8
+        - name: scene_select
+          direction: inbound
+          group_address: "$param(ga_main)/1/13"
+          value_codec: string
+          payload_length: 8
+          write_attribute: "#attr(k__scene_active)"
+        - name: occupancy
+          direction: inbound
+          group_address: "$param(ga_main)/1/14"
+          value_codec: bool
+          write_attribute: "#attr(k__occupancy_detected)"
+        - name: daylight_sensor
+          direction: outbound
+          group_address: "$param(ga_main)/1/15"
+          dpt: 9.004
+          read_attribute: "#attr(k__daylight_lux)"
+        - name: k__emergency_override
+          direction: inbound
+          group_address: "$param(ga_main)/1/16"
+          value_codec: bool
+          write_attribute: "#attr(k__emergency_override)"
+        - name: alarm_emergency
+          direction: outbound
+          group_address: "$param(ga_main)/1/17"
+          value_codec: bool
+          read_attribute: "#attr(alarm_emergency)"
+        - name: alarm_failure
+          direction: outbound
+          group_address: "$param(ga_main)/1/18"
+          value_codec: bool
+          read_attribute: "#attr(alarm_failure)"
+
+scenarios:
+  workday_scene:
+    display_name: "Workday Scene"
+    description: Apply normal automatic workday lighting targets.
+    duration: 15.0
+    overrides:
+      $in(k__zone_state): automatic
+      $in(k__scene_active): daylight
+      $in(k__circuit_a_target_percent): 70.0
+      $in(k__circuit_b_target_percent): 40.0
+
+  cleaning_scene:
+    display_name: "Cleaning Scene"
+    description: Override the zone into a brighter manual cleaning scene.
+    duration: 10.0
+    overrides:
+      $in(k__zone_state): manual
+      $in(k__scene_active): cleaning
+      $in(k__circuit_a_target_percent): 100.0
+      $in(k__circuit_b_target_percent): 80.0
+
+  night_shutdown:
+    display_name: "Night Shutdown"
+    description: Turn the zone off and clear occupancy for night operation.
+    duration: 25.0
+    overrides:
+      $in(k__zone_state): off
+      $in(k__scene_active): night
+      $in(k__occupancy_detected): 0

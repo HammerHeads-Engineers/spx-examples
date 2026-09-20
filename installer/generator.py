@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import stat
 import json
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -41,6 +42,7 @@ class DeploymentGenerator:
 
     def generate(self, selection, output_dir: Path) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        spx_python_requirement = self._resolve_spx_python_requirement()
 
         installation_id = uuid.uuid4().hex
 
@@ -64,7 +66,12 @@ class DeploymentGenerator:
 
         self._write_env(output_dir, selection.license_key)
         self._write_bundle(output_dir, selection, installation_id=installation_id, compose_data=compose_data)
-        self._write_hardened_artifacts(output_dir, installation_id, compose_data)
+        self._write_hardened_artifacts(
+            output_dir,
+            installation_id,
+            compose_data,
+            spx_python_requirement,
+        )
         return
 
         bootstrap_cmd_sh = '"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" --bundle "$SCRIPT_DIR/bundle.json"\n'
@@ -75,17 +82,11 @@ class DeploymentGenerator:
 
         start_script = """
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -z "${PYTHON_BIN:-}" ]; then
-  if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN=python3
-  elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN=python
-  else
-    echo "[spx-start] Missing required command: python3 or python" >&2
-    exit 1
-  fi
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
 fi
-REQUIRED_MODULES=(requests:requests spx_python:spx-python yaml:pyyaml)
 BLE_ADAPTER_PORT=${BLE_ADAPTER_PORT:-8085}
 BLE_ADAPTER_PID=""
 
@@ -109,33 +110,60 @@ need_cmd() {
   fi
 }
 
-check_python_modules() {
-  local missing=()
-  local packages=()
-  for entry in "${REQUIRED_MODULES[@]}"; do
-    local module="${entry%%:*}"
-    local package="${entry##*:}"
-    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
-      missing+=("$module")
-      packages+=("$package")
-    fi
-  done
-  if [ ${#missing[@]} -eq 0 ]; then
+resolve_system_python() {
+  if [ -n "${PYTHON_BIN:-}" ]; then
+    printf '%s\n' "${PYTHON_BIN}"
     return
   fi
-  echo "[spx-start] Missing Python modules: ${missing[*]}. Installing via pip..."
-  "$PYTHON_BIN" -m pip install --user "${packages[@]}"
-  for module in "${missing[@]}"; do
-    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
-      echo "[spx-start] Unable to import module '${module}' even after pip install." >&2
-      exit 1
+
+  if [ "$(uname -s)" = "Darwin" ] && command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    local bundled_python
+    bundled_python="$(spx_resolve_macos_python || true)"
+    if [ -n "${bundled_python}" ]; then
+      printf '%s\n' "${bundled_python}"
+      return
     fi
-  done
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    printf 'python3\n'
+    return
+  fi
+
+  if command -v python >/dev/null 2>&1; then
+    printf 'python\n'
+    return
+  fi
+
+  echo "[spx-start] Missing required command: python3 or python" >&2
+  exit 1
 }
 
+bootstrap_python_runtime() {
+  local system_python="$1"
+  local runtime_bootstrap="$SCRIPT_DIR/runtime_bootstrap.py"
+
+  if [ ! -f "$runtime_bootstrap" ]; then
+    echo "[spx-start] Missing runtime bootstrap helper: $runtime_bootstrap" >&2
+    exit 1
+  fi
+
+  "$system_python" "$runtime_bootstrap" \
+    --venv-dir "$SCRIPT_DIR/.spx-runtime" \
+    --package requests \
+    --package "__SPX_PYTHON_REQUIREMENT__" \
+    --package pyyaml
+}
+
+SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd docker
-need_cmd "$PYTHON_BIN"
-check_python_modules
+need_cmd "$SYSTEM_PYTHON_BIN"
+PYTHON_BIN="$(bootstrap_python_runtime "$SYSTEM_PYTHON_BIN")"
+if [ ! -x "$PYTHON_BIN" ]; then
+  echo "[spx-start] Python runtime bootstrap did not return an executable interpreter." >&2
+  exit 1
+fi
+export PYTHON_BIN
 
 # Optional BLE adapter (NodeJS) support
 HAS_BLE=$(
@@ -176,6 +204,9 @@ echo "[spx-start] SPX started successfully."
 echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
 echo "[spx-start] You can now open the available services and start playing with SPX :)"
 """
+        start_script = start_script.replace(
+            "__SPX_PYTHON_REQUIREMENT__", spx_python_requirement
+        )
         start_script = start_script.replace("__BOOTSTRAP_CMD_SH__", bootstrap_cmd_sh).strip("\n")
         start_script_ps1 = r"""
 $ErrorActionPreference = "Stop"
@@ -214,12 +245,6 @@ function Resolve-Python {
     throw "[spx-start] Missing required command: python (3.x). Install Python 3 or set PYTHON_BIN."
 }
 
-$PythonBin = Resolve-Python
-$RequiredModules = @(
-    @{ Module = "requests"; Package = "requests" },
-    @{ Module = "spx_python"; Package = "spx-python" },
-    @{ Module = "yaml"; Package = "pyyaml" }
-)
 $BleAdapterPort = if ($Env:BLE_ADAPTER_PORT) { $Env:BLE_ADAPTER_PORT } else { 8085 }
 $bleProcess = $null
 
@@ -230,39 +255,34 @@ function Need-Command {
     }
 }
 
-function Check-PythonModules {
-    function Test-PythonModule {
-        param([string]$Module)
-        $checkCmd = "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('$Module') else 1)"
-        try {
-            & $PythonBin -c $checkCmd 2>$null | Out-Null
-        } catch {
-            return $false
-        }
-        return ($LASTEXITCODE -eq 0)
+function Bootstrap-PythonRuntime {
+    param([string]$SystemPython)
+
+    $runtimeBootstrap = Join-Path $ScriptDir "runtime_bootstrap.py"
+    if (-not (Test-Path $runtimeBootstrap)) {
+        throw "[spx-start] Missing runtime bootstrap helper: $runtimeBootstrap"
     }
 
-    $missing = @()
-    foreach ($entry in $RequiredModules) {
-        if (-not (Test-PythonModule $entry.Module)) {
-            $missing += $entry
-        }
-    }
-    if ($missing.Count -eq 0) {
-        return
-    }
-    $moduleNames = $missing | ForEach-Object { $_.Module }
-    $packages = $missing | ForEach-Object { $_.Package }
-    Write-Host "[spx-start] Missing Python modules: $($moduleNames -join ', '). Installing via pip..."
-    & $PythonBin -m pip install --user @($packages)
+    $pythonPath = & $SystemPython $runtimeBootstrap `
+        --venv-dir (Join-Path $ScriptDir ".spx-runtime") `
+        --package "requests" `
+        --package "__SPX_PYTHON_REQUIREMENT__" `
+        --package "pyyaml"
+
     if ($LASTEXITCODE -ne 0) {
-        throw "[spx-start] pip install failed"
+        throw "[spx-start] Failed to prepare the local Python runtime."
     }
-    foreach ($entry in $missing) {
-        if (-not (Test-PythonModule $entry.Module)) {
-            throw "[spx-start] Unable to import module '$($entry.Module)' even after pip install."
-        }
+
+    $pythonPath = "$pythonPath".Trim()
+    if (-not $pythonPath) {
+        throw "[spx-start] Local Python runtime bootstrap returned an empty interpreter path."
     }
+
+    if (-not (Test-Path $pythonPath)) {
+        throw "[spx-start] Local Python runtime bootstrap returned a missing interpreter: $pythonPath"
+    }
+
+    return $pythonPath
 }
 
 function Cleanup-OnFailure {
@@ -278,8 +298,9 @@ function Cleanup-OnFailure {
 
 try {
     Need-Command "docker"
-    Need-Command $PythonBin
-    Check-PythonModules
+    $SystemPython = Resolve-Python
+    Need-Command $SystemPython
+    $PythonBin = Bootstrap-PythonRuntime $SystemPython
 
     $bundlePath = Join-Path $ScriptDir "bundle.json"
     $hasBle = $false
@@ -295,19 +316,7 @@ try {
     }
 
     if ($hasBle) {
-        if (Get-Command npm -ErrorAction SilentlyContinue) {
-            if (Get-Command spx-ble-adapter -ErrorAction SilentlyContinue) {
-                Write-Host "[spx-start] Updating BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
-                npm update -g '@simplephysx/spx-ble-adapter' | Out-Null
-            } else {
-                Write-Host "[spx-start] Installing BLE adapter '@simplephysx/spx-ble-adapter' via npm -g"
-                npm install -g '@simplephysx/spx-ble-adapter' | Out-Null
-            }
-            Write-Host "[spx-start] Starting BLE adapter on port $BleAdapterPort"
-            $bleProcess = Start-Process "spx-ble-adapter" -ArgumentList "--port", "$BleAdapterPort" -NoNewWindow -PassThru
-        } else {
-            Write-Warning "[spx-start] npm not available; skipping BLE adapter start"
-        }
+        Write-Warning "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. Skipping npm install and BLE adapter startup. Use WSL2, macOS/Linux, or an external BLE bridge."
     }
 
     Write-Warning "[spx-start] Legacy cleanup path disabled; stack_manager.py owns container cleanup."
@@ -325,6 +334,9 @@ catch {
     Cleanup-OnFailure 1
 }
 """
+        start_script_ps1 = start_script_ps1.replace(
+            "__SPX_PYTHON_REQUIREMENT__", spx_python_requirement
+        )
         start_script_ps1 = start_script_ps1.replace("__BOOTSTRAP_CMD_PS__", bootstrap_cmd_ps)
         self._write_script(output_dir / "spx-start.sh", start_script.strip() + "\n")
         self._write_ps_script(output_dir / "spx-start.ps1", start_script_ps1.strip() + "\n")
@@ -354,6 +366,8 @@ exit /b %EXITCODE%
         self._write_text_script(output_dir / "spx-start.command", start_command.strip() + "\n", executable=True)
         self._write_text_script(output_dir / "spx-start.bat", start_bat.strip() + "\n")
         self._write_bootstrap_runner(output_dir)
+        self._write_runtime_bootstrap(output_dir)
+        self._write_macos_python_helper(output_dir)
         stop_script = """
 echo "[spx-stop] Legacy stop path disabled; stack_manager.py owns exact-container cleanup."
 """
@@ -646,30 +660,46 @@ exit /b %EXITCODE%
         output_dir: Path,
         installation_id: str,
         compose_data: Dict[str, Dict],
+        spx_python_requirement: str,
     ) -> None:
         """Write the transactional scripts used by every generated bundle."""
 
         shutil.copy2(Path(__file__).with_name("stack_manager.py"), output_dir / "stack_manager.py")
         shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
+        self._write_runtime_bootstrap(output_dir)
+        self._write_macos_python_helper(output_dir)
 
         required_ports = ",".join(str(port) for port in self._compose_host_ports(compose_data))
         bash = r'''SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
 INSTALLATION_ID="__INSTALLATION_ID__"
 SNAPSHOT="$SCRIPT_DIR/.spx-stack-snapshot.json"
 MANAGER="$SCRIPT_DIR/stack_manager.py"
 STAGE="runtime"
-PYTHON_BIN="${PYTHON_BIN:-}"
+SYSTEM_PYTHON_BIN="${PYTHON_BIN:-}"
+PYTHON_BIN="$SYSTEM_PYTHON_BIN"
 BLE_ADAPTER_PID=""
 
-if [ -z "$PYTHON_BIN" ]; then
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
+  if command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    SYSTEM_PYTHON_BIN="$(spx_resolve_macos_python || true)"
+  fi
+fi
+
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
   if command -v python3 >/dev/null 2>&1; then
-    PYTHON_BIN=python3
+    SYSTEM_PYTHON_BIN=python3
   elif command -v python >/dev/null 2>&1; then
-    PYTHON_BIN=python
+    SYSTEM_PYTHON_BIN=python
   else
     echo "[spx-start] stage=runtime: missing Python 3" >&2
     exit 1
   fi
+  PYTHON_BIN="$SYSTEM_PYTHON_BIN"
 fi
 
 ASSUME_ARGS=()
@@ -706,27 +736,21 @@ need_cmd() {
   fi
 }
 
-check_python_modules() {
-  local missing=()
-  local packages=()
-  for entry in requests:requests spx_python:spx-python yaml:pyyaml; do
-    local module="${entry%%:*}"
-    local package="${entry##*:}"
-    if ! "$PYTHON_BIN" -c "import ${module}" >/dev/null 2>&1; then
-      missing+=("${module}")
-      packages+=("${package}")
-    fi
-  done
-  if [ "${#missing[@]}" -eq 0 ]; then
-    return
-  fi
-  echo "[spx-start] stage=runtime: installing missing Python modules: ${missing[*]}"
-  "$PYTHON_BIN" -m pip install --user "${packages[@]}"
-}
-
 need_cmd docker
-STAGE="runtime"
-check_python_modules
+need_cmd "$SYSTEM_PYTHON_BIN"
+if [ ! -f "$SCRIPT_DIR/runtime_bootstrap.py" ]; then
+  echo "[spx-start] stage=runtime: missing runtime bootstrap helper" >&2
+  exit 1
+fi
+PYTHON_BIN="$($SYSTEM_PYTHON_BIN "$SCRIPT_DIR/runtime_bootstrap.py" \
+  --venv-dir "$SCRIPT_DIR/.spx-runtime" \
+  --package requests \
+  --package "__SPX_PYTHON_REQUIREMENT__" \
+  --package pyyaml)"
+if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+  echo "[spx-start] stage=runtime: local Python runtime bootstrap failed" >&2
+  exit 1
+fi
 
 if "$PYTHON_BIN" - "$SCRIPT_DIR/bundle.json" <<'PY'
 import json
@@ -786,7 +810,7 @@ docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "
 echo ""
 echo "[spx-start] SPX started successfully."
 echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
-'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports)
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
         ui_enabled = SPX_UI_SERVICE_NAME in (compose_data.get("services", {}) or {})
         self._write_script(
             output_dir / "spx-start.sh",
@@ -811,6 +835,30 @@ function Resolve-Python {
     throw "Missing Python 3"
 }
 
+function Bootstrap-PythonRuntime {
+    param([string]$SystemPython)
+
+    $runtimeBootstrap = Join-Path $ScriptDir "runtime_bootstrap.py"
+    if (-not (Test-Path $runtimeBootstrap)) {
+        throw "Missing runtime bootstrap helper: $runtimeBootstrap"
+    }
+
+    $pythonPath = & $SystemPython $runtimeBootstrap `
+        --venv-dir (Join-Path $ScriptDir ".spx-runtime") `
+        --package "requests" `
+        --package "__SPX_PYTHON_REQUIREMENT__" `
+        --package "pyyaml"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to prepare the local Python runtime"
+    }
+
+    $pythonPath = "$pythonPath".Trim()
+    if (-not $pythonPath -or -not (Test-Path $pythonPath)) {
+        throw "Local Python runtime bootstrap returned an invalid interpreter path"
+    }
+    return $pythonPath
+}
+
 function Invoke-Manager {
     param([string[]]$Arguments)
     & $PythonBin $Manager @Arguments
@@ -823,12 +871,25 @@ function Redact-Message {
 }
 
 try {
-    $PythonBin = Resolve-Python
+    $SystemPython = Resolve-Python
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Missing Docker CLI" }
     $Stage = "runtime"
-    foreach ($module in @("requests", "spx_python", "yaml")) {
-        & $PythonBin -c "import $module" 2>$null
-        if ($LASTEXITCODE -ne 0) { throw "Missing Python module $module" }
+    $PythonBin = Bootstrap-PythonRuntime $SystemPython
+
+    $bundlePath = Join-Path $ScriptDir "bundle.json"
+    $hasBle = $false
+    if (Test-Path $bundlePath) {
+        try {
+            $bundle = Get-Content $bundlePath -Raw | ConvertFrom-Json
+            if ($bundle.services -and ($bundle.services -contains "btvirt_adapter")) {
+                $hasBle = $true
+            }
+        } catch {
+            $hasBle = $false
+        }
+    }
+    if ($hasBle) {
+        Write-Warning "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. Skipping npm install and BLE adapter startup. Use WSL2, macOS/Linux, or an external BLE bridge."
     }
 
     $Stage = "preflight"
@@ -868,7 +929,7 @@ catch {
     }
     exit 1
 }
-'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports)
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
         self._write_ps_script(
             output_dir / "spx-start.ps1",
             powershell.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
@@ -967,6 +1028,21 @@ exit /b %ERRORLEVEL%
             dest = output_dir / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dest)
+
+    def _resolve_spx_python_requirement(self) -> str:
+        pyproject = self.repo_root / "pyproject.toml"
+        if not pyproject.exists():
+            return "spx-python"
+
+        content = pyproject.read_text(encoding="utf-8")
+        match = re.search(r'^\s*spx-python\s*=\s*"([^"]+)"', content, flags=re.MULTILINE)
+        if not match:
+            return "spx-python"
+
+        spec = match.group(1).strip()
+        if not spec or any(char in spec for char in "^~<>*,[]"):
+            return "spx-python"
+        return f"spx-python=={spec}"
 
     def _write_bootstrap_runner(self, output_dir: Path) -> None:
         # Keep one canonical implementation.  The legacy inline runner below
@@ -1173,3 +1249,27 @@ if __name__ == "__main__":  # pragma: no cover
 """
         path = output_dir / "bootstrap_runner.py"
         path.write_text(runner, encoding="utf-8")
+
+    def _write_runtime_bootstrap(self, output_dir: Path) -> None:
+        src = self.repo_root / "installer" / "runtime_bootstrap.py"
+        if not src.exists():
+            src = Path(__file__).with_name("runtime_bootstrap.py")
+        if not src.exists():
+            raise FileNotFoundError(f"Missing runtime bootstrap helper: {src}")
+
+        dest = output_dir / "runtime_bootstrap.py"
+        shutil.copy2(src, dest)
+        mode = os.stat(dest).st_mode
+        os.chmod(dest, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+    def _write_macos_python_helper(self, output_dir: Path) -> None:
+        src = self.repo_root / "installer" / "macos" / "python_runtime.sh"
+        if not src.exists():
+            src = Path(__file__).parent / "macos" / "python_runtime.sh"
+        if not src.exists():
+            raise FileNotFoundError(f"Missing macOS Python runtime helper: {src}")
+
+        dest = output_dir / "macos_python_runtime.sh"
+        shutil.copy2(src, dest)
+        mode = os.stat(dest).st_mode
+        os.chmod(dest, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

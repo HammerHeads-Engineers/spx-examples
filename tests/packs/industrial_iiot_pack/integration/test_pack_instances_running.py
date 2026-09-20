@@ -15,6 +15,7 @@ INSTANCE_KEYS = [
     "spx_eurotherm_3216_temp",
     "spx_eurotherm_3504_pressure",
     "spx_g120c_vfd",
+    "spx_altivar_320_vfd",
     "spx_wago_750_8000_io",
 ]
 
@@ -100,11 +101,11 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         baseline_pressure = _float_attr(attrs_3504["pressure_sp_bar"])
         self.assertIsNotNone(baseline_pressure, "Unable to read Eurotherm 3504 pressure setpoint.")
 
-        attrs_3216["auto_man_raw"].internal_value = 0
-        attrs_3216["target_sp_raw"].internal_value = 600
+        attrs_3216["k__auto_man"].internal_value = 0
+        attrs_3216["k__setpoint_c"].internal_value = 60.0
 
         temp_ready = wait_for_condition(
-            lambda: abs((_float_attr(attrs_3216["setpoint_c"]) or 0.0) - 60.0) <= 0.1,
+            lambda: abs((_float_attr(attrs_3216["k__setpoint_c"]) or 0.0) - 60.0) <= 0.1,
             timeout=5.0,
             interval=0.2,
         )
@@ -117,7 +118,7 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
             "Eurotherm 3504 setpoint changed while updating Eurotherm 3216.",
         )
 
-        baseline_temp = _float_attr(attrs_3216["setpoint_c"])
+        baseline_temp = _float_attr(attrs_3216["k__setpoint_c"])
         self.assertIsNotNone(baseline_temp, "Unable to read Eurotherm 3216 temperature setpoint.")
 
         attrs_3504["auto_man_raw"].internal_value = 0
@@ -130,7 +131,7 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         )
         self.assertTrue(pressure_ready, "Eurotherm 3504 setpoint did not reach 2.5 bar.")
 
-        temp_after_pressure = _float_attr(attrs_3216["setpoint_c"])
+        temp_after_pressure = _float_attr(attrs_3216["k__setpoint_c"])
         self.assertIsNotNone(temp_after_pressure, "Unable to read Eurotherm 3216 temperature setpoint.")
         self.assertTrue(
             abs(temp_after_pressure - baseline_temp) <= 0.1,
@@ -139,9 +140,11 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
 
     def test_drive_io_opcua_commands_are_independent(self):
         g120c = self._instances["spx_g120c_vfd"]
+        altivar = self._instances["spx_altivar_320_vfd"]
         wago = self._instances["spx_wago_750_8000_io"]
 
         g120c_attrs = g120c["attributes"]
+        altivar_attrs = altivar["attributes"]
         wago_attrs = wago["attributes"]
 
         g120c_attrs["control_word_raw"].internal_value = 79
@@ -153,6 +156,16 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
             interval=0.2,
         )
         self.assertTrue(drive_ready, "G120C did not ramp the actual speed above 0.5 Hz.")
+
+        altivar_attrs["cmd__control_word_raw"].internal_value = 1
+        altivar_attrs["k__speed_setpoint_raw"].internal_value = 30
+
+        altivar_ready = wait_for_condition(
+            lambda: (_float_attr(altivar_attrs["speed_actual_hz"]) or 0.0) > 0.5,
+            timeout=8.0,
+            interval=0.2,
+        )
+        self.assertTrue(altivar_ready, "Altivar 320 did not ramp the actual speed above 0.5 Hz.")
 
         wago_attrs["do_1"].internal_value = 1
         io_ready = wait_for_condition(

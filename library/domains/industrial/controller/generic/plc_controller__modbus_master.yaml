@@ -1,0 +1,258 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: plc_controller__modbus_master
+description: |
+  Generic PLC-style controller that uses Modbus TCP master bindings to supervise
+  a Schneider Altivar 320 VFD and a Schneider iEM3000 energy meter. The model
+  demonstrates a typical PLC pattern:
+    - persistent drive run/speed commands written to downstream Modbus slaves
+    - drive feedback and meter telemetry read back into controller state
+    - a simple local interlock that blocks the drive when measured power exceeds
+      the configured limit
+
+meta_parameters:
+  drive_host:
+    type: string
+    default: 127.0.0.1
+  drive_port:
+    type: int
+    default: 5030
+  drive_unit_id:
+    type: int
+    default: 1
+  meter_host:
+    type: string
+    default: 127.0.0.1
+  meter_port:
+    type: int
+    default: 5023
+  meter_unit_id:
+    type: int
+    default: 1
+
+attributes:
+  k__drive_run_enable:
+    type: int
+    default: 0
+  k__drive_speed_setpoint_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  k__power_limit_kw:
+    type: float
+    default: 20.0
+    unit: kW
+  k__power_limit_stop_enable:
+    type: int
+    default: 1
+
+  drive_status_word_raw:
+    type: int
+    default: 0
+  drive_speed_actual_raw:
+    type: int
+    default: 0
+  drive_speed_actual_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  drive_run_effective:
+    type: int
+    default: 0
+  drive_running:
+    type: int
+    default: 0
+  drive_fault_active:
+    type: int
+    default: 0
+
+  meter_active_power_total_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  meter_frequency_hz:
+    type: float
+    default: 0.0
+    unit: Hz
+  meter_energy_import_total_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+
+  power_limit_active:
+    type: int
+    default: 0
+  drive_command_blocked:
+    type: int
+    default: 0
+
+  drive_speed_scale_hz_per_unit:
+    type: float
+    default: 1.0
+    unit: Hz/unit
+  drive_speed_max_hz:
+    type: float
+    default: 60.0
+    unit: Hz
+
+  _drive_control_word_raw:
+    type: int
+    default: 0
+  _drive_speed_setpoint_raw:
+    type: int
+    default: 0
+
+actions:
+  - function: $in(power_limit_active)
+    name: compute_power_limit_active
+    description: Raise the PLC interlock when measured active power exceeds the configured limit.
+    call: 1 if ($in(k__power_limit_stop_enable) == 1 and $in(meter_active_power_total_kw) > $in(k__power_limit_kw)) else 0
+
+  - function: $in(drive_command_blocked)
+    name: compute_drive_command_blocked
+    description: Expose whether a requested drive run is currently blocked by the PLC interlock.
+    call: 1 if ($in(k__drive_run_enable) == 1 and $in(power_limit_active) == 1) else 0
+
+  - function: $in(drive_run_effective)
+    name: compute_drive_run_effective
+    description: Forward the run request only when the power-limit interlock is clear.
+    call: 1 if ($in(k__drive_run_enable) == 1 and $in(power_limit_active) == 0) else 0
+
+  - function: $in(_drive_control_word_raw)
+    name: encode_drive_control_word_raw
+    description: Encode the effective run request into the Altivar command register.
+    call: 1 if $in(drive_run_effective) == 1 else 0
+
+  - function: $in(_drive_speed_setpoint_raw)
+    name: encode_drive_speed_setpoint_raw
+    description: Encode the requested drive speed into the Altivar speed reference register.
+    call: int(round(
+            (
+              max(0.0, min($in(drive_speed_max_hz), $in(k__drive_speed_setpoint_hz)))
+              if $in(drive_run_effective) == 1
+              else 0.0
+            ) / max(0.001, $in(drive_speed_scale_hz_per_unit))
+          ))
+
+  - function: $in(drive_speed_actual_hz)
+    name: decode_drive_speed_actual_hz
+    description: Convert the Altivar raw speed feedback register into engineering units.
+    call: $in(drive_speed_actual_raw) * $in(drive_speed_scale_hz_per_unit)
+
+  - function: $in(drive_running)
+    name: compute_drive_running
+    description: Consider the drive running when the actual speed is measurably above zero.
+    call: 1 if abs($in(drive_speed_actual_hz)) >= 0.1 else 0
+
+  - function: $in(drive_fault_active)
+    name: decode_drive_fault_active
+    description: Decode the Altivar minimal fault bit from the lower status-word nibble.
+    call: 1 if (($in(drive_status_word_raw) % 16) >= 8) else 0
+
+polling:
+  interval: 0.2
+
+communication:
+  - modbus_master:
+      poll_interval: 0.2
+      timeout: 1.0
+      max_retries: 1
+      retry_delay: 0.1
+      bindings:
+        - name: query_drive_status_word
+          host: "$param(drive_host)"
+          port: "$param(drive_port)"
+          slave_id: "$param(drive_unit_id)"
+          area: h_r
+          address: 12741
+          length: 1
+          codec: uint_16
+          direction: inbound
+          attribute: drive_status_word_raw
+
+        - name: query_drive_speed_actual
+          host: "$param(drive_host)"
+          port: "$param(drive_port)"
+          slave_id: "$param(drive_unit_id)"
+          area: h_r
+          address: 12742
+          length: 1
+          codec: uint_16
+          direction: inbound
+          attribute: drive_speed_actual_raw
+
+        - name: set_drive_control_word
+          host: "$param(drive_host)"
+          port: "$param(drive_port)"
+          slave_id: "$param(drive_unit_id)"
+          area: h_r
+          address: 12761
+          length: 1
+          codec: uint_16
+          direction: outbound
+          attribute: _drive_control_word_raw
+
+        - name: set_drive_speed_reference
+          host: "$param(drive_host)"
+          port: "$param(drive_port)"
+          slave_id: "$param(drive_unit_id)"
+          area: h_r
+          address: 12762
+          length: 1
+          codec: uint_16
+          direction: outbound
+          attribute: _drive_speed_setpoint_raw
+
+        - name: query_meter_active_power_total
+          host: "$param(meter_host)"
+          port: "$param(meter_port)"
+          slave_id: "$param(meter_unit_id)"
+          area: i_r
+          address: 3060
+          length: 2
+          codec: float
+          direction: inbound
+          attribute: meter_active_power_total_kw
+
+        - name: query_meter_frequency
+          host: "$param(meter_host)"
+          port: "$param(meter_port)"
+          slave_id: "$param(meter_unit_id)"
+          area: i_r
+          address: 3110
+          length: 2
+          codec: float
+          direction: inbound
+          attribute: meter_frequency_hz
+
+        - name: query_meter_energy_import_total
+          host: "$param(meter_host)"
+          port: "$param(meter_port)"
+          slave_id: "$param(meter_unit_id)"
+          area: h_r
+          address: 45100
+          length: 2
+          codec: float
+          direction: inbound
+          attribute: meter_energy_import_total_kwh
+
+scenarios:
+  drive_run_nominal:
+    display_name: Drive Run Nominal
+    description: Enable the drive at a moderate speed with the power limit comfortably above the measured load.
+    duration: 20.0
+    overrides:
+      $in(k__drive_run_enable): 1
+      $in(k__drive_speed_setpoint_hz): 25.0
+      $in(k__power_limit_kw): 20.0
+
+  power_limit_stop:
+    display_name: Power-Limit Stop
+    description: Request the drive while keeping the PLC power limit below the measured meter load.
+    duration: 20.0
+    overrides:
+      $in(k__drive_run_enable): 1
+      $in(k__drive_speed_setpoint_hz): 25.0
+      $in(k__power_limit_kw): 3.0
