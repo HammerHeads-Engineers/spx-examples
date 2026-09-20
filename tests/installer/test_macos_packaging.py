@@ -15,6 +15,12 @@ def test_native_macos_package_flow_contains_launchers_license_and_notarization()
     assert "--app-sign" in package_script
     assert "--notarytool-profile" in package_script
     assert "notarize_package" in package_script
+    assert r'"\${COMMAND_LINE_INSTALL:-}"' in package_script
+    assert r'"\${SPX_SKIP_AUTO_SETUP:-}"' in package_script
+    assert "Installer.app/Contents/MacOS/Installer" in package_script
+    assert r'/bin/launchctl bootstrap "gui/\${console_uid}"' in package_script
+    assert r'launchctl bootstrap "gui/\${console_uid}"' in package_script
+    assert 'launchctl asuser' not in package_script
     assert (ROOT / "packaging/macos/resources/English.lproj/License.rtf").is_file()
     for name in (
         "spx_setup_launcher.applescript",
@@ -24,6 +30,13 @@ def test_native_macos_package_flow_contains_launchers_license_and_notarization()
         "spx_uninstall_launcher.applescript",
     ):
         assert (ROOT / "installer/macos" / name).is_file()
+
+
+def test_macos_setup_command_only_pauses_when_setup_fails() -> None:
+    launcher = (ROOT / "spx-setup.command").read_text(encoding="utf-8")
+
+    assert 'if [ "$EXIT_CODE" -ne 0 ]; then' in launcher
+    assert 'read -r -p "Press Enter to close..." _ || true' in launcher
 
 
 def test_macos_cleanup_preserves_docker_data_and_unrelated_processes() -> None:

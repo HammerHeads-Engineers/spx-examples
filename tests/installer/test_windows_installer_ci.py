@@ -116,3 +116,11 @@ def test_windows_bundle_uses_an_spx_owned_python_marker() -> None:
     assert 'DetectCondition="SpxBundledPython312Installed = 1"' in bundle
     assert "Python312InstallPathPerMachine OR Python312InstallPathPerUser" not in bundle
     assert 'Name="BundledPython312Installed"' in product
+
+
+def test_windows_bundle_offers_setup_launch_on_success() -> None:
+    bundle = BUNDLE_WXS_PATH.read_text(encoding="utf-8")
+
+    assert 'LaunchTarget="[LocalAppDataFolder]SPX\\app\\SpxLauncher.exe"' in bundle
+    assert 'LaunchArguments="setup --pause-on-exit"' in bundle
+    assert 'LaunchWorkingFolder="[LocalAppDataFolder]SPX\\app"' in bundle

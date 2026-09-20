@@ -38,7 +38,10 @@
         LocalizationFile="$(var.ThemeLocalizationFile)"
         LicenseFile="$(var.LicenseFile)"
         LogoFile="$(var.LogoFile)"
-        ShowVersion="yes" />
+        ShowVersion="yes"
+        LaunchTarget="[LocalAppDataFolder]SPX\app\SpxLauncher.exe"
+        LaunchArguments="setup --pause-on-exit"
+        LaunchWorkingFolder="[LocalAppDataFolder]SPX\app" />
       <Payload Name="icon.ico" SourceFile="$(var.BundleIconFile)" Compressed="yes" />
     </BootstrapperApplication>
 
