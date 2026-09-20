@@ -214,5 +214,4 @@ industries:
       - spx_g120c_vfd
       - spx_altivar_320_vfd
       - spx_wago_750_8000_io
-      - spx_s7_1500_process_cell
     path: library/industries/industrial_iiot_pack

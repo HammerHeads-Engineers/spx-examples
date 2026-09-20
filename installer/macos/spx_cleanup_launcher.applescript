@@ -15,7 +15,7 @@ on run
   end if
 
   activate
-  display dialog "SPX Cleanup will stop the local stack, remove generated files, remove the installer runtime, and ask Docker to delete containers, volumes, and images referenced by the generated environment." buttons {"Cancel", "Clean Up"} default button "Clean Up" cancel button "Cancel" with icon caution
+  display dialog "SPX Cleanup will stop only the installer-managed SPX containers, then remove generated files and the installer runtime. Docker images, volumes, and unrelated containers will be preserved." buttons {"Cancel", "Clean Up"} default button "Clean Up" cancel button "Cancel" with icon caution
 
   set commandText to "/bin/bash -lc " & quoted form of my cleanupShell(generatedDir, runtimeDir)
 
@@ -37,12 +37,11 @@ on cleanupShell(generatedDir, runtimeDir)
   set end of commandLines to "RUNTIME_DIR=" & quoted form of runtimeDir
   set end of commandLines to "echo \"[spx-cleanup] Generated directory: $GENERATED_DIR\""
   set end of commandLines to "echo \"[spx-cleanup] Runtime directory: $RUNTIME_DIR\""
-  set end of commandLines to "pkill -f spx-ble-adapter >/dev/null 2>&1 || true"
-  set end of commandLines to "if [ -f \"$GENERATED_DIR/docker-compose.generated.yml\" ] && command -v docker >/dev/null 2>&1; then"
-  set end of commandLines to "  echo \"[spx-cleanup] Removing Docker resources from generated environment...\""
-  set end of commandLines to "  docker compose -f \"$GENERATED_DIR/docker-compose.generated.yml\" --env-file \"$GENERATED_DIR/.env\" down --remove-orphans --volumes --rmi all || true"
+  set end of commandLines to "if [ -x \"$GENERATED_DIR/spx-stop.sh\" ]; then"
+  set end of commandLines to "  echo \"[spx-cleanup] Stopping installer-managed SPX containers...\""
+  set end of commandLines to "  \"$GENERATED_DIR/spx-stop.sh\" || true"
   set end of commandLines to "elif [ -f \"$GENERATED_DIR/docker-compose.generated.yml\" ]; then"
-  set end of commandLines to "  echo \"[spx-cleanup] Docker CLI not found; skipping Docker cleanup.\""
+  set end of commandLines to "  echo \"[spx-cleanup] Generated stop helper not found; no Docker resources were changed.\""
   set end of commandLines to "fi"
   set end of commandLines to "rm -rf \"$GENERATED_DIR\" \"$RUNTIME_DIR\""
   set end of commandLines to "echo \"[spx-cleanup] Removed local SPX generated and runtime directories.\""

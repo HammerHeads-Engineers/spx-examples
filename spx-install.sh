@@ -157,5 +157,5 @@ if [ $# -eq 0 ]; then
   set -- generate --output "${DEFAULT_OUTPUT_DIR}"
 fi
 
-echo "[spx-install] Running installer CLI: $PYTHON_BIN -m installer $*"
+echo "[spx-install] Running installer CLI with redacted arguments."
 "$PYTHON_BIN" -m installer "$@"

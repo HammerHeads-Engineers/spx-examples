@@ -184,8 +184,7 @@ try {
         $installerArgs = $args
     }
 
-    $argsDisplay = $installerArgs -join ' '
-    Write-Host "[spx-install] Running installer CLI: $PythonBin -m installer $argsDisplay"
+    Write-Host "[spx-install] Running installer CLI with redacted arguments."
 
     & $PythonBin -m installer @installerArgs
     if ($LASTEXITCODE -ne 0) {

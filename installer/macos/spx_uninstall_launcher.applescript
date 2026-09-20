@@ -56,9 +56,8 @@ on cleanupShell(supportDir, generatedDir, workspaceDir, legacyWorkspaceDir, remo
   set end of commandLines to "WORKSPACE_DIR=" & quoted form of workspaceDir
   set end of commandLines to "LEGACY_WORKSPACE_DIR=" & quoted form of legacyWorkspaceDir
   set end of commandLines to "REMOVE_WORKSPACE=" & (my boolToFlag(removeWorkspace))
-  set end of commandLines to "pkill -f spx-ble-adapter >/dev/null 2>&1 || true"
-  set end of commandLines to "if [ -f \"$GENERATED_DIR/docker-compose.generated.yml\" ] && command -v docker >/dev/null 2>&1; then"
-  set end of commandLines to "  docker compose -f \"$GENERATED_DIR/docker-compose.generated.yml\" --env-file \"$GENERATED_DIR/.env\" down --remove-orphans --volumes --rmi all || true"
+  set end of commandLines to "if [ -x \"$GENERATED_DIR/spx-stop.sh\" ]; then"
+  set end of commandLines to "  \"$GENERATED_DIR/spx-stop.sh\" || true"
   set end of commandLines to "fi"
   set end of commandLines to "rm -rf \"$SUPPORT_DIR\""
   set end of commandLines to "if [ \"$REMOVE_WORKSPACE\" = 1 ]; then"

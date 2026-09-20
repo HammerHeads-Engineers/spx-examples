@@ -8,6 +8,7 @@ import stat
 import json
 import re
 import shutil
+import uuid
 from pathlib import Path
 from typing import Dict, List, Set
 
@@ -15,14 +16,20 @@ import yaml
 
 from .manifest import ManifestIndex, ServiceManifest
 from . import paths
+from .compatibility import SPX_SERVER_VERSION, SPX_UI_VERSION, validate_version_pair
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
-SPX_SERVER_IMAGE = "simplephysx/spx-server:v1.0.0-rc.64"
+SPX_SERVER_IMAGE = f"simplephysx/spx-server:{SPX_SERVER_VERSION}"
 # SPX_SERVER_IMAGE = "spx-server:trial"
 SPX_UI_SERVICE_NAME = "spx-ui"
-SPX_UI_IMAGE = "simplephysx/spx-ui:v1.0.0-rc.68"
-# SPX_UI_IMAGE = "spx-ui:trial"
+SPX_UI_IMAGE = f"simplephysx/spx-ui:{SPX_UI_VERSION}"
+
+SPX_COMPOSE_PROJECT = "spx"
+SPX_LABEL_STACK = "com.simplephysx.spx.stack"
+SPX_LABEL_MANAGED_BY = "com.simplephysx.spx.managed-by"
+SPX_LABEL_PROJECT = "com.simplephysx.spx.project"
+SPX_LABEL_INSTALLATION_ID = "com.simplephysx.spx.installation-id"
 
 
 class DeploymentGenerator:
@@ -31,10 +38,13 @@ class DeploymentGenerator:
     def __init__(self, index: ManifestIndex) -> None:
         self.index = index
         self.repo_root = paths.repo_root()
+        validate_version_pair(SPX_SERVER_VERSION, SPX_UI_VERSION)
 
     def generate(self, selection, output_dir: Path) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
         spx_python_requirement = self._resolve_spx_python_requirement()
+
+        installation_id = uuid.uuid4().hex
 
         assets_root = output_dir / "assets"
         assets_root.mkdir(parents=True, exist_ok=True)
@@ -44,13 +54,26 @@ class DeploymentGenerator:
         if extensions_src.exists():
             shutil.copytree(extensions_src, output_dir / "extensions", dirs_exist_ok=True)
 
-        compose_data = self._build_compose(selection.service_ids, assets_root, selection.install_spx_ui)
+        compose_data = self._build_compose(
+            selection.service_ids,
+            assets_root,
+            selection.install_spx_ui,
+            installation_id=installation_id,
+        )
         compose_path = output_dir / "docker-compose.generated.yml"
         with compose_path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(compose_data, handle, sort_keys=False)
 
         self._write_env(output_dir, selection.license_key)
-        self._write_bundle(output_dir, selection)
+        self._write_bundle(output_dir, selection, installation_id=installation_id, compose_data=compose_data)
+        self._write_hardened_artifacts(
+            output_dir,
+            installation_id,
+            compose_data,
+            spx_python_requirement,
+        )
+        return
+
         bootstrap_cmd_sh = '"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" --bundle "$SCRIPT_DIR/bundle.json"\n'
         bootstrap_cmd_ps = '    & $PythonBin (Join-Path $ScriptDir "bootstrap_runner.py") --bundle (Join-Path $ScriptDir "bundle.json")\n'
         if not selection.install_examples:
@@ -74,7 +97,7 @@ cleanup_on_failure() {
   if [ -n "${BLE_ADAPTER_PID:-}" ] && kill -0 "${BLE_ADAPTER_PID}" >/dev/null 2>&1; then
     kill "${BLE_ADAPTER_PID}" >/dev/null 2>&1 || true
   fi
-  docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
+  echo "[spx-start] Legacy cleanup path disabled; stack_manager.py owns container cleanup."
   exit "${status}"
 }
 
@@ -171,7 +194,7 @@ if [ "$HAS_BLE" = "yes" ]; then
   fi
 fi
 
-docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" down --remove-orphans >/dev/null 2>&1 || true
+echo "[spx-start] Legacy cleanup path disabled; stack_manager.py owns container cleanup."
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
 echo "[spx-start] Active container ports:"
 docker compose -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps
@@ -268,7 +291,7 @@ function Cleanup-OnFailure {
         try { $bleProcess.Kill() | Out-Null } catch {}
     }
     try {
-        docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
+        Write-Warning "[spx-start] Legacy cleanup path disabled; stack_manager.py owns container cleanup."
     } catch {}
     exit $ExitCode
 }
@@ -296,7 +319,7 @@ try {
         Write-Warning "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. Skipping npm install and BLE adapter startup. Use WSL2, macOS/Linux, or an external BLE bridge."
     }
 
-    docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down --remove-orphans | Out-Null
+    Write-Warning "[spx-start] Legacy cleanup path disabled; stack_manager.py owns container cleanup."
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d | Out-Null
     Write-Host "[spx-start] Active container ports:"
     docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps
@@ -346,8 +369,7 @@ exit /b %EXITCODE%
         self._write_runtime_bootstrap(output_dir)
         self._write_macos_python_helper(output_dir)
         stop_script = """
-pkill -f spx-ble-adapter >/dev/null 2>&1 || true
-docker compose -f "$(dirname "$0")/docker-compose.generated.yml" --env-file "$(dirname "$0")/.env" down
+echo "[spx-stop] Legacy stop path disabled; stack_manager.py owns exact-container cleanup."
 """
         stop_script_ps1 = r"""
 $ErrorActionPreference = "Stop"
@@ -363,7 +385,7 @@ try {
     }
 } catch {}
 
-docker compose -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") down
+Write-Warning "[spx-stop] Legacy stop path disabled; stack_manager.py owns exact-container cleanup."
 """
         self._write_script(output_dir / "spx-stop.sh", stop_script.strip() + "\n")
         self._write_ps_script(output_dir / "spx-stop.ps1", stop_script_ps1.strip() + "\n")
@@ -394,7 +416,14 @@ exit /b %EXITCODE%
         self._write_text_script(output_dir / "spx-stop.bat", stop_bat.strip() + "\n")
 
     # Internal helpers -------------------------------------------------------
-    def _build_compose(self, service_ids: List[str], assets_root: Path, include_ui: bool) -> Dict[str, Dict]:
+    def _build_compose(
+        self,
+        service_ids: List[str],
+        assets_root: Path,
+        include_ui: bool,
+        *,
+        installation_id: str = "",
+    ) -> Dict[str, Dict]:
         services: Dict[str, Dict] = {}
         builtin_ports: List[str] = []
         docker_services: Dict[str, ServiceManifest] = {}
@@ -419,14 +448,16 @@ exit /b %EXITCODE%
             # Expose an extended Modbus TCP range for multi-instance demos.
             builtin_ports.extend([f"{port}:{port}" for port in range(5020, 5121)])
 
-        services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root)
+        labels = self._stack_labels(installation_id)
+        services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root, labels)
         if include_ui:
-            services[SPX_UI_SERVICE_NAME] = self._build_spx_ui_service()
+            services[SPX_UI_SERVICE_NAME] = self._build_spx_ui_service(labels)
 
         for service_id, manifest in docker_services.items():
-            services[service_id] = self._build_docker_service(manifest, assets_root)
+            services[service_id] = self._build_docker_service(manifest, assets_root, labels)
 
         compose = {
+            "name": SPX_COMPOSE_PROJECT,
             "services": services,
         }
         if native_services:
@@ -434,7 +465,20 @@ exit /b %EXITCODE%
             compose["x-native-services"] = [svc.id for svc in native_services]
         return compose
 
-    def _build_spx_server_service(self, extra_ports: List[str], assets_root: Path) -> Dict:
+    def _stack_labels(self, installation_id: str) -> Dict[str, str]:
+        return {
+            SPX_LABEL_STACK: "true",
+            SPX_LABEL_MANAGED_BY: "installer",
+            SPX_LABEL_PROJECT: SPX_COMPOSE_PROJECT,
+            SPX_LABEL_INSTALLATION_ID: installation_id or uuid.uuid4().hex,
+        }
+
+    def _build_spx_server_service(
+        self,
+        extra_ports: List[str],
+        assets_root: Path,
+        labels: Dict[str, str] | None = None,
+    ) -> Dict:
         ports = ["8000:8000"]
         for port in extra_ports:
             if port not in ports:
@@ -444,12 +488,24 @@ exit /b %EXITCODE%
         service = {
             "image": SPX_SERVER_IMAGE,
             "container_name": "spx-server",
+            "labels": dict(labels or self._stack_labels("")),
             # Ensure host.docker.internal resolves on Linux (Docker Engine) for models
             # that reference host-mapped service ports (e.g., MQTT, LwM2M, BLE bridge).
             "extra_hosts": ["host.docker.internal:host-gateway"],
             "ports": ports,
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
+            },
+            "healthcheck": {
+                "test": [
+                    "CMD",
+                    "python",
+                    "-c",
+                    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+                ],
+                "interval": "10s",
+                "timeout": "5s",
+                "retries": 5,
             },
             "volumes": volumes,
             "command": [
@@ -463,10 +519,11 @@ exit /b %EXITCODE%
         }
         return service
 
-    def _build_spx_ui_service(self) -> Dict:
+    def _build_spx_ui_service(self, labels: Dict[str, str] | None = None) -> Dict:
         return {
             "image": SPX_UI_IMAGE,
             "container_name": "spx-ui-server",
+            "labels": dict(labels or self._stack_labels("")),
             "depends_on": {
                 SPX_SERVER_SERVICE_NAME: {
                     "condition": "service_healthy",
@@ -478,12 +535,18 @@ exit /b %EXITCODE%
             },
         }
 
-    def _build_docker_service(self, manifest: ServiceManifest, assets_root: Path) -> Dict:
+    def _build_docker_service(
+        self,
+        manifest: ServiceManifest,
+        assets_root: Path,
+        labels: Dict[str, str] | None = None,
+    ) -> Dict:
         deployment = manifest.deployment
         assert deployment is not None
         service = {
             "image": deployment.image,
             "container_name": deployment.container_name or manifest.id,
+            "labels": dict(labels or self._stack_labels("")),
         }
         ports = self._format_ports(manifest)
         if ports:
@@ -580,7 +643,350 @@ exit /b %EXITCODE%
             mode = os.stat(path).st_mode
             os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    def _write_bundle(self, output_dir: Path, selection) -> None:
+    def _compose_host_ports(self, compose_data: Dict[str, Dict]) -> List[int]:
+        ports: Set[int] = set()
+        for service in compose_data.get("services", {}).values():
+            for entry in service.get("ports", []) or []:
+                raw = str(entry).split("/")[0]
+                parts = raw.split(":")
+                candidate = parts[0] if len(parts) == 2 else parts[-2] if len(parts) >= 3 else ""
+                digits = "".join(char for char in candidate if char.isdigit())
+                if digits and 1 <= int(digits) <= 65535:
+                    ports.add(int(digits))
+        return sorted(ports)
+
+    def _write_hardened_artifacts(
+        self,
+        output_dir: Path,
+        installation_id: str,
+        compose_data: Dict[str, Dict],
+        spx_python_requirement: str,
+    ) -> None:
+        """Write the transactional scripts used by every generated bundle."""
+
+        shutil.copy2(Path(__file__).with_name("stack_manager.py"), output_dir / "stack_manager.py")
+        shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
+        self._write_runtime_bootstrap(output_dir)
+        self._write_macos_python_helper(output_dir)
+
+        required_ports = ",".join(str(port) for port in self._compose_host_ports(compose_data))
+        bash = r'''SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
+if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
+  # shellcheck source=/dev/null
+  . "${MACOS_PYTHON_HELPER}"
+fi
+INSTALLATION_ID="__INSTALLATION_ID__"
+SNAPSHOT="$SCRIPT_DIR/.spx-stack-snapshot.json"
+MANAGER="$SCRIPT_DIR/stack_manager.py"
+STAGE="runtime"
+SYSTEM_PYTHON_BIN="${PYTHON_BIN:-}"
+PYTHON_BIN="$SYSTEM_PYTHON_BIN"
+BLE_ADAPTER_PID=""
+
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
+  if command -v spx_resolve_macos_python >/dev/null 2>&1; then
+    SYSTEM_PYTHON_BIN="$(spx_resolve_macos_python || true)"
+  fi
+fi
+
+if [ -z "$SYSTEM_PYTHON_BIN" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    SYSTEM_PYTHON_BIN=python3
+  elif command -v python >/dev/null 2>&1; then
+    SYSTEM_PYTHON_BIN=python
+  else
+    echo "[spx-start] stage=runtime: missing Python 3" >&2
+    exit 1
+  fi
+  PYTHON_BIN="$SYSTEM_PYTHON_BIN"
+fi
+
+ASSUME_ARGS=()
+for arg in "$@"; do
+  if [ "$arg" = "--yes" ]; then
+    ASSUME_ARGS+=("--yes")
+  fi
+done
+
+cleanup_on_failure() {
+  local status=$?
+  trap - ERR INT TERM
+  echo "[spx-start] stage=${STAGE}: installation failed (exit code ${status}); attempting rollback" >&2
+  if [ -n "${BLE_ADAPTER_PID:-}" ] && kill -0 "$BLE_ADAPTER_PID" >/dev/null 2>&1; then
+    kill "$BLE_ADAPTER_PID" >/dev/null 2>&1 || true
+  fi
+  if [ -x "$MANAGER" ] || [ -f "$MANAGER" ]; then
+    "$PYTHON_BIN" "$MANAGER" rollback \
+      --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+      --env-file "$SCRIPT_DIR/.env" \
+      --project spx \
+      --installation-id "$INSTALLATION_ID" \
+      --snapshot "$SNAPSHOT" >/dev/null 2>&1 || \
+      echo "[spx-start] stage=rollback: automatic restore was not completed" >&2
+  fi
+  exit "$status"
+}
+trap cleanup_on_failure ERR INT TERM
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "[spx-start] stage=${STAGE}: missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+need_cmd docker
+need_cmd "$SYSTEM_PYTHON_BIN"
+if [ ! -f "$SCRIPT_DIR/runtime_bootstrap.py" ]; then
+  echo "[spx-start] stage=runtime: missing runtime bootstrap helper" >&2
+  exit 1
+fi
+PYTHON_BIN="$($SYSTEM_PYTHON_BIN "$SCRIPT_DIR/runtime_bootstrap.py" \
+  --venv-dir "$SCRIPT_DIR/.spx-runtime" \
+  --package requests \
+  --package "__SPX_PYTHON_REQUIREMENT__" \
+  --package pyyaml)"
+if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
+  echo "[spx-start] stage=runtime: local Python runtime bootstrap failed" >&2
+  exit 1
+fi
+
+if "$PYTHON_BIN" - "$SCRIPT_DIR/bundle.json" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    raise SystemExit(0 if "btvirt_adapter" in json.load(handle).get("services", []) else 1)
+PY
+then
+  if command -v npm >/dev/null 2>&1 && command -v spx-ble-adapter >/dev/null 2>&1; then
+    spx-ble-adapter --port "${BLE_ADAPTER_PORT:-8085}" >/dev/null 2>&1 &
+    BLE_ADAPTER_PID=$!
+  elif command -v npm >/dev/null 2>&1; then
+    npm install -g @simplephysx/spx-ble-adapter >/dev/null 2>&1
+    spx-ble-adapter --port "${BLE_ADAPTER_PORT:-8085}" >/dev/null 2>&1 &
+    BLE_ADAPTER_PID=$!
+  else
+    echo "[spx-start] stage=runtime: npm is unavailable; BLE adapter was not started" >&2
+  fi
+fi
+
+STAGE="preflight"
+"$PYTHON_BIN" "$MANAGER" prepare \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --env-file "$SCRIPT_DIR/.env" \
+  --project spx \
+  --installation-id "$INSTALLATION_ID" \
+  --snapshot "$SNAPSHOT" \
+  --ports "__REQUIRED_PORTS__" \
+  "${ASSUME_ARGS[@]}"
+
+STAGE="compose"
+docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" up -d
+
+STAGE="healthcheck"
+"$PYTHON_BIN" "$MANAGER" wait-health \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --env-file "$SCRIPT_DIR/.env" \
+  --project spx \
+  --installation-id "$INSTALLATION_ID" \
+  --api-url "${SPX_BASE_URL:-http://localhost:8000}"
+
+if [ "__UI_ENABLED__" = "yes" ]; then
+  STAGE="ui"
+  if ! docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps --services --status running | grep -Fxq "spx-ui"; then
+    echo "[spx-start] stage=ui: SPX UI is not running" >&2
+    exit 1
+  fi
+fi
+
+STAGE="bootstrap"
+"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" \
+  --bundle "$SCRIPT_DIR/bundle.json" \
+  --api-url "${SPX_BASE_URL:-http://localhost:8000}"
+
+STAGE="start"
+docker compose -p spx -f "$SCRIPT_DIR/docker-compose.generated.yml" --env-file "$SCRIPT_DIR/.env" ps
+echo ""
+echo "[spx-start] SPX started successfully."
+echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
+        ui_enabled = SPX_UI_SERVICE_NAME in (compose_data.get("services", {}) or {})
+        self._write_script(
+            output_dir / "spx-start.sh",
+            bash.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
+        )
+
+        powershell = r'''param([string[]]$StartArgs)
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$InstallationId = "__INSTALLATION_ID__"
+$Snapshot = Join-Path $ScriptDir ".spx-stack-snapshot.json"
+$Manager = Join-Path $ScriptDir "stack_manager.py"
+$Stage = "runtime"
+
+function Resolve-Python {
+    if ($Env:PYTHON_BIN) { return $Env:PYTHON_BIN }
+    foreach ($candidate in @("python3", "python")) {
+        if (Get-Command $candidate -ErrorAction SilentlyContinue) { return $candidate }
+    }
+    throw "Missing Python 3"
+}
+
+function Bootstrap-PythonRuntime {
+    param([string]$SystemPython)
+
+    $runtimeBootstrap = Join-Path $ScriptDir "runtime_bootstrap.py"
+    if (-not (Test-Path $runtimeBootstrap)) {
+        throw "Missing runtime bootstrap helper: $runtimeBootstrap"
+    }
+
+    $pythonPath = & $SystemPython $runtimeBootstrap `
+        --venv-dir (Join-Path $ScriptDir ".spx-runtime") `
+        --package "requests" `
+        --package "__SPX_PYTHON_REQUIREMENT__" `
+        --package "pyyaml"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to prepare the local Python runtime"
+    }
+
+    $pythonPath = "$pythonPath".Trim()
+    if (-not $pythonPath -or -not (Test-Path $pythonPath)) {
+        throw "Local Python runtime bootstrap returned an invalid interpreter path"
+    }
+    return $pythonPath
+}
+
+function Invoke-Manager {
+    param([string[]]$Arguments)
+    & $PythonBin $Manager @Arguments
+    if ($LASTEXITCODE -ne 0) { throw "stack manager failed" }
+}
+
+function Redact-Message {
+    param([string]$Message)
+    return ($Message -replace '(?i)(spx[_-]?product[_-]?key\s*[=:]\s*)[^\s,;]+', '$1<redacted>' -replace '(?i)(--product-key\s+)[^\s]+', '$1<redacted>')
+}
+
+try {
+    $SystemPython = Resolve-Python
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "Missing Docker CLI" }
+    $Stage = "runtime"
+    $PythonBin = Bootstrap-PythonRuntime $SystemPython
+
+    $bundlePath = Join-Path $ScriptDir "bundle.json"
+    $hasBle = $false
+    if (Test-Path $bundlePath) {
+        try {
+            $bundle = Get-Content $bundlePath -Raw | ConvertFrom-Json
+            if ($bundle.services -and ($bundle.services -contains "btvirt_adapter")) {
+                $hasBle = $true
+            }
+        } catch {
+            $hasBle = $false
+        }
+    }
+    if ($hasBle) {
+        Write-Warning "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. Skipping npm install and BLE adapter startup. Use WSL2, macOS/Linux, or an external BLE bridge."
+    }
+
+    $Stage = "preflight"
+    $prepare = @("prepare", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot, "--ports", "__REQUIRED_PORTS__")
+    if ($StartArgs -contains "--yes") { $prepare += "--yes" }
+    Invoke-Manager $prepare
+
+    $Stage = "compose"
+    docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") up -d
+    if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
+
+    $Stage = "healthcheck"
+    Invoke-Manager @("wait-health", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--api-url", $(if ($Env:SPX_BASE_URL) { $Env:SPX_BASE_URL } else { "http://localhost:8000" }))
+
+    if ("__UI_ENABLED__" -eq "yes") {
+        $Stage = "ui"
+        $runningServices = docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps --services --status running
+        if ($LASTEXITCODE -ne 0 -or (($runningServices -split "`r?`n") -notcontains "spx-ui")) { throw "SPX UI is not running" }
+    }
+
+    $Stage = "bootstrap"
+    & $PythonBin (Join-Path $ScriptDir "bootstrap_runner.py") --bundle (Join-Path $ScriptDir "bundle.json") --api-url $(if ($Env:SPX_BASE_URL) { $Env:SPX_BASE_URL } else { "http://localhost:8000" })
+    if ($LASTEXITCODE -ne 0) { throw "bootstrap failed" }
+
+    $Stage = "start"
+    docker compose -p spx -f (Join-Path $ScriptDir "docker-compose.generated.yml") --env-file (Join-Path $ScriptDir ".env") ps
+    Write-Host ""
+    Write-Host "[spx-start] SPX started successfully."
+    Write-Host "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
+}
+catch {
+    Write-Error ("[spx-start] stage={0}: {1}; attempting rollback" -f $Stage, (Redact-Message $_.Exception.Message))
+    try {
+        Invoke-Manager @("rollback", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot)
+    } catch {
+        Write-Error "[spx-start] stage=rollback: automatic restore was not completed"
+    }
+    exit 1
+}
+'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
+        self._write_ps_script(
+            output_dir / "spx-start.ps1",
+            powershell.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
+        )
+
+        stop_sh = r'''SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+exec "$PYTHON_BIN" "$SCRIPT_DIR/stack_manager.py" stop \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --env-file "$SCRIPT_DIR/.env" \
+  --project spx \
+  --installation-id "__INSTALLATION_ID__"
+'''.replace("__INSTALLATION_ID__", installation_id)
+        self._write_script(output_dir / "spx-stop.sh", stop_sh.strip() + "\n")
+        stop_ps = r'''$ErrorActionPreference = "Stop"
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$PythonBin = if ($Env:PYTHON_BIN) { $Env:PYTHON_BIN } else { "python" }
+& $PythonBin (Join-Path $ScriptDir "stack_manager.py") stop `
+  --compose-file (Join-Path $ScriptDir "docker-compose.generated.yml") `
+  --env-file (Join-Path $ScriptDir ".env") `
+  --project spx `
+  --installation-id "__INSTALLATION_ID__"
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+'''.replace("__INSTALLATION_ID__", installation_id)
+        self._write_ps_script(output_dir / "spx-stop.ps1", stop_ps.strip() + "\n")
+
+        start_command = '''#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec bash "$SCRIPT_DIR/spx-start.sh" "$@"
+'''
+        stop_command = '''#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec bash "$SCRIPT_DIR/spx-stop.sh" "$@"
+'''
+        start_bat = r'''@echo off
+setlocal
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0spx-start.ps1" %*
+exit /b %ERRORLEVEL%
+'''
+        stop_bat = r'''@echo off
+setlocal
+powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0spx-stop.ps1" %*
+exit /b %ERRORLEVEL%
+'''
+        self._write_text_script(output_dir / "spx-start.command", start_command, executable=True)
+        self._write_text_script(output_dir / "spx-stop.command", stop_command, executable=True)
+        self._write_text_script(output_dir / "spx-start.bat", start_bat)
+        self._write_text_script(output_dir / "spx-stop.bat", stop_bat)
+
+    def _write_bundle(
+        self,
+        output_dir: Path,
+        selection,
+        *,
+        installation_id: str = "",
+        compose_data: Dict[str, Dict] | None = None,
+    ) -> None:
         model_entries = []
         model_paths: Set[Path] = set()
         for model_id in selection.model_ids:
@@ -597,11 +1003,15 @@ exit /b %EXITCODE%
         bundle = {
             "packages": selection.packages,
             "protocols": selection.protocols,
-            "license_key": selection.license_key,
+            "server_version": SPX_SERVER_VERSION,
+            "ui_version": SPX_UI_VERSION,
             "models": model_entries,
             "instances": self._collect_instances(selection),
             "start_instances": list(selection.start_instances),
             "services": selection.service_ids,
+            "installation_id": installation_id,
+            "compose_project": SPX_COMPOSE_PROJECT,
+            "required_ports": self._compose_host_ports(compose_data or {}),
         }
         bundle_path = output_dir / "bundle.json"
         bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
@@ -635,6 +1045,12 @@ exit /b %EXITCODE%
         return f"spx-python=={spec}"
 
     def _write_bootstrap_runner(self, output_dir: Path) -> None:
+        # Keep one canonical implementation.  The legacy inline runner below
+        # is intentionally unreachable and can be removed after downstream
+        # callers stop invoking this private compatibility hook.
+        shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
+        return
+
         runner = """#!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 \"\"\"Local bootstrap runner bundled with generated artifacts.\"\"\"

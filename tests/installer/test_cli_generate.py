@@ -238,6 +238,38 @@ def test_generate_requires_product_key_by_default(
     assert "Missing SPX product key" in str(exc.value)
 
 
+def test_generate_can_limit_default_instances_noninteractive(
+    tmp_path: Path,
+    manifest_dirs: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+    output_dir = tmp_path / "limited"
+
+    rc = cli.main(
+        [
+            "generate",
+            "--catalog",
+            str(manifest_dirs["catalog_dir"]),
+            "--profiles",
+            str(manifest_dirs["profiles_dir"]),
+            "--output",
+            str(output_dir),
+            "--packages",
+            "test_pack",
+            "--product-key",
+            "KEY",
+            "--instance-limit",
+            "0",
+            "--no-start",
+        ]
+    )
+    assert rc == 0
+    bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
+    assert bundle["instances"] == []
+    assert bundle["start_instances"] == []
+
+
 @pytest.fixture()
 def ble_manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     repo_root = tmp_path / "repo-ble"

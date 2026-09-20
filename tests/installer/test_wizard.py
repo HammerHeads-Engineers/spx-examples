@@ -196,7 +196,7 @@ def test_wizard_can_opt_in_to_default_instances(
 
     wizard = InstallerWizard(loader=FakeLoader())
 
-    inputs = iter(["1", "", "", "y", "", "n", "", ""])
+    inputs = iter(["1", "", "", "y", "", "", "n", "", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(inputs))
 
     selection = wizard.run()

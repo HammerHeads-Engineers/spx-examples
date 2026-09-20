@@ -14,6 +14,7 @@ from typing import Dict, List, Sequence
 from . import paths, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .selection import (
+    COMMUNITY_AUTO_START_LIMIT,
     apply_platform_compatibility,
     current_platform_name,
     resolve_default_instances,
@@ -22,6 +23,7 @@ from .selection import (
     resolve_protocol_service_ids,
     resolve_service_ids,
 )
+from .compatibility import SPX_SERVER_VERSION, SPX_UI_VERSION
 
 DEFAULT_PROTOCOLS = ("modbus", "ascii", "scpi")
 PROTOCOL_ALIASES = {"ascii": "scpi"}
@@ -403,7 +405,7 @@ class InstallerWizard:
                 str(entry).strip()
                 for entry in manifest.start_instances
                 if str(entry).strip()
-            ]
+            ][:COMMUNITY_AUTO_START_LIMIT]
             if not start_keys:
                 continue
             instance_models = {
@@ -418,15 +420,34 @@ class InstallerWizard:
                     print(f"  • {instance_key} ({model_id})")
                 else:
                     print(f"  • {instance_key}")
-            if self._prompt_yes_no(
-                "Start these instances after creation? [Y/n]: ", default=True
-            ):
-                for instance_key in start_keys:
+            if self._prompt_yes_no("Start these instances after creation? [Y/n]: ", default=True):
+                chosen = self._prompt_instance_subset(start_keys)
+                for instance_key in chosen:
                     if instance_key in seen:
                         continue
                     seen.add(instance_key)
                     selected.append(instance_key)
         return selected
+
+    def _prompt_instance_subset(self, instance_keys: Sequence[str]) -> List[str]:
+        if not instance_keys:
+            return []
+        while True:
+            raw = input(
+                "Select instance numbers to auto-start (comma-separated, ENTER for all): "
+            ).strip()
+            self._check_quit(raw)
+            if not raw:
+                return list(instance_keys)
+            try:
+                choices = [int(token.strip()) for token in raw.split(",") if token.strip()]
+            except ValueError:
+                print(ui.warn("  Invalid input. Please enter instance numbers."))
+                continue
+            if not choices or any(choice < 1 or choice > len(instance_keys) for choice in choices):
+                print(ui.warn(f"  Values must be between 1 and {len(instance_keys)}."))
+                continue
+            return [instance_keys[index - 1] for index in sorted(set(choices))]
 
     def _prompt_yes_no(self, prompt: str, *, default: bool) -> bool:
         while True:
@@ -759,6 +780,11 @@ class InstallerWizard:
         )
         print(f"Start stack now: {ui.success('yes') if start_now else ui.warn('no')}")
         print(f"SPX product key: {ui.heading(self._mask_secret(license_key))}")
+        print(f"SPX runtime: server {SPX_SERVER_VERSION}, UI {SPX_UI_VERSION}")
+        print(
+            f"Counts: models={len(model_ids)}, planned instances={len(instances)}, "
+            f"auto-start instances={len(start_instances)}"
+        )
         print("\nModels:")
         for model_id in model_ids:
             manifest = index.models[model_id]

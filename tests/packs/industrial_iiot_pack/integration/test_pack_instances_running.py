@@ -17,7 +17,6 @@ INSTANCE_KEYS = [
     "spx_g120c_vfd",
     "spx_altivar_320_vfd",
     "spx_wago_750_8000_io",
-    "spx_s7_1500_process_cell",
 ]
 
 
@@ -143,12 +142,10 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
         g120c = self._instances["spx_g120c_vfd"]
         altivar = self._instances["spx_altivar_320_vfd"]
         wago = self._instances["spx_wago_750_8000_io"]
-        s7 = self._instances["spx_s7_1500_process_cell"]
 
         g120c_attrs = g120c["attributes"]
         altivar_attrs = altivar["attributes"]
         wago_attrs = wago["attributes"]
-        s7_attrs = s7["attributes"]
 
         g120c_attrs["control_word_raw"].internal_value = 79
         g120c_attrs["speed_setpoint_raw"].internal_value = 30
@@ -177,11 +174,3 @@ class TestIndustrialPackInstancesRunning(unittest.TestCase):
             interval=0.2,
         )
         self.assertTrue(io_ready, "WAGO DO1 did not update to 1.")
-
-        s7_attrs["pump_command_percent"].internal_value = 60.0
-        pump_ready = wait_for_condition(
-            lambda: abs((_float_attr(s7_attrs["pump_speed_percent"]) or 0.0) - 60.0) <= 5.0,
-            timeout=8.0,
-            interval=0.2,
-        )
-        self.assertTrue(pump_ready, "S7-1500 pump speed did not track the command.")

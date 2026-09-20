@@ -90,6 +90,7 @@ copy_entries=(
   "spx-mcp-setup.sh"
   "spx-install.sh"
   "spx-install.ps1"
+  "INSTALLER_README.md"
   "README.md"
   "pyproject.toml"
   "poetry.lock"
@@ -189,6 +190,16 @@ development/debug flow where the native wrappers are not required.
 3. If you unpacked a `.zip` and the shell launchers are not executable, run `chmod +x spx-setup.command spx-setup.sh`.
 4. Follow the wizard prompts. Artifacts are written to `build/spx-generated/` by default.
 5. Inside the generated directory run `./spx-start.sh` (or `pwsh ./spx-start.ps1`) to start the stack.
+
+The generated start flow performs a Docker/Compose preflight, detects labelled
+and legacy SPX stacks, and asks before replacing one. It uses Compose project
+`spx`, preserves volumes/images, and can restore the previous stack if model or
+instance bootstrap fails. Community defaults auto-start at most five instances.
+The bundle uses SPX Server `v1.0.0-rc.64` with SPX UI `v1.0.0-rc.68`.
+
+New `bundle.json` files do not contain the raw Product Key; bootstrap reads it
+from `.env` or `SPX_PRODUCT_KEY` and still accepts older bundles with
+`license_key`. Profiles remain additive to the selected pack.
 
 ## Optional SPX MCP workspace
 
