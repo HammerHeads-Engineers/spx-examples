@@ -247,9 +247,12 @@ Choose the artifact that matches your platform:
 ### 2. Run the installer / setup wizard
 
 - **Windows:** launch `spx-installer-<version>.exe`, finish installation, then
-  open `SPX Setup` from the Start Menu or Windows Apps.
-- **macOS:** open `spx-installer-macos-<version>.pkg`, finish installation,
-  then launch `SPX Setup.app` from `/Applications/SPX Tools/`.
+  use the `Launch SPX Setup` button on the success screen. The same wizard is
+  also available later from the Start Menu or Windows Apps.
+- **macOS:** open `spx-installer-macos-<version>.pkg`; after a normal GUI
+  installation, `SPX Setup.app` starts automatically. Command-line, CI and
+  managed installations intentionally skip this GUI launch; open it later
+  from `/Applications/SPX Tools/` if needed.
 - **Linux/Unix:** make the self-extractor executable, then run it:
 
   ```bash
@@ -278,7 +281,10 @@ unsupported version pairs are rejected during generation. Community defaults
 auto-start at most five instances. A profile is additive to its selected pack,
 not a replacement for the pack.
 
-After the wizard finishes, it will prompt to start the stack now. If you choose yes, it will run the generated start script for you.
+After the wizard finishes, it will prompt to start the stack now. If you choose
+yes, it will run the generated start script for you. When the stack starts
+successfully with the UI enabled, the default browser opens at
+`http://localhost:3000`. Set `SPX_OPEN_BROWSER=0` to disable that behavior.
 Package selection and quickstarts remain the curated path for package models,
 profiles, default instances, and their package-level services.
 
@@ -355,7 +361,9 @@ The installer engine:
 - writes the output to `build/spx-generated` (or another `--output` path you pass through).
 
 After the wizard finishes, it will prompt to start the stack now. If you choose
-yes, it will run the generated start script for you.
+yes, it will run the generated start script for you. When the stack starts
+successfully with the UI enabled, the default browser opens at
+`http://localhost:3000`; set `SPX_OPEN_BROWSER=0` to disable it.
 
 ### 6. Build a portable installer package (optional)
 
@@ -458,11 +466,12 @@ launcher app and the final package, submits it to Apple, staples the ticket,
 and rejects the release if signature or Gatekeeper validation fails.
 
 The output package is written to `dist/spx-installer-macos-<version>.pkg`. After
-installation, users launch `SPX Setup.app` from `/Applications/SPX Tools/`; the
-installer defaults to a user-writable output directory when it is running from
-a packaged location such as `/Applications/SPX Tools/`. Once they have
-generated a local environment, they can later manage it via the companion
-launchers in the same folder:
+a normal GUI installation, `SPX Setup.app` starts automatically in the logged-in
+user's session. Use `SPX_SKIP_AUTO_SETUP=1` to disable that launch when invoking
+the package from an automation wrapper. The installer defaults to a
+user-writable output directory when it is running from a packaged location such
+as `/Applications/SPX Tools/`. Once they have generated a local environment,
+they can later manage it via the companion launchers in the same folder:
 
 The release workflow builds this signed, notarized, and stapled package on a
 native `macos-latest` GitHub Actions runner and attaches

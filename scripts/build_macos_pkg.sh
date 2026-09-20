@@ -232,8 +232,8 @@ prepare_python_component() {
   rm -rf "${python_scripts_dir}"
   mkdir -p "${python_scripts_dir}"
   cat > "${python_scripts_dir}/postinstall" <<EOF
-#!/bin/sh
-set -eu
+#!/bin/bash
+set -euo pipefail
 
 framework_root="/Library/Frameworks/Python.framework/Versions/${PYTHON_FRAMEWORK_VERSION}"
 python_bin="\${framework_root}/bin/python${PYTHON_FRAMEWORK_VERSION}"
@@ -244,6 +244,77 @@ if [ -x "\${python_bin}" ] && [ -f "\${compileall}" ]; then
     -f -x 'bad_coding|badsyntax|site-packages|test/test_lib2to3/data' \\
     "\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}"
 fi
+
+# GUI launch is intentionally limited to an interactive Installer.app session.
+# This is the final product component, so the one-shot launch is scheduled only
+# after both the application and bundled Python packages have been installed.
+if [[ "\${COMMAND_LINE_INSTALL:-}" == "1" ||
+      "\${SPX_SKIP_AUTO_SETUP:-}" == "1" ||
+      -n "\${CI:-}" ||
+      -n "\${GITHUB_ACTIONS:-}" ]]; then
+  exit 0
+fi
+
+if ! /usr/bin/pgrep -f '/System/Library/CoreServices/Installer.app/Contents/MacOS/Installer' >/dev/null 2>&1; then
+  exit 0
+fi
+
+console_user="\$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
+if [[ -z "\${console_user}" || "\${console_user}" == "root" || "\${console_user}" == "loginwindow" ]]; then
+  exit 0
+fi
+
+console_uid="\$(/usr/bin/id -u "\${console_user}" 2>/dev/null || true)"
+console_home="\$(/usr/bin/dscl . -read "/Users/\${console_user}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print \$2}' || true)"
+if [[ -z "\${console_uid}" || -z "\${console_home}" ]]; then
+  exit 0
+fi
+
+tools_dir="${INSTALL_LOCATION}/${TOOLS_DIR_NAME}"
+setup_app="\${tools_dir}/SPX Setup.app"
+if [[ ! -d "\${setup_app}" ]]; then
+  exit 0
+fi
+
+launch_agents_dir="\${console_home}/Library/LaunchAgents"
+label="com.simplephysx.spx.setup-once"
+plist="\${launch_agents_dir}/\${label}.plist"
+helper="\${console_home}/Library/Application Support/SPX/\${label}.sh"
+
+/bin/mkdir -p "\${launch_agents_dir}" "\$(/usr/bin/dirname "\${helper}")" || exit 0
+/usr/bin/launchctl bootout "gui/\${console_uid}/\${label}" >/dev/null 2>&1 || true
+
+/bin/cat > "\${helper}" <<HELPER
+#!/bin/bash
+set -u
+/bin/sleep 1
+/usr/bin/open -a "\${setup_app}" >/dev/null 2>&1 || true
+/bin/rm -f "\${plist}" "\${helper}"
+HELPER
+
+/bin/cat > "\${plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>\${label}</string>
+  <key>ProgramArguments</key>
+  <array><string>\${helper}</string></array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+</dict>
+</plist>
+PLIST
+
+/bin/chmod 755 "\${helper}" || exit 0
+user_group="\$(/usr/bin/id -gn "\${console_user}" 2>/dev/null || printf 'staff')"
+/usr/sbin/chown "\${console_user}:\${user_group}" "\${plist}" "\${helper}" || exit 0
+/usr/bin/launchctl bootstrap "gui/\${console_uid}" "\${plist}" >/dev/null 2>&1 || {
+  /bin/rm -f "\${plist}" "\${helper}"
+}
 EOF
   chmod +x "${python_scripts_dir}/postinstall"
 

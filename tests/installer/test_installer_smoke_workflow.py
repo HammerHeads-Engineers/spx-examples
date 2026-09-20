@@ -87,6 +87,7 @@ def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:
     assert "build_macos_pkg.sh" in job
     assert "installer-macos-${VERSION}.pkg" in job
     assert "-allowUntrusted" in job
+    assert "SPX_SKIP_AUTO_SETUP=1" in job
     assert "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12" in job
     assert 'file "${python_bin}" | grep -q "universal binary"' in job
     assert "pkgutil --pkg-info com.hammerheadsengineers.spx.python" in job

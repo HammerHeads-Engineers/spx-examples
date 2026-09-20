@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import webbrowser
 
 from pathlib import Path
 import os
@@ -23,6 +24,53 @@ from .selection import (
     resolve_start_instances,
 )
 from .wizard import InstallerWizard, WizardSelection
+
+
+SPX_UI_URL = "http://localhost:3000"
+
+
+def _env_flag_disabled(name: str) -> bool:
+    value = os.environ.get(name, "").strip().lower()
+    return value in {"0", "false", "no", "off"}
+
+
+def _is_interactive_session(stream) -> bool:
+    stdin_is_tty = getattr(sys.stdin, "isatty", lambda: False)()
+    stream_is_tty = getattr(stream, "isatty", lambda: False)()
+    return bool(stdin_is_tty and stream_is_tty)
+
+
+def _open_ui_browser(selection: WizardSelection, *, stream=sys.stdout) -> None:
+    """Open the generated UI without making browser integration a hard failure."""
+
+    if not selection.install_spx_ui:
+        return
+    if _env_flag_disabled("SPX_OPEN_BROWSER"):
+        print(
+            "[spx-installer] Browser opening disabled by SPX_OPEN_BROWSER=0.",
+            file=stream,
+        )
+        return
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        return
+    if not _is_interactive_session(stream):
+        return
+
+    try:
+        opened = webbrowser.open(SPX_UI_URL, new=2)
+    except Exception as exc:  # pragma: no cover - browser backends are platform-specific
+        print(
+            f"[spx-installer] Could not open {SPX_UI_URL} automatically: {exc}",
+            file=stream,
+        )
+        return
+    if not opened:
+        print(
+            f"[spx-installer] Could not open {SPX_UI_URL} automatically; open it manually.",
+            file=stream,
+        )
+        return
+    print(f"[spx-installer] Opened SPX UI: {SPX_UI_URL}", file=stream)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -362,13 +410,19 @@ def run(args: argparse.Namespace) -> int:
         )
 
         if getattr(args, "start", False):
-            return 0 if _launch_stack(output_dir, stream=info_stream) else 1
+            if not _launch_stack(output_dir, stream=info_stream):
+                return 1
+            _open_ui_browser(selection, stream=info_stream)
+            return 0
 
         if noninteractive or getattr(args, "no_start", False):
             return 0
 
         if not selection.offline_bundle:
-            return 0 if _launch_stack(output_dir, stream=info_stream) else 1
+            if not _launch_stack(output_dir, stream=info_stream):
+                return 1
+            _open_ui_browser(selection, stream=info_stream)
+            return 0
         return 0
     if args.command == "bootstrap":
         from .bootstrap import bootstrap

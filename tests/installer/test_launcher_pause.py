@@ -57,6 +57,56 @@ def test_setup_wrapper_preserves_success_without_pause_flag(tmp_path: Path) -> N
     assert "Press ENTER to close..." not in result.stdout
 
 
+def test_macos_command_wrapper_closes_after_success(tmp_path: Path) -> None:
+    command = tmp_path / "spx-setup.command"
+    command.write_text(
+        (REPO_ROOT / "spx-setup.command").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    installer = tmp_path / "spx-setup.sh"
+    installer.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf '%s\\n' child-output\n",
+        encoding="utf-8",
+    )
+    installer.chmod(0o755)
+
+    result = subprocess.run(
+        [BASH, str(command)],
+        cwd=tmp_path,
+        input="",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert "child-output" in result.stdout
+    assert "Press Enter to close..." not in result.stdout
+
+
+def test_macos_command_wrapper_pauses_after_error_on_tty(tmp_path: Path) -> None:
+    command = tmp_path / "spx-setup.command"
+    command.write_text(
+        (REPO_ROOT / "spx-setup.command").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    installer = tmp_path / "spx-setup.sh"
+    installer.write_text(
+        "#!/usr/bin/env bash\n"
+        "exit 7\n",
+        encoding="utf-8",
+    )
+    installer.chmod(0o755)
+
+    result = _run_with_pty(
+        [BASH, str(command)], tmp_path, prompt=b"Press Enter to close..."
+    )
+
+    assert result.returncode == 7
+    assert "Press Enter to close..." in result.stdout
+
+
 def test_setup_wrapper_does_not_block_or_change_success_without_tty(tmp_path: Path) -> None:
     result = _run_setup_wrapper(tmp_path, "--pause-on-exit")
 
@@ -73,7 +123,9 @@ def test_setup_wrapper_preserves_error_code_without_tty(tmp_path: Path) -> None:
     assert "Press ENTER to close..." not in result.stdout
 
 
-def _run_with_pty(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run_with_pty(
+    command: list[str], cwd: Path, prompt: bytes = b"Press ENTER to close..."
+) -> subprocess.CompletedProcess[str]:
     master_fd, slave_fd = os.openpty()
     process = subprocess.Popen(
         command,
@@ -95,7 +147,7 @@ def _run_with_pty(command: list[str], cwd: Path) -> subprocess.CompletedProcess[
             process.kill()
 
     try:
-        while time.monotonic() < deadline and b"Press ENTER to close..." not in output:
+        while time.monotonic() < deadline and prompt not in output:
             ready, _, _ = select.select([master_fd], [], [], 0.1)
             if not ready:
                 continue
@@ -106,7 +158,7 @@ def _run_with_pty(command: list[str], cwd: Path) -> subprocess.CompletedProcess[
                     break
                 raise
 
-        if b"Press ENTER to close..." not in output:
+        if prompt not in output:
             kill_process_tree()
             process.wait(timeout=5)
             pytest.fail("The launcher did not reach its interactive pause prompt.")

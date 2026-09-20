@@ -455,7 +455,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo /usr/sbin/installer \
+          sudo env SPX_SKIP_AUTO_SETUP=1 /usr/sbin/installer \
             -pkg "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg" \
             -target / \
             -allowUntrusted
