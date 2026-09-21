@@ -60,3 +60,19 @@ def test_macos_cleanup_preserves_docker_data_and_unrelated_processes() -> None:
         assert "--volumes" not in content
         assert "--rmi all" not in content
         assert "pkill -f spx-ble-adapter" not in content
+
+
+def test_macos_uninstaller_elevates_filesystem_cleanup_after_user_stack_stop() -> None:
+    content = (ROOT / "installer/macos/spx_uninstall_launcher.applescript").read_text(
+        encoding="utf-8"
+    )
+    cleanup_start = content.index("on cleanupShell")
+    uninstall_start = content.index("on uninstallShell")
+    cleanup_shell = content[cleanup_start:uninstall_start]
+    uninstall_shell = content[uninstall_start:]
+
+    assert r'\"$GENERATED_DIR/spx-stop.sh\" || true' in cleanup_shell
+    assert r'rm -rf \"$SUPPORT_DIR\"' not in cleanup_shell
+    assert r'rm -rf \"$SUPPORT_DIR\"' in uninstall_shell
+    assert "with administrator privileges" in content
+    assert "uninstallShell(appsDirPath, packageId, supportDir" in content

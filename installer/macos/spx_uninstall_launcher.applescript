@@ -30,8 +30,11 @@ on run
   end if
 
   try
-    do shell script "/bin/bash -lc " & quoted form of my cleanupShell(supportDir, generatedDir, workspaceDir, legacyWorkspaceDir, removeWorkspace)
-    do shell script "/bin/bash -lc " & quoted form of my uninstallShell(appsDirPath, packageId) with administrator privileges
+    -- Stop the user's Docker stack in the user's session so Docker Desktop
+    -- remains accessible, then perform all filesystem removal as root. Older
+    -- installers could leave Application Support/SPX owned by root.
+    do shell script "/bin/bash -lc " & quoted form of my cleanupShell(generatedDir)
+    do shell script "/bin/bash -lc " & quoted form of my uninstallShell(appsDirPath, packageId, supportDir, workspaceDir, legacyWorkspaceDir, removeWorkspace) with administrator privileges
     activate
     if removeWorkspace then
       display dialog appTitle & " removed the installed SPX tools and the installer-managed workspace." buttons {"OK"} default button "OK" with icon note
@@ -48,30 +51,30 @@ on run
   end try
 end run
 
-on cleanupShell(supportDir, generatedDir, workspaceDir, legacyWorkspaceDir, removeWorkspace)
+on cleanupShell(generatedDir)
   set commandLines to {}
   set end of commandLines to "set -euo pipefail"
-  set end of commandLines to "SUPPORT_DIR=" & quoted form of supportDir
   set end of commandLines to "GENERATED_DIR=" & quoted form of generatedDir
-  set end of commandLines to "WORKSPACE_DIR=" & quoted form of workspaceDir
-  set end of commandLines to "LEGACY_WORKSPACE_DIR=" & quoted form of legacyWorkspaceDir
-  set end of commandLines to "REMOVE_WORKSPACE=" & (my boolToFlag(removeWorkspace))
   set end of commandLines to "if [ -x \"$GENERATED_DIR/spx-stop.sh\" ]; then"
   set end of commandLines to "  \"$GENERATED_DIR/spx-stop.sh\" || true"
   set end of commandLines to "fi"
+  return my joinLines(commandLines, linefeed)
+end cleanupShell
+
+on uninstallShell(appsDirPath, packageId, supportDir, workspaceDir, legacyWorkspaceDir, removeWorkspace)
+  set commandLines to {}
+  set end of commandLines to "set -euo pipefail"
+  set end of commandLines to "APPS_DIR=" & quoted form of appsDirPath
+  set end of commandLines to "PACKAGE_ID=" & quoted form of packageId
+  set end of commandLines to "SUPPORT_DIR=" & quoted form of supportDir
+  set end of commandLines to "WORKSPACE_DIR=" & quoted form of workspaceDir
+  set end of commandLines to "LEGACY_WORKSPACE_DIR=" & quoted form of legacyWorkspaceDir
+  set end of commandLines to "REMOVE_WORKSPACE=" & (my boolToFlag(removeWorkspace))
   set end of commandLines to "rm -rf \"$SUPPORT_DIR\""
   set end of commandLines to "if [ \"$REMOVE_WORKSPACE\" = 1 ]; then"
   set end of commandLines to "  rm -rf \"$WORKSPACE_DIR\""
   set end of commandLines to "  rm -rf \"$LEGACY_WORKSPACE_DIR\""
   set end of commandLines to "fi"
-  return my joinLines(commandLines, linefeed)
-end cleanupShell
-
-on uninstallShell(appsDirPath, packageId)
-  set commandLines to {}
-  set end of commandLines to "set -euo pipefail"
-  set end of commandLines to "APPS_DIR=" & quoted form of appsDirPath
-  set end of commandLines to "PACKAGE_ID=" & quoted form of packageId
   set end of commandLines to "for app_name in 'SPX Setup.app' 'SPX MCP Setup.app' 'SPX Start.app' 'SPX Stop.app' 'SPX Cleanup.app' 'SPX Uninstall.app'; do"
   set end of commandLines to "  rm -rf \"$APPS_DIR/$app_name\""
   set end of commandLines to "done"
