@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Subscribe to comfort index updates published by the MQTT environment sensor."""
 
 from __future__ import annotations

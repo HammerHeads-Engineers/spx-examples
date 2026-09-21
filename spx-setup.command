@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: MIT
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR" || exit 1
@@ -29,11 +30,16 @@ if command -v xattr >/dev/null 2>&1; then
   done
 fi
 
-bash "$LAUNCHER" "$@"
-EXIT_CODE=$?
+if bash "$LAUNCHER" "$@"; then
+  EXIT_CODE=0
+else
+  EXIT_CODE=$?
+fi
 
 echo ""
 echo "Exit code: $EXIT_CODE"
-read -r -p "Press Enter to close..." _
+if [ "$EXIT_CODE" -ne 0 ]; then
+  read -r -p "Press Enter to close..." _ || true
+fi
 
 exit $EXIT_CODE

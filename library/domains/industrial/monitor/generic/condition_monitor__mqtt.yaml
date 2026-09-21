@@ -1,0 +1,164 @@
+# SPDX-License-Identifier: MIT
+
+name: condition_monitor__mqtt
+description: |
+  Simplified condition monitoring node for rotating equipment. Publishes vibration
+  RMS values and winding temperature over MQTT with a derived health index.
+
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: "host.docker.internal"
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/condition_monitor"
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+  mqtt_default_qos:
+    type: int
+    default: 1
+
+attributes:
+  vib_rms_x:
+    type: float
+    default: 2.0
+    unit: mm/s
+  vib_rms_y:
+    type: float
+    default: 1.5
+    unit: mm/s
+  vib_rms_z:
+    type: float
+    default: 1.8
+    unit: mm/s
+  vib_limit_warning:
+    type: float
+    default: 4.5
+    unit: mm/s
+  vib_limit_alarm:
+    type: float
+    default: 7.0
+    unit: mm/s
+
+  temp_stator_c:
+    type: float
+    default: 65.0
+    unit: degC
+  temp_limit_warning_c:
+    type: float
+    default: 90.0
+    unit: degC
+  temp_limit_alarm_c:
+    type: float
+    default: 110.0
+    unit: degC
+
+  health_index:
+    type: float
+    default: 100.0
+    unit: score
+  alarm_vibration:
+    type: int
+    default: 0
+  alarm_temperature:
+    type: int
+    default: 0
+
+actions:
+  - function: $in(health_index)
+    name: compute_health_index
+    description: Combine vibration and temperature deviations into a single index.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0
+            - 5.0 * max(0.0, ($in(vib_rms_x) + $in(vib_rms_y) + $in(vib_rms_z)) / 3.0 - $in(vib_limit_warning))
+            - 2.0 * max(0.0, $in(temp_stator_c) - $in(temp_limit_warning_c))
+          )
+        )
+
+  - function: $in(alarm_vibration)
+    name: detect_vibration_alarm
+    description: Alarm when any axis exceeds the alarm vibration limit.
+    call: 1 if max($in(vib_rms_x), $in(vib_rms_y), $in(vib_rms_z)) >= $in(vib_limit_alarm) else 0
+
+  - function: $in(alarm_temperature)
+    name: detect_temperature_alarm
+    description: Alarm when winding temperature exceeds the alarm limit.
+    call: 1 if $in(temp_stator_c) >= $in(temp_limit_alarm_c) else 0
+
+communication:
+  - mqtt:
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
+      default_retain: false
+      bindings:
+        - name: publish_vib_rms_x
+          attribute: $ext(vib_rms_x)
+          topic: telemetry/vib_rms_x
+          direction: publish
+        - name: publish_vib_rms_y
+          attribute: $ext(vib_rms_y)
+          topic: telemetry/vib_rms_y
+          direction: publish
+        - name: publish_vib_rms_z
+          attribute: $ext(vib_rms_z)
+          topic: telemetry/vib_rms_z
+          direction: publish
+        - name: publish_temp_stator_c
+          attribute: $ext(temp_stator_c)
+          topic: telemetry/temp_stator_c
+          direction: publish
+        - name: publish_health_index
+          attribute: $ext(health_index)
+          topic: telemetry/health_index
+          direction: publish
+        - name: publish_alarm_vibration
+          attribute: $ext(alarm_vibration)
+          topic: telemetry/alarms/vibration
+          direction: publish
+        - name: publish_alarm_temperature
+          attribute: $ext(alarm_temperature)
+          topic: telemetry/alarms/temperature
+          direction: publish
+
+scenarios:
+  bearing_fault_spike:
+    enabled: true
+    display_name: "Bearing Fault Spike"
+    description: Raise vibration on all axes to emulate a bearing failure signature.
+    duration: 12.0
+    overrides:
+      $in(vib_rms_x): 8.0
+      $in(vib_rms_y): 7.5
+      $in(vib_rms_z): 6.2
+
+  thermal_warning:
+    enabled: true
+    display_name: "Thermal Warning"
+    description: Raise stator temperature into the warning range with moderate vibration.
+    duration: 15.0
+    overrides:
+      $in(temp_stator_c): 105.0
+      $in(vib_rms_x): 3.0
+      $in(vib_rms_y): 2.8
+      $in(vib_rms_z): 2.6
+
+  sensor_dropout:
+    enabled: true
+    display_name: "Sensor Dropout"
+    description: Collapse measured vibration and temperature to emulate a sensor outage.
+    duration: 6.0
+    overrides:
+      $in(vib_rms_x): 0.2
+      $in(vib_rms_y): 0.2
+      $in(vib_rms_z): 0.2
+      $in(temp_stator_c): 40.0

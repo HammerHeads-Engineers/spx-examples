@@ -1,0 +1,370 @@
+# SPDX-License-Identifier: MIT
+
+name: energy_meter_3ph__mqtt
+description: |
+  Virtual three-phase energy meter exposing voltages, currents, power and
+  cumulative energy over MQTT. Useful for testing industrial energy dashboards
+  and load-shedding logic.
+
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: "host.docker.internal"
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/energy_meter"
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+  mqtt_default_qos:
+    type: int
+    default: 1
+
+attributes:
+  voltage_l1:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_l2:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_l3:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_nominal:
+    type: float
+    default: 400.0
+    unit: V
+  voltage_drop_per_amp:
+    type: float
+    default: 1.5
+    unit: V/A
+  voltage_unbalance_gain:
+    type: float
+    default: 0.8
+    unit: V/A
+  voltage_floor:
+    type: float
+    default: 340.0
+    unit: V
+  voltage_ceiling:
+    type: float
+    default: 420.0
+    unit: V
+
+  current_l1:
+    type: float
+    default: 12.0
+    unit: A
+  current_l2:
+    type: float
+    default: 10.5
+    unit: A
+  current_l3:
+    type: float
+    default: 11.2
+    unit: A
+  current_nominal:
+    type: float
+    default: 10.0
+    unit: A
+
+  frequency_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  frequency_nominal_hz:
+    type: float
+    default: 50.0
+    unit: Hz
+  frequency_droop_per_kw:
+    type: float
+    default: 0.03
+    unit: Hz/kW
+  frequency_floor_hz:
+    type: float
+    default: 47.5
+    unit: Hz
+  frequency_ceiling_hz:
+    type: float
+    default: 51.5
+    unit: Hz
+
+  power_factor:
+    type: float
+    default: 0.95
+    unit: ratio
+  power_factor_leading:
+    type: int
+    default: 0
+
+  active_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  energy_import_kwh:
+    type: float
+    default: 0.0
+    unit: kWh
+  reactive_power_kvar:
+    type: float
+    default: 0.0
+    unit: kVAR
+
+  overload_threshold_kw:
+    type: float
+    default: 45.0
+    unit: kW
+  overload_alarm:
+    type: int
+    default: 0
+
+  nominal_power_kw:
+    type: float
+    default: 30.0
+    unit: kW
+
+  cycle_time_s:
+    type: float
+    default: 1.0
+    unit: s
+
+actions:
+  - function: $in(active_power_kw)
+    name: compute_active_power
+    description: Estimate active power from three-phase voltage, currents, and power factor.
+    call: 1e-3
+         * $in(power_factor)
+         * (
+             $in(voltage_l1) * $in(current_l1)
+             + $in(voltage_l2) * $in(current_l2)
+             + $in(voltage_l3) * $in(current_l3)
+           )
+
+  - function: $in(energy_import_kwh)
+    name: integrate_energy
+    description: Integrate cumulative imported energy based on active power.
+    call: $in(energy_import_kwh) + max(0.0, $in(active_power_kw)) * cycle_time_s / 3600.0
+
+  - function: $in(overload_alarm)
+    name: detect_overload
+    description: Raise overload alarm when power exceeds the threshold.
+    call: 1 if $in(active_power_kw) >= $in(overload_threshold_kw) else 0
+
+  - function: $in(reactive_power_kvar)
+    name: compute_reactive_power
+    description: Approximate reactive power magnitude from the present power factor.
+    call: (
+          (
+            max(
+              0.0,
+              (
+                (
+                  abs($in(active_power_kw))
+                  / max(0.05, min(1.0, abs($in(power_factor))))
+                )
+                ** 2
+                - ($in(active_power_kw) ** 2)
+              )
+            )
+          )
+          ** 0.5
+        ) * (-1.0 if $in(power_factor_leading) else 1.0)
+
+  - function: $in(voltage_l1)
+    name: adjust_voltage_l1
+    description: Apply load-dependent sag and unbalance effects on phase L1 voltage.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l1) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l1)
+                  - (($in(current_l2) + $in(current_l3)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(voltage_l2)
+    name: adjust_voltage_l2
+    description: Same sag/unbalance logic for phase L2.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l2) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l2)
+                  - (($in(current_l1) + $in(current_l3)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(voltage_l3)
+    name: adjust_voltage_l3
+    description: Same sag/unbalance logic for phase L3.
+    call: max(
+          $in(voltage_floor),
+          min(
+            $in(voltage_ceiling),
+            $in(voltage_nominal)
+            - $in(voltage_drop_per_amp) * max(0.0, $in(current_l3) - $in(current_nominal))
+            - $in(voltage_unbalance_gain)
+              * max(
+                0.0,
+                abs(
+                  $in(current_l3)
+                  - (($in(current_l1) + $in(current_l2)) / 2.0)
+                )
+              )
+          )
+        )
+
+  - function: $in(frequency_hz)
+    name: droop_frequency
+    description: Simple droop control to emulate weak grid behaviour.
+    call: max(
+          $in(frequency_floor_hz),
+          min(
+            $in(frequency_ceiling_hz),
+            $in(frequency_nominal_hz)
+            - $in(frequency_droop_per_kw)
+              * max(0.0, $in(active_power_kw) - $in(nominal_power_kw))
+          )
+        )
+
+communication:
+  - mqtt:
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
+      default_retain: false
+      bindings:
+        - name: publish_voltage_l1
+          attribute: $ext(voltage_l1)
+          topic: telemetry/voltage_l1
+          direction: publish
+        - name: publish_voltage_l2
+          attribute: $ext(voltage_l2)
+          topic: telemetry/voltage_l2
+          direction: publish
+        - name: publish_voltage_l3
+          attribute: $ext(voltage_l3)
+          topic: telemetry/voltage_l3
+          direction: publish
+        - name: publish_current_l1
+          attribute: $ext(current_l1)
+          topic: telemetry/current_l1
+          direction: publish
+        - name: publish_current_l2
+          attribute: $ext(current_l2)
+          topic: telemetry/current_l2
+          direction: publish
+        - name: publish_current_l3
+          attribute: $ext(current_l3)
+          topic: telemetry/current_l3
+          direction: publish
+        - name: publish_active_power_kw
+          attribute: $ext(active_power_kw)
+          topic: telemetry/active_power_kw
+          direction: publish
+        - name: publish_energy_import_kwh
+          attribute: $ext(energy_import_kwh)
+          topic: telemetry/energy_import_kwh
+          direction: publish
+        - name: publish_frequency_hz
+          attribute: $ext(frequency_hz)
+          topic: telemetry/frequency_hz
+          direction: publish
+        - name: publish_power_factor
+          attribute: $ext(power_factor)
+          topic: telemetry/power_factor
+          direction: publish
+        - name: publish_reactive_power_kvar
+          attribute: $ext(reactive_power_kvar)
+          topic: telemetry/reactive_power_kvar
+          direction: publish
+        - name: publish_overload_alarm
+          attribute: $ext(overload_alarm)
+          topic: telemetry/alarms/overload
+          direction: publish
+        - name: subscribe_overload_threshold_kw
+          attribute: $attr(overload_threshold_kw)
+          topic: command/overload_threshold_kw
+          direction: subscribe
+        - name: subscribe_power_factor
+          attribute: $attr(power_factor)
+          topic: command/power_factor
+          direction: subscribe
+        - name: subscribe_power_factor_leading
+          attribute: $attr(power_factor_leading)
+          topic: command/power_factor_leading
+          direction: subscribe
+
+scenarios:
+  balanced_load_step:
+    enabled: true
+    display_name: "Balanced Load Step"
+    description: Raise all three phase currents together for a balanced demand step.
+    duration: 20.0
+    overrides:
+      $in(current_l1): 18.0
+      $in(current_l2): 17.5
+      $in(current_l3): 18.2
+      $in(power_factor): 0.92
+
+  unbalanced_phase_l2:
+    enabled: true
+    display_name: "Unbalanced Phase L2"
+    description: Push most of the load onto phase L2 to exercise unbalance handling.
+    duration: 15.0
+    overrides:
+      $in(current_l1): 9.0
+      $in(current_l2): 24.0
+      $in(current_l3): 8.5
+      $in(power_factor): 0.88
+
+  voltage_sag_event:
+    enabled: true
+    display_name: "Voltage Sag Event"
+    description: Lower the nominal voltage and increase sag sensitivity under load.
+    duration: 10.0
+    overrides:
+      $in(voltage_nominal): 390.0
+      $in(voltage_drop_per_amp): 2.5
+      $in(power_factor): 0.9
+
+  pv_backfeed_disturbance:
+    enabled: true
+    display_name: "PV Backfeed Disturbance"
+    description: Emulate export power with leading power factor and higher local voltage.
+    duration: 18.0
+    overrides:
+      $in(current_l1): -14.0
+      $in(current_l2): -11.5
+      $in(current_l3): -15.2
+      $in(power_factor): 0.98
+      $in(power_factor_leading): 1
+      $in(voltage_nominal): 415.0
+      $in(voltage_drop_per_amp): 0.8
+      $in(voltage_unbalance_gain): 1.4
+      $in(frequency_droop_per_kw): 0.07
+      $in(nominal_power_kw): 18.0

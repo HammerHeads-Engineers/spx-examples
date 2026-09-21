@@ -1,0 +1,210 @@
+# SPDX-License-Identifier: MIT
+name: siglent_sdl1000x__scpi
+description: |
+  Virtual Siglent SDL1000X series programmable DC electronic load exposing
+  core SCPI commands for mode selection, setpoints, input state, and
+  measurements over ASCII/TCP.
+
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  idn:
+    type: str
+    default: "SIGLENT,SDL1020X,SDL1000X0000000,1.01.01.15"
+
+  k__mode:
+    type: str
+    default: "CURRent"
+  k__input_state:
+    type: str
+    default: "OFF"
+  k__current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__voltage_set_v:
+    type: float
+    default: 12.0
+    unit: V
+  k__power_set_w:
+    type: float
+    default: 10.0
+    unit: W
+  k__resistance_set_ohm:
+    type: float
+    default: 10.0
+    unit: ohm
+
+  voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  current_a:
+    type: float
+    default: 0.0
+    unit: A
+  power_w:
+    type: float
+    default: 0.0
+    unit: W
+  resistance_ohm:
+    type: float
+    default: 0.0
+    unit: ohm
+
+  mode_status:
+    type: str
+    default: "CURRENT"
+  input_state_value:
+    type: str
+    default: "0"
+
+actions:
+  - function: $in(mode_status)
+    name: update_mode_status
+    description: Convert the internal SCPI mode token to the public status string.
+    call: |
+      (lambda mode:
+        "CURRENT" if mode == "CURRent"
+        else "VOLTAGE" if mode == "VOLTage"
+        else "POWER" if mode == "POWer"
+        else "RESISTANCE" if mode == "RESistance"
+        else str(mode).upper()
+      )($in(k__mode))
+  - function: $in(input_state_value)
+    name: update_input_state_value
+    description: Mirror the electronic-load input state as the SCPI numeric reply.
+    call: ("1" if $in(k__input_state) == "ON" else "0")
+  - function: $in(voltage_v)
+    name: update_voltage
+    description: Publish the effective load voltage when the input is enabled.
+    call: ($in(k__voltage_set_v) if $in(k__input_state) == "ON" else 0.0)
+  - function: $in(current_a)
+    name: update_current
+    description: Derive the active current from the selected operating mode and setpoints.
+    call: |
+      (lambda enabled, mode, i_set, v_set, p_set, r_set:
+        0.0 if not enabled
+        else i_set if mode == "CURRent"
+        else (p_set / v_set if v_set > 0.0 else 0.0) if mode == "POWer"
+        else (v_set / r_set if r_set > 0.0 else 0.0) if mode == "RESistance"
+        else i_set
+      )(
+        $in(k__input_state) == "ON",
+        $in(k__mode),
+        $in(k__current_set_a),
+        $in(k__voltage_set_v),
+        $in(k__power_set_w),
+        $in(k__resistance_set_ohm),
+      )
+  - function: $in(resistance_ohm)
+    name: update_resistance
+    description: Expose the instantaneous effective resistance seen by the load.
+    call: |
+      (lambda enabled, mode, r_set, v_set, current:
+        0.0 if not enabled
+        else r_set if mode == "RESistance"
+        else (v_set / current if current > 0.0 else 0.0)
+      )(
+        $in(k__input_state) == "ON",
+        $in(k__mode),
+        $in(k__resistance_set_ohm),
+        $in(k__voltage_set_v),
+        $in(current_a),
+      )
+  - function: $in(power_w)
+    name: update_power
+    description: Compute instantaneous dissipated power from voltage and current.
+    call: ($in(voltage_v) * $in(current_a) if $in(k__input_state) == "ON" else 0.0)
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+
+        ":SOURce:FUNCtion CURRent":
+          name: set_current_mode
+          response: null
+          "#attr(k__mode)": "CURRent"
+        ":SOURce:FUNCtion VOLTage":
+          name: set_voltage_mode
+          response: null
+          "#attr(k__mode)": "VOLTage"
+        ":SOURce:FUNCtion POWer":
+          name: set_power_mode
+          response: null
+          "#attr(k__mode)": "POWer"
+        ":SOURce:FUNCtion RESistance":
+          name: set_resistance_mode
+          response: null
+          "#attr(k__mode)": "RESistance"
+        ":SOURce:FUNCtion?":
+          name: query_mode
+          response: "#out(mode_status)"
+
+        ":SOURce:INPut:STATe ON":
+          name: enable_input
+          response: null
+          "#attr(k__input_state)": "ON"
+        ":SOURce:INPut:STATe OFF":
+          name: disable_input
+          response: null
+          "#attr(k__input_state)": "OFF"
+        ":SOURce:INPut:STATe?":
+          name: query_input
+          response: "#out(input_state_value)"
+
+        ":SOURce:CURRent:LEVel:IMMediate {current}":
+          name: set_current
+          response: null
+          "#attr(k__current_set_a)": "current"
+        ":SOURce:CURRent:LEVel:IMMediate?":
+          name: query_current
+          response: "#out(k__current_set_a)"
+
+        ":SOURce:VOLTage:LEVel:IMMediate {voltage}":
+          name: set_voltage
+          response: null
+          "#attr(k__voltage_set_v)": "voltage"
+        ":SOURce:VOLTage:LEVel:IMMediate?":
+          name: query_voltage
+          response: "#out(k__voltage_set_v)"
+
+        ":SOURce:POWer:LEVel:IMMediate {power}":
+          name: set_power
+          response: null
+          "#attr(k__power_set_w)": "power"
+        ":SOURce:POWer:LEVel:IMMediate?":
+          name: query_power
+          response: "#out(k__power_set_w)"
+
+        ":SOURce:RESistance:LEVel:IMMediate {resistance}":
+          name: set_resistance
+          response: null
+          "#attr(k__resistance_set_ohm)": "resistance"
+        ":SOURce:RESistance:LEVel:IMMediate?":
+          name: query_resistance
+          response: "#out(k__resistance_set_ohm)"
+
+        ":MEASure:CURRent?":
+          name: query_current_measurement
+          response: "#out(current_a)"
+        ":MEASure:VOLTage?":
+          name: query_voltage_measurement
+          response: "#out(voltage_v)"
+        ":MEASure:POWer?":
+          name: query_power_measurement
+          response: "#out(power_w)"
+        ":MEASure:RESistance?":
+          name: query_resistance_measurement
+          response: "#out(resistance_ohm)"

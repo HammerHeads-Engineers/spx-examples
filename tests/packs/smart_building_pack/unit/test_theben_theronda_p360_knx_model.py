@@ -10,7 +10,15 @@ ROOT = repo_root()
 
 
 def test_theben_theronda_p360_knx_model_loads() -> None:
-    path = ROOT / "library" / "domains" / "iot" / "theben" / "theronda_p360__knx.yaml"
+    path = (
+        ROOT
+        / "library"
+        / "domains"
+        / "building"
+        / "sensor"
+        / "theben"
+        / "theronda_p360__knx.yaml"
+    )
     doc = yaml.safe_load(path.read_text(encoding="utf-8"))
 
     assert isinstance(doc, dict)
@@ -38,5 +46,11 @@ def test_theben_theronda_p360_knx_model_in_catalog() -> None:
     models = catalog.get("models")
     assert isinstance(models, list)
 
-    matches = [m for m in models if isinstance(m, dict) and m.get("path") == "library/domains/iot/theben/theronda_p360__knx.yaml"]
+    matches = [
+        m
+        for m in models
+        if isinstance(m, dict)
+        and m.get("path")
+        == "library/domains/building/sensor/theben/theronda_p360__knx.yaml"
+    ]
     assert matches, "Model is missing from library/catalog/models.yaml"

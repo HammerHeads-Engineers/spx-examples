@@ -1,0 +1,274 @@
+# SPDX-License-Identifier: MIT
+
+name: abb_sa_s12_16_5_1__knx
+description: |
+  ABB SA/S12.16.5.1 (Sim) – 12-fold KNX switch actuator.
+
+  Each channel exposes separate group addresses for command and status feedback (1-bit / DPT 1.001),
+  so Home Assistant KNX can maintain a stable switch state per channel.
+
+  Group address plan (3-level):
+  - Channel commands: 1/3/1 .. 1/3/12
+  - Channel states:   1/4/1 .. 1/4/12
+  - Central OFF cmd:  1/0/1 (optional)
+
+meta_parameters:
+  knx_router_host:
+    type: str
+    default: knx_gateway
+  knx_router_port:
+    type: int
+    default: 3671
+  knx_poll_interval:
+    type: float
+    default: 0.2
+  ga_main:
+    type: str
+    default: "1"
+
+attributes:
+  _cycle_time_s:
+    type: float
+    default: 0.2
+    unit: s
+  k__channel_load_w:
+    type: float
+    default: 60.0
+    unit: W
+  active_channel_count:
+    type: int
+    default: 0
+  lighting_load_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  all_off_cmd:
+    type: int
+    default: 0
+
+  k__ch01:
+    type: int
+    default: 0
+  k__ch02:
+    type: int
+    default: 0
+  k__ch03:
+    type: int
+    default: 0
+  k__ch04:
+    type: int
+    default: 0
+  k__ch05:
+    type: int
+    default: 0
+  k__ch06:
+    type: int
+    default: 0
+  k__ch07:
+    type: int
+    default: 0
+  k__ch08:
+    type: int
+    default: 0
+  k__ch09:
+    type: int
+    default: 0
+  k__ch10:
+    type: int
+    default: 0
+  k__ch11:
+    type: int
+    default: 0
+  k__ch12:
+    type: int
+    default: 0
+
+conditions:
+  - if: $attr(all_off_cmd) == 1
+    actions:
+      - function: $in(k__ch01)
+        call: 0
+      - function: $in(k__ch02)
+        call: 0
+      - function: $in(k__ch03)
+        call: 0
+      - function: $in(k__ch04)
+        call: 0
+      - function: $in(k__ch05)
+        call: 0
+      - function: $in(k__ch06)
+        call: 0
+      - function: $in(k__ch07)
+        call: 0
+      - function: $in(k__ch08)
+        call: 0
+      - function: $in(k__ch09)
+        call: 0
+      - function: $in(k__ch10)
+        call: 0
+      - function: $in(k__ch11)
+        call: 0
+      - function: $in(k__ch12)
+        call: 0
+      - function: $in(all_off_cmd)
+        call: 0
+
+actions:
+  - function: $in(active_channel_count)
+    name: compute_active_channel_count
+    description: Count active KNX lighting channels currently turned on.
+    call: int(max(0, $in(k__ch01))) + int(max(0, $in(k__ch02))) + int(max(0, $in(k__ch03))) + int(max(0, $in(k__ch04)))
+      + int(max(0, $in(k__ch05))) + int(max(0, $in(k__ch06))) + int(max(0, $in(k__ch07))) + int(max(0, $in(k__ch08)))
+      + int(max(0, $in(k__ch09))) + int(max(0, $in(k__ch10))) + int(max(0, $in(k__ch11))) + int(max(0, $in(k__ch12)))
+
+  - function: $in(lighting_load_w)
+    name: compute_lighting_load
+    description: Approximate active lighting load from enabled ABB switch channels.
+    call: max(0.0, $in(active_channel_count)) * max(0.0, $in(k__channel_load_w))
+
+communication:
+  - knx_ip:
+      router:
+        host: "$param(knx_router_host)"
+        port: "$param(knx_router_port)"
+        route_back: true
+      poll_interval: "$param(knx_poll_interval)"
+      bindings:
+        - name: all_off_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/0/1"
+          value_codec: bool
+          write_attribute: "#attr(all_off_cmd)"
+
+        - name: ch01_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/1"
+          value_codec: bool
+          write_attribute: "#attr(k__ch01)"
+        - name: ch01_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/1"
+          value_codec: bool
+          read_attribute: "#attr(k__ch01)"
+
+        - name: ch02_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/2"
+          value_codec: bool
+          write_attribute: "#attr(k__ch02)"
+        - name: ch02_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/2"
+          value_codec: bool
+          read_attribute: "#attr(k__ch02)"
+
+        - name: ch03_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/3"
+          value_codec: bool
+          write_attribute: "#attr(k__ch03)"
+        - name: ch03_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/3"
+          value_codec: bool
+          read_attribute: "#attr(k__ch03)"
+
+        - name: ch04_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/4"
+          value_codec: bool
+          write_attribute: "#attr(k__ch04)"
+        - name: ch04_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/4"
+          value_codec: bool
+          read_attribute: "#attr(k__ch04)"
+
+        - name: ch05_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/5"
+          value_codec: bool
+          write_attribute: "#attr(k__ch05)"
+        - name: ch05_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/5"
+          value_codec: bool
+          read_attribute: "#attr(k__ch05)"
+
+        - name: ch06_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/6"
+          value_codec: bool
+          write_attribute: "#attr(k__ch06)"
+        - name: ch06_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/6"
+          value_codec: bool
+          read_attribute: "#attr(k__ch06)"
+
+        - name: ch07_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/7"
+          value_codec: bool
+          write_attribute: "#attr(k__ch07)"
+        - name: ch07_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/7"
+          value_codec: bool
+          read_attribute: "#attr(k__ch07)"
+
+        - name: ch08_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/8"
+          value_codec: bool
+          write_attribute: "#attr(k__ch08)"
+        - name: ch08_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/8"
+          value_codec: bool
+          read_attribute: "#attr(k__ch08)"
+
+        - name: ch09_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/9"
+          value_codec: bool
+          write_attribute: "#attr(k__ch09)"
+        - name: ch09_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/9"
+          value_codec: bool
+          read_attribute: "#attr(k__ch09)"
+
+        - name: ch10_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/10"
+          value_codec: bool
+          write_attribute: "#attr(k__ch10)"
+        - name: ch10_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/10"
+          value_codec: bool
+          read_attribute: "#attr(k__ch10)"
+
+        - name: ch11_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/11"
+          value_codec: bool
+          write_attribute: "#attr(k__ch11)"
+        - name: ch11_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/11"
+          value_codec: bool
+          read_attribute: "#attr(k__ch11)"
+
+        - name: ch12_cmd
+          direction: inbound
+          group_address: "$param(ga_main)/3/12"
+          value_codec: bool
+          write_attribute: "#attr(k__ch12)"
+        - name: ch12_state
+          direction: outbound
+          group_address: "$param(ga_main)/4/12"
+          value_codec: bool
+          read_attribute: "#attr(k__ch12)"

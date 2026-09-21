@@ -16,11 +16,11 @@ Purpose: multi-protocol BMS/BAS demo pack covering HVAC, lighting, safety, energ
 6. Add or update tests under `tests/packs/smart_building_pack/`.
 
 ## Golden references
-- `library/domains/iot/generic/hvac_flexit_nordic__bacnet.yaml`: BACnet object map with derived HVAC dynamics.
-- `library/domains/weather/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: MQTT telemetry plus Home Assistant discovery payloads.
-- `library/domains/iot/generic/energy_meter_iem3000__modbus.yaml`: Modbus register mapping with derived power metrics.
-- `library/domains/iot/abb/abb_jra_s4_230_5_1__knx.yaml`: multi-channel KNX bindings with mirrored state.
-- `library/domains/thermal_controllers/generic/thermal_controller_advanced.yaml`: control-loop patterns shared across packs.
+- `library/domains/building/controller/generic/hvac_flexit_nordic__bacnet.yaml`: BACnet object map with derived HVAC dynamics.
+- `library/domains/environment/gateway/wago_vaisala/weather_gateway_wago_pfc200__vaisala_wxt530__mqtt.yaml`: MQTT telemetry plus Home Assistant discovery payloads.
+- `library/domains/energy/meter/schneider/energy_meter_iem3000__modbus.yaml`: Modbus register mapping with derived power metrics.
+- `library/domains/building/actuator/abb/abb_jra_s4_230_5_1__knx.yaml`: multi-channel KNX bindings with mirrored state.
+- `library/domains/industrial/controller/generic/thermal_controller_advanced.yaml`: control-loop patterns shared across packs.
 
 ## Validation
 ```bash

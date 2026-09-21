@@ -1,0 +1,298 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: air_quality_static
+description: |
+  Static air quality monitoring station served over an HTTP endpoint.
+  Provides deterministic particulate matter and pollutant readings so
+  HTTP clients can be validated against the SPX simulator without
+  connecting to external APIs or sensors.
+
+meta_parameters:
+  http_host:
+    type: str
+    default: 0.0.0.0
+  http_port:
+    type: int
+    default: 8092
+
+attributes:
+  k__station_id:
+    type: str
+    default: "PL-WAW-001"
+  k__station_name:
+    type: str
+    default: "Warsaw Srodmiescie Monitor"
+  k__latitude:
+    type: float
+    default: 52.2297
+    unit: deg
+  k__longitude:
+    type: float
+    default: 21.0122
+    unit: deg
+  k__timezone:
+    type: str
+    default: "Europe/Warsaw"
+  generation_time_ms:
+    type: float
+    default: 11.2
+    unit: ms
+  measurement_interval_minutes:
+    type: int
+    default: 60
+    unit: min
+  monitoring_window_hours:
+    type: int
+    default: 24
+    unit: h
+  k__active_profile:
+    type: str
+    default: "urban-baseline"
+
+  hourly_time:
+    type: list
+    default:
+      - "2025-01-01T00:00"
+      - "2025-01-01T03:00"
+      - "2025-01-01T06:00"
+      - "2025-01-01T09:00"
+      - "2025-01-01T12:00"
+      - "2025-01-01T15:00"
+      - "2025-01-01T18:00"
+      - "2025-01-01T21:00"
+  hourly_pm2_5:
+    type: list
+    default:
+      - 12.8
+      - 15.4
+      - 18.3
+      - 22.7
+      - 26.4
+      - 24.2
+      - 19.6
+      - 15.8
+    unit: ug/m3
+  hourly_pm10:
+    type: list
+    default:
+      - 20.1
+      - 24.5
+      - 28.8
+      - 34.2
+      - 39.5
+      - 36.1
+      - 30.4
+      - 24.9
+    unit: ug/m3
+  hourly_no2:
+    type: list
+    default:
+      - 18.5
+      - 20.1
+      - 22.4
+      - 25.7
+      - 28.3
+      - 26.5
+      - 23.6
+      - 21.0
+    unit: ug/m3
+  hourly_o3:
+    type: list
+    default:
+      - 61.0
+      - 59.2
+      - 57.4
+      - 54.8
+      - 52.6
+      - 53.9
+      - 56.8
+      - 59.7
+    unit: ug/m3
+  hourly_aqi:
+    type: list
+    default:
+      - 42
+      - 49
+      - 56
+      - 67
+      - 74
+      - 70
+      - 59
+      - 50
+    unit: index
+  hourly_aqi_category:
+    type: list
+    default:
+      - "good"
+      - "good"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "moderate"
+      - "good"
+
+  k__current_timestamp:
+    type: str
+    default: "2025-01-01T12:00"
+  k__current_pm2_5:
+    type: float
+    default: 26.4
+    unit: ug/m3
+  k__current_pm10:
+    type: float
+    default: 39.5
+    unit: ug/m3
+  k__current_no2:
+    type: float
+    default: 28.3
+    unit: ug/m3
+  k__current_o3:
+    type: float
+    default: 52.6
+    unit: ug/m3
+  k__current_aqi:
+    type: int
+    default: 74
+    unit: index
+  k__current_aqi_category:
+    type: str
+    default: "moderate"
+
+communication:
+  - http_endpoint:
+      host: "$param(http_host)"
+      port: "$param(http_port)"
+      endpoints:
+        "/v1/air-quality/{profile}":
+          method: GET
+          alias:
+            - "#attr(k__active_profile) = #param(profile)"
+          response:
+            station:
+              id: "#attr(k__station_id)"
+              name: "#attr(k__station_name)"
+              latitude: "#attr(k__latitude)"
+              longitude: "#attr(k__longitude)"
+              timezone: "#attr(k__timezone)"
+            generation_time_ms: "#attr(generation_time_ms)"
+            profile: "#attr(k__active_profile)"
+            monitoring_window_hours: "#attr(monitoring_window_hours)"
+            measurement_interval_minutes: "#attr(measurement_interval_minutes)"
+            hourly_units:
+              timestamp: "iso8601"
+              pm2_5: "ug/m3"
+              pm10: "ug/m3"
+              no2: "ug/m3"
+              o3: "ug/m3"
+              aqi: "index"
+              aqi_category: "category"
+            hourly_readings:
+              timestamp: "#attr(hourly_time)"
+              pm2_5: "#attr(hourly_pm2_5)"
+              pm10: "#attr(hourly_pm10)"
+              no2: "#attr(hourly_no2)"
+              o3: "#attr(hourly_o3)"
+              aqi: "#attr(hourly_aqi)"
+              aqi_category: "#attr(hourly_aqi_category)"
+            current:
+              timestamp: "#attr(k__current_timestamp)"
+              pm2_5: "#attr(k__current_pm2_5)"
+              pm10: "#attr(k__current_pm10)"
+              no2: "#attr(k__current_no2)"
+              o3: "#attr(k__current_o3)"
+              aqi: "#attr(k__current_aqi)"
+              aqi_category: "#attr(k__current_aqi_category)"
+
+        "/simulator/profile":
+          method: POST
+          alias:
+            - "#attr(k__active_profile) = #param(__body__.profile)"
+            - "#attr(monitoring_window_hours) = #param(__body__.monitoring_window_hours)"
+          response:
+            status: "ok"
+            active_profile: "#attr(k__active_profile)"
+            monitoring_window_hours: "#attr(monitoring_window_hours)"
+
+        "/simulator/location":
+          method: PUT
+          alias:
+            - "#attr(k__station_name) = #param(__body__.station_name)"
+            - "#attr(k__latitude) = #param(__body__.latitude)"
+            - "#attr(k__longitude) = #param(__body__.longitude)"
+            - "#attr(k__timezone) = #param(__body__.timezone)"
+          response:
+            status: "ok"
+            station_name: "#attr(k__station_name)"
+            latitude: "#attr(k__latitude)"
+            longitude: "#attr(k__longitude)"
+            timezone: "#attr(k__timezone)"
+
+        "/simulator/current":
+          method: PATCH
+          alias:
+            - "#attr(k__current_timestamp) = #param(__body__.timestamp)"
+            - "#attr(k__current_pm2_5) = #param(__body__.pm2_5)"
+            - "#attr(k__current_pm10) = #param(__body__.pm10)"
+            - "#attr(k__current_no2) = #param(__body__.no2)"
+            - "#attr(k__current_o3) = #param(__body__.o3)"
+            - "#attr(k__current_aqi) = #param(__body__.aqi)"
+            - "#attr(k__current_aqi_category) = #param(__body__.aqi_category)"
+          response:
+            status: "ok"
+            timestamp: "#attr(k__current_timestamp)"
+            pm2_5: "#attr(k__current_pm2_5)"
+            pm10: "#attr(k__current_pm10)"
+            no2: "#attr(k__current_no2)"
+            o3: "#attr(k__current_o3)"
+            aqi: "#attr(k__current_aqi)"
+            aqi_category: "#attr(k__current_aqi_category)"
+
+scenarios:
+  winter_smog_episode:
+    display_name: "Winter Smog Episode"
+    description: Apply elevated particulate and NO2 readings for a severe urban pollution episode.
+    duration: 45.0
+    overrides:
+      $in(k__active_profile): "urban-smog"
+      $in(k__current_timestamp): "2025-01-01T07:00"
+      $in(k__current_pm2_5): 115.0
+      $in(k__current_pm10): 168.0
+      $in(k__current_no2): 64.0
+      $in(k__current_o3): 32.0
+      $in(k__current_aqi): 182
+      $in(k__current_aqi_category): unhealthy
+      $in(hourly_pm2_5): [45.0, 52.0, 78.0, 115.0, 98.0, 74.0, 66.0, 54.0]
+      $in(hourly_pm10): [60.0, 72.0, 118.0, 168.0, 159.0, 121.0, 96.0, 72.0]
+      $in(hourly_no2): [30.0, 38.0, 49.0, 64.0, 61.0, 55.0, 46.0, 36.0]
+      $in(hourly_o3): [40.0, 38.0, 36.0, 32.0, 33.0, 35.0, 38.0, 41.0]
+      $in(hourly_aqi): [76, 92, 141, 182, 170, 138, 110, 88]
+      $in(hourly_aqi_category): [moderate, moderate, unhealthy, unhealthy, unhealthy, unhealthy, unhealthy, moderate]
+
+  coastal_reset:
+    display_name: "Coastal Reset"
+    description: Reset the station to a cleaner coastal-style air profile.
+    duration: 30.0
+    overrides:
+      $in(k__active_profile): "coastal-clean"
+      $in(k__current_timestamp): "2025-01-01T14:00"
+      $in(k__current_pm2_5): 8.0
+      $in(k__current_pm10): 14.0
+      $in(k__current_no2): 9.0
+      $in(k__current_o3): 78.0
+      $in(k__current_aqi): 32
+      $in(k__current_aqi_category): good
+
+  station_relocation:
+    display_name: "Station Relocation"
+    description: Move the simulated station to a different monitored city and profile.
+    duration: 60.0
+    overrides:
+      $in(k__station_id): "PL-LOD-004"
+      $in(k__station_name): "Lodz Fabryczna Monitor"
+      $in(k__latitude): 51.7592
+      $in(k__longitude): 19.4550
+      $in(k__timezone): Europe/Warsaw
+      $in(k__active_profile): "industrial-corridor"

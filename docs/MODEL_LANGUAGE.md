@@ -389,3 +389,19 @@ These appear in system-level configs more often than per-model YAML.
 - `templates` / `models`: mapping of template name -> model definition (registers a class).
 - `snapshots`: snapshot config (`base_dir`, `persist_memory_to_disk`, `memory_subdir`).
 - `logs`: log buffer config (`max_entries`, `level`, `format`, `datefmt`).
+
+### System connections
+Connections propagate values between attributes on live system components.
+
+Use `from` for the source read endpoint and `to` for the target write endpoint:
+
+```yaml
+connections:
+  Weather_Brightness_to_PV_Physics_Illuminance:
+    from: $out(Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT.k__brightness_lux)
+    to: $in(PV_Physics_Lux.k__illuminance_lux)
+```
+
+The source endpoint should normally be telemetry or a calculated output. The
+target endpoint should normally be a persistent input, commonly a `k__*`
+attribute. Use `cmd__*` targets only for explicit command or trigger behavior.

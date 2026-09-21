@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import webbrowser
 
 from pathlib import Path
 import os
@@ -16,12 +17,60 @@ from typing import Iterable, List, Optional
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
 from .selection import (
+    apply_platform_compatibility,
     resolve_default_instances,
     resolve_model_ids,
     resolve_service_ids,
     resolve_start_instances,
 )
 from .wizard import InstallerWizard, WizardSelection
+
+
+SPX_UI_URL = "http://localhost:3000"
+
+
+def _env_flag_disabled(name: str) -> bool:
+    value = os.environ.get(name, "").strip().lower()
+    return value in {"0", "false", "no", "off"}
+
+
+def _is_interactive_session(stream) -> bool:
+    stdin_is_tty = getattr(sys.stdin, "isatty", lambda: False)()
+    stream_is_tty = getattr(stream, "isatty", lambda: False)()
+    return bool(stdin_is_tty and stream_is_tty)
+
+
+def _open_ui_browser(selection: WizardSelection, *, stream=sys.stdout) -> None:
+    """Open the generated UI without making browser integration a hard failure."""
+
+    if not selection.install_spx_ui:
+        return
+    if _env_flag_disabled("SPX_OPEN_BROWSER"):
+        print(
+            "[spx-installer] Browser opening disabled by SPX_OPEN_BROWSER=0.",
+            file=stream,
+        )
+        return
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        return
+    if not _is_interactive_session(stream):
+        return
+
+    try:
+        opened = webbrowser.open(SPX_UI_URL, new=2)
+    except Exception as exc:  # pragma: no cover - browser backends are platform-specific
+        print(
+            f"[spx-installer] Could not open {SPX_UI_URL} automatically: {exc}",
+            file=stream,
+        )
+        return
+    if not opened:
+        print(
+            f"[spx-installer] Could not open {SPX_UI_URL} automatically; open it manually.",
+            file=stream,
+        )
+        return
+    print(f"[spx-installer] Opened SPX UI: {SPX_UI_URL}", file=stream)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -127,6 +176,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         default=None,
         help="Disable bootstrap runner in generated start scripts.",
+    )
+    generate_parser.add_argument(
+        "--instance-limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Limit the number of default instances created/started in non-interactive mode.",
     )
     generate_parser.add_argument(
         "--print-selection",
@@ -246,18 +302,35 @@ def _build_noninteractive_selection(
         allowed = set(start_instances)
         instances = [entry for entry in instances if entry.get("instance_key") in allowed]
 
+    instance_limit = getattr(args, "instance_limit", None)
+    if instance_limit is not None:
+        if instance_limit < 0:
+            raise SystemExit("--instance-limit must be zero or greater")
+        instances = instances[:instance_limit]
+        allowed = {entry.get("instance_key") for entry in instances}
+        start_instances = [key for key in start_instances if key in allowed][:instance_limit]
+    compatibility = apply_platform_compatibility(
+        model_ids=model_ids,
+        service_ids=service_ids,
+        instances=instances,
+        start_instances=start_instances,
+        index=index,
+    )
+    for warning in compatibility.warnings:
+        print(f"[spx-installer] {warning}", file=sys.stderr)
+
     return WizardSelection(
         packages=packages,
         profiles=profile_ids,
         protocols=protocols,
         install_examples=install_examples,
         install_spx_ui=install_spx_ui,
-        offline_bundle=True,
+        offline_bundle=not bool(getattr(args, "start", False)),
         license_key=product_key,
-        model_ids=model_ids,
-        service_ids=service_ids,
-        instances=instances,
-        start_instances=start_instances,
+        model_ids=compatibility.model_ids,
+        service_ids=compatibility.service_ids,
+        instances=compatibility.instances,
+        start_instances=compatibility.start_instances,
     )
 
 
@@ -337,15 +410,19 @@ def run(args: argparse.Namespace) -> int:
         )
 
         if getattr(args, "start", False):
-            _launch_stack(output_dir, stream=info_stream)
+            if not _launch_stack(output_dir, stream=info_stream):
+                return 1
+            _open_ui_browser(selection, stream=info_stream)
             return 0
 
         if noninteractive or getattr(args, "no_start", False):
             return 0
 
-        launch = input("\nStart the stack now? [Y/n]: ").strip().lower()
-        if launch in {"", "y", "yes"}:
-            _launch_stack(output_dir, stream=info_stream)
+        if not selection.offline_bundle:
+            if not _launch_stack(output_dir, stream=info_stream):
+                return 1
+            _open_ui_browser(selection, stream=info_stream)
+            return 0
         return 0
     if args.command == "bootstrap":
         from .bootstrap import bootstrap
@@ -365,35 +442,43 @@ def main(argv: list[str] | None = None) -> int:
     return run(args)
 
 
-def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> None:
+def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     if os.name == "nt":
         script = output_dir / "spx-start.ps1"
         if not script.exists():
             print(f"[spx-installer] Cannot find {script}; skipping start.", file=stream)
-            return
+            return False
         shell = shutil.which("pwsh") or shutil.which("powershell")
         if not shell:
             print(
                 "[spx-installer] Neither pwsh nor powershell is available; please start manually.",
                 file=stream,
             )
-            return
+            return False
         cmd = [shell, "-ExecutionPolicy", "Bypass", "-File", str(script)]
     else:
         script = output_dir / "spx-start.sh"
         if not script.exists():
             print(f"[spx-installer] Cannot find {script}; skipping start.", file=stream)
-            return
+            return False
         cmd = [str(script)]
 
     print(f"[spx-installer] Launching stack via {script} ...", file=stream)
+    child_env = os.environ.copy()
+    # spx-install.sh uses a private interpreter to run the wizard. It must not
+    # become the interpreter of the generated stack, especially when its path
+    # contains spaces (for example macOS Application Support).
+    child_env.pop("PYTHON_BIN", None)
+    child_env.pop("SPX_INSTALLER_PYTHON_BIN", None)
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, env=child_env)
     except subprocess.CalledProcessError as exc:
         print(
             f"[spx-installer] Start script exited with {exc.returncode}. Please inspect the logs.",
             file=stream,
         )
+        return False
+    return True
 
 
 if __name__ == "__main__":

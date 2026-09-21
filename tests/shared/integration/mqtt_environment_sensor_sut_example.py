@@ -13,8 +13,8 @@ import unittest
 from pathlib import Path
 from typing import Callable, Optional
 
-from tests.common.spx_utils import ensure_instance, ensure_model, load_model_definition, wait_for_condition
-from tests.devices.mqtt_environment_sensor_sut_example import SimpleMqttEnvironmentSensorSUT
+from tests.common import spx_utils
+from tests.devices import mqtt_environment_sensor_sut_example as mqtt_sut
 
 try:
     from paho.mqtt import client as mqtt  # type: ignore
@@ -34,7 +34,9 @@ if BROKER_CONTAINER_HOST is None:
 BROKER_CONTAINER_PORT = int(
     os.environ.get("MQTT_TEST_BROKER_PORT_CONTAINER", str(BROKER_PORT))
 )
-MODEL_PATH = Path("library/domains/iot/generic/environment_sensor__mqtt.yaml")
+MODEL_PATH = Path(
+    "library/domains/environment/sensor/generic/environment_sensor__mqtt.yaml"
+)
 MODEL_KEY = "tests__generic_mqtt_environment_sensor"
 INSTANCE_KEY = "tests_generic_mqtt_environment_sensor_inst"
 SPX_BASE_URL = os.environ.get("SPX_BASE_URL", "http://localhost:8000")
@@ -55,9 +57,13 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         if mqtt is None:
-            raise unittest.SkipTest("paho-mqtt is not installed; install it to run MQTT integration tests.")
+            raise unittest.SkipTest(
+                "paho-mqtt is not installed; install it to run MQTT integration tests."
+            )
         if not _broker_available(BROKER_HOST, BROKER_PORT):
-            raise unittest.SkipTest(f"MQTT broker not reachable at {BROKER_HOST}:{BROKER_PORT}")
+            raise unittest.SkipTest(
+                f"MQTT broker not reachable at {BROKER_HOST}:{BROKER_PORT}"
+            )
 
         try:
             import spx_python  # type: ignore
@@ -66,17 +72,19 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
 
         product_key = os.environ.get("SPX_PRODUCT_KEY")
         if not product_key:
-            raise unittest.SkipTest("SPX_PRODUCT_KEY must be set to run MQTT integration tests.")
+            raise unittest.SkipTest(
+                "SPX_PRODUCT_KEY must be set to run MQTT integration tests."
+            )
 
         cls._spx_client = spx_python.init(address=SPX_BASE_URL, product_key=product_key)
-        model_def = load_model_definition(MODEL_PATH)
+        model_def = spx_utils.load_model_definition(MODEL_PATH)
 
         model_def["communication"][0]["mqtt"]["broker"] = BROKER_CONTAINER_HOST
         model_def["communication"][0]["mqtt"]["port"] = BROKER_CONTAINER_PORT
 
-        model_changed = ensure_model(cls._spx_client, MODEL_KEY, model_def)
+        model_changed = spx_utils.ensure_model(cls._spx_client, MODEL_KEY, model_def)
 
-        cls._instance = ensure_instance(
+        cls._instance = spx_utils.ensure_instance(
             cls._spx_client,
             INSTANCE_KEY,
             MODEL_KEY,
@@ -84,9 +92,13 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         )
 
     def setUp(self) -> None:
-        self.sut = SimpleMqttEnvironmentSensorSUT(host=BROKER_HOST, port=BROKER_PORT)
+        self.sut = mqtt_sut.SimpleMqttEnvironmentSensorSUT(
+            host=BROKER_HOST, port=BROKER_PORT
+        )
         if not self.sut.connect():
-            self.skipTest(f"Unable to connect SUT to MQTT broker at {BROKER_HOST}:{BROKER_PORT}")
+            self.skipTest(
+                f"Unable to connect SUT to MQTT broker at {BROKER_HOST}:{BROKER_PORT}"
+            )
         time.sleep(0.2)
 
         self.instance = getattr(self.__class__, "_instance", None)
@@ -97,7 +109,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         # Ensure the SPX model has attached to the broker before publishing commands.
         mqtt_connected_attr = self.attributes["k__mqtt_connected"]
         if mqtt_connected_attr is not None:
-            connected = wait_for_condition(
+            connected = spx_utils.wait_for_condition(
                 lambda: bool(float(getattr(mqtt_connected_attr, "internal_value", 0))),
                 timeout=10.0,
             )
@@ -163,9 +175,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
     # Tests
     # ------------------------------------------------------------------
     def test_receives_temperature_humidity_comfort(self):
-        self._publish(SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "26.75")
-        self._publish(SimpleMqttEnvironmentSensorSUT.HUMIDITY_TOPIC, "51.2")
-        self._publish(SimpleMqttEnvironmentSensorSUT.COMFORT_TOPIC, "89.4")
+        self._publish(
+            mqtt_sut.SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "26.75"
+        )
+        self._publish(mqtt_sut.SimpleMqttEnvironmentSensorSUT.HUMIDITY_TOPIC, "51.2")
+        self._publish(mqtt_sut.SimpleMqttEnvironmentSensorSUT.COMFORT_TOPIC, "89.4")
 
         temperature = self._await_value(self.sut.latest_temperature)
         humidity = self._await_value(self.sut.latest_humidity)
@@ -179,7 +193,7 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         self.assertAlmostEqual(comfort, 89.4, places=1)
 
     def test_ignores_non_numeric_payload(self):
-        self._publish(SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "22.1")
+        self._publish(mqtt_sut.SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "22.1")
         baseline = self._await_value(
             self.sut.latest_temperature,
             timeout=2.0,
@@ -187,7 +201,9 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         )
         self.assertIsInstance(baseline, float)
 
-        self._publish(SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "invalid")
+        self._publish(
+            mqtt_sut.SimpleMqttEnvironmentSensorSUT.TEMPERATURE_TOPIC, "invalid"
+        )
         time.sleep(0.3)
         current = self._await_value(
             self.sut.latest_temperature,
@@ -209,8 +225,11 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         attempts = 3
         for attempt in range(attempts):
             self._publish(COMMAND_SETPOINT_TOPIC, f"{target_value}")
-            target_updated = wait_for_condition(
-                lambda: abs(self.attributes["k__target_c"].internal_value - target_value) <= 0.05,
+            target_updated = spx_utils.wait_for_condition(
+                lambda: abs(
+                    self.attributes["k__target_c"].internal_value - target_value
+                )
+                <= 0.05,
                 timeout=5.0,
             )
             if target_updated:
@@ -223,7 +242,9 @@ class TestSimpleMqttEnvironmentSensorSUTIntegration(unittest.TestCase):
         )
 
         temp_reached = self._wait_for_temperature(target_value, timeout=10.0)
-        self.assertTrue(temp_reached, "k__temperature_c did not converge to the setpoint")
+        self.assertTrue(
+            temp_reached, "k__temperature_c did not converge to the setpoint"
+        )
 
         telemetry_temperature = self._await_value(
             self.sut.latest_temperature,
