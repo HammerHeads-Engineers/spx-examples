@@ -417,11 +417,9 @@ jobs:
           set -euo pipefail
           DIST_DIR="${RUNNER_TEMP}/spx-macos-dist"
           OUTPUT_DIR="${RUNNER_TEMP}/spx-macos-generated"
-          RUNTIME_DIR="${RUNNER_TEMP}/spx-macos-runtime"
           {
             echo "DIST_DIR=${DIST_DIR}"
             echo "OUTPUT_DIR=${OUTPUT_DIR}"
-            echo "RUNTIME_DIR=${RUNTIME_DIR}"
           } >> "${GITHUB_ENV}"
           chmod +x scripts/build_macos_pkg.sh
           scripts/build_macos_pkg.sh \
@@ -455,10 +453,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          support_dir="$HOME/Library/Application Support/SPX"
+          marker="${support_dir}/legacy-data/marker"
+          sudo mkdir -p "$(dirname "${marker}")"
+          sudo touch "${marker}"
+          sudo chown root:wheel "${support_dir}" "${support_dir}/legacy-data" "${marker}"
           sudo env SPX_SKIP_AUTO_SETUP=1 /usr/sbin/installer \
             -pkg "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg" \
             -target / \
             -allowUntrusted
+          test "$(stat -f '%Su' "${support_dir}")" = "$(id -un)"
+          test "$(stat -f '%Su' "${marker}")" = "root"
+          test ! -e "$HOME/Library/LaunchAgents/com.simplephysx.spx.setup-once.plist"
+          test ! -e "$HOME/Library/LaunchAgents/com.simplephysx.spx.setup-once.sh"
 
       - name: Verify bundled Python and run the installed setup payload
         shell: bash
@@ -474,7 +481,6 @@ jobs:
           test -x "${payload}/spx-install.sh"
           mkdir -p "${OUTPUT_DIR}"
           PATH="${RUNNER_TEMP}/spx-fake-bin:/usr/bin:/bin" \
-            SPX_RUNTIME_HOME="${RUNTIME_DIR}" \
             "${payload}/spx-install.sh" \
             generate \
             --protocols "modbus,mqtt,bacnet" \
@@ -482,6 +488,7 @@ jobs:
             --allow-missing-product-key \
             --no-start \
             2>&1 | tee "${RUNNER_TEMP}/spx-macos-generate.log"
+          test -d "$HOME/Library/Application Support/SPX/runtime/installer"
 
       - name: Bootstrap MCP workspace with the bundled macOS Python
         shell: bash

@@ -32,6 +32,20 @@ def test_native_macos_package_flow_contains_launchers_license_and_notarization()
         assert (ROOT / "installer/macos" / name).is_file()
 
 
+def test_macos_postinstall_repairs_only_root_owned_runtime_parent() -> None:
+    package_script = (ROOT / "scripts/build_macos_pkg.sh").read_text(encoding="utf-8")
+
+    assert r'support_dir="\${console_home}/Library/Application Support/SPX"' in package_script
+    assert r'if [[ "\${support_owner}" == "root" ]]; then' in package_script
+    assert r'/usr/sbin/chown "\${console_user}:\${user_group}" "\${support_dir}"' in package_script
+    assert r'helper="\${launch_agents_dir}/\${label}.sh"' in package_script
+    assert r'/usr/sbin/chown "\${console_user}:\${user_group}" "\${launch_agents_dir}"' in package_script
+    assert 'Application Support/SPX/\\${label}.sh' not in package_script
+    assert "/usr/sbin/chown -R" not in package_script
+    assert "chown -R" not in package_script
+    assert r'/bin/launchctl bootstrap "gui/\${console_uid}"' in package_script
+
+
 def test_macos_setup_command_only_pauses_when_setup_fails() -> None:
     launcher = (ROOT / "spx-setup.command").read_text(encoding="utf-8")
 

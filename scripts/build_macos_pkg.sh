@@ -245,20 +245,6 @@ if [ -x "\${python_bin}" ] && [ -f "\${compileall}" ]; then
     "\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}"
 fi
 
-# GUI launch is intentionally limited to an interactive Installer.app session.
-# This is the final product component, so the one-shot launch is scheduled only
-# after both the application and bundled Python packages have been installed.
-if [[ "\${COMMAND_LINE_INSTALL:-}" == "1" ||
-      "\${SPX_SKIP_AUTO_SETUP:-}" == "1" ||
-      -n "\${CI:-}" ||
-      -n "\${GITHUB_ACTIONS:-}" ]]; then
-  exit 0
-fi
-
-if ! /usr/bin/pgrep -f '/System/Library/CoreServices/Installer.app/Contents/MacOS/Installer' >/dev/null 2>&1; then
-  exit 0
-fi
-
 console_user="\$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
 if [[ -z "\${console_user}" || "\${console_user}" == "root" || "\${console_user}" == "loginwindow" ]]; then
   exit 0
@@ -267,6 +253,33 @@ fi
 console_uid="\$(/usr/bin/id -u "\${console_user}" 2>/dev/null || true)"
 console_home="\$(/usr/bin/dscl . -read "/Users/\${console_user}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print \$2}' || true)"
 if [[ -z "\${console_uid}" || -z "\${console_home}" ]]; then
+  exit 0
+fi
+
+user_group="\$(/usr/bin/id -gn "\${console_user}" 2>/dev/null || printf 'staff')"
+support_dir="\${console_home}/Library/Application Support/SPX"
+
+# Older packages accidentally created this exact directory as root. Repair only
+# that directory so the normal user's runtime can be created, leaving all
+# existing files and subdirectories untouched.
+if [[ -d "\${support_dir}" && ! -L "\${support_dir}" ]]; then
+  support_owner="\$(/usr/bin/stat -f '%Su' "\${support_dir}" 2>/dev/null || true)"
+  if [[ "\${support_owner}" == "root" ]]; then
+    /usr/sbin/chown "\${console_user}:\${user_group}" "\${support_dir}" || exit 0
+  fi
+fi
+
+# GUI launch is intentionally limited to an interactive Installer.app session.
+# The ownership repair above also runs for CLI/CI installs, but no one-shot
+# Setup launch is scheduled in those modes.
+if [[ "\${COMMAND_LINE_INSTALL:-}" == "1" ||
+      "\${SPX_SKIP_AUTO_SETUP:-}" == "1" ||
+      -n "\${CI:-}" ||
+      -n "\${GITHUB_ACTIONS:-}" ]]; then
+  exit 0
+fi
+
+if ! /usr/bin/pgrep -f '/System/Library/CoreServices/Installer.app/Contents/MacOS/Installer' >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -279,9 +292,15 @@ fi
 launch_agents_dir="\${console_home}/Library/LaunchAgents"
 label="com.simplephysx.spx.setup-once"
 plist="\${launch_agents_dir}/\${label}.plist"
-helper="\${console_home}/Library/Application Support/SPX/\${label}.sh"
+helper="\${launch_agents_dir}/\${label}.sh"
 
-/bin/mkdir -p "\${launch_agents_dir}" "\$(/usr/bin/dirname "\${helper}")" || exit 0
+/bin/mkdir -p "\${launch_agents_dir}" || exit 0
+launch_agents_owner="\$(/usr/bin/stat -f '%Su' "\${launch_agents_dir}" 2>/dev/null || true)"
+if [[ "\${launch_agents_owner}" == "root" ]]; then
+  /usr/sbin/chown "\${console_user}:\${user_group}" "\${launch_agents_dir}" || exit 0
+elif [[ "\${launch_agents_owner}" != "\${console_user}" ]]; then
+  exit 0
+fi
 /bin/launchctl bootout "gui/\${console_uid}/\${label}" >/dev/null 2>&1 || true
 
 /bin/cat > "\${helper}" <<HELPER
@@ -309,8 +328,8 @@ HELPER
 </plist>
 PLIST
 
-/bin/chmod 755 "\${helper}" || exit 0
-user_group="\$(/usr/bin/id -gn "\${console_user}" 2>/dev/null || printf 'staff')"
+/bin/chmod 700 "\${helper}" || exit 0
+/bin/chmod 600 "\${plist}" || exit 0
 /usr/sbin/chown "\${console_user}:\${user_group}" "\${plist}" "\${helper}" || exit 0
 /bin/launchctl bootstrap "gui/\${console_uid}" "\${plist}" >/dev/null 2>&1 || {
   /bin/rm -f "\${plist}" "\${helper}"
