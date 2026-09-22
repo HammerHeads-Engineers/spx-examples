@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -20,16 +21,6 @@ from installer.generator import (
     SPX_LABEL_STACK,
     SPX_SERVER_IMAGE,
     SPX_UI_IMAGE,
-)
-from installer.manifest import (
-    DomainManifest,
-    IndustryManifest,
-    ManifestIndex,
-    ModelManifest,
-    ProfileManifest,
-    ServiceDeployment,
-    ServiceManifest,
-    ServicePort,
 )
 from installer.wizard import WizardSelection
 
@@ -89,6 +80,27 @@ def build_index() -> manifest.ManifestIndex:
             ],
             deployment=manifest.ServiceDeployment(runtime="builtin"),
         ),
+        "knx_gateway": manifest.ServiceManifest(
+            id="knx_gateway",
+            name="KNX Gateway",
+            protocol="knx",
+            description="KNX/IP test gateway",
+            ports=[
+                manifest.ServicePort(
+                    transport="udp", host=3671, container=3671, purpose="KNX/IP"
+                ),
+                manifest.ServicePort(
+                    transport="tcp", host=6720, container=6720, purpose="knxd TCP"
+                ),
+            ],
+            deployment=manifest.ServiceDeployment(
+                runtime="docker",
+                image="michelmu/knxd-docker:latest",
+                container_name="knxd-test",
+                volumes=["./library/assets/knx/knxd.ini:/etc/knxd.ini:ro"],
+                entrypoint=["knxd", "/etc/knxd.ini"],
+            ),
+        ),
     }
     models = {
         "sensor": manifest.ModelManifest(
@@ -147,7 +159,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         offline_bundle=False,
         license_key="ABC-123",
         model_ids=["sensor"],
-        service_ids=["mqtt_broker", "modbus_tcp_gateway"],
+        service_ids=["mqtt_broker", "modbus_tcp_gateway", "knx_gateway"],
         instances=[{"model_id": "sensor", "instance_key": "inst_001"}],
         start_instances=["inst_001"],
     )
@@ -178,8 +190,15 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         for name, service in transaction_services.items()
         if name.endswith("-spx-server")
     )
+    transaction_knx = next(
+        service
+        for name, service in transaction_services.items()
+        if name.endswith("-knx_gateway")
+    )
     assert transaction_server["container_name"].startswith("spx-transaction-")
     assert transaction_server["container_name"] != services["spx-server"]["container_name"]
+    assert "knx_gateway" in transaction_knx["networks"]["default"]["aliases"]
+    assert (output_dir / "assets" / "knx" / "knxd.ini").is_file()
     assert "8000:8000" in services["spx-server"]["ports"]
     assert "healthcheck" in services["spx-server"]
     assert "host.docker.internal:host-gateway" in services["spx-server"].get(
@@ -203,6 +222,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         "SPX_PRODUCT_KEY=ABC-123",
         "SPX_BIND_MQTT_BROKER=127.0.0.1",
         "SPX_BIND_MODBUS_TCP_GATEWAY=127.0.0.1",
+        "SPX_BIND_KNX_GATEWAY=127.0.0.1",
     ]
 
     asset_file = output_dir / "assets" / "mosquitto" / "mosquitto.conf"
@@ -214,8 +234,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert bundle["server_version"] == "v1.0.0-rc.64"
     assert bundle["ui_version"] == "v1.0.0-rc.68"
     assert bundle["compose_project"] == "spx"
-    assert {1883, 502, 8000}.issubset(set(bundle["required_ports"]))
-    assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway"]
+    assert {1883, 502, 3671, 6720, 8000}.issubset(set(bundle["required_ports"]))
+    assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway", "knx_gateway"]
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
     assert bundle.get("instances") == [
@@ -277,6 +297,46 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert 'param([string[]]$StartArgs = @())' in start_ps_content
     assert "$Env:SPX_SYSTEM_PYTHON_BIN" in start_ps_content
     assert "$RuntimePython" in start_ps_content
+
+
+def test_generator_repairs_stale_directory_at_file_asset_path(tmp_path: Path) -> None:
+    generator = DeploymentGenerator(build_index())
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=False,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="ABC-123",
+        model_ids=[],
+        service_ids=["knx_gateway"],
+        instances=[],
+        start_instances=[],
+    )
+    output_dir = tmp_path / "out"
+    generator.generate(selection, output_dir)
+
+    asset = output_dir / "assets" / "knx" / "knxd.ini"
+    source = generator.repo_root / "library/assets/knx/knxd.ini"
+    assert asset.is_file()
+    asset.unlink()
+    asset.mkdir()
+    shutil.copy2(source, asset / source.name)
+
+    generator.generate(selection, output_dir)
+
+    assert asset.is_file()
+    assert asset.read_bytes() == source.read_bytes()
+    transaction_services = yaml.safe_load(
+        (output_dir / "docker-compose.transaction.yml").read_text(encoding="utf-8")
+    )["services"]
+    transaction_knx = next(
+        service
+        for name, service in transaction_services.items()
+        if name.endswith("-knx_gateway")
+    )
+    assert "knx_gateway" in transaction_knx["networks"]["default"]["aliases"]
 
 
 def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
