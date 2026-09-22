@@ -152,6 +152,7 @@ services:
   - id: btvirt_adapter
     name: btvirt Adapter
     protocol: ble
+    network_exposure: local_only
     description: btvirt-backed fake BLE adapter that exposes BLE GATT devices over HTTP.
     ports:
       - transport: tcp

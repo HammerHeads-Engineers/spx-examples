@@ -12,6 +12,9 @@ import yaml
 from . import paths
 
 
+VALID_NETWORK_EXPOSURES = {"selectable", "local_only"}
+
+
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
@@ -49,6 +52,7 @@ class ServiceManifest:
     description: str
     ports: List[ServicePort]
     deployment: Optional[ServiceDeployment]
+    network_exposure: str = "selectable"
 
 
 @dataclass(frozen=True)
@@ -185,6 +189,16 @@ class ManifestLoader:
                     commands=dict(dep.get("commands", {}) or {}),
                     notes=dep.get("notes"),
                 )
+            network_exposure = (
+                str(entry.get("network_exposure", "selectable")).strip().lower()
+                or "selectable"
+            )
+            if network_exposure not in VALID_NETWORK_EXPOSURES:
+                raise ValueError(
+                    f"Service {service_id!r} has unsupported network_exposure "
+                    f"{network_exposure!r}; expected one of "
+                    f"{sorted(VALID_NETWORK_EXPOSURES)}."
+                )
             services[service_id] = ServiceManifest(
                 id=service_id,
                 name=entry.get("name", service_id),
@@ -192,6 +206,7 @@ class ManifestLoader:
                 description=entry.get("description", ""),
                 ports=ports,
                 deployment=deployment,
+                network_exposure=network_exposure,
             )
         return services
 
