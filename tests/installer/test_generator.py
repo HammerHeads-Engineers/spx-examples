@@ -185,15 +185,25 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "host.docker.internal:host-gateway" in services["spx-server"].get(
         "extra_hosts", []
     )
-    assert "502:502" in services["spx-server"]["ports"]
-    assert "1883:1883" in services["mqtt_broker"]["ports"]
+    assert (
+        "${SPX_BIND_MODBUS_TCP_GATEWAY:-127.0.0.1}:502:502"
+        in services["spx-server"]["ports"]
+    )
+    assert (
+        "${SPX_BIND_MQTT_BROKER:-127.0.0.1}:1883:1883"
+        in services["mqtt_broker"]["ports"]
+    )
     mqtt_volumes = services["mqtt_broker"].get("volumes", [])
     assert any(
         vol.startswith("./assets/mosquitto/mosquitto.conf") for vol in mqtt_volumes
     )
 
     env_path = output_dir / ".env"
-    assert env_path.read_text(encoding="utf-8").strip() == "SPX_PRODUCT_KEY=ABC-123"
+    assert env_path.read_text(encoding="utf-8").splitlines() == [
+        "SPX_PRODUCT_KEY=ABC-123",
+        "SPX_BIND_MQTT_BROKER=127.0.0.1",
+        "SPX_BIND_MODBUS_TCP_GATEWAY=127.0.0.1",
+    ]
 
     asset_file = output_dir / "assets" / "mosquitto" / "mosquitto.conf"
     assert asset_file.exists()
@@ -442,9 +452,79 @@ def test_generator_formats_bacnet_ports_with_bind_addr(tmp_path: Path) -> None:
     compose_path = output_dir / "docker-compose.generated.yml"
     data = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
     ports = data["services"]["spx-server"]["ports"]
-    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47808:47808/udp" in ports
-    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47818:47818/udp" in ports
-    assert "${BACNET_BIND_ADDR:-127.0.0.1}:47828:47828/udp" in ports
+    assert (
+        "${BACNET_BIND_ADDR:-${SPX_BIND_BACNET_GATEWAY:-127.0.0.1}}:47808:47808/udp"
+        in ports
+    )
+    assert (
+        "${BACNET_BIND_ADDR:-${SPX_BIND_BACNET_GATEWAY:-127.0.0.1}}:47818:47818/udp"
+        in ports
+    )
+    assert (
+        "${BACNET_BIND_ADDR:-${SPX_BIND_BACNET_GATEWAY:-127.0.0.1}}:47828:47828/udp"
+        in ports
+    )
+
+
+def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=True,
+        install_spx_ui=True,
+        offline_bundle=False,
+        license_key="ABC-123",
+        model_ids=["sensor"],
+        service_ids=["mqtt_broker", "modbus_tcp_gateway", "bacnet_gateway"],
+        instances=[],
+        start_instances=[],
+        service_bind_addresses={
+            "mqtt_broker": "192.168.0.142",
+            "modbus_tcp_gateway": "127.0.0.1",
+            "bacnet_gateway": "10.0.0.15",
+        },
+    )
+
+    output_dir = tmp_path / "out-bindings"
+    generator.generate(selection, output_dir)
+    compose = yaml.safe_load(
+        (output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8")
+    )
+
+    assert (
+        "${SPX_BIND_MQTT_BROKER:-192.168.0.142}:1883:1883"
+        in compose["services"]["mqtt_broker"]["ports"]
+    )
+    assert (
+        "${SPX_BIND_MODBUS_TCP_GATEWAY:-127.0.0.1}:5020:5020"
+        in compose["services"]["spx-server"]["ports"]
+    )
+    assert (
+        "${BACNET_BIND_ADDR:-${SPX_BIND_BACNET_GATEWAY:-10.0.0.15}}:47808:47808/udp"
+        in compose["services"]["spx-server"]["ports"]
+    )
+    assert (output_dir / "network.py").exists()
+    env = (output_dir / ".env").read_text(encoding="utf-8")
+    assert "SPX_BIND_MQTT_BROKER=192.168.0.142" in env
+    start_sh = (output_dir / "spx-start.sh").read_text(encoding="utf-8")
+    network_preflight = start_sh.index(
+        '"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file'
+    )
+    manager_preflight = start_sh.index(
+        '"$RUNTIME_PYTHON_BIN" "$MANAGER"', network_preflight
+    )
+    transaction_prepare = start_sh.index("TRANSACTION_PREPARED=1")
+    assert network_preflight < manager_preflight < transaction_prepare
+    start_ps1 = (output_dir / "spx-start.ps1").read_text(encoding="utf-8")
+    network_preflight_ps = start_ps1.index(
+        '& $RuntimePython $NetworkHelper --env-file'
+    )
+    manager_preflight_ps = start_ps1.index("Invoke-Manager $prepare")
+    transaction_prepare_ps = start_ps1.index("$TransactionPrepared = $true")
+    assert network_preflight_ps < manager_preflight_ps < transaction_prepare_ps
 
 
 def test_generator_writes_protocol_bundle_without_instances(tmp_path: Path) -> None:

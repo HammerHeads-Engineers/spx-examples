@@ -10,6 +10,16 @@ preflights Docker, ports and existing labelled/legacy stacks, and asks before
 replacement. It preserves images and volumes; a failed model or instance
 bootstrap can restore the previous stack.
 
+For each selected service that publishes protocol ports, the wizard asks
+whether to keep it local on `127.0.0.1` (default) or bind it to a selected
+private IPv4 address for LAN access. Non-interactive generation stays
+local-only. The start scripts verify that a saved LAN address still belongs to
+the host and stop before changing the stack if it has changed. BACnet/IP and
+KNXnet/IP discovery is most reliable on the same subnet; firewall and routing
+configuration are not changed by the installer. Advanced users can edit the
+`SPX_BIND_<SERVICE_ID>` values in `.env`; `BACNET_BIND_ADDR` remains a legacy
+BACnet override.
+
 The native macOS `.pkg` starts `SPX Setup.app` automatically after a normal
 GUI installation. Command-line, CI and managed installations skip that GUI
 launch. The Windows `.exe` offers a `Launch SPX Setup` button on its success

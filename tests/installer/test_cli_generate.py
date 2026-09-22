@@ -164,9 +164,9 @@ def test_generate_noninteractive_packages_prints_json_and_creates_artifacts(
     assert "TEST-SECRET-KEY" not in captured.err
 
     assert (output_dir / "docker-compose.generated.yml").exists()
-    assert (output_dir / ".env").read_text(
-        encoding="utf-8"
-    ).strip() == "SPX_PRODUCT_KEY=TEST-SECRET-KEY"
+    env_lines = (output_dir / ".env").read_text(encoding="utf-8").splitlines()
+    assert env_lines[0] == "SPX_PRODUCT_KEY=TEST-SECRET-KEY"
+    assert "SPX_BIND_MQTT_BROKER=127.0.0.1" in env_lines
     assert (output_dir / "bundle.json").exists()
     assert (output_dir / "spx-start.sh").exists()
     assert (output_dir / "spx-stop.sh").exists()
@@ -232,9 +232,9 @@ def test_generate_allows_missing_product_key_when_flag_set(
     assert rc == 0
     selection = json.loads(captured.out)
     assert selection["product_key_present"] is False
-    assert (output_dir / ".env").read_text(
-        encoding="utf-8"
-    ).strip() == "SPX_PRODUCT_KEY=REPLACE_ME"
+    env_lines = (output_dir / ".env").read_text(encoding="utf-8").splitlines()
+    assert env_lines[0] == "SPX_PRODUCT_KEY=REPLACE_ME"
+    assert "SPX_BIND_MQTT_BROKER=127.0.0.1" in env_lines
 
 
 def test_generate_requires_product_key_by_default(
@@ -296,14 +296,20 @@ def test_generate_can_limit_default_instances_noninteractive(
 
 
 @pytest.fixture()
-def ble_manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
+def ble_manifest_dirs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> dict[str, Path]:
     repo_root = tmp_path / "repo-ble"
     ble_dir = repo_root / "library" / "domains" / "lab" / "monitor" / "generic"
     mqtt_dir = repo_root / "library" / "domains" / "environment" / "sensor" / "generic"
     ble_dir.mkdir(parents=True)
     mqtt_dir.mkdir(parents=True)
-    (ble_dir / "vital_signs_monitor__ble_gatt.yaml").write_text("name: vital_signs_monitor__ble_gatt\n", encoding="utf-8")
-    (mqtt_dir / "environment_sensor__mqtt.yaml").write_text("name: environment_sensor__mqtt\n", encoding="utf-8")
+    (ble_dir / "vital_signs_monitor__ble_gatt.yaml").write_text(
+        "name: vital_signs_monitor__ble_gatt\n", encoding="utf-8"
+    )
+    (mqtt_dir / "environment_sensor__mqtt.yaml").write_text(
+        "name: environment_sensor__mqtt\n", encoding="utf-8"
+    )
 
     catalog_dir = repo_root / "catalog"
     catalog_dir.mkdir()

@@ -60,12 +60,18 @@ class DeploymentGenerator:
             assets_root,
             selection.install_spx_ui,
             installation_id=installation_id,
+            service_bind_addresses=getattr(selection, "service_bind_addresses", {}),
         )
         compose_path = output_dir / "docker-compose.generated.yml"
         with compose_path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(compose_data, handle, sort_keys=False)
 
-        self._write_env(output_dir, selection.license_key)
+        self._write_env(
+            output_dir,
+            selection.license_key,
+            selection.service_ids,
+            getattr(selection, "service_bind_addresses", {}),
+        )
         self._write_bundle(output_dir, selection, installation_id=installation_id, compose_data=compose_data)
         self._write_hardened_artifacts(
             output_dir,
@@ -424,20 +430,26 @@ exit /b %EXITCODE%
         include_ui: bool,
         *,
         installation_id: str = "",
+        service_bind_addresses: Dict[str, str] | None = None,
     ) -> Dict[str, Dict]:
         services: Dict[str, Dict] = {}
         builtin_ports: List[str] = []
         docker_services: Dict[str, ServiceManifest] = {}
         native_services: List[ServiceManifest] = []
         modbus_enabled = False
+        service_bind_addresses = service_bind_addresses or {}
 
         for service_id in service_ids:
             manifest = self.index.services.get(service_id)
             if not manifest or not manifest.deployment:
                 continue
             runtime = manifest.deployment.runtime
+            bind_expression = self._bind_expression(
+                manifest,
+                service_bind_addresses.get(service_id, "127.0.0.1"),
+            )
             if runtime == "builtin":
-                builtin_ports.extend(self._format_ports(manifest))
+                builtin_ports.extend(self._format_ports(manifest, bind_expression))
             elif runtime == "docker":
                 docker_services[service_id] = manifest
             else:
@@ -447,7 +459,13 @@ exit /b %EXITCODE%
 
         if modbus_enabled:
             # Expose an extended Modbus TCP range for multi-instance demos.
-            builtin_ports.extend([f"{port}:{port}" for port in range(5020, 5121)])
+            bind_expression = self._bind_expression(
+                self.index.services["modbus_tcp_gateway"],
+                service_bind_addresses.get("modbus_tcp_gateway", "127.0.0.1"),
+            )
+            builtin_ports.extend(
+                [f"{bind_expression}:{port}:{port}" for port in range(5020, 5121)]
+            )
 
         labels = self._stack_labels(installation_id)
         services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root, labels)
@@ -455,7 +473,13 @@ exit /b %EXITCODE%
             services[SPX_UI_SERVICE_NAME] = self._build_spx_ui_service(labels)
 
         for service_id, manifest in docker_services.items():
-            services[service_id] = self._build_docker_service(manifest, assets_root, labels)
+            bind_expression = self._bind_expression(
+                manifest,
+                service_bind_addresses.get(service_id, "127.0.0.1"),
+            )
+            services[service_id] = self._build_docker_service(
+                manifest, assets_root, labels, bind_expression
+            )
 
         compose = {
             "name": SPX_COMPOSE_PROJECT,
@@ -541,6 +565,7 @@ exit /b %EXITCODE%
         manifest: ServiceManifest,
         assets_root: Path,
         labels: Dict[str, str] | None = None,
+        bind_expression: str | None = None,
     ) -> Dict:
         deployment = manifest.deployment
         assert deployment is not None
@@ -549,7 +574,7 @@ exit /b %EXITCODE%
             "container_name": deployment.container_name or manifest.id,
             "labels": dict(labels or self._stack_labels("")),
         }
-        ports = self._format_ports(manifest)
+        ports = self._format_ports(manifest, bind_expression)
         if ports:
             service["ports"] = ports
         if deployment.volumes:
@@ -568,18 +593,30 @@ exit /b %EXITCODE%
             service["hostname"] = deployment.hostname
         return service
 
-    def _format_ports(self, manifest: ServiceManifest) -> List[str]:
+    @staticmethod
+    def _bind_env_name(service_id: str) -> str:
+        return "SPX_BIND_" + re.sub(r"[^A-Za-z0-9]", "_", service_id).upper()
+
+    def _bind_expression(self, manifest: ServiceManifest, default: str) -> str:
+        bind_variable = f"${{{self._bind_env_name(manifest.id)}:-{default}}}"
+        if manifest.id == "bacnet_gateway":
+            # Keep the pre-existing manual setting usable by existing bundles.
+            return f"${{BACNET_BIND_ADDR:-{bind_variable}}}"
+        return bind_variable
+
+    def _format_ports(
+        self, manifest: ServiceManifest, bind_expression: str | None = None
+    ) -> List[str]:
         entries = []
+        bind_expression = bind_expression or self._bind_expression(
+            manifest, "127.0.0.1"
+        )
         for port in manifest.ports:
             transport = port.transport.lower()
             if transport == "udp":
-                if manifest.id == "bacnet_gateway":
-                    bind = "${BACNET_BIND_ADDR:-127.0.0.1}"
-                    entry = f"{bind}:{port.host}:{port.container}/udp"
-                else:
-                    entry = f"{port.host}:{port.container}/udp"
+                entry = f"{bind_expression}:{port.host}:{port.container}/udp"
             else:
-                entry = f"{port.host}:{port.container}"
+                entry = f"{bind_expression}:{port.host}:{port.container}"
             entries.append(entry)
         return entries
 
@@ -624,10 +661,30 @@ exit /b %EXITCODE%
 
         return f"./assets/{relative}"
 
-    def _write_env(self, output_dir: Path, product_key: str) -> None:
+    def _write_env(
+        self,
+        output_dir: Path,
+        product_key: str,
+        service_ids: List[str] | None = None,
+        service_bind_addresses: Dict[str, str] | None = None,
+    ) -> None:
         env_path = output_dir / ".env"
         value = product_key or "REPLACE_ME"
-        env_path.write_text(f"SPX_PRODUCT_KEY={value}\n", encoding="utf-8")
+        lines = [f"SPX_PRODUCT_KEY={value}"]
+        for service_id in service_ids or []:
+            manifest = self.index.services.get(service_id)
+            deployment = manifest.deployment if manifest is not None else None
+            if (
+                manifest is None
+                or not manifest.ports
+                or manifest.network_exposure != "selectable"
+                or deployment is None
+                or deployment.runtime not in {"builtin", "docker"}
+            ):
+                continue
+            address = (service_bind_addresses or {}).get(service_id, "127.0.0.1")
+            lines.append(f"{self._bind_env_name(service_id)}={address}")
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def _write_script(self, path: Path, command: str) -> None:
         script = "#!/usr/bin/env bash\nset -euo pipefail\n" + command
@@ -666,6 +723,7 @@ exit /b %EXITCODE%
         """Write the transactional scripts used by every generated bundle."""
 
         shutil.copy2(Path(__file__).with_name("stack_manager.py"), output_dir / "stack_manager.py")
+        shutil.copy2(Path(__file__).with_name("network.py"), output_dir / "network.py")
         shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
         self._write_runtime_bootstrap(output_dir)
         self._write_macos_python_helper(output_dir)
@@ -843,6 +901,7 @@ then
 fi
 
 STAGE="preflight"
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env"
 "$RUNTIME_PYTHON_BIN" "$MANAGER" "${PREPARE_ARGS[@]}"
 TRANSACTION_PREPARED=1
 
@@ -901,6 +960,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $InstallationId = "__INSTALLATION_ID__"
 $Snapshot = Join-Path $ScriptDir ".spx-stack-snapshot.json"
 $Manager = Join-Path $ScriptDir "stack_manager.py"
+$NetworkHelper = Join-Path $ScriptDir "network.py"
 $TransactionComposeTemplate = Join-Path $ScriptDir "docker-compose.transaction.yml"
 $TransactionToken = "{0}-{1}" -f [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(), $PID
 $TransactionCompose = $null
@@ -980,6 +1040,8 @@ try {
     }
 
     $Stage = "preflight"
+    & $RuntimePython $NetworkHelper --env-file (Join-Path $ScriptDir ".env")
+    if ($LASTEXITCODE -ne 0) { throw "network bind address preflight failed" }
     $prepare = @("prepare", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot, "--ports", "__REQUIRED_PORTS__")
     if ($StartArgs -contains "--yes") { $prepare += "--yes" }
     Invoke-Manager $prepare

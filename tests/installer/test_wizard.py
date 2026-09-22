@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from installer import manifest
+from installer import manifest, network
 from installer.wizard import InstallerWizard
 
 
@@ -170,7 +170,7 @@ def test_wizard_with_inputs(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
 
@@ -197,7 +197,7 @@ def test_wizard_can_opt_in_to_default_instances(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "", "", "y", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
 
@@ -220,7 +220,7 @@ def test_wizard_can_select_quickstart_profiles(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "1", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
 
@@ -242,7 +242,7 @@ def test_wizard_can_select_all_quickstart_profiles(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "a", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
 
@@ -259,7 +259,7 @@ def test_wizard_protocol_selection(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["0", "1,2,3", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
     assert selection.packages == []
@@ -292,7 +292,7 @@ def test_wizard_protocol_selection_can_skip_models_but_keep_services(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["0", "1,2,3", "n", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
 
@@ -320,7 +320,7 @@ def test_wizard_protocol_selection_can_choose_service_subset(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["0", "1,2,3", "", "2", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
     captured = capsys.readouterr()
@@ -348,7 +348,7 @@ def test_wizard_protocol_selection_can_disable_all_services(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["0", "1,2,3", "", "none", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
     captured = capsys.readouterr()
@@ -378,7 +378,7 @@ def test_wizard_masks_product_key_in_output(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
     monkeypatch.setattr(
         "getpass.getpass",
         lambda _: "COAUA-AAGRC-RWIUB-MRKIB-UMSHS-H7ZCU",
@@ -403,7 +403,7 @@ def test_wizard_masks_env_product_key_in_output(
     wizard = InstallerWizard(loader=FakeLoader())
 
     inputs = iter(["1", "", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
 
     selection = wizard.run()
     captured = capsys.readouterr()
@@ -423,7 +423,7 @@ def test_wizard_prints_runtime_notices(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["1", "", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
     monkeypatch.setattr("installer.wizard.current_platform_name", lambda: "windows")
 
     wizard.run()
@@ -443,7 +443,7 @@ def test_wizard_banner_includes_installer_version(
 
     wizard = InstallerWizard(loader=FakeLoader())
     inputs = iter(["1", "", "", "", "n", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs, ""))
     monkeypatch.setattr(wizard, "_resolve_installer_version", lambda: "9.9.9-test")
 
     wizard.run()
@@ -522,3 +522,78 @@ def test_package_overview_uses_embedded_lab_display_summary() -> None:
     overview = wizard._format_package_overview(manifest_value, 120)
 
     assert "Modbus TCP, SCPI, BLE, MQTT/LwM2M" in overview
+
+
+def test_wizard_prompts_per_service_and_uses_selected_private_ipv4(
+    monkeypatch: pytest.MonkeyPatch,
+    manifest_index: manifest.ManifestIndex,
+    capsys,
+) -> None:
+    wizard = InstallerWizard()
+    monkeypatch.setattr(
+        "installer.wizard.discover_ipv4_addresses",
+        lambda: [
+            network.IPv4Address("en0", "192.168.0.142"),
+            network.IPv4Address("en1", "10.0.0.15"),
+        ],
+    )
+    inputs = iter(["y", "2", "", "y", "1"])
+    monkeypatch.setattr("builtins.input", lambda _: next(inputs))
+
+    bindings = wizard._prompt_service_bind_addresses(
+        ["mqtt_broker", "modbus_tcp_gateway", "bacnet_gateway"],
+        manifest_index,
+    )
+
+    assert bindings == {
+        "mqtt_broker": "10.0.0.15",
+        "modbus_tcp_gateway": "127.0.0.1",
+        "bacnet_gateway": "192.168.0.142",
+    }
+    assert "same subnet" in capsys.readouterr().out
+
+
+def test_wizard_keeps_service_local_when_no_private_address_exists(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex, capsys
+) -> None:
+    wizard = InstallerWizard()
+    monkeypatch.setattr("installer.wizard.discover_ipv4_addresses", lambda: [])
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    bindings = wizard._prompt_service_bind_addresses(["mqtt_broker"], manifest_index)
+
+    assert bindings == {"mqtt_broker": "127.0.0.1"}
+    assert "No private IPv4 address" in capsys.readouterr().out
+
+
+def test_wizard_does_not_prompt_for_local_only_services(
+    monkeypatch: pytest.MonkeyPatch, manifest_index: manifest.ManifestIndex
+) -> None:
+    wizard = InstallerWizard()
+    local_only_service = manifest.ServiceManifest(
+        id="btvirt_adapter",
+        name="btvirt Adapter",
+        protocol="ble",
+        description="Local BLE adapter",
+        ports=[
+            manifest.ServicePort(
+                transport="tcp", host=8085, container=8085, purpose="adapter"
+            )
+        ],
+        deployment=manifest.ServiceDeployment(runtime="native"),
+        network_exposure="local_only",
+    )
+    local_only_index = manifest.ManifestIndex(
+        services={"btvirt_adapter": local_only_service},
+        models={},
+        domains={},
+        industries={},
+        profiles={},
+    )
+    monkeypatch.setattr(
+        "builtins.input", lambda _: pytest.fail("local-only service prompted")
+    )
+
+    assert wizard._prompt_service_bind_addresses(
+        ["btvirt_adapter"], local_only_index
+    ) == {}

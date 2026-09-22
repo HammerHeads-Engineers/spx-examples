@@ -6,13 +6,14 @@ from __future__ import annotations
 import getpass
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from shutil import get_terminal_size
 from textwrap import shorten
 from typing import Dict, List, Sequence
 
 from . import paths, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
+from .network import discover_ipv4_addresses
 from .selection import (
     COMMUNITY_AUTO_START_LIMIT,
     apply_platform_compatibility,
@@ -75,6 +76,7 @@ class WizardSelection:
     service_ids: List[str]
     instances: List[Dict[str, str]]
     start_instances: List[str]
+    service_bind_addresses: Dict[str, str] = field(default_factory=dict)
 
 
 class InstallerWizard:
@@ -97,6 +99,7 @@ class InstallerWizard:
         start_instances: List[str] = []
         model_ids: List[str] = []
         service_ids: List[str] = []
+        service_bind_addresses: Dict[str, str] = {}
         instances: List[Dict[str, str]] = []
 
         if protocol_only:
@@ -179,6 +182,10 @@ class InstallerWizard:
             for warning in compatibility.warnings:
                 print(f"  - {warning}")
 
+        service_bind_addresses = self._prompt_service_bind_addresses(
+            compatibility.service_ids, index
+        )
+
         runtime_notices = self._build_runtime_notices(
             service_ids=service_ids,
             install_spx_ui=install_spx_ui,
@@ -205,6 +212,7 @@ class InstallerWizard:
             service_ids,
             instances,
             start_instances,
+            service_bind_addresses,
             index,
         )
 
@@ -220,6 +228,7 @@ class InstallerWizard:
             service_ids=service_ids,
             instances=instances,
             start_instances=start_instances,
+            service_bind_addresses=service_bind_addresses,
         )
 
     # Internal helpers -------------------------------------------------------
@@ -549,6 +558,77 @@ class InstallerWizard:
                 continue
             return [candidates[index - 1].id for index in sorted(set(choices))]
 
+    def _prompt_service_bind_addresses(
+        self,
+        service_ids: Sequence[str],
+        index: ManifestIndex,
+    ) -> Dict[str, str]:
+        """Ask whether selected network services should be reachable from LAN."""
+
+        bindings: Dict[str, str] = {}
+        prompted = []
+        for service_id in service_ids:
+            service = index.services.get(service_id)
+            deployment = service.deployment if service is not None else None
+            if (
+                service is None
+                or not service.ports
+                or service.network_exposure != "selectable"
+                or deployment is None
+                or deployment.runtime not in {"builtin", "docker"}
+            ):
+                continue
+            prompted.append(service)
+
+        if not prompted:
+            return bindings
+
+        print(ui.heading("\nNetwork exposure:"))
+        print(
+            "  Services are local-only by default. LAN exposure binds ports to a "
+            "selected private IPv4 address on this host."
+        )
+        for service in prompted:
+            if not self._prompt_yes_no(
+                f"Expose {service.name} to the local network? [y/N]: ",
+                default=False,
+            ):
+                bindings[service.id] = "127.0.0.1"
+                continue
+
+            addresses = discover_ipv4_addresses()
+            if not addresses:
+                print(
+                    ui.warn(
+                        f"  No private IPv4 address was found for {service.name}; "
+                        "keeping it local-only."
+                    )
+                )
+                bindings[service.id] = "127.0.0.1"
+                continue
+
+            print(f"  Select the host address for {service.name}:")
+            for position, address in enumerate(addresses, start=1):
+                print(
+                    f"    [{ui.accent(str(position))}] {address.interface} — {address.address}"
+                )
+            choice = self._prompt_indices(
+                "  Address (required, q to quit): ",
+                len(addresses),
+                allow_empty=False,
+            )
+            selected = addresses[choice[0] - 1]
+            bindings[service.id] = selected.address
+            if service.protocol.lower() in {"bacnet", "knx"}:
+                print(
+                    ui.warn(
+                        "  Discovery may require the client and SPX host to be in "
+                        "the same subnet; routing between subnets may need BBMD/router configuration."
+                    )
+                )
+
+        return bindings
+
     def _warn_for_disabled_protocol_services(
         self,
         model_ids: Sequence[str],
@@ -749,6 +829,7 @@ class InstallerWizard:
         service_ids: Sequence[str],
         instances: Sequence[Dict[str, str]],
         start_instances: Sequence[str],
+        service_bind_addresses: Dict[str, str],
         index: ManifestIndex,
     ) -> None:
         print(ui.heading("\nSummary"))
@@ -758,6 +839,26 @@ class InstallerWizard:
             for pkg in packages:
                 manifest = index.industries[pkg]
                 print(f"  • {ui.heading(manifest.name)}")
+        else:
+            print("  • (none selected)")
+        print("\nNetwork endpoints:")
+        network_services = [
+            service_id
+            for service_id in service_ids
+            if index.services.get(service_id) is not None
+            and index.services[service_id].ports
+        ]
+        if network_services:
+            for service_id in network_services:
+                manifest = index.services[service_id]
+                bind = service_bind_addresses.get(service_id, "127.0.0.1")
+                scope = "local-only" if bind == "127.0.0.1" else f"LAN {bind}"
+                ports = ", ".join(
+                    f"{port.host}/{port.transport}" for port in manifest.ports
+                )
+                if service_id == "modbus_tcp_gateway":
+                    ports = f"{ports}, 5020–5120/tcp"
+                print(f"  • {manifest.name}: {scope}, {ports}")
         else:
             print("  • (none selected)")
         if profiles:

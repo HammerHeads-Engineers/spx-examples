@@ -273,7 +273,12 @@ all local services for the selected protocols, enter service numbers to choose
 a subset, or enter `none`/`n` to disable all local services. Disabling a
 service does not prevent compatible models from being registered, but the
 wizard warns that dependent models require a separately configured external
-endpoint. External endpoint configuration is not part of this flow yet.
+endpoint. For selected services with network ports, the wizard separately asks
+whether each endpoint should remain local (`127.0.0.1`, the default) or bind to
+a specific private IPv4 address on the host. It never selects `0.0.0.0` for LAN
+access. BACnet/IP and KNXnet/IP discovery generally works best within the same
+subnet; firewalls and inter-subnet routing remain the user's responsibility.
+Non-interactive generation always uses local-only binds.
 
 The generated stack always uses Compose project `spx` and installer labels. The
 server/UI contract is SPX Server `v1.0.0-rc.64` with SPX UI `v1.0.0-rc.68`;
@@ -296,7 +301,7 @@ launches the same terminal-based installer engine used by the portable package.
 Inside `build/spx-generated/` you will see:
 
 - `docker-compose.generated.yml` – only the services selected in the wizard.
-- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME`; update it with a real key from [simplephysx.com](https://simplephysx.com) after selecting a subscription type. New bundles do not duplicate the raw key in `bundle.json`.
+- `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME` and per-service `SPX_BIND_<SERVICE_ID>=127.0.0.1` defaults; update the product key from [simplephysx.com](https://simplephysx.com), and edit a bind value to a current private host IPv4 address for LAN access. Startup validates that the address is still assigned. `BACNET_BIND_ADDR` remains a supported compatibility override. New bundles do not duplicate the raw key in `bundle.json`.
 - `bundle.json` – consumed by `bootstrap_runner.py`; older bundles containing `license_key` remain supported.
 - `stack_manager.py` and `.spx-stack-snapshot.json` – used for exact-container preflight, replacement and rollback.
 - `spx-start.sh` / `spx-stop.sh` and `spx-start.ps1` / `spx-stop.ps1` – start/stop helpers for Bash/zsh and PowerShell.

@@ -74,6 +74,7 @@ def catalog_dir(tmp_path: Path) -> Path:
               - id: mqtt_broker
                 name: MQTT
                 protocol: mqtt
+                network_exposure: selectable
                 description: Test broker
                 ports:
                   - transport: tcp
@@ -124,6 +125,7 @@ def test_manifest_loader_parses_catalog(
     broker = index.services["mqtt_broker"]
     assert broker.deployment is not None
     assert broker.deployment.image == "eclipse-mosquitto:latest"
+    assert broker.network_exposure == "selectable"
 
     assert "sensor" in index.models
     model = index.models["sensor"]
@@ -135,3 +137,19 @@ def test_manifest_loader_parses_catalog(
         {"model": "sensor", "instance": "pack_sensor_01"}
     ]
     assert "test_profile" in index.profiles
+
+
+def test_manifest_loader_rejects_unknown_network_exposure(
+    catalog_dir: Path, profiles_dir: Path
+) -> None:
+    services_path = catalog_dir / "services.yaml"
+    services_path.write_text(
+        services_path.read_text(encoding="utf-8").replace(
+            "network_exposure: selectable", "network_exposure: lan"
+        ),
+        encoding="utf-8",
+    )
+
+    loader = ManifestLoader(catalog_dir=catalog_dir, profiles_dir=profiles_dir)
+    with pytest.raises(ValueError, match="unsupported network_exposure 'lan'"):
+        loader.load()

@@ -262,11 +262,15 @@ def _build_noninteractive_selection(
 
     unknown_packages = [pkg for pkg in packages if pkg not in index.industries]
     if unknown_packages:
-        raise SystemExit(f"Unknown pack id(s): {', '.join(sorted(set(unknown_packages)))}")
+        raise SystemExit(
+            f"Unknown pack id(s): {', '.join(sorted(set(unknown_packages)))}"
+        )
 
     unknown_profiles = [pid for pid in profile_ids if pid not in index.profiles]
     if unknown_profiles:
-        raise SystemExit(f"Unknown profile id(s): {', '.join(sorted(set(unknown_profiles)))}")
+        raise SystemExit(
+            f"Unknown profile id(s): {', '.join(sorted(set(unknown_profiles)))}"
+        )
 
     product_key = _resolve_product_key(
         explicit=getattr(args, "product_key", None),
@@ -274,15 +278,21 @@ def _build_noninteractive_selection(
     )
 
     install_examples = (
-        True if getattr(args, "install_examples", None) is None else bool(args.install_examples)
+        True
+        if getattr(args, "install_examples", None) is None
+        else bool(args.install_examples)
     )
     install_spx_ui = (
-        False if getattr(args, "install_spx_ui", None) is None else bool(args.install_spx_ui)
+        False
+        if getattr(args, "install_spx_ui", None) is None
+        else bool(args.install_spx_ui)
     )
 
     model_ids = resolve_model_ids(packages, profile_ids, protocols, index)
     if packages and not model_ids:
-        raise SystemExit(f"Selection for packages {packages!r} resolves to zero models; check catalog configuration.")
+        raise SystemExit(
+            f"Selection for packages {packages!r} resolves to zero models; check catalog configuration."
+        )
 
     service_ids = resolve_service_ids(model_ids, packages, profile_ids, index)
     unknown_services = [sid for sid in service_ids if sid not in index.services]
@@ -293,14 +303,18 @@ def _build_noninteractive_selection(
         )
 
     instances = resolve_default_instances(packages, index) if install_examples else []
-    start_instances = resolve_start_instances(packages, index) if install_examples else []
+    start_instances = (
+        resolve_start_instances(packages, index) if install_examples else []
+    )
     if install_examples and (
         "smart_building_pack" in packages
         or "industrial_iiot_pack" in packages
         or "embedded_lab_pack" in packages
     ):
         allowed = set(start_instances)
-        instances = [entry for entry in instances if entry.get("instance_key") in allowed]
+        instances = [
+            entry for entry in instances if entry.get("instance_key") in allowed
+        ]
 
     instance_limit = getattr(args, "instance_limit", None)
     if instance_limit is not None:
@@ -319,6 +333,13 @@ def _build_noninteractive_selection(
     for warning in compatibility.warnings:
         print(f"[spx-installer] {warning}", file=sys.stderr)
 
+    service_bind_addresses = {
+        service_id: "127.0.0.1"
+        for service_id in compatibility.service_ids
+        if index.services.get(service_id) is not None
+        and index.services[service_id].ports
+    }
+
     return WizardSelection(
         packages=packages,
         profiles=profile_ids,
@@ -331,6 +352,7 @@ def _build_noninteractive_selection(
         service_ids=compatibility.service_ids,
         instances=compatibility.instances,
         start_instances=compatibility.start_instances,
+        service_bind_addresses=service_bind_addresses,
     )
 
 
@@ -343,9 +365,12 @@ def _print_selection(selection: WizardSelection, *, index) -> None:
         "install_spx_ui": bool(selection.install_spx_ui),
         "models": selection.model_ids,
         "services": selection.service_ids,
+        "service_bind_addresses": selection.service_bind_addresses,
         "instances": selection.instances,
         "start_instances": selection.start_instances,
-        "product_key_present": bool(selection.license_key and selection.license_key != "REPLACE_ME"),
+        "product_key_present": bool(
+            selection.license_key and selection.license_key != "REPLACE_ME"
+        ),
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
 
@@ -353,17 +378,27 @@ def _print_selection(selection: WizardSelection, *, index) -> None:
 def run(args: argparse.Namespace) -> int:
     if args.command == "wizard":
         loader = ManifestLoader(
-            catalog_dir=None if getattr(args, "catalog", None) is None else args.catalog,
-            profiles_dir=None if getattr(args, "profiles", None) is None else args.profiles,
+            catalog_dir=(
+                None if getattr(args, "catalog", None) is None else args.catalog
+            ),
+            profiles_dir=(
+                None if getattr(args, "profiles", None) is None else args.profiles
+            ),
         )
         wizard = InstallerWizard(loader=loader)
         wizard.run()
         return 0
     if args.command == "generate":
-        info_stream = sys.stderr if getattr(args, "print_selection", None) else sys.stdout
+        info_stream = (
+            sys.stderr if getattr(args, "print_selection", None) else sys.stdout
+        )
         loader = ManifestLoader(
-            catalog_dir=None if getattr(args, "catalog", None) is None else args.catalog,
-            profiles_dir=None if getattr(args, "profiles", None) is None else args.profiles,
+            catalog_dir=(
+                None if getattr(args, "catalog", None) is None else args.catalog
+            ),
+            profiles_dir=(
+                None if getattr(args, "profiles", None) is None else args.profiles
+            ),
         )
 
         noninteractive = bool(
@@ -391,7 +426,10 @@ def run(args: argparse.Namespace) -> int:
 
         print(f"\nArtifacts generated in {output_dir}", file=info_stream)
         print("Next steps:", file=info_stream)
-        print(f"  1. Update '{output_dir}/.env' with your SPX product key if needed.", file=info_stream)
+        print(
+            f"  1. Update '{output_dir}/.env' with your SPX product key if needed.",
+            file=info_stream,
+        )
         print(
             f"  2. Run '{output_dir}/spx-start.sh' (macOS/Linux) or 'pwsh {output_dir}/spx-start.ps1' (Windows) to start the stack.",
             file=info_stream,
