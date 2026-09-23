@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import filecmp
 import json
 import os
 import re
@@ -657,6 +658,30 @@ exit /b %EXITCODE%
             shutil.copytree(src, dest, dirs_exist_ok=True)
         else:
             dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.is_symlink():
+                raise IsADirectoryError(
+                    f"Refusing to replace symlink at generated asset path: {dest}"
+                )
+            if dest.is_dir():
+                # Repeated generation can leave a directory where a file is
+                # expected (for example knxd.ini/knxd.ini). Repair only the
+                # exact, byte-identical nested copy; preserve other contents.
+                entries = list(dest.iterdir())
+                nested_copy = dest / src.name
+                if not entries:
+                    dest.rmdir()
+                elif (
+                    len(entries) == 1
+                    and entries[0] == nested_copy
+                    and nested_copy.is_file()
+                    and filecmp.cmp(src, nested_copy, shallow=False)
+                ):
+                    nested_copy.unlink()
+                    dest.rmdir()
+                else:
+                    raise IsADirectoryError(
+                        f"Generated asset path is a directory with unexpected contents: {dest}"
+                    )
             shutil.copy2(src, dest)
 
         return f"./assets/{relative}"
@@ -747,6 +772,14 @@ exit /b %EXITCODE%
             transaction_service_name = transaction_service_names[service_name]
             transaction_name = f"spx-transaction-__TRANSACTION_TOKEN__-{service_name}"
             service["container_name"] = transaction_name
+            # Transaction-prefixed service keys are only isolation names. Keep
+            # the original Compose DNS name available to models that connect
+            # to bundled services by their stable ID (for example knx_gateway).
+            networks = service.setdefault("networks", {})
+            default_network = networks.setdefault("default", {})
+            aliases = default_network.setdefault("aliases", [])
+            if service_name not in aliases:
+                aliases.append(service_name)
             depends_on = service.get("depends_on")
             if isinstance(depends_on, dict):
                 service["depends_on"] = {
