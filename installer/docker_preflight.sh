@@ -1,21 +1,53 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 
+spx_docker_platform() {
+  case "$(uname -s)" in
+    Darwin) printf 'macOS\n' ;;
+    Linux) printf 'Linux\n' ;;
+    *) printf 'Other\n' ;;
+  esac
+}
+
+spx_resolve_docker_cli() {
+  local candidate
+
+  if command -v docker >/dev/null 2>&1; then
+    return 0
+  fi
+
+  for candidate in \
+    "${HOME:-}/.docker/bin/docker" \
+    /Applications/Docker.app/Contents/Resources/bin/docker \
+    /opt/homebrew/bin/docker \
+    /usr/local/bin/docker \
+    /usr/bin/docker \
+    /snap/bin/docker; do
+    if [[ -n "${candidate}" && -x "${candidate}" ]]; then
+      PATH="$(dirname "${candidate}"):${PATH}"
+      export PATH
+      command -v docker >/dev/null 2>&1 && return 0
+    fi
+  done
+
+  return 1
+}
+
 spx_docker_daemon_ready() {
+  spx_resolve_docker_cli || return 1
   docker info >/dev/null 2>&1
 }
 
 spx_wait_for_docker_daemon() {
-  local attempt
+  local timeout_seconds="${1:-60}"
+  local attempt attempts=$(( (timeout_seconds + 1) / 2 ))
 
-  if spx_docker_daemon_ready; then
-    return 0
-  fi
-
-  for ((attempt = 0; attempt < 30; attempt++)); do
-    sleep 2
+  for ((attempt = 0; attempt <= attempts; attempt++)); do
     if spx_docker_daemon_ready; then
       return 0
+    fi
+    if (( attempt < attempts )); then
+      sleep 2
     fi
   done
 
@@ -23,19 +55,21 @@ spx_wait_for_docker_daemon() {
 }
 
 spx_start_docker_desktop() {
-  if docker desktop start --detach >/dev/null 2>&1; then
+  local platform="$1"
+
+  if spx_resolve_docker_cli && docker desktop start --detach >/dev/null 2>&1; then
     echo "[spx-install] Requested Docker Desktop startup through the Docker CLI."
     return 0
   fi
 
-  if [[ "$(uname -s)" == "Darwin" ]] && command -v open >/dev/null 2>&1; then
+  if [[ "${platform}" == "macOS" ]] && command -v open >/dev/null 2>&1; then
     if open -a Docker >/dev/null 2>&1; then
-      echo "[spx-install] Opened Docker Desktop. Waiting for its daemon..."
+      echo "[spx-install] Opened Docker Desktop. Waiting for Docker Engine..."
       return 0
     fi
   fi
 
-  echo "[spx-install] Could not start Docker Desktop automatically." >&2
+  echo "[spx-install] Docker Desktop could not be started automatically." >&2
   return 1
 }
 
@@ -50,79 +84,252 @@ spx_print_docker_detail() {
       return 0
     fi
   done <<< "${detail}"
-
-  return 0
 }
 
-spx_docker_recovery_message() {
-  local detail="$1"
-  local lowered_detail
-  lowered_detail="$(printf '%s' "${detail}" | tr '[:upper:]' '[:lower:]')"
-  if [[ "${lowered_detail}" == *"manually paused"* ]]; then
-    printf '%s\n' "[spx-install] Docker Desktop is paused or its daemon is unavailable. Unpause Docker Desktop, wait until it is ready, then retry."
+spx_desktop_instructions() {
+  cat <<'EOF'
+Docker Desktop could not be started automatically.
+If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/.
+Open Docker Desktop, unpause it if necessary, and wait until Docker Engine is running.
+EOF
+}
+
+spx_linux_engine_instructions() {
+  cat <<'EOF'
+Docker Engine is not available.
+Install Docker Engine and the Docker Compose plugin using https://docs.docker.com/engine/install/.
+On systemd-based Linux distributions, you can start the service with: sudo systemctl start docker
+If the daemon reports a permission error, follow Docker's instructions for non-root access.
+EOF
+}
+
+spx_compose_instructions() {
+  local platform="$1"
+  if [[ "${platform}" == "Linux" ]]; then
+    cat <<'EOF'
+Docker Compose is not available.
+Install the Docker Compose plugin using https://docs.docker.com/compose/install/linux/.
+EOF
   else
-    printf '%s\n' "[spx-install] Docker Desktop is not reachable. Install and start Docker Desktop, wait until it is ready, then retry."
+    cat <<'EOF'
+Docker Compose is not available.
+Install or update Docker Desktop from https://www.docker.com/products/docker-desktop/.
+Docker Desktop includes the Docker Compose plugin.
+EOF
   fi
 }
 
-check_docker() {
-  local platform docker_info recovery_message choice
+spx_print_recovery_instructions() {
+  local failure="$1"
+  local platform="$2"
+  local detail="$3"
+  local lowered_detail
+  lowered_detail="$(printf '%s' "${detail}" | tr '[:upper:]' '[:lower:]')"
 
-  need_cmd docker
-  platform="$(uname -s)"
+  case "${failure}" in
+    cli)
+      if [[ "${platform}" == "Linux" ]]; then
+        spx_linux_engine_instructions
+      else
+        spx_desktop_instructions
+      fi
+      ;;
+    daemon)
+      if [[ "${lowered_detail}" == *"permission denied"* || "${lowered_detail}" == *"permissionerror"* ]]; then
+        echo "Docker CLI is installed, but this user cannot access the Docker daemon."
+        if [[ "${platform}" == "Linux" ]]; then
+          echo "Follow Docker's instructions for non-root access, then sign out and back in if required."
+        else
+          spx_desktop_instructions
+        fi
+      elif [[ "${platform}" == "Linux" ]]; then
+        spx_linux_engine_instructions
+      else
+        spx_desktop_instructions
+      fi
+      ;;
+    compose)
+      spx_compose_instructions "${platform}"
+      ;;
+  esac
+}
+
+spx_check_docker_state() {
+  local platform="$1"
+  local docker_info
+
+  if ! spx_resolve_docker_cli; then
+    SPX_DOCKER_FAILURE="cli"
+    SPX_DOCKER_DETAIL=""
+    return 1
+  fi
 
   if ! docker_info="$(docker info 2>&1)"; then
-    if [[ "${platform}" != "Darwin" ]]; then
-      echo "[spx-install] Docker daemon not reachable. Start Docker Desktop/service and retry." >&2
-      return 1
-    fi
-
+    SPX_DOCKER_FAILURE="daemon"
+    SPX_DOCKER_DETAIL="${docker_info}"
     spx_print_docker_detail "${docker_info}"
-    echo "[spx-install] Docker daemon is not reachable. Attempting to start Docker Desktop..."
-    spx_start_docker_desktop || true
-
-    if ! spx_wait_for_docker_daemon; then
-      docker_info="$(docker info 2>&1 || true)"
-      while true; do
-        recovery_message="$(spx_docker_recovery_message "${docker_info}")"
-        if [[ ! -t 0 ]]; then
-          printf '%s Run SPX Setup again after Docker Desktop is ready.\n' "${recovery_message}" >&2
-          return 1
-        fi
-
-        printf '%s\n' "${recovery_message}" >&2
-        if ! IFS= read -r -p 'Press R to retry the Docker connection or Q to quit: ' choice; then
-          printf '%s Run SPX Setup again after Docker Desktop is ready.\n' "${recovery_message}" >&2
-          return 1
-        fi
-
-        case "${choice}" in
-          R|r)
-            echo "[spx-install] Retrying the Docker connection for up to 60 seconds..."
-            if spx_wait_for_docker_daemon; then
-              break
-            fi
-            docker_info="$(docker info 2>&1 || true)"
-            spx_print_docker_detail "${docker_info}"
-            ;;
-          Q|q)
-            printf '%s\n' "${recovery_message}" >&2
-            return 1
-            ;;
-          *)
-            echo "[spx-install] Enter R to retry or Q to quit." >&2
-            ;;
-        esac
-      done
-    fi
+    return 1
   fi
 
   if docker compose version >/dev/null 2>&1; then
     export DOCKER_COMPOSE="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then
+    SPX_DOCKER_FAILURE=""
+    SPX_DOCKER_DETAIL=""
+    return 0
+  fi
+
+  if command -v docker-compose >/dev/null 2>&1; then
     export DOCKER_COMPOSE="docker-compose"
-  else
-    echo "[spx-install] Neither 'docker compose' nor 'docker-compose' is available." >&2
+    SPX_DOCKER_FAILURE=""
+    SPX_DOCKER_DETAIL=""
+    return 0
+  fi
+
+  SPX_DOCKER_FAILURE="compose"
+  SPX_DOCKER_DETAIL=""
+  return 1
+}
+
+spx_try_docker_desktop_recovery() {
+  local platform="$1"
+  local failure="$2"
+
+  if [[ "${platform}" != "macOS" && "${platform}" != "Windows" ]]; then
     return 1
   fi
+  if [[ "${failure}" != "cli" && "${failure}" != "daemon" ]]; then
+    return 1
+  fi
+
+  echo "[spx-install] Docker is not ready. Attempting to start Docker Desktop..."
+  if [[ "${failure}" == "cli" ]]; then
+    spx_start_docker_desktop "${platform}" || return 1
+  else
+    spx_start_docker_desktop "${platform}" || true
+  fi
+
+  spx_wait_for_docker_daemon 60
+}
+
+spx_retry_docker_check() {
+  local platform="$1"
+
+  if spx_check_docker_state "${platform}"; then
+    return 0
+  fi
+
+  local failure="${SPX_DOCKER_FAILURE}"
+
+  if [[ "${failure}" == "daemon" && "${platform}" == "Linux" ]]; then
+    echo "[spx-install] Checking Docker Engine for up to 60 seconds..."
+    spx_wait_for_docker_daemon 60 || true
+  elif [[ "${failure}" == "cli" && ( "${platform}" == "macOS" || "${platform}" == "Windows" ) ]]; then
+    spx_try_docker_desktop_recovery "${platform}" "cli" || true
+  elif [[ "${failure}" == "daemon" && ( "${platform}" == "macOS" || "${platform}" == "Windows" ) ]]; then
+    spx_try_docker_desktop_recovery "${platform}" "daemon" || true
+  fi
+}
+
+spx_print_headless_recovery_hint() {
+  local platform="$1"
+  case "${platform}" in
+    Linux)
+      echo "Run SPX Setup again after Docker Engine and Docker Compose are ready." >&2
+      ;;
+    *)
+      echo "Run SPX Setup again after Docker Desktop and Docker Compose are ready." >&2
+      ;;
+  esac
+}
+
+check_docker() {
+  local platform choice failure detail
+  platform="$(spx_docker_platform)"
+
+  if spx_check_docker_state "${platform}"; then
+    return 0
+  fi
+
+  failure="${SPX_DOCKER_FAILURE}"
+  detail="${SPX_DOCKER_DETAIL}"
+  if [[ "${failure}" == "daemon" && "${platform}" == "Linux" ]]; then
+    : # Linux Engine is always started by the user, never by this installer.
+  else
+    spx_try_docker_desktop_recovery "${platform}" "${failure}" || true
+  fi
+
+  if spx_check_docker_state "${platform}"; then
+    return 0
+  fi
+
+  while true; do
+    failure="${SPX_DOCKER_FAILURE}"
+    detail="${SPX_DOCKER_DETAIL}"
+    spx_print_recovery_instructions "${failure}" "${platform}" "${detail}" >&2
+
+    if [[ ! -t 0 ]]; then
+      spx_print_headless_recovery_hint "${platform}"
+      return 1
+    fi
+
+    if ! IFS= read -r -p 'Press Enter to check again, or type Q to quit: ' choice; then
+      spx_print_headless_recovery_hint "${platform}"
+      return 1
+    fi
+
+    case "${choice}" in
+      Q|q)
+        echo "[spx-install] Docker preflight cancelled by the user." >&2
+        return 1
+        ;;
+      "")
+        spx_retry_docker_check "${platform}"
+        if spx_check_docker_state "${platform}"; then
+          return 0
+        fi
+        ;;
+      *)
+        echo "[spx-install] Press Enter to check again, or type Q to quit." >&2
+        ;;
+    esac
+  done
+}
+
+spx_docker_preflight_required() {
+  local arg command_name="" has_selector=0 has_start=0 has_no_start=0
+
+  for arg in "$@"; do
+    case "${arg}" in
+      -h|--help)
+        return 1
+        ;;
+    esac
+  done
+
+  [[ $# -gt 0 ]] || return 0
+  command_name="$1"
+  [[ "${command_name}" == "generate" ]] || return 1
+
+  shift
+  for arg in "$@"; do
+    case "${arg}" in
+      --packages|--profile-ids|--protocols)
+        has_selector=1
+        ;;
+      --packages=*|--profile-ids=*|--protocols=*)
+        has_selector=1
+        ;;
+      --start)
+        has_start=1
+        ;;
+      --no-start)
+        has_no_start=1
+        ;;
+    esac
+  done
+
+  (( has_start == 1 )) && return 0
+  (( has_no_start == 1 )) && return 1
+  (( has_selector == 1 )) && return 1
+  return 0
 }

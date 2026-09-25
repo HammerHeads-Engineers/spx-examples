@@ -359,11 +359,23 @@ self-extractor when present). You can run the engine directly if needed:
 - **Bash:** `./spx-install.sh`
 - **PowerShell (Windows or pwsh on macOS/Linux):** `pwsh ./spx-install.ps1`
 
-The installer engine:
+The installer engine checks Python (`pyyaml`, `colorama`) and checks
+Docker/Compose only when it will start a local stack: interactive Setup or an
+explicit `--start`. `--help`, bootstrap, non-interactive artifact generation,
+and `--no-start` do not require a local Docker daemon.
 
-- checks that Python (`pyyaml`, `colorama`) and Docker/Compose are available,
-- launches `python -m installer generate` with the wizard,
-- writes the output to `build/spx-generated` (or another `--output` path you pass through).
+On macOS and Windows, Setup tries to start Docker Desktop automatically. If
+the CLI, daemon, or Compose is still unavailable, it prints platform-specific
+recovery instructions in English. Press Enter to check again or type `Q` to
+quit; it continues only after Docker and Compose are verified. In a headless
+session it exits with instructions to fix Docker and rerun Setup. On Linux it
+does not start Docker Engine or run administrative commands; it explains the
+manual Engine/Compose steps and offers the same Enter/Q retry in an interactive
+terminal.
+
+The installer launches `python -m installer generate` with the wizard and
+writes artifacts to `build/spx-generated` (or another `--output` path you pass
+through).
 
 After the wizard finishes, it will prompt to start the stack now. If you choose
 yes, it will run the generated start script for you. When the stack starts

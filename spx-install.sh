@@ -117,7 +117,17 @@ print_python_runtime_hint() {
 
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"
-check_docker
+
+if [ $# -eq 0 ]; then
+  DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
+  echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
+  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
+fi
+
+if spx_docker_preflight_required "$@"; then
+  check_docker
+fi
+
 BOOTSTRAP_LOG="$(mktemp)"
 trap 'rm -f "$BOOTSTRAP_LOG"' EXIT
 if INSTALLER_PYTHON_BIN="$(
@@ -140,12 +150,6 @@ fi
 unset PYTHON_BIN
 
 cd "$REPO_DIR"
-
-if [ $# -eq 0 ]; then
-  DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
-  echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
-  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
-fi
 
 echo "[spx-install] Running installer CLI with redacted arguments."
 "$INSTALLER_PYTHON_BIN" -m installer "$@"

@@ -153,16 +153,19 @@ function Check-PythonModules {
 try {
     . (Join-Path $RepoDir "installer/docker_preflight.ps1")
     Need-Command $InstallerPythonBin
-    $DockerCompose = Check-Docker
-    Check-PythonModules
-
-    Set-Location -Path $RepoDir
 
     if ($args.Count -eq 0) {
         $installerArgs = @("generate", "--output", "build/spx-generated")
     } else {
-        $installerArgs = $args
+        $installerArgs = @($args)
     }
+
+    if (Test-DockerPreflightRequired -Arguments ([string[]]$installerArgs)) {
+        $DockerCompose = Check-Docker
+    }
+    Check-PythonModules
+
+    Set-Location -Path $RepoDir
 
     Write-Host "[spx-install] Running installer CLI with redacted arguments."
 
