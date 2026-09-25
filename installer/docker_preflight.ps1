@@ -380,12 +380,17 @@ function Check-Docker {
             throw "$rerunHint"
         }
 
-        $choice = ([string](Read-Host "Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:")).Trim()
+        $retryPrompt = if ($state.Failure -eq "compose") {
+            "Press Enter to check Docker CLI, Engine, and Compose again, or type Q to quit:"
+        } else {
+            "Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:"
+        }
+        $choice = ([string](Read-Host $retryPrompt)).Trim()
         if ($choice -match "(?i)^q$") {
             throw "[spx-install] Docker preflight cancelled by the user."
         }
         if ($choice) {
-            [Console]::Error.WriteLine("[spx-install] Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit.")
+            [Console]::Error.WriteLine("[spx-install] $retryPrompt")
             continue
         }
 

@@ -106,7 +106,7 @@ def _run_bash_with_tty(
     os.close(slave_fd)
     output = bytearray()
     deadline = time.monotonic() + 10
-    prompt = b"Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:"
+    prompt = b"or type Q to quit:"
 
     try:
         while time.monotonic() < deadline and prompt not in output:
@@ -255,8 +255,14 @@ def test_missing_compose_has_separate_instructions_and_enter_rechecks(
     assert result.returncode == 0
     assert "Docker Compose is not available." in result.stdout
     assert "Docker Desktop includes the Docker Compose plugin." in result.stdout
+    assert (
+        "Press Enter to check Docker CLI, Engine, and Compose again, or type Q to quit:"
+        in result.stdout
+    )
+    assert "wait up to 60 seconds" not in result.stdout
     assert "RESULT=0" in result.stdout
     assert "START_CALLS=0" in result.stdout
+    assert "SLEEP_CALLS=0" in result.stdout
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
@@ -499,6 +505,8 @@ def test_missing_compose_uses_separate_instructions_and_rechecks_after_enter() -
         + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpected result' }
+if ($script:lastPrompt -ne 'Press Enter to check Docker CLI, Engine, and Compose again, or type Q to quit:') { throw 'wrong retry prompt for missing Compose' }
+if ($script:fakeElapsedMilliseconds -ne 0) { throw 'Compose retry should recheck immediately' }
 'PREFLIGHT_TEST_PASSED'
 """
     )

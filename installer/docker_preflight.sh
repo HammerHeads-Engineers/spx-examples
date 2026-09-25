@@ -244,7 +244,7 @@ spx_print_headless_recovery_hint() {
 }
 
 check_docker() {
-  local platform choice failure detail
+  local platform choice failure detail retry_prompt
   platform="$(spx_docker_platform)"
 
   if spx_check_docker_state "${platform}"; then
@@ -273,7 +273,13 @@ check_docker() {
       return 1
     fi
 
-    if ! IFS= read -r -p 'Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit: ' choice; then
+    if [[ "${failure}" == "compose" ]]; then
+      retry_prompt='Press Enter to check Docker CLI, Engine, and Compose again, or type Q to quit: '
+    else
+      retry_prompt='Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit: '
+    fi
+
+    if ! IFS= read -r -p "${retry_prompt}" choice; then
       spx_print_headless_recovery_hint "${platform}"
       return 1
     fi
@@ -290,7 +296,7 @@ check_docker() {
         fi
         ;;
       *)
-        echo "[spx-install] Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit." >&2
+        echo "[spx-install] ${retry_prompt}" >&2
         ;;
     esac
   done
