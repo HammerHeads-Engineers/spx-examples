@@ -133,7 +133,8 @@ spx_print_recovery_instructions() {
       else
         cat <<'EOF'
 Docker CLI was not found.
-Install Docker Desktop from https://www.docker.com/products/docker-desktop/; it includes the Docker CLI and Compose.
+If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/.
+Docker Desktop includes the Docker CLI and Compose.
 Then open Docker Desktop and wait until Docker Engine is running.
 EOF
       fi
@@ -219,6 +220,7 @@ spx_try_docker_desktop_recovery() {
 spx_retry_docker_check() {
   local platform="$1"
 
+  echo "[spx-install] Retrying Docker CLI, Engine, and Compose checks..."
   if spx_check_docker_state "${platform}"; then
     return 0
   fi

@@ -40,6 +40,7 @@ def _bash_harness(
     compose_test = f'[[ -f "{compose_marker}" ]]' if compose_marker else "false"
     return f"""
 source '{helper}'
+set -euo pipefail
 PLATFORM='{platform}'
 CLI_PRESENT={1 if cli_present else 0}
 READY_AFTER={ready_after}
@@ -52,6 +53,11 @@ spx_docker_platform() {{ printf '%s\\n' "$PLATFORM"; }}
 spx_resolve_docker_cli() {{ (( CLI_PRESENT == 1 )) || {marker_test}; }}
 spx_start_docker_desktop() {{ start_calls=$((start_calls + 1)); return "$START_STATUS"; }}
 sleep() {{ sleep_calls=$((sleep_calls + 1)); :; }}
+# Do not let a runner's legacy Compose satisfy the missing-Compose scenario.
+command() {{
+  if [[ "${{1:-}}" == '-v' && "${{2:-}}" == 'docker-compose' ]]; then return 1; fi
+  builtin command "$@"
+}}
 docker() {{
   case "${{1:-}}" in
     info)
@@ -68,8 +74,8 @@ docker() {{
   esac
   return 1
 }}
-check_docker
-status=$?
+status=0
+check_docker || status=$?
 printf 'RESULT=%s INFO_CALLS=%s START_CALLS=%s SLEEP_CALLS=%s DOCKER_COMPOSE=%s\\n' \\
   "$status" "$info_calls" "$start_calls" "$sleep_calls" "${{DOCKER_COMPOSE:-}}"
 exit "$status"
@@ -83,6 +89,7 @@ def _run_bash(script: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
+        timeout=15,
     )
 
 
@@ -181,7 +188,7 @@ def test_linux_docker_preflight_does_not_start_engine_automatically() -> None:
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
-def test_linux_enter_rechecks_engine_after_user_starts_it() -> None:
+def test_bash_linux_enter_rechecks_engine_after_user_starts_it() -> None:
     result = _run_bash_with_tty(
         _bash_harness(platform="Linux", ready_after=4),
         "\n",
@@ -219,9 +226,10 @@ def test_missing_cli_can_be_installed_and_found_after_enter(tmp_path: Path) -> N
 
     assert result.returncode == 0
     assert (
-        "Install Docker Desktop from https://www.docker.com/products/docker-desktop/"
+        "If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/"
         in result.stdout + result.stderr
     )
+    assert "Retrying Docker CLI, Engine, and Compose checks..." in result.stdout
     assert "RESULT=0" in result.stdout
 
 
@@ -232,6 +240,8 @@ def test_enter_retries_daemon_check_and_q_quits() -> None:
     retry = _run_bash_with_tty(_bash_harness(ready_after=34), "\n")
     assert retry.returncode == 0
     assert "Attempting to start Docker Desktop" in retry.stdout
+    assert "Retrying Docker CLI, Engine, and Compose checks..." in retry.stdout
+    assert "Waiting up to 60 seconds for Docker CLI and Engine..." in retry.stdout
     assert "START_CALLS=1" in retry.stdout
     assert "RESULT=0" in retry.stdout
 
@@ -260,8 +270,36 @@ def test_missing_compose_has_separate_instructions_and_enter_rechecks(
         in result.stdout
     )
     assert "wait up to 60 seconds" not in result.stdout
+    assert "Retrying Docker CLI, Engine, and Compose checks..." in result.stdout
     assert "RESULT=0" in result.stdout
     assert "START_CALLS=0" in result.stdout
+    assert "SLEEP_CALLS=0" in result.stdout
+
+
+@pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
+def test_macos_failed_launch_allows_repeated_manual_retries_without_relaunch() -> None:
+    result = _run_bash_with_tty(
+        _bash_harness(cli_present=False, start_status=1), "\n\nq\n"
+    )
+
+    assert result.returncode == 1
+    assert "Docker CLI was not found." in result.stdout
+    assert (
+        result.stdout.count("Retrying Docker CLI, Engine, and Compose checks...") == 2
+    )
+    assert "START_CALLS=1" in result.stdout
+    assert "Docker preflight cancelled by the user" in result.stdout
+
+
+@pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
+def test_macos_missing_cli_and_desktop_in_headless_mode_returns_install_steps() -> None:
+    result = _run_bash(_bash_harness(cli_present=False, start_status=1))
+
+    assert result.returncode == 1
+    assert "If Docker Desktop is not installed, install it from" in result.stderr
+    assert "Run SPX Setup again" in result.stderr
+    assert "or type Q to quit:" not in result.stderr
+    assert "START_CALLS=1" in result.stdout
     assert "SLEEP_CALLS=0" in result.stdout
 
 
