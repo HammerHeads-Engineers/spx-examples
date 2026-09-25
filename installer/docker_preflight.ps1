@@ -311,14 +311,28 @@ function Write-DockerRecoveryInstructions {
         return
     }
 
-    if ($Failure -eq "cli" -or $Platform -eq "Windows" -or $Platform -eq "macOS") {
-        if ($Failure -eq "daemon" -and $detail -match "(?i)permission denied") {
-            [Console]::Error.WriteLine("Docker CLI is installed, but this user cannot access the Docker daemon.")
-        } else {
-            [Console]::Error.WriteLine("Docker Desktop could not be started automatically.")
-        }
+    if ($Failure -eq "cli") {
+        [Console]::Error.WriteLine("Docker CLI was not found.")
         [Console]::Error.WriteLine("If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/.")
-        [Console]::Error.WriteLine("Open Docker Desktop, unpause it if necessary, and wait until Docker Engine is running.")
+        [Console]::Error.WriteLine("Then open Docker Desktop and wait until Docker Engine is running.")
+        return
+    }
+
+    if ($Failure -eq "daemon" -and $detail -match "(?i)permission denied") {
+        [Console]::Error.WriteLine("Docker CLI is installed, but this account cannot access Docker Engine.")
+        if ($Platform -eq "Linux") {
+            [Console]::Error.WriteLine("Follow Docker's instructions for non-root access: https://docs.docker.com/engine/install/linux-postinstall/.")
+            [Console]::Error.WriteLine("Then sign out and back in before retrying.")
+        } else {
+            [Console]::Error.WriteLine("Check that Docker Desktop is running under this account. If access is still denied, ask your administrator to check permissions.")
+        }
+        return
+    }
+
+    if ($Platform -eq "Windows" -or $Platform -eq "macOS") {
+        [Console]::Error.WriteLine("Docker Engine is not reachable. Docker Desktop may still be starting or paused.")
+        [Console]::Error.WriteLine("Open Docker Desktop, unpause it if needed, and wait until Docker Engine is running.")
+        [Console]::Error.WriteLine("If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/.")
         return
     }
 
@@ -366,19 +380,21 @@ function Check-Docker {
             throw "$rerunHint"
         }
 
-        $choice = ([string](Read-Host "Press Enter to check again, or type Q to quit:")).Trim()
+        $choice = ([string](Read-Host "Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:")).Trim()
         if ($choice -match "(?i)^q$") {
             throw "[spx-install] Docker preflight cancelled by the user."
         }
         if ($choice) {
-            [Console]::Error.WriteLine("[spx-install] Press Enter to check again, or type Q to quit.")
+            [Console]::Error.WriteLine("[spx-install] Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit.")
             continue
         }
 
-        $state = Test-DockerState
-        if ($state.Ready) { return $state.Compose }
-
-        Start-DockerRecoveryAttempt -Failure $state.Failure -Platform $platform
+        Write-Host "[spx-install] Retrying Docker CLI, Engine, and Compose checks..."
+        if ($state.Failure -eq "cli" -or $state.Failure -eq "daemon") {
+            Write-Host "[spx-install] Waiting up to 60 seconds for Docker Engine..."
+            $wait = Wait-DockerDaemon -TimeoutSeconds 60
+            if (-not $wait.Connected) { Write-DockerInfoDetail -Result $wait.Result }
+        }
         $state = Test-DockerState
         if ($state.Ready) { return $state.Compose }
     }

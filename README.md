@@ -366,12 +366,13 @@ and `--no-start` do not require a local Docker daemon.
 
 On macOS and Windows, Setup tries to start Docker Desktop automatically. If
 the CLI, daemon, or Compose is still unavailable, it prints platform-specific
-recovery instructions in English. Press Enter to check again or type `Q` to
-quit; it continues only after Docker and Compose are verified. In a headless
-session it exits with instructions to fix Docker and rerun Setup. On Linux it
-does not start Docker Engine or run administrative commands; it explains the
-manual Engine/Compose steps and offers the same Enter/Q retry in an interactive
-terminal.
+recovery instructions in English. After you start or fix Docker, press Enter to
+retry the checks; Setup waits up to 60 seconds for the CLI and Engine, then
+verifies Compose. This retry does not start Docker Desktop again. Type `Q` to
+quit. In a headless session it exits with instructions to fix Docker and rerun
+Setup. On Linux it does not start Docker Engine or run administrative commands;
+it explains the manual Engine/Compose steps and offers the same Enter/Q retry
+in an interactive terminal.
 
 The installer launches `python -m installer generate` with the wizard and
 writes artifacts to `build/spx-generated` (or another `--output` path you pass

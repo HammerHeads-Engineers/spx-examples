@@ -88,9 +88,9 @@ spx_print_docker_detail() {
 
 spx_desktop_instructions() {
   cat <<'EOF'
-Docker Desktop could not be started automatically.
+Docker Engine is not reachable. Docker Desktop may still be starting or paused.
+Open Docker Desktop, unpause it if needed, and wait until Docker Engine is running.
 If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/.
-Open Docker Desktop, unpause it if necessary, and wait until Docker Engine is running.
 EOF
 }
 
@@ -131,16 +131,21 @@ spx_print_recovery_instructions() {
       if [[ "${platform}" == "Linux" ]]; then
         spx_linux_engine_instructions
       else
-        spx_desktop_instructions
+        cat <<'EOF'
+Docker CLI was not found.
+Install Docker Desktop from https://www.docker.com/products/docker-desktop/; it includes the Docker CLI and Compose.
+Then open Docker Desktop and wait until Docker Engine is running.
+EOF
       fi
       ;;
     daemon)
       if [[ "${lowered_detail}" == *"permission denied"* || "${lowered_detail}" == *"permissionerror"* ]]; then
-        echo "Docker CLI is installed, but this user cannot access the Docker daemon."
+        echo "Docker CLI is installed, but this account cannot access Docker Engine."
         if [[ "${platform}" == "Linux" ]]; then
-          echo "Follow Docker's instructions for non-root access, then sign out and back in if required."
+          echo "Follow Docker's instructions for non-root access: https://docs.docker.com/engine/install/linux-postinstall/."
+          echo "Then sign out and back in before retrying."
         else
-          spx_desktop_instructions
+          echo "Check that Docker Desktop is running under this account. If access is still denied, ask your administrator to check permissions."
         fi
       elif [[ "${platform}" == "Linux" ]]; then
         spx_linux_engine_instructions
@@ -220,13 +225,9 @@ spx_retry_docker_check() {
 
   local failure="${SPX_DOCKER_FAILURE}"
 
-  if [[ "${failure}" == "daemon" && "${platform}" == "Linux" ]]; then
-    echo "[spx-install] Checking Docker Engine for up to 60 seconds..."
+  if [[ "${failure}" == "cli" || "${failure}" == "daemon" ]]; then
+    echo "[spx-install] Waiting up to 60 seconds for Docker CLI and Engine..."
     spx_wait_for_docker_daemon 60 || true
-  elif [[ "${failure}" == "cli" && ( "${platform}" == "macOS" || "${platform}" == "Windows" ) ]]; then
-    spx_try_docker_desktop_recovery "${platform}" "cli" || true
-  elif [[ "${failure}" == "daemon" && ( "${platform}" == "macOS" || "${platform}" == "Windows" ) ]]; then
-    spx_try_docker_desktop_recovery "${platform}" "daemon" || true
   fi
 }
 
@@ -272,7 +273,7 @@ check_docker() {
       return 1
     fi
 
-    if ! IFS= read -r -p 'Press Enter to check again, or type Q to quit: ' choice; then
+    if ! IFS= read -r -p 'Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit: ' choice; then
       spx_print_headless_recovery_hint "${platform}"
       return 1
     fi
@@ -289,7 +290,7 @@ check_docker() {
         fi
         ;;
       *)
-        echo "[spx-install] Press Enter to check again, or type Q to quit." >&2
+        echo "[spx-install] Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit." >&2
         ;;
     esac
   done

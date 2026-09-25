@@ -16,12 +16,14 @@ previous stack.
 On macOS and Windows, Setup attempts to start Docker Desktop automatically.
 If Docker CLI, Docker Desktop, its daemon, or Compose is unavailable, it prints
 the matching installation/recovery steps in English. In an interactive
-terminal, press Enter to check again or type `Q` to quit; each Enter re-detects
-the CLI and verifies the daemon and Compose before continuing. If the terminal
-is unavailable, Setup exits with the same instructions and can be rerun after
-Docker is ready. On Linux, Setup never starts Docker Engine or runs `sudo` for
-you; it explains how to install/start Engine and Compose, then lets you retry
-with Enter or quit with `Q`.
+terminal, start or fix Docker as instructed, then press Enter to retry the
+checks for up to 60 seconds, or type `Q` to quit. Enter retries the connection
+without starting Docker Desktop again; Setup re-detects the CLI and verifies
+Docker Engine and Compose before continuing. If the terminal is unavailable,
+Setup exits with the same instructions and can be rerun after Docker is ready.
+On Linux, Setup never starts Docker Engine or runs `sudo` for you; it explains
+how to install/start Engine and Compose, then lets you retry with Enter or quit
+with `Q`.
 
 For each selected service that publishes protocol ports, the wizard asks
 whether to keep it local on `127.0.0.1` (default) or bind it to a selected

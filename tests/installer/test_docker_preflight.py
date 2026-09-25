@@ -106,7 +106,7 @@ def _run_bash_with_tty(
     os.close(slave_fd)
     output = bytearray()
     deadline = time.monotonic() + 10
-    prompt = b"Press Enter to check again, or type Q to quit:"
+    prompt = b"Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:"
 
     try:
         while time.monotonic() < deadline and prompt not in output:
@@ -177,7 +177,7 @@ def test_linux_docker_preflight_does_not_start_engine_automatically() -> None:
     assert "sudo systemctl start docker" in result.stderr
     assert "START_CALLS=0" in result.stdout
     assert "SLEEP_CALLS=0" in result.stdout
-    assert "Press Enter to check again" not in result.stderr
+    assert "Press Enter to retry Docker checks" not in result.stderr
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
@@ -198,9 +198,9 @@ def test_headless_macos_failure_has_instructions_and_does_not_prompt() -> None:
     result = _run_bash(_bash_harness(ready_after=1000))
 
     assert result.returncode == 1
-    assert "Docker Desktop could not be started automatically." in result.stderr
+    assert "Docker Engine is not reachable." in result.stderr
     assert "Run SPX Setup again" in result.stderr
-    assert "Press Enter to check again" not in result.stderr
+    assert "Press Enter to retry Docker checks" not in result.stderr
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
@@ -218,17 +218,21 @@ def test_missing_cli_can_be_installed_and_found_after_enter(tmp_path: Path) -> N
     )
 
     assert result.returncode == 0
-    assert "install it from https://www.docker.com/products/docker-desktop/" in result.stdout
+    assert (
+        "install it from https://www.docker.com/products/docker-desktop/"
+        in result.stdout
+    )
     assert "RESULT=0" in result.stdout
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
 def test_enter_retries_daemon_check_and_q_quits() -> None:
-    # One initial probe, 31 bounded startup probes, a second state probe, then
-    # one probe after Enter observes the user-started daemon.
+    # Enter rechecks the daemon after the automatic startup wait without
+    # launching Docker Desktop a second time.
     retry = _run_bash_with_tty(_bash_harness(ready_after=34), "\n")
     assert retry.returncode == 0
     assert "Attempting to start Docker Desktop" in retry.stdout
+    assert "START_CALLS=1" in retry.stdout
     assert "RESULT=0" in retry.stdout
 
     quit_result = _run_bash_with_tty(_bash_harness(ready_after=1000), "Q\n")
@@ -237,7 +241,9 @@ def test_enter_retries_daemon_check_and_q_quits() -> None:
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
-def test_missing_compose_has_separate_instructions_and_enter_rechecks(tmp_path: Path) -> None:
+def test_missing_compose_has_separate_instructions_and_enter_rechecks(
+    tmp_path: Path,
+) -> None:
     compose_marker = tmp_path / "compose-installed"
     script = _bash_harness(compose_present=False, compose_marker=str(compose_marker))
     result = _run_bash_with_tty(
@@ -266,6 +272,30 @@ spx_start_docker_desktop macOS
 
     assert result.returncode == 0
     assert "Opened Docker Desktop" in result.stdout
+
+
+@pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
+def test_macos_recovery_messages_distinguish_cli_engine_permissions_and_compose() -> (
+    None
+):
+    helper = str(SHELL_HELPER).replace("'", "'\\''")
+    script = f"""
+source '{helper}'
+spx_print_recovery_instructions cli macOS ''
+spx_print_recovery_instructions daemon macOS 'permission denied'
+spx_print_recovery_instructions compose macOS ''
+"""
+    result = _run_bash(script)
+
+    assert result.returncode == 0
+    assert "Docker CLI was not found." in result.stdout
+    assert (
+        "Then open Docker Desktop and wait until Docker Engine is running."
+        in result.stdout
+    )
+    assert "this account cannot access Docker Engine" in result.stdout
+    assert "ask your administrator to check permissions" in result.stdout
+    assert "Docker Compose is not available." in result.stdout
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
@@ -384,18 +414,23 @@ def _ps_mocks(
     return (
         _POWERSHELL_MOCKS.replace("READY_AFTER_PLACEHOLDER", str(ready_after))
         .replace("CLI_PRESENT_PLACEHOLDER", "$true" if cli_present else "$false")
-        .replace("COMPOSE_PRESENT_PLACEHOLDER", "$true" if compose_present else "$false")
+        .replace(
+            "COMPOSE_PRESENT_PLACEHOLDER", "$true" if compose_present else "$false"
+        )
         .replace("PLATFORM_PLACEHOLDER", platform)
     )
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_windows_preflight_accepts_ready_daemon_without_starting_desktop() -> None:
-    body = _ps_mocks() + r"""
+    body = (
+        _ps_mocks()
+        + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpected result' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "PREFLIGHT_TEST_PASSED" in result.stdout
@@ -403,11 +438,14 @@ if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpect
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_windows_preflight_starts_desktop_and_waits_for_daemon() -> None:
-    body = _ps_mocks(ready_after=2) + r"""
+    body = (
+        _ps_mocks(ready_after=2)
+        + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 1) { throw 'unexpected result' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "PREFLIGHT_TEST_PASSED" in result.stdout
@@ -415,44 +453,55 @@ if ($result -ne 'docker compose' -or $script:startCalls -ne 1) { throw 'unexpect
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_windows_enter_retries_after_user_starts_daemon() -> None:
-    body = _ps_mocks(ready_after=33).replace(
-        "$script:promptAction = ''", "$script:promptAction = 'start-daemon-delayed'"
-    ) + r"""
+    body = (
+        _ps_mocks(ready_after=33).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'start-daemon-delayed'"
+        )
+        + r"""
 $result = Check-Docker
-if ($result -ne 'docker compose' -or $script:startCalls -lt 1) { throw 'unexpected result' }
-if ($script:lastPrompt -ne 'Press Enter to check again, or type Q to quit:') { throw 'wrong retry prompt' }
+if ($result -ne 'docker compose' -or $script:startCalls -ne 1) { throw 'Docker Desktop was started again during manual retry' }
+if ($script:lastPrompt -ne 'Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:') { throw 'wrong retry prompt' }
 if ($script:fakeElapsedMilliseconds -le 0) { throw 'daemon wait did not run after Enter' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "PREFLIGHT_TEST_PASSED" in result.stdout
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
-def test_missing_cli_is_rechecked_after_enter_without_runner_docker_dependency() -> None:
-    body = _ps_mocks(cli_present=False).replace(
-        "$script:promptAction = ''", "$script:promptAction = 'install-cli'"
-    ) + r"""
+def test_missing_cli_is_rechecked_after_enter_without_runner_docker_dependency() -> (
+    None
+):
+    body = (
+        _ps_mocks(cli_present=False).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'install-cli'"
+        )
+        + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose') { throw 'unexpected result' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
-    assert "Docker Desktop could not be started automatically." in result.stderr
+    assert "Docker CLI was not found." in result.stderr
     assert "PREFLIGHT_TEST_PASSED" in result.stdout
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_missing_compose_uses_separate_instructions_and_rechecks_after_enter() -> None:
-    body = _ps_mocks(compose_present=False).replace(
-        "$script:promptAction = ''", "$script:promptAction = 'install-compose'"
-    ) + r"""
+    body = (
+        _ps_mocks(compose_present=False).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'install-compose'"
+        )
+        + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpected result' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "Docker Compose is not available." in result.stderr
@@ -462,42 +511,71 @@ if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpect
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_q_quits_and_headless_mode_returns_actionable_instructions() -> None:
-    quit_body = _ps_mocks(ready_after=999).replace(
-        "$script:promptAction = ''", "$script:promptAction = 'quit'"
-    ) + r"""
+    quit_body = (
+        _ps_mocks(ready_after=999).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'quit'"
+        )
+        + r"""
 try { Check-Docker | Out-Null; throw 'expected failure' } catch {
   if ($_.Exception.Message -notmatch 'cancelled by the user') { throw }
   'PREFLIGHT_TEST_PASSED'
 }
 """
+    )
     quit_result = _run_powershell(quit_body)
     assert quit_result.returncode == 0, quit_result.stderr
     assert "PREFLIGHT_TEST_PASSED" in quit_result.stdout
 
-    headless_body = _ps_mocks(ready_after=999).replace(
-        "$script:promptAvailable = $true", "$script:promptAvailable = $false"
-    ) + r"""
+    headless_body = (
+        _ps_mocks(ready_after=999).replace(
+            "$script:promptAvailable = $true", "$script:promptAvailable = $false"
+        )
+        + r"""
 try { Check-Docker | Out-Null; throw 'expected failure' } catch {
   if ($_.Exception.Message -notmatch 'Run SPX Setup again') { throw }
   'PREFLIGHT_TEST_PASSED'
 }
 """
+    )
     headless_result = _run_powershell(headless_body)
     assert headless_result.returncode == 0, headless_result.stderr
     assert "PREFLIGHT_TEST_PASSED" in headless_result.stdout
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
+def test_windows_recovery_messages_give_specific_next_steps() -> None:
+    body = r"""
+$permission = [PSCustomObject]@{ ExitCode = 1; StdOut = ''; StdErr = 'permission denied while connecting to the Docker daemon' }
+$unavailable = [PSCustomObject]@{ ExitCode = 1; StdOut = ''; StdErr = 'cannot connect to docker API' }
+Write-DockerRecoveryInstructions -Failure 'cli' -Platform 'Windows' -Result $null
+Write-DockerRecoveryInstructions -Failure 'daemon' -Platform 'Windows' -Result $unavailable
+Write-DockerRecoveryInstructions -Failure 'daemon' -Platform 'Windows' -Result $permission
+Write-DockerRecoveryInstructions -Failure 'compose' -Platform 'Windows' -Result $null
+"""
+    result = _run_powershell(body)
+
+    assert result.returncode == 0, result.stderr
+    assert "Docker CLI was not found." in result.stderr
+    assert "Docker Engine is not reachable." in result.stderr
+    assert "this account cannot access Docker Engine" in result.stderr
+    assert "ask your administrator to check permissions" in result.stderr
+    assert "Docker Compose is not available." in result.stderr
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_linux_preflight_gives_engine_steps_without_desktop_autostart() -> None:
-    body = _ps_mocks(platform="Linux", ready_after=999).replace(
-        "$script:promptAvailable = $true", "$script:promptAvailable = $false"
-    ) + r"""
+    body = (
+        _ps_mocks(platform="Linux", ready_after=999).replace(
+            "$script:promptAvailable = $true", "$script:promptAvailable = $false"
+        )
+        + r"""
 try { Check-Docker | Out-Null; throw 'expected failure' } catch {
   if ($_.Exception.Message -notmatch 'Run SPX Setup again') { throw }
   if ($script:startCalls -ne 0) { throw 'Linux must not start Desktop' }
   'PREFLIGHT_TEST_PASSED'
 }
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "Docker Engine is not available." in result.stderr
@@ -507,15 +585,18 @@ try { Check-Docker | Out-Null; throw 'expected failure' } catch {
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_linux_enter_rechecks_engine_after_user_starts_it() -> None:
-    body = _ps_mocks(platform="Linux", ready_after=999).replace(
-        "$script:promptAction = ''", "$script:promptAction = 'start-daemon-delayed'"
-    ) + r"""
+    body = (
+        _ps_mocks(platform="Linux", ready_after=999).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'start-daemon-delayed'"
+        )
+        + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpected result' }
-if ($script:lastPrompt -ne 'Press Enter to check again, or type Q to quit:') { throw 'wrong retry prompt' }
+if ($script:lastPrompt -ne 'Press Enter to retry Docker checks (wait up to 60 seconds), or type Q to quit:') { throw 'wrong retry prompt' }
 if ($script:fakeElapsedMilliseconds -le 0) { throw 'daemon wait did not run after Enter' }
 'PREFLIGHT_TEST_PASSED'
 """
+    )
     result = _run_powershell(body)
     assert result.returncode == 0, result.stderr
     assert "Docker Engine is not available." in result.stderr
