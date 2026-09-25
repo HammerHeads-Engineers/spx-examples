@@ -194,6 +194,10 @@ jobs:
         shell: pwsh
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
+      - name: Test Docker Desktop startup and retry flow
+        shell: pwsh
+        run: poetry run pytest -q tests/installer/test_docker_preflight.py
+
       - name: Install WiX Toolset v6 CLI
         shell: pwsh
         run: |
@@ -410,6 +414,14 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12.10"
+
+      - name: Install pytest for installer behavior tests
+        shell: bash
+        run: python -m pip install pytest
+
+      - name: Test Docker Desktop startup and retry flow
+        shell: bash
+        run: python -m pytest -q tests/installer/test_docker_preflight.py
 
       - name: Build unsigned macOS installer package
         shell: bash

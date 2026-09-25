@@ -112,21 +112,8 @@ print_python_runtime_hint() {
   esac
 }
 
-check_docker() {
-  need_cmd docker
-  if ! docker info >/dev/null 2>&1; then
-    echo "[spx-install] Docker daemon not reachable. Start Docker Desktop/service and retry." >&2
-    exit 1
-  fi
-  if docker compose version >/dev/null 2>&1; then
-    export DOCKER_COMPOSE="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    export DOCKER_COMPOSE="docker-compose"
-  else
-    echo "[spx-install] Neither 'docker compose' nor 'docker-compose' is available." >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+. "${REPO_DIR}/installer/docker_preflight.sh"
 
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"

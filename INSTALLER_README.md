@@ -10,6 +10,12 @@ preflights Docker, ports and existing labelled/legacy stacks, and asks before
 replacement. It preserves images and volumes; a failed model or instance
 bootstrap can restore the previous stack.
 
+On Windows and macOS, if Docker Desktop is installed but its daemon is not
+reachable, setup tries to start Docker Desktop and waits up to 60 seconds. If
+the daemon still does not respond, an interactive setup lets you retry the
+connection or quit; non-interactive setup exits with instructions. Linux keeps
+its existing Docker Engine prerequisite flow.
+
 For each selected service that publishes protocol ports, the wizard asks
 whether to keep it local on `127.0.0.1` (default) or bind it to a selected
 private IPv4 address for LAN access. Non-interactive generation stays
