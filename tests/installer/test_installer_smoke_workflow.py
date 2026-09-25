@@ -57,7 +57,7 @@ def test_linux_smoke_builds_and_runs_self_extractor_without_starting_stack() -> 
     assert "Bootstrap MCP workspace with the Linux host Python" in job
     assert "tools/verify_mcp_stdio.py" in job
     assert "sys.version_info[:2] >= (3, 10)" in job
-    assert 'fake_bin}/docker"' in job
+    assert "Install a Docker probe" not in job
     assert "actions/upload-artifact@v7" in job
 
 
@@ -70,7 +70,7 @@ def test_windows_smoke_installs_bundle_and_runs_installed_launcher() -> None:
     assert "%LOCALAPPDATA%\\SPX\\app" in job or '"SPX\\app\\SpxLauncher.exe"' in job
     assert '"setup",' in job
     assert '"--allow-missing-product-key",' in job
-    assert '"spx-fake-docker"' in job
+    assert "Install a Docker probe" not in job
     assert "Bootstrap MCP workspace with the bundled Windows Python" in job
     assert 'ArgumentList @("mcp-setup", "--allow-write")' in job
     assert "Remove-Item Env:PYTHON_BIN" in job
@@ -93,6 +93,7 @@ def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:
     assert "pkgutil --pkg-info com.hammerheadsengineers.spx.python" in job
     assert "SPX Tools/SPX Setup.app/Contents/Resources/spx-installer" in job
     assert "Bootstrap MCP workspace with the bundled macOS Python" in job
+    assert "Install a Docker probe" not in job
     assert "SPX_MACOS_BUNDLED_ONLY=1" in job
     assert ".spx-mcp-workspace.json" in job
     assert "tools/verify_mcp_stdio.py" in job

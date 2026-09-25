@@ -18,7 +18,8 @@ function Exit-WithMessage {
 function Invoke-NativeCapture {
     param(
         [string]$Command,
-        [string[]]$ArgumentList = @()
+        [string[]]$ArgumentList = @(),
+        [int]$TimeoutMilliseconds = 0
     )
 
     $stdoutPath = [System.IO.Path]::GetTempFileName()
@@ -29,10 +30,20 @@ function Invoke-NativeCapture {
             -FilePath $Command `
             -ArgumentList $ArgumentList `
             -NoNewWindow `
-            -Wait `
             -PassThru `
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath
+
+        $timedOut = $false
+        if ($TimeoutMilliseconds -gt 0) {
+            $timedOut = -not $process.WaitForExit($TimeoutMilliseconds)
+            if ($timedOut) {
+                try { $process.Kill() } catch { }
+                try { $null = $process.WaitForExit(2000) } catch { }
+            }
+        } else {
+            $process.WaitForExit()
+        }
 
         $stdoutText = ""
         $stderrText = ""
@@ -43,8 +54,15 @@ function Invoke-NativeCapture {
             $stderrText = Get-Content -Path $stderrPath -Raw -ErrorAction SilentlyContinue
         }
 
+        if ($timedOut) {
+            $exitCode = 124
+            $stderrText = "$Command timed out after $TimeoutMilliseconds ms."
+        } else {
+            $exitCode = $process.ExitCode
+        }
+
         return [PSCustomObject]@{
-            ExitCode = $process.ExitCode
+            ExitCode = $exitCode
             StdOut = $stdoutText
             StdErr = $stderrText
         }
@@ -132,57 +150,22 @@ function Check-PythonModules {
     }
 }
 
-function Check-Docker {
-    Need-Command "docker"
-    $dockerInfo = Invoke-NativeCapture -Command "docker" -ArgumentList @("info")
-    if ($dockerInfo.ExitCode -ne 0) {
-        $dockerInfoLines = @(
-            (($dockerInfo.StdErr + "`n" + $dockerInfo.StdOut) -split "`r?`n") | ForEach-Object { "$_".Trim() } | Where-Object {
-            $_ -and $_ -notmatch "errors pretty printing info"
-            }
-        )
-        if ($dockerInfoLines.Count -gt 0) {
-            [Console]::Error.WriteLine("[spx-install] Docker detail: $($dockerInfoLines[0])")
-        }
-        $detail = ($dockerInfoLines -join " ")
-        if ($detail -match "manually paused") {
-            throw "[spx-install] Docker Desktop is paused. Open Docker Desktop and unpause it, then retry."
-        }
-        if (
-            $detail -match "failed to connect to the docker api" -or
-            $detail -match "daemon is running" -or
-            $detail -match "dockerdesktoplinuxengine" -or
-            $detail -match "the system cannot find the file specified"
-        ) {
-            throw "[spx-install] Docker Desktop or the Docker daemon is not running. Start Docker Desktop, wait until it is fully started, and retry."
-        }
-        throw "[spx-install] Docker daemon not reachable. Start or unpause Docker Desktop/service and retry."
-    }
-
-    $dockerComposeVersion = Invoke-NativeCapture -Command "docker" -ArgumentList @("compose", "version")
-    if ($dockerComposeVersion.ExitCode -eq 0) {
-        return "docker compose"
-    }
-
-    if (Get-Command docker-compose -ErrorAction SilentlyContinue) {
-        return "docker-compose"
-    }
-
-    throw "[spx-install] Neither 'docker compose' nor 'docker-compose' is available."
-}
-
 try {
+    . (Join-Path $RepoDir "installer/docker_preflight.ps1")
     Need-Command $InstallerPythonBin
-    $DockerCompose = Check-Docker
-    Check-PythonModules
-
-    Set-Location -Path $RepoDir
 
     if ($args.Count -eq 0) {
         $installerArgs = @("generate", "--output", "build/spx-generated")
     } else {
-        $installerArgs = $args
+        $installerArgs = @($args)
     }
+
+    if (Test-DockerPreflightRequired -Arguments ([string[]]$installerArgs)) {
+        $DockerCompose = Check-Docker
+    }
+    Check-PythonModules
+
+    Set-Location -Path $RepoDir
 
     Write-Host "[spx-install] Running installer CLI with redacted arguments."
 

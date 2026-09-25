@@ -59,27 +59,6 @@ jobs:
           test -f "${DIST_DIR}/spx-installer-${VERSION}.tgz"
           test -x "${DIST_DIR}/spx-installer-${VERSION}.run"
 
-      - name: Install a Docker probe for no-start wizard smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          fake_bin="${RUNNER_TEMP}/spx-fake-bin"
-          mkdir -p "${fake_bin}"
-          cat > "${fake_bin}/docker" <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          if [[ "${1:-}" == "info" ]]; then
-            exit 0
-          fi
-          if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
-            echo "Docker Compose version v2.0.0-ci"
-            exit 0
-          fi
-          exit 0
-          EOF
-          chmod +x "${fake_bin}/docker"
-          echo "${fake_bin}" >> "${GITHUB_PATH}"
-
       - name: Run the self-extracting installer and generate a bundle
         shell: bash
         run: |
@@ -194,6 +173,10 @@ jobs:
         shell: pwsh
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
 
+      - name: Test Docker Desktop startup and retry flow
+        shell: pwsh
+        run: poetry run pytest -q tests/installer/test_docker_preflight.py
+
       - name: Install WiX Toolset v6 CLI
         shell: pwsh
         run: |
@@ -219,30 +202,6 @@ jobs:
           }
           "OUTPUT_DIR=$env:RUNNER_TEMP\spx-windows-generated" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "BUNDLE_PATH=$($artifacts[0].FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Install a Docker probe for no-start wizard smoke
-        shell: pwsh
-        run: |
-          $projectDir = Join-Path $env:RUNNER_TEMP "spx-fake-docker"
-          $fakeBin = Join-Path $env:RUNNER_TEMP "spx-fake-bin"
-          New-Item -ItemType Directory -Force -Path $projectDir, $fakeBin | Out-Null
-          dotnet new console --framework net8.0 --output $projectDir --force | Out-Null
-          @'
-          using System;
-
-          if (args.Length == 1 && args[0].Equals("info", StringComparison.OrdinalIgnoreCase))
-          {
-              Console.WriteLine("Docker daemon probe");
-          }
-          else if (args.Length == 2 && args[0].Equals("compose", StringComparison.OrdinalIgnoreCase) && args[1].Equals("version", StringComparison.OrdinalIgnoreCase))
-          {
-              Console.WriteLine("Docker Compose version v2.0.0-ci");
-          }
-          return 0;
-          '@ | Set-Content -Path (Join-Path $projectDir "Program.cs") -Encoding utf8
-          dotnet publish $projectDir --configuration Release --framework net8.0 --self-contained false --output $fakeBin -p:AssemblyName=docker | Out-Null
-          $env:Path = "$fakeBin;$env:Path"
-          $fakeBin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Windows bundle silently
         shell: pwsh
@@ -411,6 +370,14 @@ jobs:
         with:
           python-version: "3.12.10"
 
+      - name: Install pytest for installer behavior tests
+        shell: bash
+        run: python -m pip install pytest
+
+      - name: Test Docker Desktop startup and retry flow
+        shell: bash
+        run: python -m pytest -q tests/installer/test_docker_preflight.py
+
       - name: Build unsigned macOS installer package
         shell: bash
         run: |
@@ -427,27 +394,6 @@ jobs:
             --output-dir "${DIST_DIR}" \
             --staging-dir "build/macos-installer-smoke"
           test -f "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg"
-
-      - name: Install a Docker probe for no-start wizard smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-          fake_bin="${RUNNER_TEMP}/spx-fake-bin"
-          mkdir -p "${fake_bin}"
-          cat > "${fake_bin}/docker" <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          if [[ "${1:-}" == "info" ]]; then
-            exit 0
-          fi
-          if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
-            echo "Docker Compose version v2.0.0-ci"
-            exit 0
-          fi
-          exit 0
-          EOF
-          chmod +x "${fake_bin}/docker"
-          echo "${fake_bin}" >> "${GITHUB_PATH}"
 
       - name: Install macOS package on the disposable runner
         shell: bash
@@ -480,7 +426,7 @@ jobs:
           payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
           test -x "${payload}/spx-install.sh"
           mkdir -p "${OUTPUT_DIR}"
-          PATH="${RUNNER_TEMP}/spx-fake-bin:/usr/bin:/bin" \
+          PATH="/usr/bin:/bin" \
             "${payload}/spx-install.sh" \
             generate \
             --protocols "modbus,mqtt,bacnet" \
@@ -500,7 +446,7 @@ jobs:
           test -f "${payload}/.spx-macos-bundled-python"
           rm -rf "${mcp_workspace}"
           env -u PYTHON_BIN -u SPX_MACOS_PYTHON_BIN \
-            PATH="${RUNNER_TEMP}/spx-fake-bin:/usr/bin:/bin" \
+            PATH="/usr/bin:/bin" \
             SPX_MACOS_BUNDLED_ONLY=1 \
             SPX_MCP_WORK_MODE=runtime_mcp \
             SPX_MCP_WORKSPACE_DIR="${mcp_workspace}" \

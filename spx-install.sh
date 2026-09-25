@@ -112,25 +112,22 @@ print_python_runtime_hint() {
   esac
 }
 
-check_docker() {
-  need_cmd docker
-  if ! docker info >/dev/null 2>&1; then
-    echo "[spx-install] Docker daemon not reachable. Start Docker Desktop/service and retry." >&2
-    exit 1
-  fi
-  if docker compose version >/dev/null 2>&1; then
-    export DOCKER_COMPOSE="docker compose"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    export DOCKER_COMPOSE="docker-compose"
-  else
-    echo "[spx-install] Neither 'docker compose' nor 'docker-compose' is available." >&2
-    exit 1
-  fi
-}
+# shellcheck source=/dev/null
+. "${REPO_DIR}/installer/docker_preflight.sh"
 
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"
-check_docker
+
+if [ $# -eq 0 ]; then
+  DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
+  echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
+  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
+fi
+
+if spx_docker_preflight_required "$@"; then
+  check_docker
+fi
+
 BOOTSTRAP_LOG="$(mktemp)"
 trap 'rm -f "$BOOTSTRAP_LOG"' EXIT
 if INSTALLER_PYTHON_BIN="$(
@@ -153,12 +150,6 @@ fi
 unset PYTHON_BIN
 
 cd "$REPO_DIR"
-
-if [ $# -eq 0 ]; then
-  DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
-  echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
-  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
-fi
 
 echo "[spx-install] Running installer CLI with redacted arguments."
 "$INSTALLER_PYTHON_BIN" -m installer "$@"

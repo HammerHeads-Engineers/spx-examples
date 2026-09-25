@@ -5,10 +5,25 @@ bootstrap and generated-stack helpers. Requirements are Python 3.9+, Docker
 Desktop/Engine with Compose V2, and a valid SPX Product Key for runtime use.
 
 Run `spx-setup.command` on macOS, `spx-setup.desktop` on Linux, or
-`spx-setup.bat` on Windows. The generated bundle uses Compose project `spx`,
-preflights Docker, ports and existing labelled/legacy stacks, and asks before
-replacement. It preserves images and volumes; a failed model or instance
-bootstrap can restore the previous stack.
+`spx-setup.bat` on Windows. Docker is checked only when Setup will start a local
+stack (interactive Setup or explicit `--start`). Artifact-only generation,
+`--no-start`, help, and bootstrap commands do not require a local Docker daemon.
+The generated bundle uses Compose project `spx`, preflights Docker, ports and
+existing labelled/legacy stacks, and asks before replacement. It preserves
+images and volumes; a failed model or instance bootstrap can restore the
+previous stack.
+
+On macOS and Windows, Setup attempts to start Docker Desktop automatically.
+If Docker CLI, Docker Desktop, its daemon, or Compose is unavailable, it prints
+the matching installation/recovery steps in English. In an interactive
+terminal, start or fix Docker as instructed, then press Enter to retry the
+checks for up to 60 seconds, or type `Q` to quit. Enter retries the connection
+without starting Docker Desktop again; Setup re-detects the CLI and verifies
+Docker Engine and Compose before continuing. If the terminal is unavailable,
+Setup exits with the same instructions and can be rerun after Docker is ready.
+On Linux, Setup never starts Docker Engine or runs `sudo` for you; it explains
+how to install/start Engine and Compose, then lets you retry with Enter or quit
+with `Q`.
 
 For each selected service that publishes protocol ports, the wizard asks
 whether to keep it local on `127.0.0.1` (default) or bind it to a selected
