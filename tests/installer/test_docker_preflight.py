@@ -219,8 +219,8 @@ def test_missing_cli_can_be_installed_and_found_after_enter(tmp_path: Path) -> N
 
     assert result.returncode == 0
     assert (
-        "install it from https://www.docker.com/products/docker-desktop/"
-        in result.stderr
+        "Install Docker Desktop from https://www.docker.com/products/docker-desktop/"
+        in result.stdout + result.stderr
     )
     assert "RESULT=0" in result.stdout
 
