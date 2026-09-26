@@ -61,6 +61,46 @@ function Resolve-DockerCli {
     return $false
 }
 
+function ConvertTo-WindowsNativeArgumentString {
+    param([string[]]$ArgumentList = @())
+
+    $quotedArguments = @()
+    foreach ($argument in $ArgumentList) {
+        $value = [string]$argument
+        if ($value.Length -gt 0 -and $value -notmatch '[\s"]') {
+            $quotedArguments += $value
+            continue
+        }
+
+        $builder = New-Object System.Text.StringBuilder
+        $null = $builder.Append([char]34)
+        $backslashCount = 0
+        foreach ($character in $value.ToCharArray()) {
+            if ($character -eq [char]92) {
+                $backslashCount++
+                continue
+            }
+            if ($character -eq [char]34) {
+                $null = $builder.Append([char]92, (2 * $backslashCount) + 1)
+                $null = $builder.Append([char]34)
+                $backslashCount = 0
+                continue
+            }
+            if ($backslashCount -gt 0) {
+                $null = $builder.Append([char]92, $backslashCount)
+                $backslashCount = 0
+            }
+            $null = $builder.Append($character)
+        }
+        if ($backslashCount -gt 0) {
+            $null = $builder.Append([char]92, 2 * $backslashCount)
+        }
+        $null = $builder.Append([char]34)
+        $quotedArguments += $builder.ToString()
+    }
+    return ($quotedArguments -join ' ')
+}
+
 function Invoke-NativeCapture {
     param(
         [string]$Command,
@@ -68,20 +108,31 @@ function Invoke-NativeCapture {
         [int]$TimeoutMilliseconds = 0
     )
 
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
-
+    $process = $null
     try {
-        $startParameters = @{
-            FilePath = $Command
-            ArgumentList = $ArgumentList
-            NoNewWindow = $true
-            PassThru = $true
-            RedirectStandardOutput = $stdoutPath
-            RedirectStandardError = $stderrPath
-            ErrorAction = "Stop"
+        # Start-Process can leave ExitCode null in Windows PowerShell 5.1 without -Wait.
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $Command
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+
+        $nativeArgumentList = $startInfo.GetType().GetProperty("ArgumentList")
+        if ($nativeArgumentList) {
+            $arguments = $nativeArgumentList.GetValue($startInfo, $null)
+            foreach ($argument in $ArgumentList) {
+                $null = $arguments.Add([string]$argument)
+            }
+        } else {
+            $startInfo.Arguments = ConvertTo-WindowsNativeArgumentString -ArgumentList $ArgumentList
         }
-        $process = Start-Process @startParameters
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) { throw "Could not start $Command." }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
 
         $timedOut = $false
         if ($TimeoutMilliseconds -gt 0) {
@@ -94,8 +145,14 @@ function Invoke-NativeCapture {
             $process.WaitForExit()
         }
 
-        $stdoutText = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw -ErrorAction SilentlyContinue } else { "" }
-        $stderrText = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw -ErrorAction SilentlyContinue } else { "" }
+        $readTasks = [System.Threading.Tasks.Task[]]@($stdoutTask, $stderrTask)
+        if ($timedOut) {
+            $null = [System.Threading.Tasks.Task]::WaitAll($readTasks, 250)
+        } else {
+            $null = [System.Threading.Tasks.Task]::WaitAll($readTasks)
+        }
+        $stdoutText = if ($stdoutTask.Status -eq "RanToCompletion") { $stdoutTask.Result } else { "" }
+        $stderrText = if ($stderrTask.Status -eq "RanToCompletion") { $stderrTask.Result } else { "" }
 
         if ($timedOut) {
             $exitCode = 124
@@ -116,7 +173,7 @@ function Invoke-NativeCapture {
             StdErr = $_.Exception.Message
         }
     } finally {
-        Remove-Item $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
+        if ($process) { $process.Dispose() }
     }
 }
 
@@ -127,6 +184,31 @@ function Invoke-DockerInfo {
         return [PSCustomObject]@{ ExitCode = 127; StdOut = ""; StdErr = "Docker CLI was not found." }
     }
     return Invoke-NativeCapture -Command $script:DockerCliPath -ArgumentList @("info") -TimeoutMilliseconds $TimeoutMilliseconds
+}
+
+function Invoke-DockerEngineVersionProbe {
+    param([int]$TimeoutMilliseconds = 5000)
+
+    if (-not $script:DockerCliPath -and -not (Resolve-DockerCli)) {
+        return [PSCustomObject]@{ ExitCode = 127; StdOut = ""; StdErr = "Docker CLI was not found." }
+    }
+    return Invoke-NativeCapture `
+        -Command $script:DockerCliPath `
+        -ArgumentList @("version", "--format", "{{.Server.Version}}") `
+        -TimeoutMilliseconds $TimeoutMilliseconds
+}
+
+function Get-DockerEngineVersion {
+    param([Parameter(Mandatory = $true)]$Result)
+
+    if ($Result.ExitCode -ne 0) { return "" }
+    $versions = @(
+        ($Result.StdOut -split "`r?`n") |
+            ForEach-Object { "$($_)".Trim() } |
+            Where-Object { $_ }
+    )
+    if ($versions.Count -ne 1 -or $versions[0] -match "(?i)^<no value>$") { return "" }
+    return $versions[0]
 }
 
 function Get-DockerInfoDetail {
@@ -175,8 +257,8 @@ function Wait-DockerDaemon {
         $remainingMilliseconds = $timeoutMilliseconds - $probeStartedMilliseconds
         $probeTimeoutMilliseconds = [Math]::Min(2000, $remainingMilliseconds)
         if (Resolve-DockerCli) {
-            $result = Invoke-DockerInfo -TimeoutMilliseconds $probeTimeoutMilliseconds
-            if ($result.ExitCode -eq 0) {
+            $result = Invoke-DockerEngineVersionProbe -TimeoutMilliseconds $probeTimeoutMilliseconds
+            if (Get-DockerEngineVersion -Result $result) {
                 return [PSCustomObject]@{ Connected = $true; Result = $result }
             }
         } else {
@@ -196,7 +278,7 @@ function Wait-DockerDaemon {
     }
 
     if (-not $result) {
-        $result = [PSCustomObject]@{ ExitCode = 124; StdOut = ""; StdErr = "Docker info timed out after $TimeoutSeconds seconds." }
+        $result = [PSCustomObject]@{ ExitCode = 124; StdOut = ""; StdErr = "Docker Engine version check timed out after $TimeoutSeconds seconds." }
     }
     return [PSCustomObject]@{ Connected = $false; Result = $result }
 }
@@ -211,8 +293,9 @@ function Start-DockerDesktop {
                 -NoNewWindow `
                 -PassThru `
                 -ErrorAction Stop
-            if (-not $process.WaitForExit(2000) -or $process.ExitCode -eq 0) {
-                Write-Host "[spx-install] Requested Docker Desktop startup through the Docker CLI."
+            $startupCommandExited = $process.WaitForExit(2000)
+            if (-not $startupCommandExited -or $null -eq $process.ExitCode -or $process.ExitCode -eq 0) {
+                Write-Host "[spx-install] Sent a Docker Desktop startup request through the Docker CLI."
                 return $true
             }
         } catch {
@@ -271,9 +354,26 @@ function Test-DockerState {
         return [PSCustomObject]@{ Ready = $false; Failure = "cli"; Result = $null; Compose = $null }
     }
 
-    $info = Invoke-DockerInfo
+    $info = Invoke-DockerInfo -TimeoutMilliseconds 5000
     if ($info.ExitCode -ne 0) {
-        return [PSCustomObject]@{ Ready = $false; Failure = "daemon"; Result = $info; Compose = $null }
+        $serverProbe = Invoke-DockerEngineVersionProbe -TimeoutMilliseconds 5000
+        $engineVersion = Get-DockerEngineVersion -Result $serverProbe
+        if (-not $engineVersion) {
+            $infoDetail = Get-DockerInfoDetail -Result $info
+            $probeDetail = Get-DockerInfoDetail -Result $serverProbe
+            $detailLines = @(
+                $infoDetail
+                "Docker server version check failed with exit code $($serverProbe.ExitCode)."
+                $probeDetail
+            ) | Where-Object { $_ }
+            $diagnostic = [PSCustomObject]@{
+                ExitCode = $serverProbe.ExitCode
+                StdOut = ""
+                StdErr = ($detailLines -join "`n")
+            }
+            return [PSCustomObject]@{ Ready = $false; Failure = "daemon"; Result = $diagnostic; Compose = $null }
+        }
+        $info = $serverProbe
     }
 
     $compose = Resolve-DockerCompose
