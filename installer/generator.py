@@ -934,7 +934,7 @@ then
 fi
 
 STAGE="preflight"
-"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env"
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env" --published-ports "__REQUIRED_PORTS__"
 "$RUNTIME_PYTHON_BIN" "$MANAGER" "${PREPARE_ARGS[@]}"
 TRANSACTION_PREPARED=1
 
@@ -1073,7 +1073,7 @@ try {
     }
 
     $Stage = "preflight"
-    & $RuntimePython $NetworkHelper --env-file (Join-Path $ScriptDir ".env")
+    & $RuntimePython $NetworkHelper --env-file (Join-Path $ScriptDir ".env") --published-ports "__REQUIRED_PORTS__"
     if ($LASTEXITCODE -ne 0) { throw "network bind address preflight failed" }
     $prepare = @("prepare", "--compose-file", (Join-Path $ScriptDir "docker-compose.generated.yml"), "--env-file", (Join-Path $ScriptDir ".env"), "--project", "spx", "--installation-id", $InstallationId, "--snapshot", $Snapshot, "--ports", "__REQUIRED_PORTS__")
     if ($StartArgs -contains "--yes") { $prepare += "--yes" }
