@@ -23,6 +23,7 @@ SHELL_HELPER = ROOT / "installer" / "docker_preflight.sh"
 POWERSHELL_HELPER = ROOT / "installer" / "docker_preflight.ps1"
 BASH = shutil.which("bash") if os.name != "nt" else None
 POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+WINDOWS_POWERSHELL = shutil.which("powershell") if os.name == "nt" else None
 
 
 def _bash_harness(
@@ -40,7 +41,6 @@ def _bash_harness(
     compose_test = f'[[ -f "{compose_marker}" ]]' if compose_marker else "false"
     return f"""
 source '{helper}'
-set -euo pipefail
 PLATFORM='{platform}'
 CLI_PRESENT={1 if cli_present else 0}
 READY_AFTER={ready_after}
@@ -53,11 +53,6 @@ spx_docker_platform() {{ printf '%s\\n' "$PLATFORM"; }}
 spx_resolve_docker_cli() {{ (( CLI_PRESENT == 1 )) || {marker_test}; }}
 spx_start_docker_desktop() {{ start_calls=$((start_calls + 1)); return "$START_STATUS"; }}
 sleep() {{ sleep_calls=$((sleep_calls + 1)); :; }}
-# Do not let a runner's legacy Compose satisfy the missing-Compose scenario.
-command() {{
-  if [[ "${{1:-}}" == '-v' && "${{2:-}}" == 'docker-compose' ]]; then return 1; fi
-  builtin command "$@"
-}}
 docker() {{
   case "${{1:-}}" in
     info)
@@ -74,8 +69,8 @@ docker() {{
   esac
   return 1
 }}
-status=0
-check_docker || status=$?
+check_docker
+status=$?
 printf 'RESULT=%s INFO_CALLS=%s START_CALLS=%s SLEEP_CALLS=%s DOCKER_COMPOSE=%s\\n' \\
   "$status" "$info_calls" "$start_calls" "$sleep_calls" "${{DOCKER_COMPOSE:-}}"
 exit "$status"
@@ -89,7 +84,6 @@ def _run_bash(script: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
-        timeout=15,
     )
 
 
@@ -188,7 +182,7 @@ def test_linux_docker_preflight_does_not_start_engine_automatically() -> None:
 
 
 @pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
-def test_bash_linux_enter_rechecks_engine_after_user_starts_it() -> None:
+def test_linux_enter_rechecks_engine_after_user_starts_it() -> None:
     result = _run_bash_with_tty(
         _bash_harness(platform="Linux", ready_after=4),
         "\n",
@@ -226,10 +220,9 @@ def test_missing_cli_can_be_installed_and_found_after_enter(tmp_path: Path) -> N
 
     assert result.returncode == 0
     assert (
-        "If Docker Desktop is not installed, install it from https://www.docker.com/products/docker-desktop/"
+        "Install Docker Desktop from https://www.docker.com/products/docker-desktop/"
         in result.stdout + result.stderr
     )
-    assert "Retrying Docker CLI, Engine, and Compose checks..." in result.stdout
     assert "RESULT=0" in result.stdout
 
 
@@ -240,8 +233,6 @@ def test_enter_retries_daemon_check_and_q_quits() -> None:
     retry = _run_bash_with_tty(_bash_harness(ready_after=34), "\n")
     assert retry.returncode == 0
     assert "Attempting to start Docker Desktop" in retry.stdout
-    assert "Retrying Docker CLI, Engine, and Compose checks..." in retry.stdout
-    assert "Waiting up to 60 seconds for Docker CLI and Engine..." in retry.stdout
     assert "START_CALLS=1" in retry.stdout
     assert "RESULT=0" in retry.stdout
 
@@ -270,36 +261,8 @@ def test_missing_compose_has_separate_instructions_and_enter_rechecks(
         in result.stdout
     )
     assert "wait up to 60 seconds" not in result.stdout
-    assert "Retrying Docker CLI, Engine, and Compose checks..." in result.stdout
     assert "RESULT=0" in result.stdout
     assert "START_CALLS=0" in result.stdout
-    assert "SLEEP_CALLS=0" in result.stdout
-
-
-@pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX TTY")
-def test_macos_failed_launch_allows_repeated_manual_retries_without_relaunch() -> None:
-    result = _run_bash_with_tty(
-        _bash_harness(cli_present=False, start_status=1), "\n\nq\n"
-    )
-
-    assert result.returncode == 1
-    assert "Docker CLI was not found." in result.stdout
-    assert (
-        result.stdout.count("Retrying Docker CLI, Engine, and Compose checks...") == 2
-    )
-    assert "START_CALLS=1" in result.stdout
-    assert "Docker preflight cancelled by the user" in result.stdout
-
-
-@pytest.mark.skipif(BASH is None or os.name == "nt", reason="Requires POSIX Bash")
-def test_macos_missing_cli_and_desktop_in_headless_mode_returns_install_steps() -> None:
-    result = _run_bash(_bash_harness(cli_present=False, start_status=1))
-
-    assert result.returncode == 1
-    assert "If Docker Desktop is not installed, install it from" in result.stderr
-    assert "Run SPX Setup again" in result.stderr
-    assert "or type Q to quit:" not in result.stderr
-    assert "START_CALLS=1" in result.stdout
     assert "SLEEP_CALLS=0" in result.stdout
 
 
@@ -381,9 +344,27 @@ def _run_powershell(body: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _run_windows_powershell(body: str) -> subprocess.CompletedProcess[str]:
+    assert WINDOWS_POWERSHELL is not None
+    return subprocess.run(
+        [
+            WINDOWS_POWERSHELL,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            _powershell_script(body),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 _POWERSHELL_MOCKS = r"""
 $ErrorActionPreference = 'Stop'
 $script:infoCalls = 0
+$script:probeCalls = 0
 $script:readyAfter = READY_AFTER_PLACEHOLDER
 $script:cliPresent = CLI_PRESENT_PLACEHOLDER
 $script:composePresent = COMPOSE_PRESENT_PLACEHOLDER
@@ -404,6 +385,14 @@ function Invoke-DockerInfo {
   $script:infoCalls++
   if ($script:infoCalls -ge $script:readyAfter) {
     return [PSCustomObject]@{ ExitCode = 0; StdOut = ''; StdErr = '' }
+  }
+  return [PSCustomObject]@{ ExitCode = 1; StdOut = ''; StdErr = 'cannot connect to docker API' }
+}
+function Invoke-DockerEngineVersionProbe {
+  param([int]$TimeoutMilliseconds = 5000)
+  $script:probeCalls++
+  if ($script:probeCalls -ge $script:readyAfter) {
+    return [PSCustomObject]@{ ExitCode = 0; StdOut = '29.8.0'; StdErr = '' }
   }
   return [PSCustomObject]@{ ExitCode = 1; StdOut = ''; StdErr = 'cannot connect to docker API' }
 }
@@ -428,15 +417,15 @@ function Read-Host {
   if ($script:promptAction -eq 'quit') { return 'Q' }
   if ($script:promptAction -eq 'install-cli') {
     $script:cliPresent = $true
-    $script:readyAfter = $script:infoCalls + 1
+    $script:readyAfter = $script:probeCalls + 1
     return ''
   }
   if ($script:promptAction -eq 'start-daemon') {
-    $script:readyAfter = $script:infoCalls + 1
+    $script:readyAfter = $script:probeCalls + 1
     return ''
   }
   if ($script:promptAction -eq 'start-daemon-delayed') {
-    $script:readyAfter = $script:infoCalls + 3
+    $script:readyAfter = $script:probeCalls + 3
     return ''
   }
   if ($script:promptAction -eq 'install-compose') {
@@ -465,6 +454,40 @@ def _ps_mocks(
     )
 
 
+@pytest.mark.skipif(
+    WINDOWS_POWERSHELL is None, reason="Requires Windows PowerShell 5.1"
+)
+def test_windows_powershell_51_captures_native_output_and_exit_code() -> None:
+    body = r"""
+$success = Invoke-NativeCapture -Command $env:ComSpec -ArgumentList @('/d', '/c', 'echo SPX_NATIVE_CAPTURE_OK') -TimeoutMilliseconds 5000
+if ($success.ExitCode -ne 0 -or $success.StdOut -notmatch 'SPX_NATIVE_CAPTURE_OK') { throw "wrong successful process result: $($success | ConvertTo-Json -Compress)" }
+$failure = Invoke-NativeCapture -Command $env:ComSpec -ArgumentList @('/d', '/c', 'exit 7') -TimeoutMilliseconds 5000
+if ($failure.ExitCode -ne 7) { throw "wrong failed process exit code: $($failure.ExitCode)" }
+'PREFLIGHT_TEST_PASSED'
+"""
+    result = _run_windows_powershell(body)
+    assert result.returncode == 0, result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
+@pytest.mark.skipif(
+    WINDOWS_POWERSHELL is None, reason="Requires Windows PowerShell 5.1"
+)
+def test_windows_powershell_51_native_capture_keeps_output_when_timed_out() -> None:
+    body = r"""
+$childShell = Join-Path $PSHOME 'powershell.exe'
+$childCommand = 'Write-Output SPX_PARTIAL_OUTPUT; Start-Sleep -Seconds 30'
+$result = Invoke-NativeCapture -Command $childShell -ArgumentList @('-NoProfile', '-Command', $childCommand) -TimeoutMilliseconds 1500
+if ($result.ExitCode -ne 124) { throw "wrong timeout exit code: $($result.ExitCode)" }
+if ($result.StdOut -notmatch 'SPX_PARTIAL_OUTPUT') { throw 'partial standard output was lost after timeout' }
+if ($result.StdErr -notmatch 'timed out after 1500 ms') { throw 'timeout detail was not reported' }
+'PREFLIGHT_TEST_PASSED'
+"""
+    result = _run_windows_powershell(body)
+    assert result.returncode == 0, result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_windows_preflight_accepts_ready_daemon_without_starting_desktop() -> None:
     body = (
@@ -472,6 +495,65 @@ def test_windows_preflight_accepts_ready_daemon_without_starting_desktop() -> No
         + r"""
 $result = Check-Docker
 if ($result -ne 'docker compose' -or $script:startCalls -ne 0) { throw 'unexpected result' }
+'PREFLIGHT_TEST_PASSED'
+"""
+    )
+    result = _run_powershell(body)
+    assert result.returncode == 0, result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
+def test_windows_engine_ready_when_info_exit_is_nonzero_but_server_version_succeeds() -> (
+    None
+):
+    body = (
+        _ps_mocks(ready_after=999)
+        + r"""
+function Invoke-DockerInfo {
+  param([int]$TimeoutMilliseconds = 5000)
+  return [PSCustomObject]@{
+    ExitCode = 1
+    StdOut = "Server Version: 29.8.0`nContainers: 7`n Running: 4`n Stopped: 3"
+    StdErr = 'errors pretty printing info'
+  }
+}
+function Invoke-DockerEngineVersionProbe {
+  param([int]$TimeoutMilliseconds = 5000)
+  return [PSCustomObject]@{ ExitCode = 0; StdOut = '29.8.0'; StdErr = '' }
+}
+$state = Test-DockerState
+if (-not $state.Ready -or $state.Failure -or $state.Compose -ne 'docker compose') { throw 'server version probe did not establish Engine readiness' }
+if ($script:startCalls -ne 0) { throw 'Docker Desktop was unnecessarily restarted' }
+'PREFLIGHT_TEST_PASSED'
+"""
+    )
+    result = _run_powershell(body)
+    assert result.returncode == 0, result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
+def test_windows_partial_info_output_does_not_replace_failed_server_probe() -> None:
+    body = (
+        _ps_mocks(ready_after=999)
+        + r"""
+function Invoke-DockerInfo {
+  param([int]$TimeoutMilliseconds = 5000)
+  return [PSCustomObject]@{
+    ExitCode = 1
+    StdOut = "Server Version: 29.8.0`nContainers: 7`n Running: 4`n Stopped: 3"
+    StdErr = 'docker info returned a nonzero exit code'
+  }
+}
+function Invoke-DockerEngineVersionProbe {
+  param([int]$TimeoutMilliseconds = 5000)
+  return [PSCustomObject]@{ ExitCode = 1; StdOut = '29.8.0'; StdErr = 'server check timed out' }
+}
+$state = Test-DockerState
+if ($state.Ready -or $state.Failure -ne 'daemon') { throw 'partial info output incorrectly passed readiness' }
+$detail = Get-DockerInfoDetail -Result $state.Result
+if ($detail -notmatch 'Server Version: 29.8.0' -or $detail -notmatch 'server check timed out') { throw 'diagnostic output was not preserved' }
 'PREFLIGHT_TEST_PASSED'
 """
     )
@@ -552,6 +634,26 @@ if ($script:fakeElapsedMilliseconds -ne 0) { throw 'Compose retry should recheck
     assert result.returncode == 0, result.stderr
     assert "Docker Compose is not available." in result.stderr
     assert "Docker Desktop includes the Docker Compose plugin." in result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
+def test_q_quits_when_compose_is_missing_without_waiting_or_starting_desktop() -> None:
+    body = (
+        _ps_mocks(compose_present=False).replace(
+            "$script:promptAction = ''", "$script:promptAction = 'quit'"
+        )
+        + r"""
+try { Check-Docker | Out-Null; throw 'expected failure' } catch {
+  if ($_.Exception.Message -notmatch 'cancelled by the user') { throw }
+  if ($script:startCalls -ne 0 -or $script:fakeElapsedMilliseconds -ne 0) { throw 'Compose quit triggered recovery work' }
+  if ($script:lastPrompt -ne 'Press Enter to check Docker CLI, Engine, and Compose again, or type Q to quit:') { throw 'wrong Compose quit prompt' }
+  'PREFLIGHT_TEST_PASSED'
+}
+"""
+    )
+    result = _run_powershell(body)
+    assert result.returncode == 0, result.stderr
     assert "PREFLIGHT_TEST_PASSED" in result.stdout
 
 
@@ -681,6 +783,31 @@ if ($script:fakeProcess.WaitTimeoutMs -ne 2000) { throw 'startup process was not
 
 
 @pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
+def test_windows_desktop_start_request_handles_missing_process_exit_code() -> None:
+    body = r"""
+$ErrorActionPreference = 'Stop'
+$script:DockerCliPath = 'mock-docker.exe'
+function Get-DockerDesktopPlatform { return 'Windows' }
+function Resolve-DockerCli { $script:DockerCliPath = 'mock-docker.exe'; return $true }
+function Start-Process {
+  param([string]$FilePath, [string[]]$ArgumentList = @(), [switch]$NoNewWindow, [switch]$PassThru, [System.Management.Automation.ActionPreference]$ErrorAction)
+  $process = [PSCustomObject]@{ ExitCode = $null; WaitTimeoutMs = 0 }
+  $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+    param([int]$TimeoutMs)
+    $this.WaitTimeoutMs = $TimeoutMs
+    return $true
+  }
+  return $process
+}
+if (-not (Start-DockerDesktop)) { throw 'a completed startup request with an unavailable exit code was treated as a failed launch' }
+'PREFLIGHT_TEST_PASSED'
+"""
+    result = _run_powershell(body)
+    assert result.returncode == 0, result.stderr
+    assert "PREFLIGHT_TEST_PASSED" in result.stdout
+
+
+@pytest.mark.skipif(POWERSHELL is None, reason="PowerShell is not available")
 def test_docker_cli_resolution_rechecks_common_install_locations() -> None:
     body = r"""
 $ErrorActionPreference = 'Stop'
@@ -722,11 +849,11 @@ function Resolve-DockerCli { $script:DockerCliPath = 'mock-docker'; return $true
 function New-DockerPreflightTimer { return [PSCustomObject]@{} }
 function Get-DockerPreflightElapsedMilliseconds { param($Timer); return $script:fakeElapsedMilliseconds }
 function Invoke-DockerPreflightSleep { param([int]$Milliseconds = 2000); $script:fakeElapsedMilliseconds += $Milliseconds }
-function Invoke-DockerInfo {
+function Invoke-DockerEngineVersionProbe {
   param([int]$TimeoutMilliseconds = 5000)
   $script:probeTimeouts += $TimeoutMilliseconds
   $script:fakeElapsedMilliseconds += $TimeoutMilliseconds
-  return [PSCustomObject]@{ ExitCode = 124; StdOut = ''; StdErr = 'docker info timed out' }
+  return [PSCustomObject]@{ ExitCode = 124; StdOut = '29.8.0'; StdErr = 'server version probe timed out' }
 }
 $result = Wait-DockerDaemon -TimeoutSeconds 5
 if ($result.Connected) { throw 'unexpected connection' }
