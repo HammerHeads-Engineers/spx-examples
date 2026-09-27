@@ -276,27 +276,28 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "PREPARE_ARGS=(" in start_content
     assert "ASSUME_ARGS" not in start_content
     assert "commit" in start_content
+    stack_runner_path = output_dir / "stack_runner.py"
+    assert stack_runner_path.exists()
+    stack_runner_content = stack_runner_path.read_text(encoding="utf-8")
     start_ps_path = output_dir / "spx-start.ps1"
     stop_ps_path = output_dir / "spx-stop.ps1"
     assert start_ps_path.exists()
     assert stop_ps_path.exists()
     start_ps_content = start_ps_path.read_text(encoding="utf-8")
     stop_ps_content = stop_ps_path.read_text(encoding="utf-8")
-    assert "Invoke-Manager" in start_ps_content
-    assert "wait-health" in start_ps_content
-    assert "docker compose -p spx" in start_ps_content
-    assert "bootstrap_runner.py" in start_ps_content
-    assert "stack_manager.py" in stop_ps_content
-    assert "--installation-id" in stop_ps_content
-    assert "btvirt_adapter' is not supported on Windows" in start_ps_content
-    assert "npm install -g '@simplephysx/spx-ble-adapter'" not in start_ps_content
-    assert 'Start-Process "spx-ble-adapter"' not in start_ps_content
-    assert "bootstrap_runner.py" in start_ps_content
-    assert "runtime_bootstrap.py" in start_ps_content
-    assert "pip install --user" not in start_ps_content
-    assert 'param([string[]]$StartArgs = @())' in start_ps_content
+    assert "stack_runner.py" in start_ps_content
+    assert "SpxLauncher.exe" in start_ps_content
     assert "$Env:SPX_SYSTEM_PYTHON_BIN" in start_ps_content
-    assert "$RuntimePython" in start_ps_content
+    assert "py -3" in start_ps_content
+    assert "stack_runner.py" in stop_ps_content
+    assert "SpxLauncher.exe" in stop_ps_content
+    assert "$Env:SPX_SYSTEM_PYTHON_BIN" in stop_ps_content
+    assert "btvirt_adapter" in stack_runner_content
+    assert "bootstrap_runner.py" in stack_runner_content
+    assert "runtime_bootstrap.py" in stack_runner_content
+    assert "wait-health" in stack_runner_content
+    assert "docker compose" not in stack_runner_content
+    assert "pip install --user" not in stack_runner_content
 
 
 def test_generator_repairs_stale_directory_at_file_asset_path(tmp_path: Path) -> None:
@@ -578,13 +579,21 @@ def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
     )
     transaction_prepare = start_sh.index("TRANSACTION_PREPARED=1")
     assert network_preflight < manager_preflight < transaction_prepare
-    start_ps1 = (output_dir / "spx-start.ps1").read_text(encoding="utf-8")
-    network_preflight_ps = start_ps1.index(
-        '& $RuntimePython $NetworkHelper --env-file'
+    stack_runner = (output_dir / "stack_runner.py").read_text(encoding="utf-8")
+    network_preflight_python = stack_runner.index('stage = "preflight"')
+    network_helper_python = stack_runner.index(
+        'str(script_dir / "network.py")', network_preflight_python
     )
-    manager_preflight_ps = start_ps1.index("Invoke-Manager $prepare")
-    transaction_prepare_ps = start_ps1.index("$TransactionPrepared = $true")
-    assert network_preflight_ps < manager_preflight_ps < transaction_prepare_ps
+    manager_prepare_python = stack_runner.index('"prepare"', network_helper_python)
+    transaction_prepare_python = stack_runner.index(
+        "transaction_prepared = True", manager_prepare_python
+    )
+    assert (
+        network_preflight_python
+        < network_helper_python
+        < manager_prepare_python
+        < transaction_prepare_python
+    )
 
 
 def test_generator_writes_protocol_bundle_without_instances(tmp_path: Path) -> None:

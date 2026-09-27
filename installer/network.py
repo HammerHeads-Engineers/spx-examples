@@ -54,12 +54,30 @@ def _run_command(command: Sequence[str]) -> str:
             list(command),
             check=False,
             capture_output=True,
-            text=True,
             timeout=2,
         )
     except (OSError, subprocess.SubprocessError):
         return ""
-    return result.stdout or ""
+    output = result.stdout or b""
+    if isinstance(output, str):
+        return output
+    return _decode_command_output(output)
+
+
+def _decode_command_output(output: bytes) -> str:
+    """Decode command output without letting a host code page crash the wizard."""
+
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            # Windows console utilities such as ipconfig use the OEM code page,
+            # which can differ from Python's ANSI default encoding.
+            code_page = int(ctypes.windll.kernel32.GetOEMCP())
+            return output.decode(f"cp{code_page}", errors="replace")
+        except (AttributeError, OSError, LookupError, ValueError):
+            pass
+    return output.decode("utf-8", errors="replace")
 
 
 def _parse_ip_output(output: str) -> List[IPv4Address]:

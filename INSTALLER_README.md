@@ -13,6 +13,14 @@ existing labelled/legacy stacks, and asks before replacement. It preserves
 images and volumes; a failed model or instance bootstrap can restore the
 previous stack.
 
+Before changing a stack, Setup checks whether required host ports are already
+used. If an unrelated application or container holds a port, Setup shows the
+port and owner when available, asks you to stop or reconfigure it yourself,
+then press Enter to check again or `Q` to quit. Setup does not stop unrelated
+applications or containers. Once the required ports are free, it continues;
+without an interactive terminal it prints the same guidance and exits. This
+port-retry flow is shared by Windows, macOS, and Linux.
+
 On macOS and Windows, Setup attempts to start Docker Desktop automatically.
 If Docker CLI, Docker Desktop, its daemon, or Compose is unavailable, it prints
 the matching installation/recovery steps in English. In an interactive
@@ -53,6 +61,12 @@ Support`, are passed as single arguments. If a system interpreter must be
 selected explicitly, use `SPX_SYSTEM_PYTHON_BIN`; `PYTHON_BIN` is reserved for
 backward compatibility with the installer launcher and is not forwarded to a
 generated start script.
+
+Generated Windows start and stop commands run through the bundled Python
+stack helper. The `.bat` files and native launcher call Python directly; the
+PowerShell files are short wrappers for users who prefer them. This keeps the
+transaction, health checks and rollback in the shared stack helper instead of
+embedding a per-install PowerShell program.
 
 New `bundle.json` files do not contain the raw Product Key. Bootstrap reads it
 from `.env` or `SPX_PRODUCT_KEY` and accepts older bundles with `license_key`.

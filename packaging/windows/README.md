@@ -23,7 +23,7 @@ The current scaffold does the following:
 - builds an MSI that installs the payload under `%LocalAppData%\SPX\app`,
 - builds a Burn bundle EXE that chains the Python prerequisite and the MSI.
 
-The current scaffold still does not install Docker. `SpxLauncher.exe` delegates into the existing PowerShell/Python flows after installation. It resolves the Python 3.12 interpreter installed by the Burn prerequisite from the Python registry keys and passes that exact executable to both `setup` and `mcp-setup`; it does not fall back to an unrelated Python on `PATH`. An explicit `PYTHON_BIN` remains available as a development/test override.
+The current scaffold still does not install Docker. `SpxLauncher.exe` uses the existing PowerShell wizard for `setup` and Python helpers for MCP setup and generated-stack start/stop. It resolves the Python 3.12 interpreter installed by the Burn prerequisite from the Python registry keys and passes that exact executable to these flows; it does not fall back to an unrelated Python on `PATH`. An explicit `PYTHON_BIN` remains available as a development/test override.
 
 When setup cannot reach Docker Desktop, it attempts to start it and waits up to
 60 seconds for the daemon. If it remains unavailable, interactive setup offers

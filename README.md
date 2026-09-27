@@ -303,8 +303,9 @@ Inside `build/spx-generated/` you will see:
 - `docker-compose.generated.yml` – only the services selected in the wizard.
 - `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME` and per-service `SPX_BIND_<SERVICE_ID>=127.0.0.1` defaults; update the product key from [simplephysx.com](https://simplephysx.com), and edit a bind value to a current private host IPv4 address for LAN access. Startup validates that the address is still assigned. `BACNET_BIND_ADDR` remains a supported compatibility override. New bundles do not duplicate the raw key in `bundle.json`.
 - `bundle.json` – consumed by `bootstrap_runner.py`; older bundles containing `license_key` remain supported.
-- `stack_manager.py` and `.spx-stack-snapshot.json` – used for exact-container preflight, replacement and rollback.
-- `spx-start.sh` / `spx-stop.sh` and `spx-start.ps1` / `spx-stop.ps1` – start/stop helpers for Bash/zsh and PowerShell.
+- `stack_manager.py`, `stack_runner.py` and `.spx-stack-snapshot.json` – used for exact-container preflight, replacement and rollback.
+- `spx-start.sh` / `spx-stop.sh` and `spx-start.bat` / `spx-stop.bat` – start/stop helpers for Bash/zsh and Windows.
+- `spx-start.ps1` / `spx-stop.ps1` – small PowerShell wrappers for users who prefer PowerShell.
 - `assets/` and `extensions/` – copied resources referenced by the selected services.
 
 You can zip or commit this folder and hand it to teammates; they do not need the full repo.
@@ -315,10 +316,10 @@ From inside the generated folder:
 
 - **Start:**  
   - macOS/Linux: `./spx-start.sh`  
-  - Windows/pwsh: `pwsh ./spx-start.ps1`
+  - Windows: double-click `spx-start.bat` or run `py -3 .\stack_runner.py start`
 - **Stop:**  
   - macOS/Linux: `./spx-stop.sh`  
-  - Windows/pwsh: `pwsh ./spx-stop.ps1`
+  - Windows: double-click `spx-stop.bat` or run `py -3 .\stack_runner.py stop`
 
 `spx-start` performs a Docker/Compose/configuration/port preflight, reports any
 existing SPX stack, and asks before replacement. After confirmation it snapshots
@@ -326,9 +327,11 @@ the previous containers under temporary `spx-snapshot-*` names, starts a
 transaction-scoped `docker compose -p spx` stack, waits for health/API
 readiness, bootstraps models and instances idempotently, and commits the update
 under the stable production container names by removing only the exact old
-container IDs. A failure is reported with its stage and restores the previous
-stack when possible; it never removes
-volumes/images or unrelated containers. Legacy `spx-rollback-*` containers from
+container IDs. If an unrelated application or container occupies a required
+port, Setup identifies the owner when possible and waits for you to free it;
+press Enter to recheck or `Q` to quit. A failure is reported with its stage and
+restores the previous stack when possible; it never removes volumes/images or
+unrelated containers. Legacy `spx-rollback-*` containers from
 RC65 are detected as SPX snapshots and are not left behind after a successful
 rerun. `spx-stop` stops only containers carrying the generated installation ID.
 
