@@ -57,8 +57,8 @@ internal static class Program
         {
             "setup" => RunSetup(installRoot, extraArgs),
             "mcp-setup" => RunMcpSetup(installRoot, extraArgs),
-            "start" => RunGeneratedPowerShell("spx-start.ps1"),
-            "stop" => RunGeneratedPowerShell("spx-stop.ps1"),
+            "start" => RunGeneratedPython("start", extraArgs),
+            "stop" => RunGeneratedPython("stop", extraArgs),
             "cleanup" => RunCleanup(),
             "help" or "--help" or "-h" => ShowHelp(),
             _ => throw new InvalidOperationException(
@@ -75,8 +75,8 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("  setup      Generate or refresh the local SPX environment.");
         Console.WriteLine("  mcp-setup  Create or refresh the SPX MCP workspace.");
-        Console.WriteLine("  start      Run the generated SPX start script.");
-        Console.WriteLine("  stop       Run the generated SPX stop script.");
+        Console.WriteLine("  start      Start the generated SPX stack.");
+        Console.WriteLine("  stop       Stop the generated SPX stack.");
         Console.WriteLine("  cleanup    Remove the generated SPX environment and Docker resources.");
         Console.WriteLine("  --pause-on-error  Wait for ENTER before closing after an error.");
         Console.WriteLine("  --pause-on-exit   Wait for ENTER before closing after success or error.");
@@ -174,23 +174,19 @@ internal static class Program
         return RunCommand(pythonExecutable, arguments, installRoot);
     }
 
-    private static int RunGeneratedPowerShell(string scriptName)
+    private static int RunGeneratedPython(string command, IReadOnlyList<string> extraArgs)
     {
-        var scriptPath = Path.Combine(GetGeneratedDirectory(), scriptName);
+        var generatedDirectory = GetGeneratedDirectory();
+        var scriptPath = Path.Combine(generatedDirectory, "stack_runner.py");
         EnsureFileExists(
             scriptPath,
-            $"Missing generated launcher '{scriptName}'. Run SPX Setup first."
+            "Missing generated stack helper 'stack_runner.py'. Windows security software may have quarantined it. "
+                + "Check its protection history, then run SPX Setup again."
         );
 
-        var arguments = new[]
-        {
-            "-ExecutionPolicy",
-            "Bypass",
-            "-NoProfile",
-            "-File",
-            scriptPath,
-        };
-        return RunCommand(GetPowerShellExecutable(), arguments, GetGeneratedDirectory());
+        var arguments = new List<string> { scriptPath, command };
+        arguments.AddRange(extraArgs);
+        return RunCommand(ResolvePythonExecutable(), arguments, generatedDirectory);
     }
 
     private static int RunCleanup()

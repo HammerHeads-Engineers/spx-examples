@@ -228,6 +228,7 @@ class StackManager:
             list(command),
             capture_output=True,
             text=True,
+            errors="replace",
             check=False,
         )
         if check and result.returncode != 0:
@@ -397,9 +398,20 @@ class StackManager:
     def _fallback_host_ports(self) -> dict[int, list[str]]:
         owners: dict[int, list[str]] = {}
         if self.platform.startswith("win"):
-            command = ["powershell", "-NoProfile", "-Command", "Get-NetTCPConnection -State Listen | ConvertTo-Json -Compress"]
+            script = (
+                "$ErrorActionPreference='Stop'; "
+                "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | "
+                "ForEach-Object { $connection=$_; "
+                "$process=Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue; "
+                "$processName='unknown'; if($process){$processName=$process.ProcessName}; "
+                "[PSCustomObject]@{LocalPort=$connection.LocalPort; "
+                "ProcessId=$connection.OwningProcess; "
+                "ProcessName=$processName} } | "
+                "ConvertTo-Json -Compress"
+            )
+            command = ["powershell", "-NoProfile", "-Command", script]
         elif shutil.which("lsof"):
-            command = ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"]
+            command = ["lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpcn"]
         elif shutil.which("ss"):
             command = ["ss", "-ltnp"]
         else:
@@ -416,15 +428,58 @@ class StackManager:
                     if isinstance(row, Mapping) and str(row.get("LocalPort", "")).isdigit():
                         port = int(row["LocalPort"])
                         if 1 <= port <= 65535:
-                            owners.setdefault(port, []).append("host process")
+                            process_name = str(row.get("ProcessName") or "").strip()
+                            process_id = str(row.get("ProcessId") or "").strip()
+                            owner = self._host_process_owner(process_name, process_id)
+                            port_owners = owners.setdefault(port, [])
+                            if owner not in port_owners:
+                                port_owners.append(owner)
                 return owners
             except (TypeError, ValueError):
                 return owners
-        for match in re.finditer(r"(?:[:.]|\s)(\d{1,5})(?:\s|$)", result.stdout or ""):
+        if command[0] == "lsof":
+            process_id = ""
+            process_name = ""
+            for line in (result.stdout or "").splitlines():
+                if line.startswith("p"):
+                    process_id = line[1:]
+                elif line.startswith("c"):
+                    process_name = line[1:]
+                elif line.startswith("n"):
+                    match = re.search(r":(\d{1,5})(?:\s|$)", line[1:])
+                    if match:
+                        port = int(match.group(1))
+                        if 1 <= port <= 65535:
+                            owner = self._host_process_owner(process_name, process_id)
+                            port_owners = owners.setdefault(port, [])
+                            if owner not in port_owners:
+                                port_owners.append(owner)
+            return owners
+
+        for line in (result.stdout or "").splitlines():
+            fields = line.split(None, 5)
+            if len(fields) < 5:
+                continue
+            match = re.search(r":(\d{1,5})$", fields[3])
+            if not match:
+                continue
             port = int(match.group(1))
-            if 1 <= port <= 65535:
-                owners.setdefault(port, []).append("host process")
+            if not 1 <= port <= 65535:
+                continue
+            processes = re.findall(r'\("([^" ]+)",pid=(\d+)', line)
+            labels = [self._host_process_owner(name, pid) for name, pid in processes]
+            port_owners = owners.setdefault(port, [])
+            for owner in labels or ["host process"]:
+                if owner not in port_owners:
+                    port_owners.append(owner)
         return owners
+
+    @staticmethod
+    def _host_process_owner(process_name: str = "", process_id: str = "") -> str:
+        details = process_name.strip()
+        if process_id.isdigit():
+            details = f"{details} (PID {process_id})" if details else f"PID {process_id}"
+        return f"process {details}" if details else "host process"
 
     def occupied_ports(self) -> dict[int, list[str]]:
         owners: dict[int, list[str]] = {}
@@ -461,8 +516,24 @@ class StackManager:
                 f"[spx-preflight] Existing stack: project={stack.project}, "
                 f"config={config}, ports={ports}\n  {images}"
             )
+        known_container_owners = {
+            f"container {container.name}"
+            for stack in result.existing
+            for container in stack.containers
+        }
         for port, owners in result.conflicts.items():
-            output(f"[spx-preflight] Port {port} is occupied by: {', '.join(owners)}")
+            existing_stack_owners = [owner for owner in owners if owner in known_container_owners]
+            unrelated_owners = [owner for owner in owners if owner not in known_container_owners]
+            if existing_stack_owners:
+                output(
+                    f"[spx-preflight] Port {port} is used by the detected SPX stack: "
+                    f"{', '.join(existing_stack_owners)}. It can be released if you approve replacement."
+                )
+            if unrelated_owners:
+                output(
+                    f"[spx-preflight] Required port {port} is already in use by: "
+                    f"{', '.join(unrelated_owners)}"
+                )
 
     def _detach_snapshot_container(self, container_id: str) -> None:
         """Keep a renamed backup out of the next Compose project discovery."""
@@ -509,18 +580,62 @@ class StackManager:
         *,
         required_ports: Iterable[int] = (),
         assume_yes: bool = False,
-        input_fn: Callable[[str], str] = input,
+        input_fn: Callable[[str], str] | None = None,
         output: Callable[[str], None] = print,
     ) -> PreflightResult:
+        normalized_ports: set[int] = set()
+        for port in required_ports:
+            value = int(port)
+            if value > 0:
+                normalized_ports.add(value)
+        required_ports = sorted(normalized_ports)
+        if input_fn is not None:
+            can_prompt = True
+            prompt = input_fn
+        else:
+            try:
+                can_prompt = sys.stdin is not None and sys.stdin.isatty()
+            except (AttributeError, OSError):
+                can_prompt = False
+            prompt = input
         result = self.preflight(required_ports)
         self.describe(result, output)
-        active = result.active_stacks
+        while result.unrelated_conflicts:
+            if not can_prompt:
+                raise PreflightError(
+                    "Some required ports are in use. Stop or reconfigure the listed applications or containers, "
+                    "then run SPX Setup again."
+                )
+            output(
+                "[spx-preflight] Stop or reconfigure the listed applications or containers yourself; "
+                "SPX Setup will not stop unrelated software."
+            )
+            try:
+                answer = prompt("[spx-preflight] Press Enter to check the ports again, or type Q to quit: ")
+            except EOFError as exc:
+                raise PreflightError(
+                    "No terminal input is available. Stop or reconfigure the listed applications or containers, "
+                    "then run SPX Setup again."
+                ) from exc
+            choice = answer.strip().lower()
+            if choice == "q":
+                raise UserDeclined("Setup cancelled. Free the listed ports and run SPX Setup again.")
+            if choice:
+                output("[spx-preflight] Press Enter to check again, or type Q to quit.")
+                continue
+            output("[spx-preflight] Checking the required ports again...")
+            result = self.preflight(required_ports)
+            self.describe(result, output)
+
         replaceable = [stack for stack in result.existing if stack.containers]
-        if result.unrelated_conflicts:
-            raise PreflightError("One or more required ports are occupied by unrelated processes or containers")
         if replaceable:
             if not assume_yes:
-                answer = input_fn("[spx-preflight] Replace the detected SPX stack? [y/N]: ").strip().lower()
+                if not can_prompt:
+                    raise UserDeclined(
+                        "A detected SPX stack was left untouched because approval requires an interactive terminal. "
+                        "Run SPX Setup interactively to review and approve replacement."
+                    )
+                answer = prompt("[spx-preflight] Replace the detected SPX stack? [y/N]: ").strip().lower()
                 if answer not in {"y", "yes"}:
                     raise UserDeclined("Existing SPX stack was left untouched; compose up was not run")
             combined = ExistingStack(

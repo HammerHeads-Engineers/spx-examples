@@ -9,7 +9,6 @@ import webbrowser
 
 from pathlib import Path
 import os
-import shutil
 import subprocess
 import sys
 from typing import Iterable, List, Optional
@@ -431,11 +430,11 @@ def run(args: argparse.Namespace) -> int:
             file=info_stream,
         )
         print(
-            f"  2. Run '{output_dir}/spx-start.sh' (macOS/Linux) or 'pwsh {output_dir}/spx-start.ps1' (Windows) to start the stack.",
+            f"  2. Run '{output_dir}/spx-start.sh' (macOS/Linux) or '{output_dir}/spx-start.bat' (Windows) to start the stack.",
             file=info_stream,
         )
         print(
-            f"  3. Use '{output_dir}/spx-stop.sh' or 'pwsh {output_dir}/spx-stop.ps1' to shut everything down.",
+            f"  3. Use '{output_dir}/spx-stop.sh' or '{output_dir}/spx-stop.bat' to shut everything down.",
             file=info_stream,
         )
         print(
@@ -482,18 +481,15 @@ def main(argv: list[str] | None = None) -> int:
 
 def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     if os.name == "nt":
-        script = output_dir / "spx-start.ps1"
+        script = output_dir / "stack_runner.py"
         if not script.exists():
-            print(f"[spx-installer] Cannot find {script}; skipping start.", file=stream)
-            return False
-        shell = shutil.which("pwsh") or shutil.which("powershell")
-        if not shell:
             print(
-                "[spx-installer] Neither pwsh nor powershell is available; please start manually.",
+                f"[spx-installer] Cannot find {script}. Windows security software may have quarantined or blocked "
+                "the stack helper. Check your protection history or quarantine before retrying.",
                 file=stream,
             )
             return False
-        cmd = [shell, "-ExecutionPolicy", "Bypass", "-File", str(script)]
+        cmd = [sys.executable, str(script), "start"]
     else:
         script = output_dir / "spx-start.sh"
         if not script.exists():
@@ -511,12 +507,38 @@ def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     try:
         subprocess.run(cmd, check=True, env=child_env)
     except subprocess.CalledProcessError as exc:
-        print(
-            f"[spx-installer] Start script exited with {exc.returncode}. Please inspect the logs.",
-            file=stream,
-        )
+        if os.name == "nt" and not _is_readable_file(script):
+            _report_windows_script_block(script, stream=stream)
+        else:
+            print(
+                f"[spx-installer] Start script exited with {exc.returncode}. Please inspect the logs.",
+                file=stream,
+            )
+        return False
+    except OSError as exc:
+        if os.name == "nt" and not _is_readable_file(script):
+            _report_windows_script_block(script, stream=stream)
+        else:
+            print(f"[spx-installer] Could not launch the start script: {exc}", file=stream)
         return False
     return True
+
+
+def _is_readable_file(path: Path) -> bool:
+    try:
+        with path.open("rb"):
+            return True
+    except OSError:
+        return False
+
+
+def _report_windows_script_block(script: Path, *, stream=sys.stdout) -> None:
+    print(
+        f"[spx-installer] Windows can no longer read the generated stack helper at {script}. Antivirus or "
+        "other security software may have quarantined or blocked it. Check its protection history or quarantine. "
+        "If you believe it was misclassified, submit the file to the security vendor for review.",
+        file=stream,
+    )
 
 
 if __name__ == "__main__":
