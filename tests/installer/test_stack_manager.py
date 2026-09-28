@@ -29,7 +29,7 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
         "Id": "old-id",
         "Name": "/spx-server",
         "Config": {
-            "Image": "simplephysx/spx-server:v1.0.0-rc.64",
+            "Image": "simplephysx/spx-server:v1.0.0-rc.65",
             "Labels": {
                 LABEL_STACK: "true",
                 LABEL_MANAGED_BY: "installer",
@@ -194,7 +194,7 @@ def test_commit_assigns_stable_names_to_transaction_containers(
     transaction = ContainerInfo(
         id="new-id",
         name="spx-transaction-new-spx-server",
-        image="simplephysx/spx-server:v1.0.0-rc.64",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
         labels={"com.docker.compose.service": "spx-server"},
         state="running",
     )
@@ -230,14 +230,14 @@ def test_transaction_containers_excludes_snapshots_with_same_installation_id(
     transaction = ContainerInfo(
         id="new-id",
         name="spx-transaction-run-spx-server",
-        image="simplephysx/spx-server:v1.0.0-rc.64",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
         labels={LABEL_INSTALLATION_ID: "same-installation"},
         state="running",
     )
     snapshot = ContainerInfo(
         id="old-id",
         name="spx-snapshot-old-id",
-        image="simplephysx/spx-server:v1.0.0-rc.64",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
         labels={LABEL_INSTALLATION_ID: "same-installation"},
         state="running",
     )
@@ -258,14 +258,14 @@ def test_stop_stack_stops_stable_names_but_not_snapshots(
     stable = ContainerInfo(
         id="stable-id",
         name="spx-server",
-        image="simplephysx/spx-server:v1.0.0-rc.64",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
         labels={LABEL_INSTALLATION_ID: "same-installation"},
         state="running",
     )
     snapshot = ContainerInfo(
         id="snapshot-id",
         name="spx-snapshot-old-id",
-        image="simplephysx/spx-server:v1.0.0-rc.64",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
         labels={LABEL_INSTALLATION_ID: "same-installation"},
         state="running",
     )
