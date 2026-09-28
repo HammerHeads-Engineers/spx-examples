@@ -5,6 +5,8 @@ param(
     [string]$RuntimeIdentifier = "win-x64",
     [string]$BuildRoot = "build/windows",
     [string]$Version = "",
+    [ValidateSet("staging", "production")]
+    [string]$TelemetryEnvironment = "staging",
     [string]$Manufacturer = "HammerHeads Engineers Sp. z o.o.",
     [string]$ProductName = "SPX Tools",
     [string]$BundleName = "SPX Tools",
@@ -428,6 +430,9 @@ Invoke-Process -FileName "poetry" -WorkingDirectory $RepoRoot -Arguments @(
     "--wix-fragment",
     $PayloadFragmentPath
 )
+
+$TelemetryEnvironmentPath = Join-Path $PayloadStageDir "installer\telemetry_environment.txt"
+Set-Content -Path $TelemetryEnvironmentPath -Value $TelemetryEnvironment -Encoding ascii -NoNewline
 
 $MsiOutputPath = Join-Path $ArtifactsDir ("spx-windows-{0}.msi" -f $Version)
 $BundleOutputPath = Join-Path $ArtifactsDir ("spx-installer-{0}.exe" -f $Version)

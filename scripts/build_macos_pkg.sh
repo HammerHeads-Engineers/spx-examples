@@ -19,6 +19,7 @@ Options:
   --pkg-name NAME               Output package stem without version/ext (default: spx-installer-macos)
   --identifier ID               macOS package identifier (default: com.hammerheadsengineers.spx.installer)
   --version VERSION             Package version (default: pyproject.toml version or dev)
+  --telemetry-environment ENV   Endpoint environment baked into the payload (default: staging)
   --install-location PATH       Parent install destination on macOS (default: /Applications)
   --app-name NAME               Installed launcher app name without extension (default: SPX Setup)
   --app-bundle-id ID            CFBundleIdentifier for the launcher app (default: com.hammerheadsengineers.spx.setup)
@@ -366,6 +367,7 @@ STAGING_DIR="build/macos-pkg"
 PKG_NAME="spx-installer-macos"
 IDENTIFIER="com.hammerheadsengineers.spx.installer"
 VERSION=""
+TELEMETRY_ENVIRONMENT="staging"
 INSTALL_LOCATION="/Applications"
 APP_NAME="SPX Setup"
 APP_BUNDLE_ID="com.hammerheadsengineers.spx.setup"
@@ -409,6 +411,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --version)
       VERSION="$2"
+      shift 2
+      ;;
+    --telemetry-environment)
+      TELEMETRY_ENVIRONMENT="$2"
       shift 2
       ;;
     --install-location)
@@ -462,6 +468,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${TELEMETRY_ENVIRONMENT}" != "staging" && "${TELEMETRY_ENVIRONMENT}" != "production" ]]; then
+  echo "Telemetry environment must be staging or production." >&2
+  exit 1
+fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "scripts/build_macos_pkg.sh must be run on macOS." >&2
@@ -544,6 +555,7 @@ build_app_args=(
   --app-name "${APP_NAME}"
   --bundle-id "${APP_BUNDLE_ID}"
   --version "${VERSION}"
+  --telemetry-environment "${TELEMETRY_ENVIRONMENT}"
   --native-macos-runtime
 )
 

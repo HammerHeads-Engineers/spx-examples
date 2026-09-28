@@ -19,6 +19,7 @@ import yaml
 from .manifest import ManifestIndex, ServiceManifest
 from . import paths
 from .compatibility import SPX_SERVER_VERSION, SPX_UI_VERSION, validate_version_pair
+from .telemetry import resolve_telemetry_environment, write_telemetry_manifest
 
 
 SPX_SERVER_SERVICE_NAME = "spx-server"
@@ -40,6 +41,9 @@ class DeploymentGenerator:
     def __init__(self, index: ManifestIndex) -> None:
         self.index = index
         self.repo_root = paths.repo_root()
+        self.telemetry_environment = resolve_telemetry_environment(
+            self.repo_root / "installer"
+        )
         validate_version_pair(SPX_SERVER_VERSION, SPX_UI_VERSION)
 
     def generate(self, selection, output_dir: Path) -> None:
@@ -54,7 +58,9 @@ class DeploymentGenerator:
         # Bundle local extensions so generated artifacts remain self-contained.
         extensions_src = self.repo_root / "extensions"
         if extensions_src.exists():
-            shutil.copytree(extensions_src, output_dir / "extensions", dirs_exist_ok=True)
+            shutil.copytree(
+                extensions_src, output_dir / "extensions", dirs_exist_ok=True
+            )
 
         compose_data = self._build_compose(
             selection.service_ids,
@@ -62,10 +68,18 @@ class DeploymentGenerator:
             selection.install_spx_ui,
             installation_id=installation_id,
             service_bind_addresses=getattr(selection, "service_bind_addresses", {}),
+            telemetry_environment=self.telemetry_environment,
         )
         compose_path = output_dir / "docker-compose.generated.yml"
         with compose_path.open("w", encoding="utf-8") as handle:
             yaml.safe_dump(compose_data, handle, sort_keys=False)
+
+        write_telemetry_manifest(
+            output_dir,
+            selection,
+            installation_id=installation_id,
+            repo_root=self.repo_root,
+        )
 
         self._write_env(
             output_dir,
@@ -97,6 +111,7 @@ class DeploymentGenerator:
         *,
         installation_id: str = "",
         service_bind_addresses: Dict[str, str] | None = None,
+        telemetry_environment: str = "staging",
     ) -> Dict[str, Dict]:
         services: Dict[str, Dict] = {}
         builtin_ports: List[str] = []
@@ -134,7 +149,12 @@ class DeploymentGenerator:
             )
 
         labels = self._stack_labels(installation_id)
-        services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(builtin_ports, assets_root, labels)
+        services[SPX_SERVER_SERVICE_NAME] = self._build_spx_server_service(
+            builtin_ports,
+            assets_root,
+            labels,
+            telemetry_environment=telemetry_environment,
+        )
         if include_ui:
             services[SPX_UI_SERVICE_NAME] = self._build_spx_ui_service(labels)
 
@@ -169,13 +189,18 @@ class DeploymentGenerator:
         extra_ports: List[str],
         assets_root: Path,
         labels: Dict[str, str] | None = None,
+        *,
+        telemetry_environment: str = "staging",
     ) -> Dict:
         ports = ["8000:8000"]
         for port in extra_ports:
             if port not in ports:
                 ports.append(port)
 
-        volumes = [self._process_volume("./extensions:/app/extensions", assets_root)]
+        volumes = [
+            self._process_volume("./extensions:/app/extensions", assets_root),
+            "./telemetry.json:/app/telemetry.json:ro",
+        ]
         service = {
             "image": SPX_SERVER_IMAGE,
             "container_name": "spx-server",
@@ -186,6 +211,8 @@ class DeploymentGenerator:
             "ports": ports,
             "environment": {
                 "SPX_PRODUCT_KEY": "${SPX_PRODUCT_KEY}",
+                "SPX_TELEMETRY_ENVIRONMENT": telemetry_environment,
+                "SPX_TELEMETRY_MANIFEST_PATH": "/app/telemetry.json",
             },
             "healthcheck": {
                 "test": [

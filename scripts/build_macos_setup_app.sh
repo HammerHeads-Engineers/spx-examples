@@ -22,6 +22,7 @@ Options:
   --native-macos-runtime
                       Mark the embedded payload as requiring the bundled macOS Python runtime
   --version VERSION   App version (default: pyproject.toml version or dev)
+  --telemetry-environment ENV  Endpoint environment baked into the payload (default: staging)
   --sign IDENTITY     Sign with this Developer ID Application identity
   -h, --help          Show this help
 EOF
@@ -106,6 +107,7 @@ ICON_SOURCE_INPUT="packaging/windows/assets/spx.png"
 SKIP_PAYLOAD=0
 NATIVE_MACOS_RUNTIME=0
 VERSION=""
+TELEMETRY_ENVIRONMENT="staging"
 SIGN_IDENTITY=""
 PAYLOAD_NAME="spx-installer"
 
@@ -147,6 +149,10 @@ while [[ $# -gt 0 ]]; do
       VERSION="$2"
       shift 2
       ;;
+    --telemetry-environment)
+      TELEMETRY_ENVIRONMENT="$2"
+      shift 2
+      ;;
     --sign)
       SIGN_IDENTITY="$2"
       shift 2
@@ -162,6 +168,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${TELEMETRY_ENVIRONMENT}" != "staging" && "${TELEMETRY_ENVIRONMENT}" != "production" ]]; then
+  echo "Telemetry environment must be staging or production." >&2
+  exit 1
+fi
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "scripts/build_macos_setup_app.sh must be run on macOS." >&2
@@ -209,7 +220,8 @@ rm -rf "${APP_PATH}"
 if [[ "${SKIP_PAYLOAD}" -eq 0 ]]; then
   "${REPO_ROOT}/scripts/build_installer_package.sh" \
     --output-dir "${STAGING_DIR}" \
-    --package-name "${PAYLOAD_NAME}"
+    --package-name "${PAYLOAD_NAME}" \
+    --telemetry-environment "${TELEMETRY_ENVIRONMENT}"
 fi
 
 xcrun osacompile -o "${APP_PATH}" "${SCRIPT_SOURCE}"

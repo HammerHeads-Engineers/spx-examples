@@ -47,7 +47,13 @@ def test_release_build_uses_one_versioned_filename_convention() -> None:
     workflow = _workflow()
 
     assert 'version="${tag#v}"' in workflow
-    assert 'scripts/build_installer_package.sh --package-name "spx-installer" --version "${version}"' in workflow
+    build_start = workflow.index("      - name: Build installer artifacts\n")
+    build_end = workflow.index("      - name: Upload installer assets", build_start)
+    build_step = workflow[build_start:build_end]
+    assert 'scripts/build_installer_package.sh \\' in build_step
+    assert '--package-name "spx-installer"' in build_step
+    assert '--version "${version}"' in build_step
+    assert '--telemetry-environment "${telemetry_environment}"' in build_step
     assert 'scripts/build_self_extractors.sh --version "${version}"' in workflow
     assert '"dist/spx-installer-${version}.tgz"' in workflow
     assert '"dist/spx-installer-${version}.run"' in workflow

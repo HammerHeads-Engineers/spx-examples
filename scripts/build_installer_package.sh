@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME] [--version VERSION]
+Usage: scripts/build_installer_package.sh [--output-dir DIR] [--package-name NAME] [--version VERSION] [--telemetry-environment ENV]
 
 Creates a portable installer archive (tgz) with the wizard CLI, manifests,
 and helper scripts so end users can run `spx-setup` without cloning the repo.
@@ -13,12 +13,14 @@ Options:
   --output-dir DIR     Directory to place the assembled folder and tarball (default: dist)
   --package-name NAME  Name of the folder/tarball (default: spx-installer)
   --version VERSION    Add VERSION to the archive filename; a leading 'v' is removed
+  --telemetry-environment ENV  Endpoint environment baked into the installer (default: staging)
 EOF
 }
 
 OUTPUT_DIR="dist"
 PACKAGE_NAME="spx-installer"
 VERSION=""
+TELEMETRY_ENVIRONMENT="staging"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,6 +36,10 @@ while [[ $# -gt 0 ]]; do
       VERSION="$2"
       shift 2
       ;;
+    --telemetry-environment)
+      TELEMETRY_ENVIRONMENT="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -45,6 +51,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${TELEMETRY_ENVIRONMENT}" != "staging" && "${TELEMETRY_ENVIRONMENT}" != "production" ]]; then
+  echo "Telemetry environment must be staging or production." >&2
+  exit 1
+fi
 
 if [[ -n "${VERSION}" ]]; then
   VERSION="${VERSION#v}"
@@ -138,6 +149,8 @@ PY
 }
 
 normalize_text_line_endings "${PACKAGE_DIR}"
+
+echo "${TELEMETRY_ENVIRONMENT}" > "${PACKAGE_DIR}/installer/telemetry_environment.txt"
 
 normalize_payload_permissions() {
   local package_dir="$1"
