@@ -205,8 +205,9 @@ services:
       image: michelmu/knxd-docker:latest
       container_name: knxd-server
       volumes:
-        - ./library/assets/knx/knxd.ini:/etc/knxd.ini:ro
-      entrypoint: ["knxd", "/etc/knxd.ini"]
+        - ./library/assets/knx/knxd.ini:/etc/knxd-template.ini:ro
+      entrypoint: ["/bin/sh", "-c"]
+      command: ["cp /etc/knxd-template.ini /etc/knxd.ini && exec knxd /etc/knxd.ini"]
       restart: unless-stopped
   - id: homeassistant_bridge
     name: Home Assistant Bridge

@@ -332,6 +332,10 @@ class StackManager:
         labels = container.labels
         if labels.get(LABEL_STACK) == "true" and labels.get(LABEL_MANAGED_BY) == "installer":
             return True
+        if self._uses_current_compose_file(container):
+            # The exact generated Compose file is ownership evidence for its
+            # third-party service containers too, such as KNX and brokers.
+            return True
         if labels.get("com.docker.compose.project") == self.project:
             # A Compose project name is not an ownership proof by itself:
             # unrelated services can share the same project on a developer
@@ -372,6 +376,19 @@ class StackManager:
             return False
         return self._image_compatible_with_service(container.image, container.name)
 
+    def _uses_current_compose_file(self, container: ContainerInfo) -> bool:
+        config_files = container.labels.get(
+            "com.docker.compose.project.config_files", ""
+        )
+        if not config_files:
+            return False
+        current = os.path.normcase(os.path.abspath(str(self.compose_file)))
+        return any(
+            os.path.normcase(os.path.abspath(candidate.strip())) == current
+            for candidate in config_files.split(",")
+            if candidate.strip()
+        )
+
     def detect_existing_stacks(self) -> list[ExistingStack]:
         grouped: dict[tuple[str, str], ExistingStack] = {}
         for container in self.list_containers():
@@ -385,7 +402,8 @@ class StackManager:
             key = (project, source)
             stack = grouped.setdefault(key, ExistingStack(project=project, source=source))
             stack.containers.append(container)
-            stack.ports = sorted(set(stack.ports).union(container.ports))
+            if container.running:
+                stack.ports = sorted(set(stack.ports).union(container.ports))
             compose_file = container.labels.get("com.docker.compose.project.config_files", "")
             if compose_file and compose_file not in stack.compose_files:
                 stack.compose_files.append(compose_file)
