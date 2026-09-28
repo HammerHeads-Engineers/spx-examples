@@ -61,8 +61,13 @@ jobs:
           set -euo pipefail
           version="${{ inputs.version || github.ref_name }}"
           version="${version#v}"
+          telemetry_environment="staging"
+          if [[ "${version}" != *-* ]]; then
+            telemetry_environment="production"
+          fi
           scripts/build_macos_pkg.sh \
             --version "${version}" \
+            --telemetry-environment "${telemetry_environment}" \
             --app-sign "${APP_SIGN_IDENTITY}" \
             --sign "${INSTALLER_SIGN_IDENTITY}" \
             --keychain "${MACOS_SIGNING_KEYCHAIN}" \

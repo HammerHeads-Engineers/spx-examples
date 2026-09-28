@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import uuid
 
 import yaml
 
@@ -182,9 +183,51 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert labels[SPX_LABEL_MANAGED_BY] == "installer"
     assert labels[SPX_LABEL_PROJECT] == "spx"
     assert labels[SPX_LABEL_INSTALLATION_ID]
+    telemetry_path = output_dir / "telemetry.json"
+    telemetry = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    configuration_event = telemetry["configuration_event"]
+    assert telemetry["schema_version"] == 1
+    assert telemetry["installation_id"] == str(
+        uuid.UUID(hex=labels[SPX_LABEL_INSTALLATION_ID])
+    )
+    assert configuration_event["event_type"] == "installation_configured"
+    assert configuration_event["installation_id"] == telemetry["installation_id"]
+    assert configuration_event["occurred_at"].endswith("Z")
+    assert configuration_event["metadata"]["services"] == [
+        "mqtt_broker",
+        "modbus_tcp_gateway",
+        "knx_gateway",
+    ]
+    assert configuration_event["metadata"]["selection"] == {
+        "packages": ["pack_a"],
+        "profiles": [],
+        "protocols": [],
+        "install_examples": True,
+        "install_spx_ui": False,
+        "offline_bundle": False,
+        "model_count": 1,
+        "planned_instance_count": 1,
+        "auto_start_instance_count": 1,
+    }
+    telemetry_text = telemetry_path.read_text(encoding="utf-8")
+    assert "ABC-123" not in telemetry_text
+    assert "email" not in telemetry_text.lower()
+    assert "license_key" not in telemetry_text.lower()
     assert services["spx-server"]["image"] == SPX_SERVER_IMAGE
     assert services["spx-server"]["container_name"] == "spx-server"
-    transaction_services = yaml.safe_load(transaction_compose_path.read_text(encoding="utf-8"))["services"]
+    assert (
+        services["spx-server"]["environment"]["SPX_TELEMETRY_ENVIRONMENT"] == "staging"
+    )
+    assert (
+        services["spx-server"]["environment"]["SPX_TELEMETRY_MANIFEST_PATH"]
+        == "/app/telemetry.json"
+    )
+    assert (
+        "./telemetry.json:/app/telemetry.json:ro" in services["spx-server"]["volumes"]
+    )
+    transaction_services = yaml.safe_load(
+        transaction_compose_path.read_text(encoding="utf-8")
+    )["services"]
     transaction_server = next(
         service
         for name, service in transaction_services.items()
@@ -463,6 +506,46 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
         (output_dir / "docker-compose.transaction.yml").read_text(encoding="utf-8")
     )["services"]
     assert any("__TRANSACTION_TOKEN__" in name for name in transaction_services)
+
+
+def test_generator_bakes_production_telemetry_target_from_installer_marker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    installer_root = tmp_path / "release-payload" / "installer"
+    installer_root.mkdir(parents=True)
+    (installer_root / "telemetry_environment.txt").write_text(
+        "production\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "installer.generator.paths.repo_root",
+        lambda: installer_root.parent,
+    )
+    generator = DeploymentGenerator(build_index())
+    selection = WizardSelection(
+        packages=["pack_a"],
+        profiles=[],
+        protocols=[],
+        install_examples=False,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="RELEASE-TEST-KEY",
+        model_ids=[],
+        service_ids=[],
+        instances=[],
+        start_instances=[],
+    )
+
+    output_dir = tmp_path / "production-output"
+    generator.generate(selection, output_dir)
+
+    compose = yaml.safe_load(
+        (output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8")
+    )
+    assert (
+        compose["services"]["spx-server"]["environment"]["SPX_TELEMETRY_ENVIRONMENT"]
+        == "production"
+    )
 
 
 def test_generator_uses_runtime_available_healthcheck(tmp_path: Path) -> None:

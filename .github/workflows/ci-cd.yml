@@ -495,7 +495,14 @@ jobs:
           chmod +x scripts/build_installer_package.sh scripts/build_self_extractors.sh
           tag="${{ steps.release.outputs.tag }}"
           version="${tag#v}"
-          scripts/build_installer_package.sh --package-name "spx-installer" --version "${version}"
+          telemetry_environment="staging"
+          if [[ "${version}" != *-* ]]; then
+            telemetry_environment="production"
+          fi
+          scripts/build_installer_package.sh \
+            --package-name "spx-installer" \
+            --version "${version}" \
+            --telemetry-environment "${telemetry_environment}"
           scripts/build_self_extractors.sh --version "${version}"
 
       - name: Upload installer assets to GitHub Release
@@ -568,10 +575,13 @@ jobs:
       - name: Build Windows installer
         shell: pwsh
         run: |
+          $releaseTag = "${{ needs.release.outputs.tag }}"
+          $telemetryEnvironment = if ($releaseTag -match '-') { "staging" } else { "production" }
           & .\packaging\windows\Build.ps1 `
             -Configuration Release `
             -RuntimeIdentifier win-x64 `
-            -BuildRoot build/windows
+            -BuildRoot build/windows `
+            -TelemetryEnvironment $telemetryEnvironment
 
       - name: Validate Windows installer artifact
         id: windows_artifact
@@ -711,12 +721,17 @@ jobs:
           chmod +x scripts/build_macos_pkg.sh
           tag="${{ needs.release.outputs.tag }}"
           version="${tag#v}"
+          telemetry_environment="staging"
+          if [[ "${version}" != *-* ]]; then
+            telemetry_environment="production"
+          fi
           if [[ -z "${version}" ]]; then
             echo "Unable to resolve package version from release tag." >&2
             exit 1
           fi
           scripts/build_macos_pkg.sh \
             --version "${version}" \
+            --telemetry-environment "${telemetry_environment}" \
             --python-version "3.12.10" \
             --app-sign "${MACOS_APP_SIGN_IDENTITY}" \
             --sign "${MACOS_INSTALLER_SIGN_IDENTITY}" \
