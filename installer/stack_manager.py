@@ -115,7 +115,10 @@ class ContainerInfo:
 
     @property
     def running(self) -> bool:
-        return self.state.lower() == "running" or self.status.lower().startswith("up")
+        return (
+            self.state.lower() in {"running", "restarting", "paused"}
+            or self.status.lower().startswith("up")
+        )
 
 
 @dataclass
@@ -484,6 +487,11 @@ class StackManager:
     def occupied_ports(self) -> dict[int, list[str]]:
         owners: dict[int, list[str]] = {}
         for container in self.list_containers():
+            # Docker inspect retains HostConfig.PortBindings for exited
+            # containers. Those bindings do not occupy host ports and must
+            # not block startup or the user's retry loop.
+            if not getattr(container, "running", True):
+                continue
             for port in container.ports:
                 owners.setdefault(port, []).append(f"container {container.name or container.id[:12]}")
         for port, values in self._fallback_host_ports().items():
