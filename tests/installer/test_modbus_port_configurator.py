@@ -57,16 +57,67 @@ def _bundle() -> dict:
     }
 
 
+def _service_compose(*, transaction: bool = False) -> dict:
+    service_name = (
+        "transaction-token-spx-server" if transaction else "spx-server"
+    )
+    container_name = (
+        "spx-transaction-token-spx-server" if transaction else "spx-server"
+    )
+    return {
+        "name": "spx",
+        "services": {
+            service_name: {
+                "container_name": container_name,
+                "ports": [
+                    "127.0.0.1:8000:8000",
+                    "${SPX_BIND_OPCUA_SERVER:-127.0.0.1}:61610:61610",
+                ],
+            }
+        },
+    }
+
+
+def _service_bundle() -> dict:
+    return {
+        "services": ["opcua_server"],
+        "compose_project": "spx",
+        "installation_id": "installation-1",
+        "required_ports": [8000, 61610],
+        "service_port_mappings": [
+            {
+                "key": "opcua_server/tcp/61610",
+                "service_id": "opcua_server",
+                "service_name": "OPC UA Server",
+                "purpose": "OPC UA discovery / sample compatibility",
+                "compose_service": "spx-server",
+                "transport": "tcp",
+                "default_host_port": 61610,
+                "host_port": 61610,
+                "container_port": 61610,
+            }
+        ],
+    }
+
+
 class FakeManager:
     def __init__(self, occupied: dict[int, list[str]]) -> None:
         self.occupied = occupied
         self.checked: list[list[int]] = []
+        self.checked_tcp: list[list[int]] = []
 
-    def preflight(self, required_ports: list[int]) -> PreflightResult:
+    def preflight(
+        self,
+        required_ports: list[int],
+        *,
+        required_tcp_ports: list[int] | None = None,
+    ) -> PreflightResult:
         self.checked.append(list(required_ports))
+        self.checked_tcp.append(list(required_tcp_ports or []))
         return PreflightResult(
             occupied_ports=self.occupied,
             required_ports=list(required_ports),
+            required_tcp_ports=list(required_tcp_ports or []),
         )
 
 
@@ -327,13 +378,19 @@ def stage_configuration_for_test(
 
     bundle = _bundle()
     compose = _compose()
-    return _stage_settings(bundle, compose, manager, input_fn=input_fn, output=output)
+    settings, ports, _, _ = _stage_settings(
+        bundle, compose, manager, input_fn=input_fn, output=output
+    )
+    return settings, ports
 
 
 def stage_settings_for_case(bundle, compose, manager, *, input_fn, output):
     from installer.modbus_port_configurator import _stage_settings
 
-    return _stage_settings(bundle, compose, manager, input_fn=input_fn, output=output)
+    settings, ports, _, _ = _stage_settings(
+        bundle, compose, manager, input_fn=input_fn, output=output
+    )
+    return settings, ports
 
 
 def _write_bundle_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
@@ -351,3 +408,174 @@ def _write_bundle_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
         encoding="utf-8",
     )
     return compose_file, bundle_file, env_file, transaction_file
+
+
+def _write_service_bundle_files(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
+    compose_file = tmp_path / "docker-compose.generated.yml"
+    bundle_file = tmp_path / "bundle.json"
+    env_file = tmp_path / ".env"
+    transaction_file = tmp_path / "docker-compose.transaction.yml"
+    compose_file.write_text(
+        yaml.safe_dump(_service_compose(), sort_keys=False), encoding="utf-8"
+    )
+    bundle_file.write_text(json.dumps(_service_bundle(), indent=2), encoding="utf-8")
+    env_file.write_text("SPX_PRODUCT_KEY=REDACTED\n", encoding="utf-8")
+    transaction_file.write_text(
+        yaml.safe_dump(_service_compose(transaction=True), sort_keys=False),
+        encoding="utf-8",
+    )
+    return compose_file, bundle_file, env_file, transaction_file
+
+
+def test_selected_tcp_service_conflict_suggests_and_persists_host_mapping(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    compose_file, bundle_file, env_file, transaction_file = _write_service_bundle_files(
+        tmp_path
+    )
+    staged_file = tmp_path / "pending.json"
+    manager = FakeManager(
+        {61610: ["Windows excluded TCP range (IPV4) 61600-61699"]}
+    )
+
+    staged = stage_configuration(
+        compose_file=compose_file,
+        bundle_file=bundle_file,
+        env_file=env_file,
+        staged_file=staged_file,
+        input_fn=lambda _prompt: "",
+        output=lambda _message: None,
+        manager=manager,
+    )
+
+    assert staged["service_host_ports"] == {"opcua_server/tcp/61610": 15000}
+    assert staged["required_ports"] == [8000, 15000]
+    assert staged["required_tcp_ports"] == [8000, 15000]
+    assert manager.checked[0] == [8000, 61610]
+    assert manager.checked_tcp[0] == [8000, 61610]
+    assert manager.checked[-1] == [8000, 15000]
+
+    updated = _commit_stage(
+        compose_file=compose_file,
+        transaction_template=transaction_file,
+        bundle_file=bundle_file,
+        staged_file=staged_file,
+    )
+    compose = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    transaction = yaml.safe_load(transaction_file.read_text(encoding="utf-8"))
+    transaction_server = next(iter(transaction["services"].values()))
+    assert "${SPX_BIND_OPCUA_SERVER:-127.0.0.1}:15000:61610" in compose["services"][
+        "spx-server"
+    ]["ports"]
+    assert "${SPX_BIND_OPCUA_SERVER:-127.0.0.1}:15000:61610" in transaction_server[
+        "ports"
+    ]
+    assert updated["service_port_mappings"][0]["host_port"] == 15000
+    assert updated["required_ports"] == [8000, 15000]
+
+    assert main(
+        [
+            "summary",
+            "--bundle",
+            str(bundle_file),
+            "--compose-file",
+            str(compose_file),
+        ]
+    ) == 0
+    assert "host port 15000 -> container port 61610/TCP" in capsys.readouterr().out
+
+    next_stage = tmp_path / "next-pending.json"
+    persisted = stage_configuration(
+        compose_file=compose_file,
+        bundle_file=bundle_file,
+        env_file=env_file,
+        staged_file=next_stage,
+        output=lambda _message: None,
+        manager=FakeManager({}),
+    )
+    assert persisted["changed"] is False
+    assert persisted["service_host_ports"] == {"opcua_server/tcp/61610": 15000}
+
+
+def test_service_mapping_custom_choice_rejects_occupied_port_and_suggestion(
+    tmp_path: Path,
+) -> None:
+    compose_file, bundle_file, env_file, _transaction_file = _write_service_bundle_files(
+        tmp_path
+    )
+    staged_file = tmp_path / "pending.json"
+    manager = FakeManager(
+        {
+            61610: ["Windows excluded TCP range (IPV4) 61600-61699"],
+            15000: ["process another app"],
+        }
+    )
+    answers = iter(["15000", "16110"])
+    messages: list[str] = []
+
+    staged = stage_configuration(
+        compose_file=compose_file,
+        bundle_file=bundle_file,
+        env_file=env_file,
+        staged_file=staged_file,
+        input_fn=lambda _prompt: next(answers),
+        output=messages.append,
+        manager=manager,
+    )
+
+    assert staged["service_host_ports"] == {"opcua_server/tcp/61610": 16110}
+    assert any("Suggested mapping: host 15001" in message for message in messages)
+    assert any("Host port 15000 is occupied" in message for message in messages)
+
+
+def test_service_mapping_can_be_cancelled_without_writing_configuration(
+    tmp_path: Path,
+) -> None:
+    compose_file, bundle_file, env_file, transaction_file = _write_service_bundle_files(
+        tmp_path
+    )
+    staged_file = tmp_path / "pending.json"
+    paths = (compose_file, bundle_file, transaction_file)
+    before = {path: path.read_bytes() for path in paths}
+
+    with pytest.raises(PortConfigurationCancelled):
+        stage_configuration(
+            compose_file=compose_file,
+            bundle_file=bundle_file,
+            env_file=env_file,
+            staged_file=staged_file,
+            input_fn=lambda _prompt: "Q",
+            output=lambda _message: None,
+            manager=FakeManager(
+                {61610: ["Windows excluded TCP range (IPV4) 61600-61699"]}
+            ),
+        )
+
+    assert not staged_file.exists()
+    assert {path: path.read_bytes() for path in paths} == before
+
+
+def test_noninteractive_service_conflict_leaves_generated_files_unchanged(
+    tmp_path: Path,
+) -> None:
+    compose_file, bundle_file, env_file, transaction_file = _write_service_bundle_files(
+        tmp_path
+    )
+    staged_file = tmp_path / "pending.json"
+    paths = (compose_file, bundle_file, transaction_file)
+    before = {path: path.read_bytes() for path in paths}
+
+    with pytest.raises(PortConfigurationError, match="Run spx-start interactively"):
+        stage_configuration(
+            compose_file=compose_file,
+            bundle_file=bundle_file,
+            env_file=env_file,
+            staged_file=staged_file,
+            output=lambda _message: None,
+            manager=FakeManager(
+                {61610: ["Windows excluded TCP range (IPV4) 61600-61699"]}
+            ),
+        )
+
+    assert not staged_file.exists()
+    assert {path: path.read_bytes() for path in paths} == before

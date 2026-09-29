@@ -199,6 +199,7 @@ class PreflightResult:
     existing: list[ExistingStack] = field(default_factory=list)
     occupied_ports: dict[int, list[str]] = field(default_factory=dict)
     required_ports: list[int] = field(default_factory=list)
+    required_tcp_ports: list[int] | None = None
     warnings: list[str] = field(default_factory=list)
 
     @property
@@ -207,11 +208,20 @@ class PreflightResult:
 
     @property
     def conflicts(self) -> dict[int, list[str]]:
-        return {
-            port: owners
-            for port, owners in self.occupied_ports.items()
-            if port in self.required_ports and owners
-        }
+        result: dict[int, list[str]] = {}
+        for port, owners in self.occupied_ports.items():
+            if port not in self.required_ports or not owners:
+                continue
+            relevant = owners
+            if self.required_tcp_ports is not None and port not in self.required_tcp_ports:
+                relevant = [
+                    owner
+                    for owner in owners
+                    if not owner.startswith("Windows excluded TCP range")
+                ]
+            if relevant:
+                result[port] = relevant
+        return result
 
     @property
     def unrelated_conflicts(self) -> dict[int, list[str]]:
@@ -252,6 +262,7 @@ class StackManager:
         self.installation_id = installation_id
         self._runner = runner or subprocess.run
         self.platform = platform or sys.platform
+        self._fallback_warnings: list[str] = []
 
     # Command and inspection primitives ---------------------------------
     def _run(
@@ -479,6 +490,7 @@ class StackManager:
 
     def _fallback_host_ports(self) -> dict[int, list[str]]:
         owners: dict[int, list[str]] = {}
+        self._fallback_warnings = []
         if self.platform.startswith("win"):
             script = (
                 "$ErrorActionPreference='Stop'; "
@@ -508,7 +520,12 @@ class StackManager:
             return owners
         try:
             result = self._run(command, check=False)
-        except OSError:
+        except OSError as exc:
+            if self.platform.startswith("win"):
+                self._fallback_warnings.append(
+                    f"Could not inspect Windows TCP listeners: {exc}"
+                )
+                self._add_windows_excluded_tcp_ports(owners)
             return owners
         if self.platform.startswith("win"):
             try:
@@ -530,9 +547,12 @@ class StackManager:
                             port_owners = owners.setdefault(port, [])
                             if owner not in port_owners:
                                 port_owners.append(owner)
-                return owners
             except (TypeError, ValueError):
-                return owners
+                self._fallback_warnings.append(
+                    "Could not parse Windows TCP listener information; reserved ranges will still be checked."
+                )
+            self._add_windows_excluded_tcp_ports(owners)
+            return owners
         if command[0] == "lsof":
             process_id = ""
             process_name = ""
@@ -569,6 +589,57 @@ class StackManager:
                 if owner not in port_owners:
                     port_owners.append(owner)
         return owners
+
+    @staticmethod
+    def _parse_windows_excluded_port_range_output(
+        output: str, family: str
+    ) -> dict[int, list[str]]:
+        """Parse netsh's numeric excluded-port table without relying on its locale."""
+
+        owners: dict[int, list[str]] = {}
+        for line in output.splitlines():
+            match = re.match(r"^\s*(\d+)\s+(\d+)(?:\s+\*)?(?:\s|$)", line)
+            if not match:
+                continue
+            start, end = (int(value) for value in match.groups())
+            if not 1 <= start <= end <= 65535:
+                continue
+            owner = f"Windows excluded TCP range ({family}) {start}-{end}"
+            for port in range(start, end + 1):
+                owners.setdefault(port, []).append(owner)
+        return owners
+
+    def _add_windows_excluded_tcp_ports(
+        self, owners: dict[int, list[str]]
+    ) -> None:
+        for family in ("ipv4", "ipv6"):
+            command = [
+                "netsh",
+                "interface",
+                family,
+                "show",
+                "excludedportrange",
+                "protocol=tcp",
+            ]
+            try:
+                result = self._run(command, check=False)
+            except OSError as exc:
+                self._fallback_warnings.append(
+                    f"Could not inspect Windows {family.upper()} excluded TCP ranges: {exc}"
+                )
+                continue
+            if result.returncode != 0:
+                details = (result.stderr or result.stdout or "").strip()
+                suffix = f" ({details})" if details else ""
+                self._fallback_warnings.append(
+                    f"Could not inspect Windows {family.upper()} excluded TCP ranges{suffix}."
+                )
+                continue
+            for port, labels in self._parse_windows_excluded_port_range_output(
+                result.stdout or "", family.upper()
+            ).items():
+                values = owners.setdefault(port, [])
+                values.extend(label for label in labels if label not in values)
 
     @staticmethod
     def _host_process_owner(
@@ -610,19 +681,33 @@ class StackManager:
             )
         return owners
 
-    def preflight(self, required_ports: Iterable[int] = ()) -> PreflightResult:
+    def preflight(
+        self,
+        required_ports: Iterable[int] = (),
+        *,
+        required_tcp_ports: Iterable[int] | None = None,
+    ) -> PreflightResult:
         self.check_prerequisites()
+        occupied = self.occupied_ports()
         return PreflightResult(
             existing=self.detect_existing_stacks(),
-            occupied_ports=self.occupied_ports(),
+            occupied_ports=occupied,
             required_ports=sorted(
                 {int(port) for port in required_ports if int(port) > 0}
             ),
+            required_tcp_ports=(
+                None
+                if required_tcp_ports is None
+                else sorted({int(port) for port in required_tcp_ports if int(port) > 0})
+            ),
+            warnings=list(self._fallback_warnings),
         )
 
     def describe(
         self, result: PreflightResult, output: Callable[[str], None] = print
     ) -> None:
+        for warning in result.warnings:
+            output(f"[spx-preflight] Warning: {warning}")
         for stack in result.existing:
             images = ", ".join(
                 f"{container.name}: {container.image} "
@@ -714,6 +799,7 @@ class StackManager:
         snapshot_path: Path,
         *,
         required_ports: Iterable[int] = (),
+        required_tcp_ports: Iterable[int] | None = None,
         assume_yes: bool = False,
         input_fn: Callable[[str], str] | None = None,
         output: Callable[[str], None] = print,
@@ -724,6 +810,17 @@ class StackManager:
             if value > 0:
                 normalized_ports.add(value)
         required_ports = sorted(normalized_ports)
+        normalized_tcp_ports = (
+            None
+            if required_tcp_ports is None
+            else sorted(
+                {
+                    int(port)
+                    for port in required_tcp_ports
+                    if 1 <= int(port) <= 65535
+                }
+            )
+        )
         if input_fn is not None:
             can_prompt = True
             prompt = input_fn
@@ -733,7 +830,9 @@ class StackManager:
             except (AttributeError, OSError):
                 can_prompt = False
             prompt = input
-        result = self.preflight(required_ports)
+        result = self.preflight(
+            required_ports, required_tcp_ports=normalized_tcp_ports
+        )
         self.describe(result, output)
         while result.unrelated_conflicts:
             if not can_prompt:
@@ -763,7 +862,9 @@ class StackManager:
                 output("[spx-preflight] Press Enter to check again, or type Q to quit.")
                 continue
             output("[spx-preflight] Checking the required ports again...")
-            result = self.preflight(required_ports)
+            result = self.preflight(
+                required_ports, required_tcp_ports=normalized_tcp_ports
+            )
             self.describe(result, output)
 
         replaceable = [stack for stack in result.existing if stack.containers]
@@ -962,6 +1063,10 @@ def _parse_ports(raw: str) -> list[int]:
     return sorted(set(ports))
 
 
+def _parse_optional_ports(raw: str | None) -> list[int] | None:
+    return None if raw is None else _parse_ports(raw)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Safely manage an installer-owned SPX Docker stack"
@@ -976,6 +1081,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--installation-id", default="")
     parser.add_argument("--snapshot", default=".spx-stack-snapshot.json")
     parser.add_argument("--ports", default="")
+    parser.add_argument("--tcp-ports", default=None)
     parser.add_argument(
         "--yes", action="store_true", help="Accept replacement of an existing stack"
     )
@@ -997,14 +1103,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     snapshot_path = Path(args.snapshot)
     if args.command == "preflight":
-        result = manager.preflight(_parse_ports(args.ports))
+        result = manager.preflight(
+            _parse_ports(args.ports),
+            required_tcp_ports=_parse_optional_ports(args.tcp_ports),
+        )
         manager.describe(result)
         if result.unrelated_conflicts:
             raise PreflightError("Required ports are already occupied")
         return 0
     if args.command == "prepare":
         manager.prepare(
-            snapshot_path, required_ports=_parse_ports(args.ports), assume_yes=args.yes
+            snapshot_path,
+            required_ports=_parse_ports(args.ports),
+            required_tcp_ports=_parse_optional_ports(args.tcp_ports),
+            assume_yes=args.yes,
         )
         return 0
     if args.command == "rollback":

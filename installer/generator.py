@@ -675,6 +675,9 @@ STAGE="preflight"
 REQUIRED_PORTS="$("$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" required-ports \
   --staged-file "$STAGED_PORTS_FILE")"
 PREPARE_ARGS+=("--ports" "$REQUIRED_PORTS")
+REQUIRED_TCP_PORTS="$("$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" required-tcp-ports \
+  --staged-file "$STAGED_PORTS_FILE")"
+PREPARE_ARGS+=("--tcp-ports" "$REQUIRED_TCP_PORTS")
 "$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env" --published-ports "$REQUIRED_PORTS"
 "$RUNTIME_PYTHON_BIN" "$MANAGER" "${PREPARE_ARGS[@]}"
 TRANSACTION_PREPARED=1
@@ -935,6 +938,42 @@ exit /b %ERRORLEVEL%
             "ui_enabled": SPX_UI_SERVICE_NAME
             in (compose_data or {}).get("services", {}),
         }
+        service_port_mappings = []
+        for service_id in selection.service_ids:
+            if service_id == "modbus_tcp_gateway":
+                # Modbus has a dedicated gateway/range configurator below.
+                continue
+            manifest = self.index.services.get(service_id)
+            deployment = manifest.deployment if manifest else None
+            if (
+                manifest is None
+                or deployment is None
+                or deployment.runtime not in {"builtin", "docker"}
+            ):
+                continue
+            compose_service = (
+                SPX_SERVER_SERVICE_NAME
+                if deployment.runtime == "builtin"
+                else service_id
+            )
+            for port in manifest.ports:
+                if port.transport.lower() != "tcp" or not 1 <= port.host <= 65535:
+                    continue
+                service_port_mappings.append(
+                    {
+                        "key": f"{service_id}/tcp/{port.container}",
+                        "service_id": service_id,
+                        "service_name": manifest.name,
+                        "purpose": port.purpose,
+                        "compose_service": compose_service,
+                        "transport": "tcp",
+                        "default_host_port": port.host,
+                        "host_port": port.host,
+                        "container_port": port.container,
+                    }
+                )
+        if service_port_mappings:
+            bundle["service_port_mappings"] = service_port_mappings
         if "modbus_tcp_gateway" in bundle["services"]:
             bundle["modbus_port_mappings"] = {
                 "gateway_host_port": MODBUS_GATEWAY_PORT,

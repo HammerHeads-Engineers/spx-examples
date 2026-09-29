@@ -280,6 +280,11 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert bundle["ui_version"] == "v1.0.0-rc.68"
     assert bundle["compose_project"] == "spx"
     assert {1883, 502, 3671, 6720, 8000}.issubset(set(bundle["required_ports"]))
+    service_mappings = {
+        mapping["key"]: mapping for mapping in bundle["service_port_mappings"]
+    }
+    assert service_mappings["mqtt_broker/tcp/1883"]["host_port"] == 1883
+    assert service_mappings["knx_gateway/tcp/6720"]["container_port"] == 6720
     assert bundle["modbus_port_mappings"] == {
         "gateway_host_port": 502,
         "gateway_container_port": 502,
@@ -298,6 +303,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert bundle.get("instances") == [
         {"model_id": "sensor", "instance_key": "inst_001"}
     ]
+
+
     assert bundle.get("start_instances") == ["inst_001"]
 
     start_path = output_dir / "spx-start.sh"
@@ -336,6 +343,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert 'modbus_port_configurator.py" stage' in start_content
     assert 'modbus_port_configurator.py" commit' in start_content
     assert 'PREPARE_ARGS+=("--ports" "$REQUIRED_PORTS")' in start_content
+    assert 'required-tcp-ports' in start_content
+    assert 'PREPARE_ARGS+=("--tcp-ports" "$REQUIRED_TCP_PORTS")' in start_content
     assert "__REQUIRED_PORTS__" not in start_content
     assert "ASSUME_ARGS" not in start_content
     assert "commit" in start_content
@@ -359,12 +368,65 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "bootstrap_runner.py" in stack_runner_content
     assert "runtime_bootstrap.py" in stack_runner_content
     assert "modbus_port_configurator.py" in stack_runner_content
+    assert '"required-tcp-ports"' in stack_runner_content
+    assert 'tcp_ports=tcp_ports' in stack_runner_content
     assert "wait-health" in stack_runner_content
     assert '"--services"' in stack_runner_content
     assert '"--status"' in stack_runner_content
     assert "[spx-start] Running services:" in stack_runner_content
     assert "docker compose" not in stack_runner_content
     assert "pip install --user" not in stack_runner_content
+
+
+def test_bundle_records_selected_opcua_tcp_host_mappings(tmp_path: Path) -> None:
+    index = build_index()
+    index.services["opcua_server"] = manifest.ServiceManifest(
+        id="opcua_server",
+        name="OPC UA Server",
+        protocol="opcua",
+        description="Built-in OPC UA endpoints",
+        ports=[
+            manifest.ServicePort(
+                transport="tcp",
+                host=61610,
+                container=61610,
+                purpose="OPC UA discovery / sample compatibility",
+            )
+        ],
+        deployment=manifest.ServiceDeployment(runtime="builtin"),
+    )
+    selection = WizardSelection(
+        packages=[],
+        profiles=[],
+        protocols=[],
+        install_examples=False,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="TEST-KEY",
+        model_ids=[],
+        service_ids=["opcua_server"],
+        instances=[],
+        start_instances=[],
+    )
+
+    DeploymentGenerator(index).generate(selection, tmp_path / "opcua")
+    bundle = json.loads(
+        (tmp_path / "opcua" / "bundle.json").read_text(encoding="utf-8")
+    )
+
+    assert bundle["service_port_mappings"] == [
+        {
+            "key": "opcua_server/tcp/61610",
+            "service_id": "opcua_server",
+            "service_name": "OPC UA Server",
+            "purpose": "OPC UA discovery / sample compatibility",
+            "compose_service": "spx-server",
+            "transport": "tcp",
+            "default_host_port": 61610,
+            "host_port": 61610,
+            "container_port": 61610,
+        }
+    ]
 
 
 def test_generator_repairs_stale_directory_at_file_asset_path(tmp_path: Path) -> None:
@@ -738,6 +800,7 @@ def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
     transaction_prepare = start_sh.index("TRANSACTION_PREPARED=1")
     assert network_preflight < manager_preflight < transaction_prepare
     assert start_sh.index('modbus_port_configurator.py" stage') < network_preflight
+    assert start_sh.index('required-tcp-ports') < manager_preflight
     assert start_sh.index('modbus_port_configurator.py" commit') > transaction_prepare
     stack_runner = (output_dir / "stack_runner.py").read_text(encoding="utf-8")
     network_preflight_python = stack_runner.index('stage = "preflight"')

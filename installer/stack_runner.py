@@ -66,6 +66,7 @@ def _manager_command(
     installation_id: str,
     snapshot: Path | None = None,
     ports: str | None = None,
+    tcp_ports: str | None = None,
     api_url: str | None = None,
     final_names: list[str] | None = None,
 ) -> list[str]:
@@ -86,6 +87,8 @@ def _manager_command(
         args.extend(["--snapshot", str(snapshot)])
     if ports is not None:
         args.extend(["--ports", ports])
+    if tcp_ports is not None:
+        args.extend(["--tcp-ports", tcp_ports])
     if api_url is not None:
         args.extend(["--api-url", api_url])
     for mapping in final_names or []:
@@ -270,6 +273,25 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 port_result.returncode,
             )
         ports = port_result.stdout.decode("utf-8", errors="replace").strip()
+        tcp_port_result = subprocess.run(
+            [
+                runtime_python,
+                str(script_dir / "modbus_port_configurator.py"),
+                "required-tcp-ports",
+                "--staged-file",
+                str(staged_ports_file),
+            ],
+            cwd=str(script_dir),
+            stdout=subprocess.PIPE,
+            check=False,
+        )
+        if tcp_port_result.returncode:
+            raise StartFailure(
+                stage,
+                "Could not read the staged TCP port mappings",
+                tcp_port_result.returncode,
+            )
+        tcp_ports = tcp_port_result.stdout.decode("utf-8", errors="replace").strip()
         _run(
             [
                 runtime_python,
@@ -290,6 +312,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             installation_id=installation_id,
             snapshot=snapshot,
             ports=ports,
+            tcp_ports=tcp_ports,
         )
         if assume_yes:
             prepare.append("--yes")
