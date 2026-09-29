@@ -65,7 +65,9 @@ class PreflightError(StackManagerError):
 class CommandError(StackManagerError):
     """A Docker or host command returned a non-zero exit code."""
 
-    def __init__(self, command: Sequence[str], returncode: int, output: str = "") -> None:
+    def __init__(
+        self, command: Sequence[str], returncode: int, output: str = ""
+    ) -> None:
         self.command = list(command)
         self.returncode = returncode
         self.output = redact(output)
@@ -82,6 +84,25 @@ def redact(value: Any) -> str:
     if product_key:
         text = text.replace(product_key, "<redacted>")
     return text
+
+
+def _format_port_numbers(ports: Iterable[int]) -> str:
+    """Render consecutive port numbers as compact ranges."""
+
+    values = sorted({int(port) for port in ports})
+    if not values:
+        return "none"
+
+    ranges: list[str] = []
+    start = previous = values[0]
+    for port in values[1:]:
+        if port == previous + 1:
+            previous = port
+            continue
+        ranges.append(str(start) if start == previous else f"{start}-{previous}")
+        start = previous = port
+    ranges.append(str(start) if start == previous else f"{start}-{previous}")
+    return ", ".join(ranges)
 
 
 def new_installation_id() -> str:
@@ -115,7 +136,11 @@ class ContainerInfo:
 
     @property
     def running(self) -> bool:
-        return self.state.lower() == "running" or self.status.lower().startswith("up")
+        return self.state.lower() in {
+            "running",
+            "restarting",
+            "paused",
+        } or self.status.lower().startswith("up")
 
 
 @dataclass
@@ -132,7 +157,11 @@ class ExistingStack:
 
     @property
     def installation_id(self) -> str:
-        values = {container.installation_id for container in self.containers if container.installation_id}
+        values = {
+            container.installation_id
+            for container in self.containers
+            if container.installation_id
+        }
         return next(iter(values), "")
 
     @property
@@ -149,11 +178,15 @@ class StackSnapshot:
 
     @classmethod
     def empty(cls, project: str, installation_id: str) -> "StackSnapshot":
-        return cls(project=project, installation_id=installation_id, created_at=time.time())
+        return cls(
+            project=project, installation_id=installation_id, created_at=time.time()
+        )
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(asdict(self), indent=2, sort_keys=True), encoding="utf-8")
+        path.write_text(
+            json.dumps(asdict(self), indent=2, sort_keys=True), encoding="utf-8"
+        )
 
     @classmethod
     def load(cls, path: Path) -> "StackSnapshot":
@@ -183,9 +216,7 @@ class PreflightResult:
     @property
     def unrelated_conflicts(self) -> dict[int, list[str]]:
         known_names = {
-            container.name
-            for stack in self.existing
-            for container in stack.containers
+            container.name for stack in self.existing for container in stack.containers
         }
         result: dict[int, list[str]] = {}
         for port, owners in self.conflicts.items():
@@ -223,7 +254,9 @@ class StackManager:
         self.platform = platform or sys.platform
 
     # Command and inspection primitives ---------------------------------
-    def _run(self, command: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def _run(
+        self, command: Sequence[str], *, check: bool = True
+    ) -> subprocess.CompletedProcess[str]:
         result = self._runner(
             list(command),
             capture_output=True,
@@ -236,11 +269,22 @@ class StackManager:
             raise CommandError(command, result.returncode, output)
         return result
 
-    def docker(self, args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    def docker(
+        self, args: Sequence[str], *, check: bool = True
+    ) -> subprocess.CompletedProcess[str]:
         return self._run(["docker", *args], check=check)
 
-    def compose(self, args: Sequence[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
-        command = ["docker", "compose", "-p", self.project, "-f", str(self.compose_file)]
+    def compose(
+        self, args: Sequence[str], *, check: bool = True
+    ) -> subprocess.CompletedProcess[str]:
+        command = [
+            "docker",
+            "compose",
+            "-p",
+            self.project,
+            "-f",
+            str(self.compose_file),
+        ]
         if self.env_file:
             command.extend(["--env-file", str(self.env_file)])
         command.extend(args)
@@ -261,7 +305,9 @@ class StackManager:
             self.docker(["compose", "version"])
             self.compose(["config", "--quiet"])
         except (OSError, CommandError) as exc:
-            raise PreflightError("Docker Compose or the generated configuration is invalid") from exc
+            raise PreflightError(
+                "Docker Compose or the generated configuration is invalid"
+            ) from exc
 
     def list_containers(self) -> list[ContainerInfo]:
         result = self.docker(["ps", "-aq"], check=False)
@@ -321,13 +367,19 @@ class StackManager:
         if isinstance(bindings, Mapping):
             for values in bindings.values():
                 for binding in values or []:
-                    if isinstance(binding, Mapping) and str(binding.get("HostPort", "")).isdigit():
+                    if (
+                        isinstance(binding, Mapping)
+                        and str(binding.get("HostPort", "")).isdigit()
+                    ):
                         ports.add(int(binding["HostPort"]))
         return ports
 
     def is_managed_container(self, container: ContainerInfo) -> bool:
         labels = container.labels
-        if labels.get(LABEL_STACK) == "true" and labels.get(LABEL_MANAGED_BY) == "installer":
+        if (
+            labels.get(LABEL_STACK) == "true"
+            and labels.get(LABEL_MANAGED_BY) == "installer"
+        ):
             return True
         if labels.get("com.docker.compose.project") == self.project:
             # A Compose project name is not an ownership proof by itself:
@@ -342,7 +394,9 @@ class StackManager:
             container.image, compose_service
         ):
             return True
-        if container.name in EXPECTED_IMAGES and self._legacy_image_compatible(container):
+        if container.name in EXPECTED_IMAGES and self._legacy_image_compatible(
+            container
+        ):
             return True
         # RC65 used spx-rollback-* for temporary backups. Treat those names as
         # installer-owned only when the image is one of the known SPX services,
@@ -359,7 +413,9 @@ class StackManager:
         prefixes = EXPECTED_IMAGES.get(service, ())
         lowered = image.lower()
         return any(
-            lowered == prefix or lowered.startswith(prefix + ":") or lowered.startswith(prefix + "@")
+            lowered == prefix
+            or lowered.startswith(prefix + ":")
+            or lowered.startswith(prefix + "@")
             for prefix in prefixes
         )
 
@@ -378,12 +434,21 @@ class StackManager:
             if any(container.name.startswith(prefix) for prefix in SNAPSHOT_PREFIXES):
                 source = "snapshot"
             else:
-                source = "labels" if container.labels.get(LABEL_STACK) == "true" else "compose/legacy"
+                source = (
+                    "labels"
+                    if container.labels.get(LABEL_STACK) == "true"
+                    else "compose/legacy"
+                )
             key = (project, source)
-            stack = grouped.setdefault(key, ExistingStack(project=project, source=source))
+            stack = grouped.setdefault(
+                key, ExistingStack(project=project, source=source)
+            )
             stack.containers.append(container)
-            stack.ports = sorted(set(stack.ports).union(container.ports))
-            compose_file = container.labels.get("com.docker.compose.project.config_files", "")
+            if container.running:
+                stack.ports = sorted(set(stack.ports).union(container.ports))
+            compose_file = container.labels.get(
+                "com.docker.compose.project.config_files", ""
+            )
             if compose_file and compose_file not in stack.compose_files:
                 stack.compose_files.append(compose_file)
         return list(grouped.values())
@@ -400,13 +465,21 @@ class StackManager:
         if self.platform.startswith("win"):
             script = (
                 "$ErrorActionPreference='Stop'; "
+                "$serviceCache=@{}; "
                 "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | "
                 "ForEach-Object { $connection=$_; "
                 "$process=Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue; "
                 "$processName='unknown'; if($process){$processName=$process.ProcessName}; "
+                "$serviceNames=''; if($processName -eq 'svchost'){ "
+                "$processId=[int]$connection.OwningProcess; "
+                "if(-not $serviceCache.ContainsKey($processId)){ "
+                "$serviceCache[$processId]=@(Get-CimInstance Win32_Service "
+                '-Filter "ProcessId = $processId" -ErrorAction SilentlyContinue '
+                "| Select-Object -ExpandProperty Name) -join ',' }; "
+                "$serviceNames=[string]$serviceCache[$processId] }; "
                 "[PSCustomObject]@{LocalPort=$connection.LocalPort; "
                 "ProcessId=$connection.OwningProcess; "
-                "ProcessName=$processName} } | "
+                "ProcessName=$processName; ServiceNames=$serviceNames} } | "
                 "ConvertTo-Json -Compress"
             )
             command = ["powershell", "-NoProfile", "-Command", script]
@@ -425,12 +498,18 @@ class StackManager:
                 payload = json.loads(result.stdout or "[]")
                 rows = payload if isinstance(payload, list) else [payload]
                 for row in rows:
-                    if isinstance(row, Mapping) and str(row.get("LocalPort", "")).isdigit():
+                    if (
+                        isinstance(row, Mapping)
+                        and str(row.get("LocalPort", "")).isdigit()
+                    ):
                         port = int(row["LocalPort"])
                         if 1 <= port <= 65535:
                             process_name = str(row.get("ProcessName") or "").strip()
                             process_id = str(row.get("ProcessId") or "").strip()
-                            owner = self._host_process_owner(process_name, process_id)
+                            service_names = str(row.get("ServiceNames") or "").strip()
+                            owner = self._host_process_owner(
+                                process_name, process_id, service_names
+                            )
                             port_owners = owners.setdefault(port, [])
                             if owner not in port_owners:
                                 port_owners.append(owner)
@@ -475,17 +554,32 @@ class StackManager:
         return owners
 
     @staticmethod
-    def _host_process_owner(process_name: str = "", process_id: str = "") -> str:
+    def _host_process_owner(
+        process_name: str = "", process_id: str = "", service_names: str = ""
+    ) -> str:
         details = process_name.strip()
+        identifiers = []
         if process_id.isdigit():
-            details = f"{details} (PID {process_id})" if details else f"PID {process_id}"
+            identifiers.append(f"PID {process_id}")
+        names = [name.strip() for name in service_names.split(",") if name.strip()]
+        if names:
+            identifiers.append(f"services {', '.join(names)}")
+        if identifiers:
+            suffix = "; ".join(identifiers)
+            details = f"{details} ({suffix})" if details else suffix
         return f"process {details}" if details else "host process"
 
     def occupied_ports(self) -> dict[int, list[str]]:
         owners: dict[int, list[str]] = {}
         for container in self.list_containers():
+            # Docker inspect retains HostConfig.PortBindings for exited
+            # containers. Those bindings do not occupy host ports.
+            if not getattr(container, "running", True):
+                continue
             for port in container.ports:
-                owners.setdefault(port, []).append(f"container {container.name or container.id[:12]}")
+                owners.setdefault(port, []).append(
+                    f"container {container.name or container.id[:12]}"
+                )
         for port, values in self._fallback_host_ports().items():
             # Docker Desktop exposes the same published port through its host
             # proxy. Docker inspect is authoritative for those ports; adding
@@ -493,7 +587,9 @@ class StackManager:
             # like an unrelated conflict and block a safe replacement.
             if port in owners:
                 continue
-            owners.setdefault(port, []).extend(value for value in values if value not in owners.get(port, []))
+            owners.setdefault(port, []).extend(
+                value for value in values if value not in owners.get(port, [])
+            )
         return owners
 
     def preflight(self, required_ports: Iterable[int] = ()) -> PreflightResult:
@@ -501,17 +597,23 @@ class StackManager:
         return PreflightResult(
             existing=self.detect_existing_stacks(),
             occupied_ports=self.occupied_ports(),
-            required_ports=sorted({int(port) for port in required_ports if int(port) > 0}),
+            required_ports=sorted(
+                {int(port) for port in required_ports if int(port) > 0}
+            ),
         )
 
-    def describe(self, result: PreflightResult, output: Callable[[str], None] = print) -> None:
+    def describe(
+        self, result: PreflightResult, output: Callable[[str], None] = print
+    ) -> None:
         for stack in result.existing:
             images = ", ".join(
-                f"{container.name}: {container.image} (health={container.health or 'unknown'})"
+                f"{container.name}: {container.image} "
+                f"(state={getattr(container, 'state', '') or 'unknown'}, "
+                f"health={container.health or 'unknown'})"
                 for container in stack.containers
             )
             config = ", ".join(stack.compose_files) or "not reported by Docker"
-            ports = ", ".join(str(port) for port in stack.ports) or "none"
+            ports = _format_port_numbers(stack.ports)
             output(
                 f"[spx-preflight] Existing stack: project={stack.project}, "
                 f"config={config}, ports={ports}\n  {images}"
@@ -521,19 +623,30 @@ class StackManager:
             for stack in result.existing
             for container in stack.containers
         }
+        existing_conflicts: dict[str, list[int]] = {}
+        unrelated_conflicts: dict[str, list[int]] = {}
         for port, owners in result.conflicts.items():
-            existing_stack_owners = [owner for owner in owners if owner in known_container_owners]
-            unrelated_owners = [owner for owner in owners if owner not in known_container_owners]
-            if existing_stack_owners:
-                output(
-                    f"[spx-preflight] Port {port} is used by the detected SPX stack: "
-                    f"{', '.join(existing_stack_owners)}. It can be released if you approve replacement."
-                )
-            if unrelated_owners:
-                output(
-                    f"[spx-preflight] Required port {port} is already in use by: "
-                    f"{', '.join(unrelated_owners)}"
-                )
+            existing_stack_owners = [
+                owner for owner in owners if owner in known_container_owners
+            ]
+            unrelated_owners = [
+                owner for owner in owners if owner not in known_container_owners
+            ]
+            for owner in existing_stack_owners:
+                existing_conflicts.setdefault(owner, []).append(port)
+            for owner in unrelated_owners:
+                unrelated_conflicts.setdefault(owner, []).append(port)
+
+        for owner, ports in sorted(existing_conflicts.items()):
+            output(
+                f"[spx-preflight] Detected SPX stack uses required host port(s) "
+                f"{_format_port_numbers(ports)} ({owner}). Approve replacement to release them."
+            )
+        for owner, ports in sorted(unrelated_conflicts.items()):
+            output(
+                f"[spx-preflight] Required host port(s) {_format_port_numbers(ports)} "
+                f"are already in use by {owner}."
+            )
 
     def _detach_snapshot_container(self, container_id: str) -> None:
         """Keep a renamed backup out of the next Compose project discovery."""
@@ -552,9 +665,13 @@ class StackManager:
             LABEL_INSTALLATION_ID,
         )
         for label in labels:
-            self._run(["docker", "update", "--label-rm", label, container_id], check=False)
+            self._run(
+                ["docker", "update", "--label-rm", label, container_id], check=False
+            )
 
-    def snapshot_existing(self, stack: ExistingStack, snapshot_path: Path) -> StackSnapshot:
+    def snapshot_existing(
+        self, stack: ExistingStack, snapshot_path: Path
+    ) -> StackSnapshot:
         snapshot = StackSnapshot.empty(self.project, self.installation_id)
         for container in stack.containers:
             original_name = container.name
@@ -611,7 +728,9 @@ class StackManager:
                 "SPX Setup will not stop unrelated software."
             )
             try:
-                answer = prompt("[spx-preflight] Press Enter to check the ports again, or type Q to quit: ")
+                answer = prompt(
+                    "[spx-preflight] Press Enter to check the ports again, or type Q to quit: "
+                )
             except EOFError as exc:
                 raise PreflightError(
                     "No terminal input is available. Stop or reconfigure the listed applications or containers, "
@@ -619,7 +738,9 @@ class StackManager:
                 ) from exc
             choice = answer.strip().lower()
             if choice == "q":
-                raise UserDeclined("Setup cancelled. Free the listed ports and run SPX Setup again.")
+                raise UserDeclined(
+                    "Setup cancelled. Free the listed ports and run SPX Setup again."
+                )
             if choice:
                 output("[spx-preflight] Press Enter to check again, or type Q to quit.")
                 continue
@@ -635,13 +756,23 @@ class StackManager:
                         "A detected SPX stack was left untouched because approval requires an interactive terminal. "
                         "Run SPX Setup interactively to review and approve replacement."
                     )
-                answer = prompt("[spx-preflight] Replace the detected SPX stack? [y/N]: ").strip().lower()
+                answer = (
+                    prompt("[spx-preflight] Replace the detected SPX stack? [y/N]: ")
+                    .strip()
+                    .lower()
+                )
                 if answer not in {"y", "yes"}:
-                    raise UserDeclined("Existing SPX stack was left untouched; compose up was not run")
+                    raise UserDeclined(
+                        "Existing SPX stack was left untouched; compose up was not run"
+                    )
             combined = ExistingStack(
-                containers=[container for stack in replaceable for container in stack.containers],
+                containers=[
+                    container for stack in replaceable for container in stack.containers
+                ],
                 project=replaceable[0].project,
-                compose_files=sorted({path for stack in replaceable for path in stack.compose_files}),
+                compose_files=sorted(
+                    {path for stack in replaceable for path in stack.compose_files}
+                ),
                 ports=sorted({port for stack in replaceable for port in stack.ports}),
                 source=replaceable[0].source,
             )
@@ -679,7 +810,9 @@ class StackManager:
 
         self.stop_stack()
 
-    def commit(self, snapshot_path: Path, final_names: Mapping[str, str] | None = None) -> None:
+    def commit(
+        self, snapshot_path: Path, final_names: Mapping[str, str] | None = None
+    ) -> None:
         """Commit a successful replacement and remove only exact old IDs."""
 
         final_names = dict(final_names or {})
@@ -696,7 +829,9 @@ class StackManager:
                 )
             if not target_name or container.name == target_name:
                 continue
-            result = self._run(["docker", "rename", container.id, target_name], check=False)
+            result = self._run(
+                ["docker", "rename", container.id, target_name], check=False
+            )
             if result.returncode != 0:
                 raise StackManagerError(
                     f"Could not assign stable name {target_name} to transaction container {container.id[:12]}"
@@ -730,7 +865,10 @@ class StackManager:
                 self._run(["docker", "stop", container.id], check=False)
         # Current transaction containers still own the compatibility names.
         for container in current:
-            self._run(["docker", "rename", container.id, f"spx-failed-{container.id[:12]}"], check=False)
+            self._run(
+                ["docker", "rename", container.id, f"spx-failed-{container.id[:12]}"],
+                check=False,
+            )
             self._detach_snapshot_container(container.id)
             # Remove only the failed transaction container. Docker volumes are
             # preserved because this command deliberately omits -v.
@@ -744,16 +882,23 @@ class StackManager:
             original_name = str(entry.get("name", ""))
             if not container_id or not original_name:
                 continue
-            result = self._run(["docker", "rename", container_id, original_name], check=False)
+            result = self._run(
+                ["docker", "rename", container_id, original_name], check=False
+            )
             if result.returncode == 0:
-                if self._run(["docker", "start", container_id], check=False).returncode != 0:
+                if (
+                    self._run(["docker", "start", container_id], check=False).returncode
+                    != 0
+                ):
                     restored = False
             else:
                 restored = False
         if restored:
             snapshot_path.unlink(missing_ok=True)
 
-    def wait_health(self, api_url: str = "http://localhost:8000", timeout: float = 120.0) -> None:
+    def wait_health(
+        self, api_url: str = "http://localhost:8000", timeout: float = 120.0
+    ) -> None:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             containers = self.transaction_containers()
@@ -768,14 +913,23 @@ class StackManager:
                 ),
                 None,
             )
-            if server and server.running and (not server.health or server.health == "healthy") and self._api_healthy(api_url):
+            if (
+                server
+                and server.running
+                and (not server.health or server.health == "healthy")
+                and self._api_healthy(api_url)
+            ):
                 return
             time.sleep(2.0)
-        raise StackManagerError(f"SPX healthcheck/API did not become ready within {timeout:.0f} seconds")
+        raise StackManagerError(
+            f"SPX healthcheck/API did not become ready within {timeout:.0f} seconds"
+        )
 
     def _api_healthy(self, api_url: str) -> bool:
         try:
-            request = urllib.request.Request(api_url.rstrip("/") + "/health", method="GET")
+            request = urllib.request.Request(
+                api_url.rstrip("/") + "/health", method="GET"
+            )
             with urllib.request.urlopen(request, timeout=3.0) as response:
                 return 200 <= response.status < 300
         except (OSError, urllib.error.URLError, ValueError):
@@ -791,18 +945,27 @@ def _parse_ports(raw: str) -> list[int]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Safely manage an installer-owned SPX Docker stack")
-    parser.add_argument("command", choices=["preflight", "prepare", "rollback", "commit", "stop", "wait-health"])
+    parser = argparse.ArgumentParser(
+        description="Safely manage an installer-owned SPX Docker stack"
+    )
+    parser.add_argument(
+        "command",
+        choices=["preflight", "prepare", "rollback", "commit", "stop", "wait-health"],
+    )
     parser.add_argument("--compose-file", required=True)
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--project", default=PROJECT)
     parser.add_argument("--installation-id", default="")
     parser.add_argument("--snapshot", default=".spx-stack-snapshot.json")
     parser.add_argument("--ports", default="")
-    parser.add_argument("--yes", action="store_true", help="Accept replacement of an existing stack")
+    parser.add_argument(
+        "--yes", action="store_true", help="Accept replacement of an existing stack"
+    )
     parser.add_argument("--api-url", default="http://localhost:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
-    parser.add_argument("--final-name", action="append", default=[], metavar="SERVICE=CONTAINER")
+    parser.add_argument(
+        "--final-name", action="append", default=[], metavar="SERVICE=CONTAINER"
+    )
     return parser
 
 
@@ -822,7 +985,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise PreflightError("Required ports are already occupied")
         return 0
     if args.command == "prepare":
-        manager.prepare(snapshot_path, required_ports=_parse_ports(args.ports), assume_yes=args.yes)
+        manager.prepare(
+            snapshot_path, required_ports=_parse_ports(args.ports), assume_yes=args.yes
+        )
         return 0
     if args.command == "rollback":
         manager.rollback(snapshot_path)

@@ -13,16 +13,22 @@ from installer.stack_manager import (
     LABEL_MANAGED_BY,
     LABEL_STACK,
     ContainerInfo,
+    ExistingStack,
+    PreflightResult,
     StackManager,
     UserDeclined,
 )
 
 
-def completed(argv: list[str], stdout: str = "", returncode: int = 0) -> subprocess.CompletedProcess[str]:
+def completed(
+    argv: list[str], stdout: str = "", returncode: int = 0
+) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr="")
 
 
-def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_path: Path) -> None:
+def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(
+    tmp_path: Path,
+) -> None:
     calls: list[list[str]] = []
 
     labelled = {
@@ -46,7 +52,10 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
     unrelated = {
         "Id": "other-id",
         "Name": "/unrelated-db",
-        "Config": {"Image": "postgres:16", "Labels": {"com.docker.compose.project": "other"}},
+        "Config": {
+            "Image": "postgres:16",
+            "Labels": {"com.docker.compose.project": "other"},
+        },
         "State": {"Status": "running"},
         "NetworkSettings": {"Ports": {"8000/tcp": [{"HostPort": "8000"}]}},
     }
@@ -56,7 +65,9 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
         if argv[:3] == ["docker", "ps", "-aq"]:
             return completed(list(argv), "old-id\nother-id\n")
         if argv[:2] == ["docker", "inspect"]:
-            return completed(list(argv), json.dumps([labelled if argv[2] == "old-id" else unrelated]))
+            return completed(
+                list(argv), json.dumps([labelled if argv[2] == "old-id" else unrelated])
+            )
         return completed(list(argv))
 
     manager = StackManager(
@@ -69,9 +80,13 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
     assert len(result.active_stacks) == 1
     assert result.active_stacks[0].project == "spx"
     assert result.active_stacks[0].ports == [8000]
-    assert result.conflicts == {8000: ["container spx-server", "container unrelated-db"]}
+    assert result.conflicts == {
+        8000: ["container spx-server", "container unrelated-db"]
+    }
     assert not any(
-        len(call) > 2 and call[0:2] in (["docker", "stop"], ["docker", "rename"]) and "other-id" in call
+        len(call) > 2
+        and call[0:2] in (["docker", "stop"], ["docker", "rename"])
+        and "other-id" in call
         for call in calls
     )
 
@@ -79,7 +94,9 @@ def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(tmp_pa
 def test_same_compose_project_does_not_make_unrelated_image_managed(
     tmp_path: Path,
 ) -> None:
-    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
+    manager = StackManager(
+        tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv))
+    )
     unrelated = ContainerInfo(
         id="other-id",
         name="spx-postgres",
@@ -91,10 +108,26 @@ def test_same_compose_project_does_not_make_unrelated_image_managed(
     assert not manager.is_managed_container(unrelated)
 
 
-def test_prepare_decline_does_not_stop_or_rename(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
+def test_prepare_decline_does_not_stop_or_rename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = StackManager(
+        tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv))
+    )
     existing = type("Existing", (), {})()
-    existing.containers = [type("Container", (), {"name": "spx-server", "image": "image", "health": "healthy", "ports": [8000], "running": True})()]
+    existing.containers = [
+        type(
+            "Container",
+            (),
+            {
+                "name": "spx-server",
+                "image": "image",
+                "health": "healthy",
+                "ports": [8000],
+                "running": True,
+            },
+        )()
+    ]
     existing.project = "spx"
     existing.compose_files = []
     existing.ports = [8000]
@@ -112,7 +145,9 @@ def test_prepare_decline_does_not_stop_or_rename(tmp_path: Path, monkeypatch: py
     )()
     monkeypatch.setattr(manager, "preflight", lambda ports: fake_result)
     commands: list[list[str]] = []
-    monkeypatch.setattr(manager, "snapshot_existing", lambda stack, path: commands.append(["snapshot"]))
+    monkeypatch.setattr(
+        manager, "snapshot_existing", lambda stack, path: commands.append(["snapshot"])
+    )
 
     with pytest.raises(UserDeclined):
         manager.prepare(tmp_path / "snapshot.json", input_fn=lambda prompt: "n")
@@ -123,10 +158,18 @@ def test_prepare_decline_does_not_stop_or_rename(tmp_path: Path, monkeypatch: py
 def test_docker_desktop_proxy_is_not_an_unrelated_port_conflict(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
-    container = type("Container", (), {"ports": [8000], "name": "spx-server", "id": "server-id"})()
+    manager = StackManager(
+        tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv))
+    )
+    container = type(
+        "Container", (), {"ports": [8000], "name": "spx-server", "id": "server-id"}
+    )()
     monkeypatch.setattr(manager, "list_containers", lambda: [container])
-    monkeypatch.setattr(manager, "_fallback_host_ports", lambda: {8000: ["host process"], 8080: ["host process"]})
+    monkeypatch.setattr(
+        manager,
+        "_fallback_host_ports",
+        lambda: {8000: ["host process"], 8080: ["host process"]},
+    )
 
     occupied = manager.occupied_ports()
 
@@ -134,26 +177,140 @@ def test_docker_desktop_proxy_is_not_an_unrelated_port_conflict(
     assert occupied[8080] == ["host process"]
 
 
-def test_prepare_snapshots_only_detected_ids_and_never_removes_data(tmp_path: Path) -> None:
+def test_occupied_ports_ignore_stopped_containers_but_include_paused_ones(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager = StackManager(tmp_path / "compose.yml")
+    stopped = ContainerInfo(
+        id="stopped-id",
+        name="stopped-server",
+        image="spx-server",
+        state="exited",
+        ports=[502],
+    )
+    paused = ContainerInfo(
+        id="paused-id",
+        name="paused-server",
+        image="spx-server",
+        state="paused",
+        ports=[1502],
+    )
+    monkeypatch.setattr(manager, "list_containers", lambda: [stopped, paused])
+    monkeypatch.setattr(manager, "_fallback_host_ports", lambda: {})
+
+    assert manager.occupied_ports() == {1502: ["container paused-server"]}
+
+
+def test_windows_port_owner_includes_services_hosted_by_svchost(
+    tmp_path: Path,
+) -> None:
+    payload = [
+        {
+            "LocalPort": 5040,
+            "ProcessId": 17052,
+            "ProcessName": "svchost",
+            "ServiceNames": "CDPSvc",
+        }
+    ]
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        runner=lambda argv, **kwargs: completed(list(argv), json.dumps(payload)),
+        platform="win32",
+    )
+
+    assert manager._fallback_host_ports() == {
+        5040: ["process svchost (PID 17052; services CDPSvc)"]
+    }
+
+
+def test_existing_stack_description_shows_state_alongside_health(
+    tmp_path: Path,
+) -> None:
+    manager = StackManager(tmp_path / "compose.yml", platform="win32")
+    container = ContainerInfo(
+        id="spx-server-id",
+        name="spx-server",
+        image="simplephysx/spx-server:v1.0.0-rc.64",
+        state="exited",
+        health="starting",
+    )
+    stack = ExistingStack(project="generated", containers=[container])
+    messages: list[str] = []
+
+    manager.describe(PreflightResult(existing=[stack]), messages.append)
+
+    assert "state=exited, health=starting" in messages[0]
+
+
+def test_describe_compacts_consecutive_stack_port_conflicts(tmp_path: Path) -> None:
+    manager = StackManager(tmp_path / "compose.yml", platform="win32")
+    ports = [1502, *range(15020, 15121)]
+    container = ContainerInfo(
+        id="spx-server-id",
+        name="spx-server",
+        image="simplephysx/spx-server:v1.0.0-rc.65",
+        state="running",
+        ports=ports,
+    )
+    stack = ExistingStack(project="spx", containers=[container], ports=ports)
+    result = PreflightResult(
+        existing=[stack],
+        occupied_ports={port: ["container spx-server"] for port in ports}
+        | {5040: ["process svchost (PID 17052; services CDPSvc)"]},
+        required_ports=[*ports, 5040],
+    )
+    messages: list[str] = []
+
+    manager.describe(result, messages.append)
+
+    assert len(messages) == 3
+    assert "ports=1502, 15020-15120" in messages[0]
+    assert (
+        "Detected SPX stack uses required host port(s) 1502, 15020-15120 "
+        "(container spx-server)" in messages[1]
+    )
+    assert "Required host port(s) 5040" in messages[2]
+    assert "services CDPSvc" in messages[2]
+
+
+def test_prepare_snapshots_only_detected_ids_and_never_removes_data(
+    tmp_path: Path,
+) -> None:
     calls: list[list[str]] = []
-    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))))
-    old = type("Container", (), {"id": "old-id", "name": "spx-server", "running": True})()
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        runner=lambda argv, **kwargs: (
+            calls.append(list(argv)) or completed(list(argv))
+        ),
+    )
+    old = type(
+        "Container", (), {"id": "old-id", "name": "spx-server", "running": True}
+    )()
     stack = type("Stack", (), {"containers": [old]})()
     snapshot = manager.snapshot_existing(stack, tmp_path / "snapshot.json")
 
     assert snapshot.containers[0]["id"] == "old-id"
     assert snapshot.containers[0]["name"] == "spx-server"
     assert snapshot.containers[0]["snapshot_name"] == "spx-snapshot-old-id"
-    assert [call[1] for call in calls if len(call) > 1 and call[1] in {"stop", "rename"}] == ["stop", "rename"]
+    assert [
+        call[1] for call in calls if len(call) > 1 and call[1] in {"stop", "rename"}
+    ] == ["stop", "rename"]
     assert not any(call[1] in {"volume", "image"} for call in calls if len(call) > 1)
-    assert any(call[:4] == ["docker", "update", "--label-rm", "com.docker.compose.project"] for call in calls)
+    assert any(
+        call[:4] == ["docker", "update", "--label-rm", "com.docker.compose.project"]
+        for call in calls
+    )
 
 
-def test_commit_removes_only_snapshot_containers_and_keeps_data_resources(tmp_path: Path) -> None:
+def test_commit_removes_only_snapshot_containers_and_keeps_data_resources(
+    tmp_path: Path,
+) -> None:
     calls: list[list[str]] = []
     manager = StackManager(
         tmp_path / "compose.yml",
-        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+        runner=lambda argv, **kwargs: (
+            calls.append(list(argv)) or completed(list(argv))
+        ),
     )
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(
@@ -162,7 +319,11 @@ def test_commit_removes_only_snapshot_containers_and_keeps_data_resources(tmp_pa
                 "project": "spx",
                 "installation_id": "new-installation",
                 "containers": [
-                    {"id": "old-id", "name": "spx-server", "snapshot_name": "spx-snapshot-old"}
+                    {
+                        "id": "old-id",
+                        "name": "spx-server",
+                        "snapshot_name": "spx-snapshot-old",
+                    }
                 ],
                 "created_at": 0,
             }
@@ -189,7 +350,9 @@ def test_commit_assigns_stable_names_to_transaction_containers(
     manager = StackManager(
         tmp_path / "compose.yml",
         installation_id="new-installation",
-        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+        runner=lambda argv, **kwargs: (
+            calls.append(list(argv)) or completed(list(argv))
+        ),
     )
     transaction = ContainerInfo(
         id="new-id",
@@ -253,7 +416,9 @@ def test_stop_stack_stops_stable_names_but_not_snapshots(
     manager = StackManager(
         tmp_path / "compose.yml",
         installation_id="same-installation",
-        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+        runner=lambda argv, **kwargs: (
+            calls.append(list(argv)) or completed(list(argv))
+        ),
     )
     stable = ContainerInfo(
         id="stable-id",
@@ -279,7 +444,9 @@ def test_stop_stack_stops_stable_names_but_not_snapshots(
 def test_legacy_rollback_named_container_is_detected_only_for_known_spx_image(
     tmp_path: Path,
 ) -> None:
-    manager = StackManager(tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv)))
+    manager = StackManager(
+        tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv))
+    )
     managed = ContainerInfo(
         id="old-id",
         name="spx-rollback-old-id",
@@ -297,14 +464,20 @@ def test_legacy_rollback_named_container_is_detected_only_for_known_spx_image(
     assert not manager.is_managed_container(unrelated)
 
 
-def test_rollback_stops_current_transaction_and_restores_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_rollback_stops_current_transaction_and_restores_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     calls: list[list[str]] = []
     manager = StackManager(
         tmp_path / "compose.yml",
         installation_id="new-installation",
-        runner=lambda argv, **kwargs: (calls.append(list(argv)) or completed(list(argv))),
+        runner=lambda argv, **kwargs: (
+            calls.append(list(argv)) or completed(list(argv))
+        ),
     )
-    current = type("Container", (), {"id": "new-id", "name": "spx-server", "running": True})()
+    current = type(
+        "Container", (), {"id": "new-id", "name": "spx-server", "running": True}
+    )()
     monkeypatch.setattr(manager, "transaction_containers", lambda: [current])
     snapshot_path = tmp_path / "snapshot.json"
     snapshot_path.write_text(
@@ -312,7 +485,13 @@ def test_rollback_stops_current_transaction_and_restores_snapshot(tmp_path: Path
             {
                 "project": "spx",
                 "installation_id": "new-installation",
-                "containers": [{"id": "old-id", "name": "spx-server", "rollback_name": "spx-rollback-old"}],
+                "containers": [
+                    {
+                        "id": "old-id",
+                        "name": "spx-server",
+                        "rollback_name": "spx-rollback-old",
+                    }
+                ],
                 "created_at": 0,
             }
         ),
