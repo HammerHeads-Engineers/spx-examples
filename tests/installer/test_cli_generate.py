@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -183,18 +184,28 @@ def test_launch_stack_does_not_forward_installer_python_path_with_spaces(
     output_dir = tmp_path / "Application Support" / "SPX" / "generated"
     output_dir.mkdir(parents=True)
     marker = tmp_path / "child-env.txt"
-    script = output_dir / "spx-start.sh"
-    script.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "if [[ -n \"${PYTHON_BIN+x}\" ]]; then exit 17; fi\n"
-        "printf '%s' \"${SPX_SYSTEM_PYTHON_BIN:-}\" > \""
-        + str(marker)
-        + "\"\n",
-        encoding="utf-8",
+    if os.name == "nt":
+        script = output_dir / "stack_runner.py"
+        script.write_text(
+            "import os\n"
+            "from pathlib import Path\n"
+            f"Path({str(marker)!r}).write_text(os.environ.get('SPX_SYSTEM_PYTHON_BIN', ''))\n",
+            encoding="utf-8",
+        )
+    else:
+        script = output_dir / "spx-start.sh"
+        script.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            'if [[ -n "${PYTHON_BIN+x}" ]]; then exit 17; fi\n'
+            'printf \'%s\' "${SPX_SYSTEM_PYTHON_BIN:-}" > "' + str(marker) + '"\n',
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+    monkeypatch.setenv(
+        "PYTHON_BIN",
+        str(tmp_path / "Library" / "Application Support" / "installer-python"),
     )
-    script.chmod(0o755)
-    monkeypatch.setenv("PYTHON_BIN", str(tmp_path / "Library" / "Application Support" / "installer-python"))
     monkeypatch.setenv("SPX_SYSTEM_PYTHON_BIN", "/usr/bin/python3")
 
     assert cli._launch_stack(output_dir)

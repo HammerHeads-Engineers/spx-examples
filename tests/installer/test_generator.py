@@ -239,7 +239,9 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         if name.endswith("-knx_gateway")
     )
     assert transaction_server["container_name"].startswith("spx-transaction-")
-    assert transaction_server["container_name"] != services["spx-server"]["container_name"]
+    assert (
+        transaction_server["container_name"] != services["spx-server"]["container_name"]
+    )
     assert "knx_gateway" in transaction_knx["networks"]["default"]["aliases"]
     assert (output_dir / "assets" / "knx" / "knxd.ini").is_file()
     assert "8000:8000" in services["spx-server"]["ports"]
@@ -278,7 +280,19 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert bundle["ui_version"] == "v1.0.0-rc.68"
     assert bundle["compose_project"] == "spx"
     assert {1883, 502, 3671, 6720, 8000}.issubset(set(bundle["required_ports"]))
-    assert bundle.get("services") == ["mqtt_broker", "modbus_tcp_gateway", "knx_gateway"]
+    assert bundle["modbus_port_mappings"] == {
+        "gateway_host_port": 502,
+        "gateway_container_port": 502,
+        "instance_host_port_start": 5020,
+        "instance_host_port_end": 5120,
+        "instance_container_port_start": 5020,
+        "instance_port_count": 101,
+    }
+    assert bundle.get("services") == [
+        "mqtt_broker",
+        "modbus_tcp_gateway",
+        "knx_gateway",
+    ]
     assert len(bundle["models"]) == 1
     assert bundle["models"][0]["id"] == "sensor"
     assert bundle.get("instances") == [
@@ -294,6 +308,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     runtime_path = output_dir / "runtime_bootstrap.py"
     macos_python_helper_path = output_dir / "macos_python_runtime.sh"
     assert runner_path.exists()
+    assert (output_dir / "modbus_port_configurator.py").exists()
     assert runtime_path.exists()
     assert macos_python_helper_path.exists()
     start_content = start_path.read_text(encoding="utf-8")
@@ -316,7 +331,12 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert 'RUNTIME_PYTHON_BIN=""' in start_content
     assert "TRANSACTION_PREPARED=0" in start_content
     assert "TRANSACTION_PREPARED=1" in start_content
+    assert 'if [ "$TRANSACTION_PREPARED" -eq 1 ]; then' in start_content
     assert "PREPARE_ARGS=(" in start_content
+    assert 'modbus_port_configurator.py" stage' in start_content
+    assert 'modbus_port_configurator.py" commit' in start_content
+    assert 'PREPARE_ARGS+=("--ports" "$REQUIRED_PORTS")' in start_content
+    assert "__REQUIRED_PORTS__" not in start_content
     assert "ASSUME_ARGS" not in start_content
     assert "commit" in start_content
     stack_runner_path = output_dir / "stack_runner.py"
@@ -338,7 +358,11 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "btvirt_adapter" in stack_runner_content
     assert "bootstrap_runner.py" in stack_runner_content
     assert "runtime_bootstrap.py" in stack_runner_content
+    assert "modbus_port_configurator.py" in stack_runner_content
     assert "wait-health" in stack_runner_content
+    assert '"--services"' in stack_runner_content
+    assert '"--status"' in stack_runner_content
+    assert "[spx-start] Running services:" in stack_runner_content
     assert "docker compose" not in stack_runner_content
     assert "pip install --user" not in stack_runner_content
 
@@ -403,13 +427,21 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     )
     generator.generate(selection, output_dir)
 
-    runtime_python = output_dir / "Library" / "Application Support" / "SPX" / "runtime" / "bin" / "python"
+    runtime_python = (
+        output_dir
+        / "Library"
+        / "Application Support"
+        / "SPX"
+        / "runtime"
+        / "bin"
+        / "python"
+    )
     runtime_python.parent.mkdir(parents=True)
     runtime_python.write_text(
         "#!/bin/sh\n"
-        "if [ \"$1\" = \"-\" ]; then exit 1; fi\n"
-        "case \"$1\" in\n"
-        "  *stack_manager.py) printf '%s\\n' \"$2 $*\" >> \"$FAKE_RUNTIME_LOG\"; exit 0 ;;\n"
+        'if [ "$1" = "-" ]; then exit 1; fi\n'
+        'case "$1" in\n'
+        '  *stack_manager.py) printf \'%s\\n\' "$2 $*" >> "$FAKE_RUNTIME_LOG"; exit 0 ;;\n'
         "  *bootstrap_runner.py) printf '%s\\n' bootstrap >> \"$FAKE_RUNTIME_LOG\"; exit 0 ;;\n"
         "esac\n"
         "exit 0\n",
@@ -425,12 +457,46 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     )
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
-    (fake_bin / "docker").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    (fake_bin / "docker").write_text(
+        "#!/bin/sh\n"
+        'case "$*" in\n'
+        "  *\"ps --services --status running\"*) printf '%s\\n' transaction-test-spx-server ;;\n"
+        "esac\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
     (fake_bin / "docker").chmod(0o755)
+    bash = shutil.which("bash")
+    if os.name == "nt":
+        bash = next(
+            (
+                str(candidate)
+                for candidate in (
+                    Path(r"C:\Program Files\Git\bin\bash.exe"),
+                    Path(r"C:\Program Files\Git\usr\bin\bash.exe"),
+                )
+                if candidate.is_file()
+            ),
+            None,
+        )
+        if bash is None:
+            pytest.skip(
+                "A Bash executable is required to exercise the generated shell launcher"
+            )
     system_python = tmp_path / "Library" / "Application Support" / "system-python"
     system_python.parent.mkdir(parents=True, exist_ok=True)
+    python_executable = sys.executable
+    if os.name == "nt":
+        converted = subprocess.run(
+            [bash, "-lc", 'cygpath -u "$1"', "_", sys.executable],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert converted.returncode == 0, converted.stderr
+        python_executable = converted.stdout.strip()
     system_python.write_text(
-        f"#!/bin/sh\nexec {sys.executable!s} \"$@\"\n",
+        f"#!/bin/sh\nexec '{python_executable}' \"$@\"\n",
         encoding="utf-8",
     )
     system_python.chmod(0o755)
@@ -441,11 +507,14 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         "FAKE_RUNTIME_PYTHON": str(runtime_python),
         "FAKE_RUNTIME_LOG": str(log_path),
         "SPX_SYSTEM_PYTHON_BIN": str(system_python),
-        "PYTHON_BIN": str(tmp_path / "Library" / "Application Support" / "installer-python"),
+        "PYTHON_BIN": str(
+            tmp_path / "Library" / "Application Support" / "installer-python"
+        ),
     }
+    command_prefix = [bash] if bash else []
 
     first = subprocess.run(
-        [str(output_dir / "spx-start.sh")],
+        [*command_prefix, str(output_dir / "spx-start.sh")],
         cwd=output_dir,
         env=environment,
         capture_output=True,
@@ -453,7 +522,7 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         check=False,
     )
     second = subprocess.run(
-        [str(output_dir / "spx-start.sh"), "--yes"],
+        [*command_prefix, str(output_dir / "spx-start.sh"), "--yes"],
         cwd=output_dir,
         env=environment,
         capture_output=True,
@@ -463,7 +532,9 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
 
     assert first.returncode == 0, first.stderr
     assert second.returncode == 0, second.stderr
-    assert "unbound variable" not in (first.stdout + first.stderr + second.stdout + second.stderr)
+    assert "unbound variable" not in (
+        first.stdout + first.stderr + second.stdout + second.stderr
+    )
     log = log_path.read_text(encoding="utf-8")
     assert "prepare" in log
     assert "--yes" in log
@@ -500,8 +571,10 @@ def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
     assert "command" not in ui_service
     assert ui_service["depends_on"]["spx-server"]["condition"] == "service_healthy"
     start_content = (output_dir / "spx-start.sh").read_text(encoding="utf-8")
-    assert 'ps --services --status running' in start_content
+    assert "ps --services --status running" in start_content
     assert 'grep -Fxq "$TRANSACTION_UI_SERVICE"' in start_content
+    assert "[spx-start] Running services:" in start_content
+    assert ' --env-file "$SCRIPT_DIR/.env" ps\n' not in start_content
     transaction_services = yaml.safe_load(
         (output_dir / "docker-compose.transaction.yml").read_text(encoding="utf-8")
     )["services"]
@@ -568,7 +641,9 @@ def test_generator_uses_runtime_available_healthcheck(tmp_path: Path) -> None:
     output_dir = tmp_path / "out-health"
     generator.generate(selection, output_dir)
 
-    server = yaml.safe_load((output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8"))["services"]["spx-server"]
+    server = yaml.safe_load(
+        (output_dir / "docker-compose.generated.yml").read_text(encoding="utf-8")
+    )["services"]["spx-server"]
     assert server["healthcheck"]["test"][0:3] == ["CMD", "python", "-c"]
     assert "/health" in server["healthcheck"]["test"][3]
 
@@ -662,6 +737,8 @@ def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
     )
     transaction_prepare = start_sh.index("TRANSACTION_PREPARED=1")
     assert network_preflight < manager_preflight < transaction_prepare
+    assert start_sh.index('modbus_port_configurator.py" stage') < network_preflight
+    assert start_sh.index('modbus_port_configurator.py" commit') > transaction_prepare
     stack_runner = (output_dir / "stack_runner.py").read_text(encoding="utf-8")
     network_preflight_python = stack_runner.index('stage = "preflight"')
     network_helper_python = stack_runner.index(
@@ -676,6 +753,13 @@ def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
         < network_helper_python
         < manager_prepare_python
         < transaction_prepare_python
+    )
+    assert (
+        stack_runner.index('"stage"', network_preflight_python) < network_helper_python
+    )
+    assert (
+        stack_runner.index('"commit"', manager_prepare_python)
+        > transaction_prepare_python
     )
 
 

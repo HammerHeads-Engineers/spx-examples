@@ -34,6 +34,9 @@ SPX_LABEL_STACK = "com.simplephysx.spx.stack"
 SPX_LABEL_MANAGED_BY = "com.simplephysx.spx.managed-by"
 SPX_LABEL_PROJECT = "com.simplephysx.spx.project"
 SPX_LABEL_INSTALLATION_ID = "com.simplephysx.spx.installation-id"
+MODBUS_GATEWAY_PORT = 502
+MODBUS_INSTANCE_PORT_START = 5020
+MODBUS_INSTANCE_PORT_END = 5120
 
 
 class DeploymentGenerator:
@@ -146,7 +149,12 @@ class DeploymentGenerator:
                 service_bind_addresses.get("modbus_tcp_gateway", "127.0.0.1"),
             )
             builtin_ports.extend(
-                [f"{bind_expression}:{port}:{port}" for port in range(5020, 5121)]
+                [
+                    f"{bind_expression}:{port}:{port}"
+                    for port in range(
+                        MODBUS_INSTANCE_PORT_START, MODBUS_INSTANCE_PORT_END + 1
+                    )
+                ]
             )
 
         labels = self._stack_labels(installation_id)
@@ -272,7 +280,9 @@ class DeploymentGenerator:
         if ports:
             service["ports"] = ports
         if deployment.volumes:
-            service["volumes"] = [self._process_volume(entry, assets_root) for entry in deployment.volumes]
+            service["volumes"] = [
+                self._process_volume(entry, assets_root) for entry in deployment.volumes
+            ]
         if deployment.environment:
             service["environment"] = deployment.environment
         if deployment.entrypoint:
@@ -335,9 +345,9 @@ class DeploymentGenerator:
 
         relative = None
         if clean.startswith("library/assets/"):
-            relative = clean[len("library/assets/"):]
+            relative = clean[len("library/assets/") :]
         elif clean.startswith("docker/"):
-            relative = clean[len("docker/"):]
+            relative = clean[len("docker/") :]
 
         if relative is None:
             return host
@@ -424,7 +434,9 @@ class DeploymentGenerator:
                 file=sys.stderr,
             )
 
-    def _write_text_script(self, path: Path, command: str, *, executable: bool = False) -> None:
+    def _write_text_script(
+        self, path: Path, command: str, *, executable: bool = False
+    ) -> None:
         path.write_text(command, encoding="utf-8")
         if executable:
             mode = os.stat(path).st_mode
@@ -436,7 +448,11 @@ class DeploymentGenerator:
             for entry in service.get("ports", []) or []:
                 raw = str(entry).split("/")[0]
                 parts = raw.split(":")
-                candidate = parts[0] if len(parts) == 2 else parts[-2] if len(parts) >= 3 else ""
+                candidate = (
+                    parts[0]
+                    if len(parts) == 2
+                    else parts[-2] if len(parts) >= 3 else ""
+                )
                 digits = "".join(char for char in candidate if char.isdigit())
                 if digits and 1 <= int(digits) <= 65535:
                     ports.add(int(digits))
@@ -451,10 +467,21 @@ class DeploymentGenerator:
     ) -> None:
         """Write the transactional scripts used by every generated bundle."""
 
-        shutil.copy2(Path(__file__).with_name("stack_manager.py"), output_dir / "stack_manager.py")
-        shutil.copy2(Path(__file__).with_name("stack_runner.py"), output_dir / "stack_runner.py")
+        shutil.copy2(
+            Path(__file__).with_name("stack_manager.py"),
+            output_dir / "stack_manager.py",
+        )
+        shutil.copy2(
+            Path(__file__).with_name("stack_runner.py"), output_dir / "stack_runner.py"
+        )
         shutil.copy2(Path(__file__).with_name("network.py"), output_dir / "network.py")
-        shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
+        shutil.copy2(
+            Path(__file__).with_name("modbus_port_configurator.py"),
+            output_dir / "modbus_port_configurator.py",
+        )
+        shutil.copy2(
+            Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py"
+        )
         self._write_runtime_bootstrap(output_dir)
         self._write_macos_python_helper(output_dir)
 
@@ -499,15 +526,17 @@ class DeploymentGenerator:
             transaction_services[transaction_service_name] = service
             final_name_pairs.append((service_name, final_name))
         transaction_compose["services"] = transaction_services
-        with (output_dir / "docker-compose.transaction.yml").open("w", encoding="utf-8") as handle:
+        with (output_dir / "docker-compose.transaction.yml").open(
+            "w", encoding="utf-8"
+        ) as handle:
             yaml.safe_dump(transaction_compose, handle, sort_keys=False)
 
-        required_ports = ",".join(str(port) for port in self._compose_host_ports(compose_data))
         final_name_bash = "\n".join(
             f'  "--final-name" "{service_name}={final_name}"'
             for service_name, final_name in final_name_pairs
         )
-        bash = r'''SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        bash = (
+            r"""SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
   # shellcheck source=/dev/null
@@ -518,6 +547,7 @@ SNAPSHOT="$SCRIPT_DIR/.spx-stack-snapshot.json"
 MANAGER="$SCRIPT_DIR/stack_manager.py"
 TRANSACTION_COMPOSE_TEMPLATE="$SCRIPT_DIR/docker-compose.transaction.yml"
 TRANSACTION_TOKEN="$(date +%s)-$$"
+STAGED_PORTS_FILE="$SCRIPT_DIR/.spx-modbus-ports.pending-${TRANSACTION_TOKEN}.json"
 TRANSACTION_COMPOSE="$SCRIPT_DIR/.docker-compose.transaction.${TRANSACTION_TOKEN}.yml"
 TRANSACTION_UI_SERVICE="transaction-${TRANSACTION_TOKEN}-spx-ui"
 STAGE="runtime"
@@ -553,7 +583,6 @@ PREPARE_ARGS=(
   "--project" "spx"
   "--installation-id" "$INSTALLATION_ID"
   "--snapshot" "$SNAPSHOT"
-  "--ports" "__REQUIRED_PORTS__"
 )
 FINAL_NAME_ARGS=(
 __FINAL_NAME_BASH__
@@ -567,7 +596,11 @@ done
 cleanup_on_failure() {
   local status=$?
   trap - ERR INT TERM
-  echo "[spx-start] stage=${STAGE}: installation failed (exit code ${status}); attempting rollback" >&2
+  if [ "$TRANSACTION_PREPARED" -eq 1 ]; then
+    echo "[spx-start] stage=${STAGE}: installation failed (exit code ${status}); attempting rollback" >&2
+  else
+    echo "[spx-start] stage=${STAGE}: installation failed (exit code ${status})" >&2
+  fi
   if [ -n "${BLE_ADAPTER_PID:-}" ] && kill -0 "$BLE_ADAPTER_PID" >/dev/null 2>&1; then
     kill "$BLE_ADAPTER_PID" >/dev/null 2>&1 || true
   fi
@@ -583,6 +616,7 @@ cleanup_on_failure() {
   if [ -n "${TRANSACTION_COMPOSE:-}" ]; then
     rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
   fi
+  rm -f "$STAGED_PORTS_FILE" >/dev/null 2>&1 || true
   exit "$status"
 }
 trap cleanup_on_failure ERR INT TERM
@@ -613,8 +647,6 @@ if [ ! -f "$TRANSACTION_COMPOSE_TEMPLATE" ]; then
   echo "[spx-start] stage=runtime: missing transaction Compose template" >&2
   exit 1
 fi
-sed "s/__TRANSACTION_TOKEN__/${TRANSACTION_TOKEN}/g" "$TRANSACTION_COMPOSE_TEMPLATE" > "$TRANSACTION_COMPOSE"
-
 if "$RUNTIME_PYTHON_BIN" - "$SCRIPT_DIR/bundle.json" <<'PY'
 import json
 import sys
@@ -635,9 +667,24 @@ then
 fi
 
 STAGE="preflight"
-"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env" --published-ports "__REQUIRED_PORTS__"
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" stage \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --bundle "$SCRIPT_DIR/bundle.json" \
+  --env-file "$SCRIPT_DIR/.env" \
+  --staged-file "$STAGED_PORTS_FILE"
+REQUIRED_PORTS="$("$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" required-ports \
+  --staged-file "$STAGED_PORTS_FILE")"
+PREPARE_ARGS+=("--ports" "$REQUIRED_PORTS")
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/network.py" --env-file "$SCRIPT_DIR/.env" --published-ports "$REQUIRED_PORTS"
 "$RUNTIME_PYTHON_BIN" "$MANAGER" "${PREPARE_ARGS[@]}"
 TRANSACTION_PREPARED=1
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" commit \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+  --transaction-template "$TRANSACTION_COMPOSE_TEMPLATE" \
+  --bundle "$SCRIPT_DIR/bundle.json" \
+  --staged-file "$STAGED_PORTS_FILE"
+rm -f "$STAGED_PORTS_FILE" >/dev/null 2>&1 || true
+sed "s/__TRANSACTION_TOKEN__/${TRANSACTION_TOKEN}/g" "$TRANSACTION_COMPOSE_TEMPLATE" > "$TRANSACTION_COMPOSE"
 
 STAGE="compose"
 docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" up -d
@@ -664,7 +711,16 @@ STAGE="bootstrap"
   --api-url "${SPX_BASE_URL:-http://localhost:8000}"
 
 STAGE="start"
-docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" ps
+RUNNING_SERVICES="$(docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" ps --services --status running)" || {
+  echo "[spx-start] stage=start: could not inspect running services" >&2
+  exit 1
+}
+if [ -z "$RUNNING_SERVICES" ]; then
+  echo "[spx-start] stage=start: no selected SPX services are running" >&2
+  exit 1
+fi
+RUNNING_SERVICE_LIST="$(printf '%s\n' "$RUNNING_SERVICES" | awk '{ sub(/^transaction-[0-9]+-[0-9]+-/, ""); if (NR > 1) printf ", "; printf "%s", $0 } END { print "" }')"
+echo "[spx-start] Running services: ${RUNNING_SERVICE_LIST}"
 
 STAGE="commit"
 "$RUNTIME_PYTHON_BIN" "$MANAGER" commit \
@@ -679,14 +735,23 @@ rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
 echo ""
 echo "[spx-start] SPX started successfully."
 echo "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
-'''.replace("__INSTALLATION_ID__", installation_id).replace("__REQUIRED_PORTS__", required_ports).replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement).replace("__FINAL_NAME_BASH__", final_name_bash)
+"$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/modbus_port_configurator.py" summary \
+  --bundle "$SCRIPT_DIR/bundle.json" \
+  --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" || true
+""".replace(
+                "__INSTALLATION_ID__", installation_id
+            )
+            .replace("__SPX_PYTHON_REQUIREMENT__", spx_python_requirement)
+            .replace("__FINAL_NAME_BASH__", final_name_bash)
+        )
         ui_enabled = SPX_UI_SERVICE_NAME in (compose_data.get("services", {}) or {})
         self._write_script(
             output_dir / "spx-start.sh",
-            bash.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip() + "\n",
+            bash.replace("__UI_ENABLED__", "yes" if ui_enabled else "no").strip()
+            + "\n",
         )
 
-        powershell = r'''[CmdletBinding()]
+        powershell = r"""[CmdletBinding()]
 param([switch]$Yes)
 $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -710,10 +775,10 @@ if (Test-Path $Launcher) {
     exit 1
 }
 exit $LASTEXITCODE
-'''
+"""
         self._write_ps_script(output_dir / "spx-start.ps1", powershell)
 
-        stop_sh = r'''SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+        stop_sh = r"""SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
   # shellcheck source=/dev/null
@@ -735,9 +800,11 @@ exec "$SYSTEM_PYTHON_BIN" "$SCRIPT_DIR/stack_manager.py" stop \
   --env-file "$SCRIPT_DIR/.env" \
   --project spx \
   --installation-id "__INSTALLATION_ID__"
-'''.replace("__INSTALLATION_ID__", installation_id)
+""".replace(
+            "__INSTALLATION_ID__", installation_id
+        )
         self._write_script(output_dir / "spx-stop.sh", stop_sh.strip() + "\n")
-        stop_ps = r'''$ErrorActionPreference = 'Stop'
+        stop_ps = r"""$ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Launcher = Join-Path $ScriptDir '..\app\SpxLauncher.exe'
 $RunnerArgs = @((Join-Path $ScriptDir 'stack_runner.py'), 'stop')
@@ -756,18 +823,18 @@ if (Test-Path $Launcher) {
     exit 1
 }
 exit $LASTEXITCODE
-'''
+"""
         self._write_ps_script(output_dir / "spx-stop.ps1", stop_ps.strip() + "\n")
 
-        start_command = '''#!/bin/bash
+        start_command = """#!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 exec bash "$SCRIPT_DIR/spx-start.sh" "$@"
-'''
-        stop_command = '''#!/bin/bash
+"""
+        stop_command = """#!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 exec bash "$SCRIPT_DIR/spx-stop.sh" "$@"
-'''
-        start_bat = r'''@echo off
+"""
+        start_bat = r"""@echo off
 setlocal
 if exist "%~dp0..\app\SpxLauncher.exe" goto run_native
 where py >nul 2>nul
@@ -790,8 +857,8 @@ exit /b %ERRORLEVEL%
 :run_python
 python "%~dp0stack_runner.py" start %*
 exit /b %ERRORLEVEL%
-'''
-        stop_bat = r'''@echo off
+"""
+        stop_bat = r"""@echo off
 setlocal
 if exist "%~dp0..\app\SpxLauncher.exe" goto run_native
 where py >nul 2>nul
@@ -814,9 +881,13 @@ exit /b %ERRORLEVEL%
 :run_python
 python "%~dp0stack_runner.py" stop %*
 exit /b %ERRORLEVEL%
-'''
-        self._write_text_script(output_dir / "spx-start.command", start_command, executable=True)
-        self._write_text_script(output_dir / "spx-stop.command", stop_command, executable=True)
+"""
+        self._write_text_script(
+            output_dir / "spx-start.command", start_command, executable=True
+        )
+        self._write_text_script(
+            output_dir / "spx-stop.command", stop_command, executable=True
+        )
         self._write_text_script(output_dir / "spx-start.bat", start_bat)
         self._write_text_script(output_dir / "spx-stop.bat", stop_bat)
 
@@ -857,10 +928,24 @@ exit /b %ERRORLEVEL%
             "spx_python_requirement": spx_python_requirement,
             "final_container_names": [
                 f"{service_name}={str(service.get('container_name', service_name))}"
-                for service_name, service in (compose_data or {}).get("services", {}).items()
+                for service_name, service in (compose_data or {})
+                .get("services", {})
+                .items()
             ],
-            "ui_enabled": SPX_UI_SERVICE_NAME in (compose_data or {}).get("services", {}),
+            "ui_enabled": SPX_UI_SERVICE_NAME
+            in (compose_data or {}).get("services", {}),
         }
+        if "modbus_tcp_gateway" in bundle["services"]:
+            bundle["modbus_port_mappings"] = {
+                "gateway_host_port": MODBUS_GATEWAY_PORT,
+                "gateway_container_port": MODBUS_GATEWAY_PORT,
+                "instance_host_port_start": MODBUS_INSTANCE_PORT_START,
+                "instance_host_port_end": MODBUS_INSTANCE_PORT_END,
+                "instance_container_port_start": MODBUS_INSTANCE_PORT_START,
+                "instance_port_count": MODBUS_INSTANCE_PORT_END
+                - MODBUS_INSTANCE_PORT_START
+                + 1,
+            }
         bundle_path = output_dir / "bundle.json"
         bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
         self._copy_model_sources(model_paths, output_dir)
@@ -883,7 +968,9 @@ exit /b %ERRORLEVEL%
             return "spx-python"
 
         content = pyproject.read_text(encoding="utf-8")
-        match = re.search(r'^\s*spx-python\s*=\s*"([^"]+)"', content, flags=re.MULTILINE)
+        match = re.search(
+            r'^\s*spx-python\s*=\s*"([^"]+)"', content, flags=re.MULTILINE
+        )
         if not match:
             return "spx-python"
 
@@ -896,7 +983,9 @@ exit /b %ERRORLEVEL%
         # Keep one canonical implementation.  The legacy inline runner below
         # is intentionally unreachable and can be removed after downstream
         # callers stop invoking this private compatibility hook.
-        shutil.copy2(Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py")
+        shutil.copy2(
+            Path(__file__).with_name("bootstrap.py"), output_dir / "bootstrap_runner.py"
+        )
         return
 
         runner = """#!/usr/bin/env python3
