@@ -11,7 +11,7 @@ from shutil import get_terminal_size
 from textwrap import shorten
 from typing import Dict, List, Sequence
 
-from . import paths, ui
+from . import paths, terminal_selection, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .network import discover_ipv4_addresses
 from .selection import (
@@ -307,6 +307,42 @@ class InstallerWizard:
             print(f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')}\n")
 
         while True:
+            protocol_choice = len(entries) + 1
+            interactive = terminal_selection.select_many(
+                "Select packages or choose protocols instead:",
+                [ind.name for ind in entries] + ["Choose by protocols instead"],
+                allow_empty=True,
+                shortcut_keys=("p", "0"),
+                exclusive_indices=(protocol_choice,),
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                if interactive.shortcut or protocol_choice in interactive.indices:
+                    protocols = self._prompt_protocols(index)
+                    if protocols:
+                        return [], protocols
+                    print(ui.warn("  Please select at least one protocol."))
+                    continue
+                package_positions = [
+                    position
+                    for position in interactive.indices
+                    if position != protocol_choice
+                ]
+                if not package_positions:
+                    if default_protocols:
+                        return [], default_protocols
+                    print(
+                        ui.warn(
+                            "  Default protocols are unavailable; please select an entry."
+                        )
+                    )
+                    continue
+                return (
+                    [entries[position - 1].id for position in package_positions],
+                    [],
+                )
+
             raw = input(
                 "Enter package numbers (comma-separated, ENTER for default protocols, 0 for protocols, q to quit): "
             ).strip()
@@ -367,6 +403,23 @@ class InstallerWizard:
             )
 
         while True:
+            sorted_profiles = sorted(available_profiles)
+            interactive = terminal_selection.select_many(
+                "Select starter scenarios; Enter keeps package defaults only:",
+                [
+                    f"{index.profiles[profile_id].name} (pack: {index.profiles[profile_id].pack_id})"
+                    for profile_id in sorted_profiles
+                ],
+                allow_empty=True,
+                select_all_key="a",
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                return [
+                    sorted_profiles[position - 1] for position in interactive.indices
+                ]
+
             raw = input(
                 "Select starter scenarios (comma-separated, ENTER to use package defaults only, a for all, q to quit): "
             ).strip()
@@ -429,7 +482,9 @@ class InstallerWizard:
                     print(f"  • {instance_key} ({model_id})")
                 else:
                     print(f"  • {instance_key}")
-            if self._prompt_yes_no("Start these instances after creation? [Y/n]: ", default=True):
+            if self._prompt_yes_no(
+                "Start these instances after creation? [Y/n]: ", default=True
+            ):
                 chosen = self._prompt_instance_subset(start_keys)
                 for instance_key in chosen:
                     if instance_key in seen:
@@ -442,6 +497,17 @@ class InstallerWizard:
         if not instance_keys:
             return []
         while True:
+            interactive = terminal_selection.select_many(
+                "Select instances to auto-start:",
+                list(instance_keys),
+                initial_indices=range(1, len(instance_keys) + 1),
+                allow_empty=False,
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                return [instance_keys[position - 1] for position in interactive.indices]
+
             raw = input(
                 "Select instance numbers to auto-start (comma-separated, ENTER for all): "
             ).strip()
@@ -449,11 +515,15 @@ class InstallerWizard:
             if not raw:
                 return list(instance_keys)
             try:
-                choices = [int(token.strip()) for token in raw.split(",") if token.strip()]
+                choices = [
+                    int(token.strip()) for token in raw.split(",") if token.strip()
+                ]
             except ValueError:
                 print(ui.warn("  Invalid input. Please enter instance numbers."))
                 continue
-            if not choices or any(choice < 1 or choice > len(instance_keys) for choice in choices):
+            if not choices or any(
+                choice < 1 or choice > len(instance_keys) for choice in choices
+            ):
                 print(ui.warn(f"  Values must be between 1 and {len(instance_keys)}."))
                 continue
             return [instance_keys[index - 1] for index in sorted(set(choices))]
@@ -489,6 +559,28 @@ class InstallerWizard:
         for idx, proto in enumerate(sorted_protocols, start=1):
             print(f"  [{ui.accent(str(idx))}] {self._format_protocol_label(proto)}")
         while True:
+            interactive = terminal_selection.select_many(
+                "Select protocols; Enter with defaults selected keeps the default set:",
+                [self._format_protocol_label(proto) for proto in sorted_protocols],
+                initial_indices=[
+                    position
+                    for position, proto in enumerate(sorted_protocols, start=1)
+                    if proto in default_protocols
+                ],
+                allow_empty=True,
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                if not interactive.indices:
+                    if default_protocols:
+                        return default_protocols
+                    print(ui.warn("  Please select at least one protocol."))
+                    continue
+                return [
+                    sorted_protocols[position - 1] for position in interactive.indices
+                ]
+
             prompt = "Select protocols (comma-separated, ENTER for default"
             if default_protocol_label:
                 prompt += f" {default_protocol_label}"
@@ -534,6 +626,17 @@ class InstallerWizard:
             print()
 
         while True:
+            interactive = terminal_selection.select_many(
+                "Select services to enable:",
+                [f"{service.name} ({service.protocol})" for service in candidates],
+                initial_indices=range(1, len(candidates) + 1),
+                allow_empty=True,
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                return [candidates[position - 1].id for position in interactive.indices]
+
             raw = input(
                 "Select services to enable (comma-separated, ENTER for all, none for none, q to quit): "
             ).strip()
@@ -616,6 +719,9 @@ class InstallerWizard:
                 "  Address (required, q to quit): ",
                 len(addresses),
                 allow_empty=False,
+                options=[
+                    f"{address.interface} — {address.address}" for address in addresses
+                ],
             )
             selected = addresses[choice[0] - 1]
             bindings[service.id] = selected.address
@@ -698,8 +804,22 @@ class InstallerWizard:
         max_index: int,
         *,
         allow_empty: bool,
+        options: Sequence[str] | None = None,
     ) -> List[int]:
         while True:
+            interactive = terminal_selection.select_one(
+                prompt,
+                (
+                    list(options)
+                    if options is not None
+                    else [str(i) for i in range(1, max_index + 1)]
+                ),
+            )
+            if interactive is not None:
+                if interactive.shortcut == "q":
+                    self._check_quit("q")
+                return interactive.indices
+
             raw = input(prompt).strip()
             self._check_quit(raw)
             if not raw and allow_empty:
