@@ -381,6 +381,10 @@ class StackManager:
             and labels.get(LABEL_MANAGED_BY) == "installer"
         ):
             return True
+        if self._uses_current_compose_file(container):
+            # The exact generated Compose file is ownership evidence for its
+            # third-party service containers too, such as KNX and brokers.
+            return True
         if labels.get("com.docker.compose.project") == self.project:
             # A Compose project name is not an ownership proof by itself:
             # unrelated services can share the same project on a developer
@@ -424,6 +428,19 @@ class StackManager:
         if not prefixes:
             return False
         return self._image_compatible_with_service(container.image, container.name)
+
+    def _uses_current_compose_file(self, container: ContainerInfo) -> bool:
+        config_files = container.labels.get(
+            "com.docker.compose.project.config_files", ""
+        )
+        if not config_files:
+            return False
+        current = os.path.normcase(os.path.abspath(str(self.compose_file)))
+        return any(
+            os.path.normcase(os.path.abspath(candidate.strip())) == current
+            for candidate in config_files.split(",")
+            if candidate.strip()
+        )
 
     def detect_existing_stacks(self) -> list[ExistingStack]:
         grouped: dict[tuple[str, str], ExistingStack] = {}
@@ -573,7 +590,8 @@ class StackManager:
         owners: dict[int, list[str]] = {}
         for container in self.list_containers():
             # Docker inspect retains HostConfig.PortBindings for exited
-            # containers. Those bindings do not occupy host ports.
+            # containers. Those bindings do not occupy host ports and must
+            # not block startup or the user's retry loop.
             if not getattr(container, "running", True):
                 continue
             for port in container.ports:

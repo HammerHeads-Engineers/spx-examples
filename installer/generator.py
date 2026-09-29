@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import uuid
 import stat
 from pathlib import Path
@@ -420,7 +421,18 @@ class DeploymentGenerator:
         os.chmod(path, mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     def _write_ps_script(self, path: Path, command: str) -> None:
-        path.write_text(command, encoding="utf-8")
+        try:
+            path.write_text(command, encoding="utf-8")
+        except PermissionError:
+            if os.name != "nt":
+                raise
+            print(
+                f"[spx-installer] Windows denied writing the optional PowerShell "
+                f"launcher '{path.name}'. Continuing; use the matching .bat "
+                "launcher. Check Windows Security or endpoint-protection logs "
+                "if you need the PowerShell wrapper.",
+                file=sys.stderr,
+            )
 
     def _write_text_script(
         self, path: Path, command: str, *, executable: bool = False
