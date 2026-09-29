@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Choose and persist host-side Modbus port mappings for generated stacks."""
+"""Choose and persist host-side TCP port mappings for generated stacks."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Mapping
 
 import yaml
 
@@ -25,6 +25,7 @@ INSTANCE_CONTAINER_START = 5020
 INSTANCE_PORT_COUNT = 101
 GATEWAY_SUGGESTION_START = 1502
 INSTANCE_SUGGESTION_START = 15020
+SERVICE_PORT_SUGGESTION_START = 15000
 
 _PORT_BINDING = re.compile(
     r"^(?P<prefix>.*:)(?P<host>\d+):(?P<container>\d+)" r"(?P<suffix>/(?:tcp|udp))?$"
@@ -183,6 +184,119 @@ def _ports_from_compose(compose: dict) -> list[int]:
             if parts is not None:
                 ports.add(parts[1])
     return sorted(ports)
+
+
+def _tcp_ports_from_compose(compose: dict) -> list[int]:
+    ports: set[int] = set()
+    services = compose.get("services", {})
+    if not isinstance(services, dict):
+        return []
+    for service in services.values():
+        if not isinstance(service, dict):
+            continue
+        for entry in service.get("ports", []) or []:
+            parts = _binding_parts(entry)
+            if parts is not None and _is_tcp(parts[3]):
+                ports.add(parts[1])
+    return sorted(ports)
+
+
+def _service_mapping_records(bundle: dict) -> list[dict]:
+    records = bundle.get("service_port_mappings", [])
+    if not isinstance(records, list):
+        return []
+    return [
+        record
+        for record in records
+        if isinstance(record, dict)
+        and str(record.get("transport", "tcp")).lower() == "tcp"
+        and str(record.get("key", ""))
+        and str(record.get("compose_service", ""))
+    ]
+
+
+def _resolve_compose_service(compose: dict, service_name: str) -> dict | None:
+    services = compose.get("services", {})
+    if not isinstance(services, dict):
+        return None
+    if service_name in services and isinstance(services[service_name], dict):
+        return services[service_name]
+    matches = [
+        service
+        for name, service in services.items()
+        if str(name).endswith(f"-{service_name}") and isinstance(service, dict)
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _service_mapping_binding(
+    compose: dict, record: Mapping[str, object]
+) -> tuple[dict, int, int] | None:
+    service = _resolve_compose_service(
+        compose, str(record.get("compose_service", ""))
+    )
+    if service is None:
+        return None
+    container_port = int(record.get("container_port", 0))
+    matches = []
+    for index, entry in enumerate(service.get("ports", []) or []):
+        parts = _binding_parts(entry)
+        if parts is not None and _is_tcp(parts[3]) and parts[2] == container_port:
+            matches.append((index, parts[1], str(entry)))
+    if len(matches) != 1:
+        return None
+    index, host_port, _ = matches[0]
+    return service, index, host_port
+
+
+def _service_mapping_hosts(bundle: dict, compose: dict) -> dict[str, int]:
+    hosts: dict[str, int] = {}
+    for record in _service_mapping_records(bundle):
+        key = str(record["key"])
+        binding = _service_mapping_binding(compose, record)
+        if binding is None:
+            # Older or hand-edited bundles may not expose every catalogued
+            # mapping. Do not guess which Compose port should be rewritten.
+            continue
+        hosts[key] = binding[2]
+    return hosts
+
+
+def _with_service_mapping_hosts(
+    compose: dict, bundle: dict, host_ports: Mapping[str, int]
+) -> dict:
+    result = json.loads(json.dumps(compose))
+    for record in _service_mapping_records(bundle):
+        key = str(record["key"])
+        if key not in host_ports:
+            continue
+        binding = _service_mapping_binding(result, record)
+        if binding is None:
+            raise PortConfigurationError(
+                f"Could not find the {record.get('service_name', record.get('service_id', key))} "
+                f"TCP container port {record.get('container_port')} in generated Compose configuration"
+            )
+        service, index, _ = binding
+        entries = list(service.get("ports", []) or [])
+        parts = _binding_parts(entries[index])
+        assert parts is not None
+        prefix, _, container_port, suffix = parts
+        service_host_port = int(host_ports[key])
+        if not 1 <= service_host_port <= 65535:
+            raise PortConfigurationError(
+                f"TCP host port for {record.get('service_name', key)} must be from 1 to 65535"
+            )
+        entries[index] = f"{prefix}{service_host_port}:{container_port}{suffix}"
+        service["ports"] = entries
+    return result
+
+
+def _service_mapping_label(record: Mapping[str, object]) -> str:
+    name = str(record.get("service_name") or record.get("service_id") or "TCP service")
+    purpose = str(record.get("purpose") or "").strip()
+    container_port = int(record.get("container_port", 0))
+    detail = f"container port {container_port}/TCP"
+    return f"{name} ({purpose}; {detail})" if purpose else f"{name} ({detail})"
 
 
 def _fixed_host_owners(compose: dict) -> dict[int, list[str]]:
@@ -381,6 +495,57 @@ def _ask_mapping(
         return choice
 
 
+def _ask_service_mapping(
+    *,
+    record: Mapping[str, object],
+    current: int,
+    suggestion: int,
+    conflicts: Iterable[str],
+    unavailable: set[int],
+    input_fn: Callable[[str], str],
+    output: Callable[[str], None],
+) -> int:
+    details = "; ".join(dict.fromkeys(conflicts)) or "another process or service"
+    label = _service_mapping_label(record)
+    while True:
+        output(
+            f"[spx-preflight] {label}: host port {current} has conflict(s): {details}. "
+            f"Suggested mapping: host {suggestion} -> container "
+            f"{record.get('container_port')}/TCP."
+        )
+        try:
+            answer = input_fn(
+                f"[spx-preflight] Press Enter to use host port {suggestion}, enter a new "
+                "host port, or type Q to quit: "
+            ).strip()
+        except EOFError as exc:
+            raise PortConfigurationCancelled(
+                "No terminal input is available to choose an alternate TCP service port. "
+                "Run spx-start interactively."
+            ) from exc
+        if answer.lower() == "q":
+            raise PortConfigurationCancelled(
+                "Port selection cancelled; no TCP service mapping was changed."
+            )
+        if not answer:
+            return suggestion
+        try:
+            choice = int(answer)
+        except ValueError:
+            output("[spx-preflight] Enter a port number or Q to quit.")
+            continue
+        if not 1 <= choice <= 65535:
+            output("[spx-preflight] The host port must be from 1 to 65535.")
+            continue
+        if choice in unavailable:
+            output(
+                f"[spx-preflight] Host port {choice} is occupied or already assigned. "
+                "Choose another port."
+            )
+            continue
+        return choice
+
+
 def _stage_settings(
     bundle: dict,
     compose: dict,
@@ -388,49 +553,100 @@ def _stage_settings(
     *,
     input_fn: Callable[[str], str] | None = None,
     output: Callable[[str], None] = print,
-) -> tuple[PortSettings, list[int]]:
-    if not _modbus_selected(bundle):
-        return PortSettings(), _ports_from_compose(compose)
-
-    current = _stored_settings(bundle, compose)
+) -> tuple[PortSettings, list[int], dict[str, int], list[int]]:
+    modbus_selected = _modbus_selected(bundle)
+    current = _stored_settings(bundle, compose) if modbus_selected else PortSettings()
+    service_hosts = _service_mapping_hosts(bundle, compose)
     can_prompt, prompt = _interactive(input_fn)
     while True:
-        effective_compose = _with_settings(compose, current)
-        required = _ports_from_compose(effective_compose)
-        result = manager.preflight(required)
-        conflicts = dict(result.unrelated_conflicts)
-        fixed_owners = _fixed_host_owners(compose)
-        for port, owners in fixed_owners.items():
-            if port in current.published_ports:
-                conflicts.setdefault(port, owners)
-        gateway_conflict = current.gateway_host_port in conflicts
-        instance_conflicts = sorted(
-            set(range(current.instance_host_start, current.instance_host_end + 1))
-            & set(conflicts)
+        effective_compose = (
+            _with_settings(compose, current) if modbus_selected else compose
         )
-        if not gateway_conflict and not instance_conflicts:
-            return current, required
-        if not can_prompt:
-            details = "; ".join(
-                f"{port}: {_owner_text(conflicts[port])}"
-                for port in sorted(
-                    ({current.gateway_host_port} if gateway_conflict else set())
-                    | set(instance_conflicts)
+        effective_compose = _with_service_mapping_hosts(
+            effective_compose, bundle, service_hosts
+        )
+        required = _ports_from_compose(effective_compose)
+        required_tcp = _tcp_ports_from_compose(effective_compose)
+        result = manager.preflight(required, required_tcp_ports=required_tcp)
+        for warning in getattr(result, "warnings", []):
+            output(f"[spx-preflight] Warning: {warning}")
+        conflicts = dict(result.unrelated_conflicts)
+        fixed_owners = _fixed_host_owners(effective_compose)
+        if modbus_selected:
+            for port, owners in fixed_owners.items():
+                if port in current.published_ports:
+                    conflicts.setdefault(port, owners)
+        gateway_conflict = modbus_selected and current.gateway_host_port in conflicts
+        instance_conflicts = sorted(
+            (
+                set(range(current.instance_host_start, current.instance_host_end + 1))
+                & set(conflicts)
+            )
+            if modbus_selected
+            else set()
+        )
+        service_conflicts: dict[str, list[str]] = {}
+        host_to_service_keys: dict[int, list[str]] = {}
+        records_by_key = {
+            str(record["key"]): record for record in _service_mapping_records(bundle)
+        }
+        for key, host in service_hosts.items():
+            host_to_service_keys.setdefault(host, []).append(key)
+        for key, host in service_hosts.items():
+            reasons = list(conflicts.get(host, []))
+            other_keys = [
+                other
+                for other in host_to_service_keys.get(host, [])
+                if other != key
+            ]
+            if other_keys:
+                reasons.extend(
+                    f"selected service {_service_mapping_label(records_by_key[other])}"
+                    for other in other_keys
                 )
+            if modbus_selected and host in current.published_ports:
+                reasons.append("selected Modbus TCP mapping")
+            if reasons:
+                service_conflicts[key] = list(dict.fromkeys(reasons))
+        if not gateway_conflict and not instance_conflicts and not service_conflicts:
+            return current, required, service_hosts, required_tcp
+        if not can_prompt:
+            conflict_details = []
+            if gateway_conflict:
+                conflict_details.append(
+                    f"{current.gateway_host_port}: {_owner_text(conflicts[current.gateway_host_port])}"
+                )
+            conflict_details.extend(
+                f"{port}: {_owner_text(conflicts[port])}"
+                for port in instance_conflicts
+            )
+            conflict_details.extend(
+                f"{service_hosts[key]}: "
+                f"{_owner_text(owners)} ({_service_mapping_label(records_by_key[key])})"
+                for key, owners in service_conflicts.items()
+            )
+            details = "; ".join(conflict_details)
+            kind = (
+                "Modbus TCP and selected service host ports"
+                if modbus_selected and service_conflicts
+                else "selected TCP service host ports"
+                if service_conflicts
+                else "Modbus TCP host ports"
             )
             raise PortConfigurationError(
-                "Modbus TCP host ports are occupied ("
-                f"{details}). Run spx-start interactively to select an alternate mapping."
+                f"{kind} are occupied ({details}). Run spx-start interactively "
+                "to select alternate mappings."
             )
 
-        fixed_owners = _fixed_host_owners(compose)
-        fixed_ports = set(fixed_owners)
         occupied = set(result.occupied_ports)
+        fixed_ports = set(fixed_owners)
+        mapped_service_ports = set(service_hosts.values())
 
         if gateway_conflict:
             unavailable = (
                 occupied
                 | fixed_ports
+                | mapped_service_ports
                 | set(range(current.instance_host_start, current.instance_host_end + 1))
             )
             suggestion = _first_available_port(
@@ -458,7 +674,12 @@ def _stage_settings(
             )
 
         if instance_conflicts:
-            unavailable = occupied | fixed_ports | {current.gateway_host_port}
+            unavailable = (
+                occupied
+                | fixed_ports
+                | mapped_service_ports
+                | {current.gateway_host_port}
+            )
             suggestion = _first_available_range(
                 INSTANCE_SUGGESTION_START,
                 unavailable,
@@ -480,6 +701,42 @@ def _stage_settings(
                     output=output,
                 ),
             )
+        for key in service_conflicts:
+            record = records_by_key[key]
+            current_host = service_hosts[key]
+            owners = list(conflicts.get(current_host, []))
+            owners.extend(
+                f"selected service {_service_mapping_label(records_by_key[other])}"
+                for other, host in service_hosts.items()
+                if other != key and host == current_host
+            )
+            if modbus_selected and current_host in current.published_ports:
+                owners.append("selected Modbus TCP mapping")
+            owners = list(dict.fromkeys(owners))
+            if not owners:
+                continue
+            unavailable = (
+                occupied
+                | fixed_ports
+                | set(service_hosts.values())
+                | (current.published_ports if modbus_selected else set())
+            )
+            suggestion = _first_available_port(
+                SERVICE_PORT_SUGGESTION_START, unavailable
+            )
+            if suggestion is None:
+                raise PortConfigurationError(
+                    f"No free host TCP port is available for {_service_mapping_label(record)}"
+                )
+            service_hosts[key] = _ask_service_mapping(
+                record=record,
+                current=current_host,
+                suggestion=suggestion,
+                conflicts=owners,
+                unavailable=unavailable,
+                input_fn=prompt,
+                output=output,
+            )
         current = validate_settings(current)
 
 
@@ -495,26 +752,34 @@ def stage_configuration(
 ) -> dict:
     compose = _read_yaml(compose_file)
     bundle = _read_json(bundle_file)
-    settings = _stored_settings(bundle, compose)
     selected_manager = manager or StackManager(
         compose_file,
         env_file,
         project=str(bundle.get("compose_project") or "spx"),
         installation_id=str(bundle.get("installation_id") or ""),
     )
-    settings, ports = _stage_settings(
+    settings, ports, service_hosts, tcp_ports = _stage_settings(
         bundle,
         compose,
         selected_manager,
         input_fn=input_fn,
         output=output,
     )
+    modbus_selected = _modbus_selected(bundle)
+    original_settings = (
+        _stored_settings(bundle, compose) if modbus_selected else PortSettings()
+    )
     staged = {
-        "modbus_selected": _modbus_selected(bundle),
-        "changed": settings != _stored_settings(bundle, compose),
+        "modbus_selected": modbus_selected,
+        "changed": (
+            settings != original_settings
+            or service_hosts != _service_mapping_hosts(bundle, compose)
+        ),
         "gateway_host_port": settings.gateway_host_port,
         "instance_host_start": settings.instance_host_start,
+        "service_host_ports": service_hosts,
         "required_ports": ports,
+        "required_tcp_ports": tcp_ports,
     }
     _write_json(staged_file, staged)
     return staged
@@ -533,25 +798,41 @@ def _commit_stage(
 ) -> dict:
     staged = _read_json(staged_file)
     bundle = _read_json(bundle_file)
-    if not staged.get("modbus_selected") or not staged.get("changed"):
+    if not staged.get("changed"):
         return bundle
 
-    settings = validate_settings(
-        PortSettings(
-            gateway_host_port=int(staged["gateway_host_port"]),
-            instance_host_start=int(staged["instance_host_start"]),
+    modbus_selected = bool(staged.get("modbus_selected"))
+    settings = PortSettings()
+    if modbus_selected:
+        settings = validate_settings(
+            PortSettings(
+                gateway_host_port=int(staged["gateway_host_port"]),
+                instance_host_start=int(staged["instance_host_start"]),
+            )
         )
-    )
-    compose = _with_settings(_read_yaml(compose_file), settings)
-    transaction = _with_settings(_read_yaml(transaction_template), settings)
-    bundle["modbus_port_mappings"] = {
-        "gateway_host_port": settings.gateway_host_port,
-        "gateway_container_port": GATEWAY_CONTAINER_PORT,
-        "instance_host_port_start": settings.instance_host_start,
-        "instance_host_port_end": settings.instance_host_end,
-        "instance_container_port_start": INSTANCE_CONTAINER_START,
-        "instance_port_count": INSTANCE_PORT_COUNT,
+    service_hosts = {
+        str(key): int(value)
+        for key, value in (staged.get("service_host_ports") or {}).items()
     }
+    compose = _read_yaml(compose_file)
+    transaction = _read_yaml(transaction_template)
+    if modbus_selected:
+        compose = _with_settings(compose, settings)
+        transaction = _with_settings(transaction, settings)
+        bundle["modbus_port_mappings"] = {
+            "gateway_host_port": settings.gateway_host_port,
+            "gateway_container_port": GATEWAY_CONTAINER_PORT,
+            "instance_host_port_start": settings.instance_host_start,
+            "instance_host_port_end": settings.instance_host_end,
+            "instance_container_port_start": INSTANCE_CONTAINER_START,
+            "instance_port_count": INSTANCE_PORT_COUNT,
+        }
+    compose = _with_service_mapping_hosts(compose, bundle, service_hosts)
+    transaction = _with_service_mapping_hosts(transaction, bundle, service_hosts)
+    for record in _service_mapping_records(bundle):
+        key = str(record["key"])
+        if key in service_hosts:
+            record["host_port"] = service_hosts[key]
     bundle["required_ports"] = _ports_from_compose(compose)
 
     updates = {
@@ -578,7 +859,7 @@ def _commit_stage(
             except OSError:
                 pass
         raise PortConfigurationError(
-            f"Could not persist the Modbus port mapping: {exc}"
+            f"Could not persist the selected host port mappings: {exc}"
         ) from exc
     finally:
         for temp_path in temporary.values():
@@ -592,6 +873,12 @@ def _commit_stage(
 def _print_required_ports(staged_file: Path) -> int:
     staged = _read_json(staged_file)
     print(",".join(str(int(port)) for port in staged.get("required_ports", [])))
+    return 0
+
+
+def _print_required_tcp_ports(staged_file: Path) -> int:
+    staged = _read_json(staged_file)
+    print(",".join(str(int(port)) for port in staged.get("required_tcp_ports", [])))
     return 0
 
 
@@ -610,6 +897,8 @@ def main(argv: list[str] | None = None) -> int:
     commit_parser.add_argument("--staged-file", type=Path, required=True)
     ports_parser = subparsers.add_parser("required-ports")
     ports_parser.add_argument("--staged-file", type=Path, required=True)
+    tcp_ports_parser = subparsers.add_parser("required-tcp-ports")
+    tcp_ports_parser.add_argument("--staged-file", type=Path, required=True)
     summary_parser = subparsers.add_parser("summary")
     summary_parser.add_argument("--bundle", type=Path, required=True)
     summary_parser.add_argument("--compose-file", type=Path, required=True)
@@ -631,10 +920,13 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "required-ports":
             return _print_required_ports(args.staged_file)
+        elif args.command == "required-tcp-ports":
+            return _print_required_tcp_ports(args.staged_file)
         elif args.command == "summary":
             bundle = _read_json(args.bundle)
+            compose = _read_yaml(args.compose_file)
             if _modbus_selected(bundle):
-                settings = _stored_settings(bundle, _read_yaml(args.compose_file))
+                settings = _stored_settings(bundle, compose)
                 print(
                     f"[spx-start] Modbus TCP gateway: host port {settings.gateway_host_port} "
                     f"-> container port {GATEWAY_CONTAINER_PORT}/TCP"
@@ -649,6 +941,16 @@ def main(argv: list[str] | None = None) -> int:
                     f"{settings.instance_host_end} -> container {INSTANCE_CONTAINER_START}-"
                     f"{INSTANCE_CONTAINER_START + INSTANCE_PORT_COUNT - 1}/TCP"
                 )
+            for record in _service_mapping_records(bundle):
+                host_port = int(record.get("host_port", record.get("default_host_port", 0)))
+                container_port = int(record.get("container_port", 0))
+                default_host_port = int(record.get("default_host_port", container_port))
+                if host_port != default_host_port:
+                    label = _service_mapping_label(record)
+                    print(
+                        f"[spx-start] {label}: host port {host_port} -> "
+                        f"container port {container_port}/TCP. Connect clients to host port {host_port}."
+                    )
         return 0
     except (PortConfigurationError, StackManagerError, OSError) as exc:
         print(f"[spx-preflight] {exc}", file=sys.stderr)

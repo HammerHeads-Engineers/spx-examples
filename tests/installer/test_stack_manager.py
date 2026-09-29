@@ -141,9 +141,10 @@ def test_prepare_decline_does_not_stop_or_rename(
             "active_stacks": [existing],
             "conflicts": {},
             "unrelated_conflicts": {},
+            "warnings": [],
         },
     )()
-    monkeypatch.setattr(manager, "preflight", lambda ports: fake_result)
+    monkeypatch.setattr(manager, "preflight", lambda ports, **kwargs: fake_result)
     commands: list[list[str]] = []
     monkeypatch.setattr(
         manager, "snapshot_existing", lambda stack, path: commands.append(["snapshot"])
@@ -214,12 +215,54 @@ def test_windows_port_owner_includes_services_hosted_by_svchost(
     ]
     manager = StackManager(
         tmp_path / "compose.yml",
-        runner=lambda argv, **kwargs: completed(list(argv), json.dumps(payload)),
+        runner=lambda argv, **kwargs: completed(
+            list(argv),
+            json.dumps(payload)
+            if argv[:1] == ["powershell"]
+            else (
+                "Start Port    End Port\n----------    --------\n61600         61699\n"
+                if "ipv4" in argv
+                else "Start Port    End Port\n----------    --------\n"
+            ),
+        ),
         platform="win32",
     )
 
-    assert manager._fallback_host_ports() == {
-        5040: ["process svchost (PID 17052; services CDPSvc)"]
+    owners = manager._fallback_host_ports()
+    assert owners[5040] == ["process svchost (PID 17052; services CDPSvc)"]
+    assert owners[61610] == ["Windows excluded TCP range (IPV4) 61600-61699"]
+    assert owners[61699] == ["Windows excluded TCP range (IPV4) 61600-61699"]
+
+
+def test_windows_excluded_range_parser_handles_ipv4_and_ipv6_tables() -> None:
+    output = (
+        "Start Port    End Port\n"
+        "----------    --------\n"
+        "      61600       61699\n"
+        "      62000       62099 *\n"
+        "* - Administered port exclusions.\n"
+    )
+
+    ipv4 = StackManager._parse_windows_excluded_port_range_output(output, "IPV4")
+    ipv6 = StackManager._parse_windows_excluded_port_range_output(output, "IPV6")
+
+    assert ipv4[61610] == ["Windows excluded TCP range (IPV4) 61600-61699"]
+    assert ipv4[62000] == ["Windows excluded TCP range (IPV4) 62000-62099"]
+    assert ipv6[61610] == ["Windows excluded TCP range (IPV6) 61600-61699"]
+
+
+def test_windows_excluded_tcp_range_only_conflicts_with_required_tcp_ports() -> None:
+    result = PreflightResult(
+        occupied_ports={
+            61610: ["Windows excluded TCP range (IPV4) 61600-61699"],
+            47808: ["Windows excluded TCP range (IPV4) 47800-47899"],
+        },
+        required_ports=[61610, 47808],
+        required_tcp_ports=[61610],
+    )
+
+    assert result.conflicts == {
+        61610: ["Windows excluded TCP range (IPV4) 61600-61699"]
     }
 
 
