@@ -49,7 +49,9 @@ def _read_bundle(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as handle:
             bundle = json.load(handle)
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise StartFailure("runtime", f"Could not read bundle configuration: {exc}") from exc
+        raise StartFailure(
+            "runtime", f"Could not read bundle configuration: {exc}"
+        ) from exc
     if not isinstance(bundle, dict):
         raise StartFailure("runtime", "Bundle configuration must be a JSON object")
     return bundle
@@ -99,13 +101,19 @@ def _stop(script_dir: Path) -> int:
         return exc.exit_code
     installation_id = str(bundle.get("installation_id") or "")
     if not installation_id:
-        print("[spx-stop] stage=runtime: Bundle configuration is missing its installation ID.", file=sys.stderr)
+        print(
+            "[spx-stop] stage=runtime: Bundle configuration is missing its installation ID.",
+            file=sys.stderr,
+        )
         return 1
     manager = script_dir / "stack_manager.py"
     compose_file = script_dir / "docker-compose.generated.yml"
     env_file = script_dir / ".env"
     if not manager.is_file() or not compose_file.is_file():
-        print("[spx-stop] Generated stack files are incomplete. Run SPX Setup again.", file=sys.stderr)
+        print(
+            "[spx-stop] Generated stack files are incomplete. Run SPX Setup again.",
+            file=sys.stderr,
+        )
         return 1
     try:
         _run(
@@ -130,6 +138,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
     stage = "runtime"
     transaction_compose: Path | None = None
     transaction_prepared = False
+    staged_ports_file: Path | None = None
     runtime_python = sys.executable
     manager = script_dir / "stack_manager.py"
     compose_file = script_dir / "docker-compose.generated.yml"
@@ -152,22 +161,22 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             bundle_path,
             transaction_template,
             script_dir / "network.py",
+            script_dir / "modbus_port_configurator.py",
             script_dir / "runtime_bootstrap.py",
             script_dir / "bootstrap_runner.py",
         ):
             if not required.is_file():
-                raise StartFailure(stage, f"Required generated file is missing: {required.name}")
+                raise StartFailure(
+                    stage, f"Required generated file is missing: {required.name}"
+                )
 
         bundle = _read_bundle(bundle_path)
         installation_id = str(bundle.get("installation_id") or "")
         if not installation_id:
-            raise StartFailure(stage, "Bundle configuration is missing its installation ID")
+            raise StartFailure(
+                stage, "Bundle configuration is missing its installation ID"
+            )
         requirement = str(bundle.get("spx_python_requirement") or "spx-python")
-        required_ports = bundle.get("required_ports", [])
-        if not isinstance(required_ports, list):
-            raise StartFailure(stage, "Bundle configuration contains an invalid port list")
-        ports = ",".join(str(int(port)) for port in required_ports if str(port).isdigit())
-
         bootstrap = script_dir / "runtime_bootstrap.py"
         print("[spx-start] Preparing the isolated SPX runtime...")
         bootstrap_environment = os.environ.copy()
@@ -192,7 +201,9 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 check=False,
             )
         except OSError as exc:
-            raise StartFailure(stage, f"Could not prepare the local Python runtime: {exc}") from exc
+            raise StartFailure(
+                stage, f"Could not prepare the local Python runtime: {exc}"
+            ) from exc
         if runtime_result.returncode:
             raise StartFailure(
                 stage,
@@ -201,19 +212,21 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             )
         runtime_python = runtime_result.stdout.decode("utf-8", errors="replace").strip()
         if not runtime_python or not Path(runtime_python).is_file():
-            raise StartFailure(stage, "Python runtime bootstrap did not return a valid interpreter")
+            raise StartFailure(
+                stage, "Python runtime bootstrap did not return a valid interpreter"
+            )
 
         token = uuid.uuid4().hex
         transaction_compose = script_dir / f".docker-compose.transaction.{token}.yml"
         transaction_service = f"transaction-{token}-spx-ui"
-        template = transaction_template.read_text(encoding="utf-8")
-        transaction_compose.write_text(
-            template.replace("__TRANSACTION_TOKEN__", token),
-            encoding="utf-8",
-        )
+        staged_ports_file = script_dir / f".spx-modbus-ports.pending.{token}.json"
 
         services = bundle.get("services", [])
-        if isinstance(services, list) and "btvirt_adapter" in services and os.name == "nt":
+        if (
+            isinstance(services, list)
+            and "btvirt_adapter" in services
+            and os.name == "nt"
+        ):
             print(
                 "[spx-start] BLE/GATT service 'btvirt_adapter' is not supported on Windows. "
                 "Use WSL2, macOS/Linux, or an external BLE bridge.",
@@ -221,6 +234,42 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             )
 
         stage = "preflight"
+        _run(
+            [
+                runtime_python,
+                str(script_dir / "modbus_port_configurator.py"),
+                "stage",
+                "--compose-file",
+                str(compose_file),
+                "--bundle",
+                str(bundle_path),
+                "--env-file",
+                str(env_file),
+                "--staged-file",
+                str(staged_ports_file),
+            ],
+            cwd=script_dir,
+            stage=stage,
+        )
+        port_result = subprocess.run(
+            [
+                runtime_python,
+                str(script_dir / "modbus_port_configurator.py"),
+                "required-ports",
+                "--staged-file",
+                str(staged_ports_file),
+            ],
+            cwd=str(script_dir),
+            stdout=subprocess.PIPE,
+            check=False,
+        )
+        if port_result.returncode:
+            raise StartFailure(
+                stage,
+                "Could not read the staged Modbus port configuration",
+                port_result.returncode,
+            )
+        ports = port_result.stdout.decode("utf-8", errors="replace").strip()
         _run(
             [
                 runtime_python,
@@ -246,6 +295,31 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             prepare.append("--yes")
         _run(prepare, cwd=script_dir, stage=stage)
         transaction_prepared = True
+        _run(
+            [
+                runtime_python,
+                str(script_dir / "modbus_port_configurator.py"),
+                "commit",
+                "--compose-file",
+                str(compose_file),
+                "--transaction-template",
+                str(transaction_template),
+                "--bundle",
+                str(bundle_path),
+                "--staged-file",
+                str(staged_ports_file),
+            ],
+            cwd=script_dir,
+            stage=stage,
+        )
+        staged_ports_file.unlink(missing_ok=True)
+        staged_ports_file = None
+        template = transaction_template.read_text(encoding="utf-8")
+        transaction_compose.write_text(
+            template.replace("__TRANSACTION_TOKEN__", token),
+            encoding="utf-8",
+        )
+        bundle = _read_bundle(bundle_path)
 
         stage = "compose"
         _run(
@@ -302,8 +376,14 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 check=False,
             )
             if result.returncode:
-                raise StartFailure(stage, f"Docker Compose exited with code {result.returncode}", result.returncode)
-            running_services = result.stdout.decode("utf-8", errors="replace").splitlines()
+                raise StartFailure(
+                    stage,
+                    f"Docker Compose exited with code {result.returncode}",
+                    result.returncode,
+                )
+            running_services = result.stdout.decode(
+                "utf-8", errors="replace"
+            ).splitlines()
             if transaction_service not in running_services:
                 raise StartFailure(stage, "SPX UI is not running")
 
@@ -322,21 +402,48 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
         )
 
         stage = "start"
-        _run(
-            [
-                "docker",
-                "compose",
-                "-p",
-                "spx",
-                "-f",
-                str(transaction_compose),
-                "--env-file",
-                str(env_file),
-                "ps",
-            ],
-            cwd=script_dir,
-            stage=stage,
-        )
+        try:
+            status_result = subprocess.run(
+                [
+                    "docker",
+                    "compose",
+                    "-p",
+                    "spx",
+                    "-f",
+                    str(transaction_compose),
+                    "--env-file",
+                    str(env_file),
+                    "ps",
+                    "--services",
+                    "--status",
+                    "running",
+                ],
+                cwd=str(script_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+        except OSError as exc:
+            raise StartFailure(
+                stage, f"Could not inspect running services: {exc}"
+            ) from exc
+        if status_result.returncode:
+            raise StartFailure(
+                stage,
+                f"Docker Compose exited with code {status_result.returncode}",
+                status_result.returncode,
+            )
+        running_services = status_result.stdout.decode(
+            "utf-8", errors="replace"
+        ).splitlines()
+        if not running_services:
+            raise StartFailure(stage, "No selected SPX services are running")
+        normalized_services = [
+            re.sub(r"^transaction-[^-]+-", "", service.strip())
+            for service in running_services
+            if service.strip()
+        ]
+        print(f"[spx-start] Running services: {', '.join(normalized_services)}")
 
         stage = "commit"
         final_names = bundle.get("final_container_names", [])
@@ -362,7 +469,25 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
         transaction_compose = None
         print()
         print("[spx-start] SPX started successfully.")
-        print("[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000")
+        print(
+            "[spx-start] UI: http://localhost:3000 (if enabled), API: http://localhost:8000"
+        )
+        try:
+            subprocess.run(
+                [
+                    runtime_python,
+                    str(script_dir / "modbus_port_configurator.py"),
+                    "summary",
+                    "--bundle",
+                    str(bundle_path),
+                    "--compose-file",
+                    str(compose_file),
+                ],
+                cwd=str(script_dir),
+                check=False,
+            )
+        except OSError:
+            pass
         return 0
     except StartFailure as exc:
         stage = exc.stage
@@ -373,7 +498,9 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
         exit_code = 1
 
     rollback_note = "; attempting rollback" if transaction_prepared else ""
-    print(f"[spx-start] stage={stage}: {_redact(message)}{rollback_note}", file=sys.stderr)
+    print(
+        f"[spx-start] stage={stage}: {_redact(message)}{rollback_note}", file=sys.stderr
+    )
     if transaction_prepared:
         installation_id = str(bundle.get("installation_id") or "")
         try:
@@ -399,13 +526,26 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             transaction_compose.unlink(missing_ok=True)
         except OSError:
             pass
+    if staged_ports_file is not None:
+        try:
+            staged_ports_file.unlink(missing_ok=True)
+        except OSError:
+            pass
     return exit_code
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Start or stop the generated SPX stack")
-    parser.add_argument("command", nargs="?", choices=("start", "stop"), default="start")
-    parser.add_argument("--yes", action="store_true", help="Accept replacement of the detected SPX stack")
+    parser = argparse.ArgumentParser(
+        description="Start or stop the generated SPX stack"
+    )
+    parser.add_argument(
+        "command", nargs="?", choices=("start", "stop"), default="start"
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Accept replacement of the detected SPX stack",
+    )
     args = parser.parse_args(argv)
     script_dir = Path(__file__).resolve().parent
     if args.command == "stop":
