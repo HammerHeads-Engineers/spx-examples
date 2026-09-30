@@ -30,7 +30,7 @@ def test_windows_installer_job_runs_after_semantic_release() -> None:
     assert "needs: release" in job
     assert "needs.release.outputs.released == 'true'" in job
     assert "ref: ${{ needs.release.outputs.tag }}" in job
-    assert "runs-on: windows-latest" in job
+    assert "runs-on: windows-2025" in job
 
 
 def test_windows_installer_job_provisions_native_build_dependencies() -> None:
