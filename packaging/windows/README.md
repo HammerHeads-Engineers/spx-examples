@@ -79,16 +79,14 @@ The Python prerequisite is cached under `build/windows/cache/` by default and is
 
 ## GitHub Actions release build
 
-The release workflow runs this native build on `windows-latest` after
-Semantic Release has created a version tag. The job checks out that exact tag,
-installs Python 3.12, .NET 8, Poetry, WiX v6, and the required WiX
-Bootstrapper Applications and Util extensions, then publishes the unsigned
-bundle both as a workflow artifact and as a GitHub Release asset named
-`spx-installer-<version>.exe`.
-
-The CI job deliberately does not use a Windows signing certificate. Add
-`-SignThumbprint` or Azure Trusted Signing inputs only on a trusted runner when
-the release policy requires an Authenticode-signed executable.
+After Semantic Release creates a version tag, the release workflow checks out
+that tag on `windows-2025` and builds the installer with Python 3.12, .NET 8,
+Poetry, WiX v6, and the required WiX Bootstrapper Applications and Util
+extensions. It signs `spx-installer-<version>.exe` with Azure Artifact Signing
+profile `spx-windows-release`, using SHA-256 and RFC 3161 timestamping, then
+publishes the signed bundle as both a workflow artifact and a GitHub Release
+asset. The job authenticates to Azure through GitHub OIDC and runs only when a
+release was published.
 
 ## Signing
 
@@ -110,7 +108,4 @@ powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
 
 Trusted Signing expects a modern Windows SDK `signtool.exe` and the build script switches the default timestamp service to `http://timestamp.acs.microsoft.com/` when that mode is active.
 
-## Next steps
-
-- Add a trusted Windows signing job or signing service integration for the
-  release bundle.
+\n

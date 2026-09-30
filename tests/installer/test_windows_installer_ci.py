@@ -30,7 +30,7 @@ def test_windows_installer_job_runs_after_semantic_release() -> None:
     assert "needs: release" in job
     assert "needs.release.outputs.released == 'true'" in job
     assert "ref: ${{ needs.release.outputs.tag }}" in job
-    assert "runs-on: windows-latest" in job
+    assert "runs-on: windows-2025" in job
 
 
 def test_windows_installer_job_provisions_native_build_dependencies() -> None:
@@ -64,9 +64,10 @@ def test_windows_packaging_docs_describe_ci_artifact() -> None:
     docs_path = REPO_ROOT / "packaging" / "windows" / "README.md"
     docs = docs_path.read_text(encoding="utf-8")
 
-    assert "windows-latest" in docs
+    assert "windows-2025" in docs
     assert "spx-installer-<version>.exe" in docs
-    assert "unsigned" in docs
+    assert "Azure Artifact Signing" in docs
+    assert "signed bundle" in docs
     assert "bundle" in docs
 
 
