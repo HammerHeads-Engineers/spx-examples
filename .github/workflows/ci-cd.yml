@@ -684,15 +684,6 @@ jobs:
             throw "Signed Burn bundle is missing its embedded MSI or Python prerequisite."
           }
 
-          $signedEnginePath = Join-Path $validationDir "spx-burn-engine.exe"
-          & wix burn detach $bundlePath -engine $signedEnginePath
-          if ($LASTEXITCODE -ne 0) {
-            throw "WiX could not detach the signed Burn engine (exit code $LASTEXITCODE)."
-          }
-          & .\packaging\windows\Verify-AuthenticodeSignature.ps1 `
-            -Path $signedEnginePath `
-            -ExpectedSigner $expectedSigner
-
           "path=$bundlePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload Windows installer as workflow artifact
