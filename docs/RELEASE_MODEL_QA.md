@@ -63,3 +63,27 @@ These twins are demonstration and integration-test models. Vendor register-map
 certification, physical device calibration and long-duration field fidelity
 require separate tests. The generic PID accepts an external process variable;
 it needs a connected plant model for a closed-loop physics demonstration.
+
+## Remaining demonstration gaps
+
+The Prevac M600DC-PS, M1600PDC-PS, TSP04-PS and XR40B-EC models currently
+provide passive register maps. Writing a command stores its value but does not
+simulate an operating-state transition, electrical dynamics or deposition.
+Fire-alarm and access-control panels also provide writable protocol state
+without autonomous event scenarios. Add event/recovery scenarios when using
+these models for operator training rather than protocol integration.
+
+The PLC Modbus Master requires an Altivar 320 slave on port 5030 and an
+iEM3000 slave on port 5023 (or configured alternatives). RUNNING alone does
+not prove feedback or closed-loop behavior when those devices are absent.
+
+The rc.65 OPC UA adapter repeats the absolute section prefix beneath a section
+when creating binding nodes. BMS energy nodes are currently browsable at
+`BMS/Energy/BMS/Energy/<node>`. Reads and writes work on these existing paths.
+Normalize the hierarchy with compatibility aliases in a separate adapter
+change so existing clients retain their addresses.
+
+The vacuum-gauge `discharge_spike` lasts 0.1 seconds. A browser refreshing at
+one second may show RESET followed directly by STOPPED; inspect pressure
+telemetry or use faster sampling to observe the pulse. Do not interpret this
+as a failed scenario start.
