@@ -71,12 +71,21 @@ def test_windows_bundle_signs_burn_engine_and_bundle_before_publishing() -> None
     upload_artifact = job.index("Upload Windows installer as workflow artifact")
     upload_release = job.index("Upload Windows installer to GitHub Release")
 
-    assert detach < sign_engine < reattach < sign_bundle < verify_bundle
+    verify_engine = job.index("Verify signed Windows Burn engine before reattaching")
+
+    assert detach < sign_engine < verify_engine < reattach < sign_bundle < verify_bundle
     assert verify_bundle < upload_artifact < upload_release
     assert "wix burn extract $bundlePath" in job
     assert 'Filter "spx-windows-*.msi"' in job
     assert 'Filter "python-3.12.10-amd64.exe"' in job
-    assert "Get-AuthenticodeSignature" in job
+    assert job.count(r".\packaging\windows\Verify-AuthenticodeSignature.ps1") == 3
+
+    verifier = (REPO_ROOT / "packaging" / "windows" / "Verify-AuthenticodeSignature.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "verify /pa /all /v" in verifier
+    assert "verificationExitCode -ne 0" in verifier
+    assert "$ExpectedSigner" in verifier
 
 
 def test_windows_bundle_blocks_when_legacy_machine_wide_install_is_detected() -> None:
