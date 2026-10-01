@@ -28,7 +28,7 @@
       Result="exists"
       Bitness="always64" />
     <bal:Condition
-      Condition="LegacyPerMachineSpxInstalled &lt;&gt; &quot;true&quot;"
+      Condition="NOT LegacyPerMachineSpxInstalled"
       Message="A legacy machine-wide SPX preview is still installed on this computer. Uninstall the older 'SPX' entry from Windows Apps before installing SPX Tools again." />
 
     <BootstrapperApplication>

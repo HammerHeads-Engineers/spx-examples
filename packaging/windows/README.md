@@ -82,11 +82,14 @@ The Python prerequisite is cached under `build/windows/cache/` by default and is
 After Semantic Release creates a version tag, the release workflow checks out
 that tag on `windows-2025` and builds the installer with Python 3.12, .NET 8,
 Poetry, WiX v6, and the required WiX Bootstrapper Applications and Util
-extensions. It signs `spx-installer-<version>.exe` with Azure Artifact Signing
-profile `spx-windows-release`, using SHA-256 and RFC 3161 timestamping, then
-publishes the signed bundle as both a workflow artifact and a GitHub Release
-asset. The job authenticates to Azure through GitHub OIDC and runs only when a
-release was published.
+extensions. It signs the Burn engine, reattaches it to the bundle, then signs
+the complete `spx-installer-<version>.exe` with Azure Artifact Signing profile
+`spx-windows-release`, using SHA-256 and RFC 3161 timestamping. Before
+publishing, the job verifies both Authenticode signatures and extracts the
+bundle to confirm that its embedded MSI and Python prerequisite are readable.
+The signed bundle is published as both a workflow artifact and a GitHub
+Release asset. The job authenticates to Azure through GitHub OIDC and runs only
+when a release was published.
 
 ## Signing
 
