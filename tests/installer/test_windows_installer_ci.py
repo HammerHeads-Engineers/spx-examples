@@ -76,9 +76,10 @@ def test_windows_bundle_signs_burn_engine_and_bundle_before_publishing() -> None
     assert detach < sign_engine < verify_engine < reattach < sign_bundle < verify_bundle
     assert verify_bundle < upload_artifact < upload_release
     assert "wix burn extract $bundlePath" in job
+    assert "wix burn detach $bundlePath" not in job
     assert 'Filter "spx-windows-*.msi"' in job
     assert 'Filter "python-3.12.10-amd64.exe"' in job
-    assert job.count(r".\packaging\windows\Verify-AuthenticodeSignature.ps1") == 3
+    assert job.count(r".\packaging\windows\Verify-AuthenticodeSignature.ps1") == 2
 
     verifier = (REPO_ROOT / "packaging" / "windows" / "Verify-AuthenticodeSignature.ps1").read_text(
         encoding="utf-8"
