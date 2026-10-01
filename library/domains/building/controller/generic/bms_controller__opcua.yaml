@@ -243,7 +243,7 @@ actions:
   - function: $in(energy_consumption_kwh)
     name: integrate_energy
     description: Integrate energy usage over time.
-    call: $in(energy_consumption_kwh) + $in(power_draw_kw) * cycle_time_s / 3600.0
+    call: $in(energy_consumption_kwh) + $in(power_draw_kw) * $in(cycle_time_s) / 3600.0
 
   - function: $in(alarm_filter)
     name: detect_filter_alarm
@@ -444,6 +444,6 @@ scenarios:
     description: Switch the HVAC plant to an off state for maintenance.
     duration: 15.0
     overrides:
-      $in(hvac_mode): off
+      $in(hvac_mode): "off"
       $in(fan_command_percent): 0.0
       $in(pump_command_percent): 0.0
