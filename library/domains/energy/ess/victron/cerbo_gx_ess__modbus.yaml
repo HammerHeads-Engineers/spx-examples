@@ -10,6 +10,9 @@ description: |
   list.
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5035
@@ -153,7 +156,25 @@ attributes:
     default: 0.0
     unit: W
 
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(pv_power_w)
     name: compute_pv_power
     description: Apply a simple derating factor to available PV power.
@@ -227,7 +248,7 @@ actions:
           min(
             100.0,
             $in(battery_soc_pct)
-            - ($in(battery_power_w) * $in(cycle_time_s) / 3600.0)
+            - ($in(battery_power_w) * $in(_elapsed_step_s) / 3600.0)
               / max(0.1, $in(battery_capacity_kwh) * 1000.0)
               * 100.0
           )
@@ -261,31 +282,31 @@ actions:
   - function: $in(grid_energy_import_kwh)
     name: integrate_grid_import
     description: Integrate imported energy.
-    call: $in(grid_energy_import_kwh) + max(0.0, $in(grid_power_w)) * $in(cycle_time_s) / 3600000.0
+    call: $in(grid_energy_import_kwh) + max(0.0, $in(grid_power_w)) * $in(_elapsed_step_s) / 3600000.0
 
   - function: $in(grid_energy_export_kwh)
     name: integrate_grid_export
     description: Integrate exported energy.
-    call: $in(grid_energy_export_kwh) + max(0.0, -$in(grid_power_w)) * $in(cycle_time_s) / 3600000.0
+    call: $in(grid_energy_export_kwh) + max(0.0, -$in(grid_power_w)) * $in(_elapsed_step_s) / 3600000.0
 
   - function: $in(pv_energy_total_kwh)
     name: integrate_pv_energy
     description: Integrate PV production.
-    call: $in(pv_energy_total_kwh) + max(0.0, $in(pv_power_w)) * $in(cycle_time_s) / 3600000.0
+    call: $in(pv_energy_total_kwh) + max(0.0, $in(pv_power_w)) * $in(_elapsed_step_s) / 3600000.0
 
   - function: $in(battery_charge_energy_kwh)
     name: integrate_battery_charge_energy
     description: Integrate battery charge energy.
-    call: $in(battery_charge_energy_kwh) + max(0.0, -$in(battery_power_w)) * $in(cycle_time_s) / 3600000.0
+    call: $in(battery_charge_energy_kwh) + max(0.0, -$in(battery_power_w)) * $in(_elapsed_step_s) / 3600000.0
 
   - function: $in(battery_discharge_energy_kwh)
     name: integrate_battery_discharge_energy
     description: Integrate battery discharge energy.
-    call: $in(battery_discharge_energy_kwh) + max(0.0, $in(battery_power_w)) * $in(cycle_time_s) / 3600000.0
+    call: $in(battery_discharge_energy_kwh) + max(0.0, $in(battery_power_w)) * $in(_elapsed_step_s) / 3600000.0
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true

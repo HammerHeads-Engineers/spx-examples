@@ -51,17 +51,34 @@ attributes:
     default: 0.1
     unit: s
 
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(speed_actual_rpm)
     name: track_speed
     description: First-order speed tracking with independent accel/decel ramps.
     call: (
-          0.0 if $in(enable) == 0
+          0.0 if $in(..enable) == 0
           else (
             $in(speed_actual_rpm)
             + (
                 ( $in(speed_set_rpm) - $in(speed_actual_rpm) )
-                * (cycle_time_s / max(0.1, ($in(accel_ramp_s) if $in(speed_set_rpm) > $in(speed_actual_rpm) else $in(decel_ramp_s))))
+                * min(1.0, $in(_elapsed_step_s) / max(0.1, ($in(accel_ramp_s) if $in(speed_set_rpm) > $in(speed_actual_rpm) else $in(decel_ramp_s))))
               )
           )
         )
@@ -69,21 +86,21 @@ actions:
   - function: $in(torque_percent)
     name: compute_torque
     description: Torque rises with relative speed, saturating near limit.
-    call: min(
+    call: 0.0 if $in(..enable) == 0 else min(
           $in(torque_limit_percent),
           max(0.0, 10.0 + 0.06 * abs($in(speed_actual_rpm)))
         )
 
   - function: $in(alarm_overload)
     name: detect_overload
-    description: Raise overload alarm when torque exceeds 100%.
-    call: 1 if $in(torque_percent) >= 100.0 else 0
+    description: Detect requested torque above the configured limit or nominal rating.
+    call: 1 if (10.0 + 0.06 * abs($in(speed_actual_rpm)) > $in(torque_limit_percent) or $in(torque_percent) > 100.0) and $in(..enable) == 1 else 0
 
   - function: $in(alarm_drive_fault)
     name: detect_drive_fault
     description: Flag drive fault when slip between command and feedback stays excessive.
     slip_limit_rpm: 200.0
-    call: 1 if ($in(enable) == 1 and abs($in(speed_set_rpm) - $in(speed_actual_rpm)) > slip_limit_rpm) else 0
+    call: 1 if ($in(..enable) == 1 and abs($in(speed_set_rpm) - $in(speed_actual_rpm)) > slip_limit_rpm) else 0
 
   - function: $in(status_word)
     name: build_status_word
@@ -91,7 +108,7 @@ actions:
     call: >-
           (
             0
-            + (1 if $in(enable) == 1 else 0)
+            + (1 if $in(..enable) == 1 else 0)
             + (2 if $in(speed_actual_rpm) > 10.0 else 0)
             + (4 if $in(alarm_overload) == 1 else 0)
             + (8 if $in(alarm_drive_fault) == 1 else 0)
@@ -114,33 +131,30 @@ communication:
 
 scenarios:
   speed_step_profile:
-    enabled: true
     display_name: "Speed Step Profile"
     description: Apply a higher speed command with quicker ramps for commissioning checks.
     duration: 25.0
     overrides:
-      $in(enable): 1
+      $in(..enable): 1
       $in(speed_set_rpm): 1800.0
       $in(accel_ramp_s): 1.2
       $in(decel_ramp_s): 1.5
 
   torque_overload:
-    enabled: true
     display_name: "Torque Overload"
     description: Increase speed while reducing torque headroom to trigger overload handling.
     duration: 15.0
     overrides:
-      $in(enable): 1
+      $in(..enable): 1
       $in(speed_set_rpm): 2200.0
       $in(torque_limit_percent): 90.0
 
   emergency_stop_fault:
-    enabled: true
     display_name: "Emergency Stop Fault"
     description: Force a rapid deceleration that mimics an emergency-stop event.
     duration: 10.0
     overrides:
-      $in(enable): 1
+      $in(..enable): 1
       $in(speed_set_rpm): 0.0
       $in(decel_ramp_s): 0.2
       $in(accel_ramp_s): 0.5

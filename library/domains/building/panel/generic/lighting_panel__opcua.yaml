@@ -5,6 +5,14 @@ description: |
   OPC UA controllable lighting panel modelling three zones, daylight harvesting and scenes.
   Useful for showcasing BMS/BAS OPC UA integrations focused on lighting and occupancy.
 
+meta_parameters:
+  opcua_endpoint:
+    type: str
+    default: opc.tcp://0.0.0.0:4844/spx/lighting-panel
+  opcua_namespace_uri:
+    type: str
+    default: urn:spx:examples:opcua:lighting-panel
+
 attributes:
   panel_state:
     type: str
@@ -84,7 +92,34 @@ attributes:
     default: 0.5
     unit: s
 
+  k__rated_zone_power_kw:
+    type: float
+    default: 1.0
+    unit: kW
+  lighting_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
+
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(zone1_level_percent)
     name: track_zone1
     description: Zone 1 dimming with slew and panel state override.
@@ -141,13 +176,18 @@ actions:
           )
         )
 
+  - function: $in(lighting_power_kw)
+    name: compute_lighting_power
+    description: Three rated zone loads scaled by actual dimmer levels.
+    call: max(0.0, $in(k__rated_zone_power_kw)) * ($in(zone1_level_percent) + $in(zone2_level_percent) + $in(zone3_level_percent)) / 100.0
+
   - function: $in(energy_today_kwh)
     name: integrate_energy
     description: Estimate lighting energy.
-    call: $in(energy_today_kwh) + ($in(zone1_level_percent) + $in(zone2_level_percent) + $in(zone3_level_percent)) * cycle_time_s / 10000.0
+    call: $in(energy_today_kwh) + $in(lighting_power_kw) * $in(_elapsed_step_s) / 3600.0
 
   - function: $in(energy_week_kwh)
-    call: max($in(energy_today_kwh), $in(energy_week_kwh) + 0.05 * cycle_time_s)
+    call: max($in(energy_today_kwh), $in(energy_week_kwh) + $in(lighting_power_kw) * $in(_elapsed_step_s) / 3600.0)
 
   - function: $in(alarm_emergency)
     name: detect_emergency_alarm
@@ -159,8 +199,8 @@ actions:
 
 communication:
   - opcua_server:
-      endpoint: opc.tcp://0.0.0.0:4844/spx/lighting-panel
-      namespace_uri: urn:spx:examples:opcua:lighting-panel
+      endpoint: "$param(opcua_endpoint)"
+      namespace_uri: "$param(opcua_namespace_uri)"
       security:
         policy: NoSecurity
         user_tokens:
@@ -295,7 +335,6 @@ communication:
 
 scenarios:
   evening_scene:
-    enabled: true
     display_name: "Evening Scene"
     description: Switch the panel to a lower evening lighting scene.
     duration: 20.0
@@ -306,19 +345,17 @@ scenarios:
       $in(zone3_target_percent): 15.0
 
   night_shutdown:
-    enabled: true
     display_name: "Night Shutdown"
     description: Turn the lighting panel off for night schedule operation.
     duration: 25.0
     overrides:
-      $in(panel_state): off
+      $in(panel_state): "off"
       $in(schedule_state): night
       $in(zone1_target_percent): 0.0
       $in(zone2_target_percent): 0.0
       $in(zone3_target_percent): 0.0
 
   emergency_test:
-    enabled: true
     display_name: "Emergency Test"
     description: Run an emergency-lighting test while the panel stays in manual mode.
     duration: 10.0

@@ -5,6 +5,14 @@ description: |
   Building-management controller twin exposing AHU/chilled-water telemetry and energy data over OPC UA.
   Ideal for testing BAS integrations that read/write setpoints, schedules and alarm states.
 
+meta_parameters:
+  opcua_endpoint:
+    type: str
+    default: opc.tcp://0.0.0.0:4843/spx/bms-controller
+  opcua_namespace_uri:
+    type: str
+    default: urn:spx:examples:opcua:bms-controller
+
 attributes:
   hvac_mode:
     type: str
@@ -116,7 +124,25 @@ attributes:
     default: 1.0
     unit: s
 
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(occupancy_percent)
     name: slew_occupancy
     description: Blend occupancy toward a scenario/weather target.
@@ -142,13 +168,15 @@ actions:
 
   - function: $in(pump_speed_percent)
     name: track_pump_speed
-    description: Pump speed follows the command with minor lag.
+    description: Pump stops in maintenance and follows the command with minor lag.
     call: (
-          $in(pump_command_percent)
-          if abs($in(pump_command_percent) - $in(pump_speed_percent)) <= 1.5
-          else (
+          0.0 if $in(hvac_mode) == "off" else (
+            $in(pump_command_percent)
+            if abs($in(pump_command_percent) - $in(pump_speed_percent)) <= 1.5
+            else (
             $in(pump_speed_percent)
             + (1.5 if $in(pump_command_percent) > $in(pump_speed_percent) else -1.5)
+            )
           )
         )
 
@@ -156,7 +184,7 @@ actions:
     name: track_fan_speed
     description: Fan response with gating from mode/alarm state.
     call: (
-          0.0 if $in(hvac_mode) == "off" or $in(alarm_fan) == 1
+          0.0 if $in(hvac_mode) == "off"
           else (
             $in(fan_command_percent)
             if abs($in(fan_command_percent) - $in(fan_speed_percent)) <= 2.5
@@ -188,12 +216,15 @@ actions:
 
   - function: $in(zone_temp_average_c)
     name: update_zone_temp
-    description: Zone temps react to occupancy and supply air.
+    description: Bounded zone heat balance from occupancy, envelope and supply air.
     call: (
           $in(zone_temp_average_c)
-          + 0.02 * ($in(occupancy_percent) - 30.0)
-          - 0.05 * ($in(supply_air_temp_c) - 16.0)
-          + 0.05 * ($in(return_air_temp_c) - $in(zone_temp_average_c))
+          + min(1.0, $in(_elapsed_step_s)) * (
+              0.006 * max(0.0, min(100.0, $in(occupancy_percent))) / 100.0
+              + 0.003 * (22.0 - $in(zone_temp_average_c))
+              + 0.004 * max(0.0, min(100.0, $in(fan_speed_percent))) / 100.0
+                * ($in(supply_air_temp_c) - $in(zone_temp_average_c))
+            )
         )
 
   - function: $in(return_air_temp_c)
@@ -225,17 +256,17 @@ actions:
           0.0,
           min(
             100.0,
-            30.0 + 0.8 * ($in(supply_air_temp_c) - $in(supply_air_setpoint_c)) * -1.0
+            30.0 + 0.8 * ($in(supply_air_temp_c) - $in(supply_air_setpoint_c))
           )
         )
 
   - function: $in(power_draw_kw)
     name: compute_power_draw
     description: Approximate power draw from major loads.
-    call: max(
-          10.0,
+    call: 0.0 if $in(hvac_mode) == "off" else max(
+          0.0,
           min(
-            120.0,
+            max(0.0, min(120.0, $in(demand_limit_kw))),
             0.4 * $in(fan_speed_percent) + 0.6 * $in(pump_speed_percent) + 20.0
           )
         )
@@ -243,7 +274,7 @@ actions:
   - function: $in(energy_consumption_kwh)
     name: integrate_energy
     description: Integrate energy usage over time.
-    call: $in(energy_consumption_kwh) + $in(power_draw_kw) * $in(cycle_time_s) / 3600.0
+    call: $in(energy_consumption_kwh) + $in(power_draw_kw) * $in(_elapsed_step_s) / 3600.0
 
   - function: $in(alarm_filter)
     name: detect_filter_alarm
@@ -255,12 +286,12 @@ actions:
 
   - function: $in(alarm_fan)
     name: detect_fan_alarm
-    call: 1 if $in(fan_speed_percent) < 5.0 and $in(fan_command_percent) > 30.0 else 0
+    call: 1 if $in(hvac_mode) != "off" and $in(fan_speed_percent) < 5.0 and $in(fan_command_percent) > 30.0 else 0
 
 communication:
   - opcua_server:
-      endpoint: opc.tcp://0.0.0.0:4843/spx/bms-controller
-      namespace_uri: urn:spx:examples:opcua:bms-controller
+      endpoint: "$param(opcua_endpoint)"
+      namespace_uri: "$param(opcua_namespace_uri)"
       security:
         policy: NoSecurity
         user_tokens:
@@ -419,7 +450,6 @@ communication:
 
 scenarios:
   morning_warmup:
-    enabled: true
     display_name: "Morning Warmup"
     description: Raise occupancy and chiller demand for a morning startup sequence.
     duration: 20.0
@@ -429,7 +459,6 @@ scenarios:
       $in(supply_air_command_c): 15.0
 
   demand_response:
-    enabled: true
     display_name: "Demand Response"
     description: Reduce fan and pump demand to stay below the power cap.
     duration: 25.0
@@ -439,7 +468,6 @@ scenarios:
       $in(pump_command_percent): 45.0
 
   maintenance_stop:
-    enabled: true
     display_name: "Maintenance Stop"
     description: Switch the HVAC plant to an off state for maintenance.
     duration: 15.0

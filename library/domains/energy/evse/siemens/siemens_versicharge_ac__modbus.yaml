@@ -8,6 +8,9 @@ description: |
   current/voltage, power, power factor, and energy consumed.
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5036
@@ -223,7 +226,25 @@ attributes:
     default: 1.0
     unit: s
 
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(current_phase_sum_a)
     name: compute_phase_current_sum_a
     description: Sum of per-phase charging current.
@@ -305,7 +326,7 @@ actions:
   - function: $in(energy_consumed_kwh)
     name: integrate_energy_consumed_kwh
     description: Integrate consumed energy from total active power.
-    call: $in(energy_consumed_kwh) + max(0.0, $in(active_power_sum_w)) * $in(_cycle_time_s) / 3600000.0
+    call: $in(energy_consumed_kwh) + max(0.0, $in(active_power_sum_w)) * $in(_elapsed_step_s) / 3600000.0
 
   - function: $in(_modbus_current_l1_raw)
     name: encode_current_l1
@@ -434,7 +455,7 @@ actions:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true

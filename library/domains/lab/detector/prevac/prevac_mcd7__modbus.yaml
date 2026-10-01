@@ -8,6 +8,9 @@ description: >
   per-channel comparator thresholds.
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5022
@@ -256,7 +259,7 @@ polling:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
@@ -283,7 +286,6 @@ communication:
 scenarios:
   modbus_disconnect:
     display_name: "Modbus Disconnect"
-    enabled: true
     duration: 2.0
     description: Temporarily detaches the Modbus slave endpoint to exercise reconnect handling.
     call:
@@ -292,7 +294,6 @@ scenarios:
 
   channel_3_dropout:
     display_name: "Channel 3 Dropout"
-    enabled: true
     duration: 20.0
     description: Force channel 3 impulse output to a fixed value during a short window.
     actions:

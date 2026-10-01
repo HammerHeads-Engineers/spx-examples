@@ -6,6 +6,9 @@ description: |
   process image for digital inputs, digital outputs, and analog inputs.
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5024
@@ -54,7 +57,7 @@ attributes:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
@@ -74,7 +77,6 @@ communication:
 
 scenarios:
   all_clear:
-    enabled: true
     display_name: "All Clear"
     description: Hold all digital channels low with low analog signal levels.
     duration: 15.0
@@ -93,7 +95,6 @@ scenarios:
       $in(ai_4): 5.5
 
   alarm_trip:
-    enabled: true
     display_name: "Alarm Trip"
     description: Assert alarm-style digital states and high analog inputs.
     duration: 8.0
@@ -112,7 +113,6 @@ scenarios:
       $in(ai_4): 2.2
 
   analog_ramp_high:
-    enabled: true
     display_name: "Analog Ramp High"
     description: Drive multiple analog inputs into a higher operating range.
     duration: 20.0
@@ -131,7 +131,6 @@ scenarios:
       $in(ai_4): 6.0
 
   maintenance_loopback:
-    enabled: true
     display_name: "Maintenance Loopback"
     description: Mirror alternating digital states for loopback and maintenance checks.
     duration: 25.0

@@ -8,6 +8,9 @@ description: |
   exposed through a compact Modbus register map for axis-control demos.
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5020
@@ -235,7 +238,7 @@ polling:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
@@ -263,7 +266,6 @@ communication:
 
 scenarios:
   homing_cycle:
-    enabled: true
     display_name: "Homing Cycle"
     description: Run a nominal homing move back to the reference position.
     duration: 15.0
@@ -276,7 +278,6 @@ scenarios:
       $in(max_decel): 0.45
 
   limit_overtravel:
-    enabled: true
     display_name: "Limit Overtravel"
     description: Command travel past the positive soft limit to exercise limit alarms.
     duration: 12.0
@@ -288,7 +289,6 @@ scenarios:
       $in(torque_limit): 60.0
 
   torque_overload_test:
-    enabled: true
     display_name: "Torque Overload Test"
     description: Lower the torque threshold while commanding a fast move.
     duration: 10.0

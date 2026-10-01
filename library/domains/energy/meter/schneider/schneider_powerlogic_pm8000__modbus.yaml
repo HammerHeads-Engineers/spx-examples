@@ -8,6 +8,9 @@ description: |
   and energy totals).
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5025
@@ -63,7 +66,25 @@ attributes:
     type: float
     default: 1.0
     unit: s
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(apparent_power_total_va)
     name: compute_apparent_power
     description: Total apparent power from average VLL and current.
@@ -76,35 +97,43 @@ actions:
     name: compute_active_power
     description: Total active power from apparent power and power factor.
     call: |
+      (
       1.7320508075688772
       * $in(k__voltage_ll_avg_v)
       * $in(k__current_avg_a)
       * $in(k__power_factor)
+      )
 
   - function: $in(reactive_power_total_var)
     name: compute_reactive_power
     description: Reactive power magnitude with leading/lagging sign.
     call: |
+      (
       (max(0.0, ($in(apparent_power_total_va) ** 2) - ($in(active_power_total_w) ** 2)) ** 0.5)
       * (-1.0 if $in(power_factor_leading) else 1.0)
+      )
 
   - function: $in(energy_import_total_kwh)
     name: integrate_energy_import
     description: Integrate imported energy (kWh) from active power (W).
     call: |
+      (
       $in(energy_import_total_kwh)
-      + max(0.0, $in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+      + max(0.0, $in(active_power_total_w)) * $in(_elapsed_step_s) / 3600000.0
+      )
 
   - function: $in(energy_export_total_kwh)
     name: integrate_energy_export
     description: Integrate exported energy (kWh) from active power (W).
     call: |
+      (
       $in(energy_export_total_kwh)
-      + max(0.0, -$in(active_power_total_w)) * $in(_cycle_time_s) / 3600000.0
+      + max(0.0, -$in(active_power_total_w)) * $in(_elapsed_step_s) / 3600000.0
+      )
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
