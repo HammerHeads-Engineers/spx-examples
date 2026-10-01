@@ -586,8 +586,8 @@ jobs:
             -BuildRoot build/windows `
             -TelemetryEnvironment $telemetryEnvironment
 
-      - name: Validate Windows installer artifact
-        id: windows_artifact
+      - name: Prepare Windows bundle for signing
+        id: windows_bundle
         shell: pwsh
         run: |
           $artifacts = @(Get-ChildItem -Path "build/windows/artifacts" -Filter "spx-installer-*.exe" -File)
@@ -595,7 +595,19 @@ jobs:
             throw "Expected exactly one Windows installer bundle, found $($artifacts.Count)."
           }
           $artifactPath = (Resolve-Path -LiteralPath $artifacts[0].FullName).Path
-          "path=$artifactPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          $signingDir = Join-Path $env:RUNNER_TEMP "spx-burn-signing"
+          New-Item -ItemType Directory -Force -Path $signingDir | Out-Null
+          $enginePath = Join-Path $signingDir "spx-burn-engine.exe"
+          $signedBundlePath = Join-Path $signingDir $artifacts[0].Name
+
+          & wix burn detach $artifactPath -engine $enginePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to detach the Burn engine (exit code $LASTEXITCODE)."
+          }
+
+          "bundle_path=$artifactPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "engine_path=$enginePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "signed_bundle_path=$signedBundlePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Azure login for Artifact Signing
         uses: azure/login@v3
@@ -604,16 +616,80 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Sign Windows installer
+      - name: Sign Windows Burn engine
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: https://plc.codesigning.azure.net/
           signing-account-name: hhe-artifact-signing
           certificate-profile-name: spx-windows-release
-          files: ${{ steps.windows_artifact.outputs.path }}
+          files: ${{ steps.windows_bundle.outputs.engine_path }}
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+
+      - name: Reattach signed Windows Burn engine
+        shell: pwsh
+        run: |
+          & wix burn reattach `
+            "${{ steps.windows_bundle.outputs.bundle_path }}" `
+            -engine "${{ steps.windows_bundle.outputs.engine_path }}" `
+            -o "${{ steps.windows_bundle.outputs.signed_bundle_path }}"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to reattach the signed Burn engine (exit code $LASTEXITCODE)."
+          }
+
+      - name: Sign Windows installer bundle
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: https://plc.codesigning.azure.net/
+          signing-account-name: hhe-artifact-signing
+          certificate-profile-name: spx-windows-release
+          files: ${{ steps.windows_bundle.outputs.signed_bundle_path }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Verify signed Windows installer bundle
+        id: windows_artifact
+        shell: pwsh
+        run: |
+          $bundlePath = "${{ steps.windows_bundle.outputs.signed_bundle_path }}"
+          $expectedSigner = "Hammerheads Engineers Sp. z o.o."
+          $bundleSignature = Get-AuthenticodeSignature -FilePath $bundlePath
+          if ($bundleSignature.Status -ne "Valid") {
+            throw "Authenticode verification failed for '$bundlePath': $($bundleSignature.Status) $($bundleSignature.StatusMessage)"
+          }
+          if ($bundleSignature.SignerCertificate.Subject -notlike "*$expectedSigner*") {
+            throw "Unexpected signer for '$bundlePath': $($bundleSignature.SignerCertificate.Subject)"
+          }
+
+          $validationDir = Join-Path $env:RUNNER_TEMP "spx-burn-validation"
+          $payloadDir = Join-Path $validationDir "payloads"
+          $baDir = Join-Path $validationDir "ba"
+          New-Item -ItemType Directory -Force -Path $payloadDir, $baDir | Out-Null
+          & wix burn extract $bundlePath -o $payloadDir -oba $baDir
+          if ($LASTEXITCODE -ne 0) {
+            throw "WiX could not extract the signed Burn bundle (exit code $LASTEXITCODE)."
+          }
+
+          $attachedPayloadDir = Join-Path $payloadDir "WixAttachedContainer"
+          $msi = Get-ChildItem -LiteralPath $attachedPayloadDir -Filter "spx-windows-*.msi" -File
+          $python = Get-ChildItem -LiteralPath $attachedPayloadDir -Filter "python-3.12.10-amd64.exe" -File
+          if (-not $msi -or -not $python) {
+            throw "Signed Burn bundle is missing its embedded MSI or Python prerequisite."
+          }
+
+          $signedEnginePath = Join-Path $validationDir "spx-burn-engine.exe"
+          & wix burn detach $bundlePath -engine $signedEnginePath
+          if ($LASTEXITCODE -ne 0) {
+            throw "WiX could not detach the signed Burn engine (exit code $LASTEXITCODE)."
+          }
+          $engineSignature = Get-AuthenticodeSignature -FilePath $signedEnginePath
+          if ($engineSignature.Status -ne "Valid" -or $engineSignature.SignerCertificate.Subject -notlike "*$expectedSigner*") {
+            throw "The reattached Burn engine does not have a valid SPX publisher signature."
+          }
+
+          "path=$bundlePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload Windows installer as workflow artifact
         uses: actions/upload-artifact@v7

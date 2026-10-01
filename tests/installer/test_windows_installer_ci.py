@@ -60,6 +60,33 @@ def test_windows_installer_job_builds_validates_and_publishes_bundle() -> None:
     assert "steps.windows_artifact.outputs.path" in job
 
 
+def test_windows_bundle_signs_burn_engine_and_bundle_before_publishing() -> None:
+    job = _job("build-windows-installer", "build-macos-installer")
+
+    detach = job.index("wix burn detach")
+    sign_engine = job.index("Sign Windows Burn engine")
+    reattach = job.index("wix burn reattach")
+    sign_bundle = job.index("Sign Windows installer bundle")
+    verify_bundle = job.index("Verify signed Windows installer bundle")
+    upload_artifact = job.index("Upload Windows installer as workflow artifact")
+    upload_release = job.index("Upload Windows installer to GitHub Release")
+
+    assert detach < sign_engine < reattach < sign_bundle < verify_bundle
+    assert verify_bundle < upload_artifact < upload_release
+    assert "wix burn extract $bundlePath" in job
+    assert 'Filter "spx-windows-*.msi"' in job
+    assert 'Filter "python-3.12.10-amd64.exe"' in job
+    assert "Get-AuthenticodeSignature" in job
+
+
+def test_windows_bundle_blocks_when_legacy_machine_wide_install_is_detected() -> None:
+    bundle = BUNDLE_WXS_PATH.read_text(encoding="utf-8")
+
+    assert 'Result="exists"' in bundle
+    assert 'Condition="NOT LegacyPerMachineSpxInstalled"' in bundle
+    assert '&quot;true&quot;' not in bundle
+
+
 def test_windows_packaging_docs_describe_ci_artifact() -> None:
     docs_path = REPO_ROOT / "packaging" / "windows" / "README.md"
     docs = docs_path.read_text(encoding="utf-8")
