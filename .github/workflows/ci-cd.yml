@@ -634,26 +634,6 @@ jobs:
           & .\packaging\windows\Verify-AuthenticodeSignature.ps1 `
             -Path "${{ steps.windows_bundle.outputs.engine_path }}" `
             -ExpectedSigner "Hammerheads Engineers Sp. z o.o."
-          append-signature: true
-
-      - name: Verify signed Windows Burn engine before reattaching
-        shell: pwsh
-        run: |
-          $enginePath = "${{ steps.windows_bundle.outputs.engine_path }}"
-          $expectedSigner = "Hammerheads Engineers Sp. z o.o."
-          $engineSignature = Get-AuthenticodeSignature -LiteralPath $enginePath
-          $engineSubject = if ($null -ne $engineSignature.SignerCertificate) {
-            $engineSignature.SignerCertificate.Subject
-          } else {
-            "<none>"
-          }
-          Write-Host "Burn engine signature before reattach: status=$($engineSignature.Status); message=$($engineSignature.StatusMessage); signer=$engineSubject"
-          if ($engineSignature.Status -ne "Valid") {
-            throw "Artifact Signing did not produce a valid Burn engine signature: status=$($engineSignature.Status); message=$($engineSignature.StatusMessage); signer=$engineSubject"
-          }
-          if ($engineSubject -notlike "*$expectedSigner*") {
-            throw "Artifact Signing produced an unexpected Burn engine signer: $engineSubject"
-          }
 
       - name: Reattach signed Windows Burn engine
         shell: pwsh
@@ -676,7 +656,6 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
-          append-signature: true
           append-signature: true
 
       - name: Verify signed Windows installer bundle
