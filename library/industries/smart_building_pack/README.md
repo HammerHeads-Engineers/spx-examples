@@ -4,6 +4,12 @@ Smart-building BMS/BAS demo pack covering HVAC, lighting, safety, energy, and te
 across MQTT, LwM2M/CoAP, HTTP, Modbus TCP, OPC UA, KNX, Matter, and BACnet. Use it
 to validate multi-protocol integrations, test gateways, or build demo dashboards.
 
+MQTT models default to the bundled `mosquitto-server:1883` on the Docker network,
+independently of the wizard's host/LAN port binding. Override `mqtt_broker_host`,
+`mqtt_broker_port`, and `mqtt_topic_prefix` for an external broker or multiple instances.
+Robot-vacuum cleaning, charging, and docking use elapsed simulation seconds;
+low battery and a full bin trigger a return to the dock and clear the clean request.
+
 ## What is inside
 
 - Protocols: MQTT, LwM2M/CoAP, HTTP, Modbus TCP, OPC UA, KNX, Matter, BACnet.

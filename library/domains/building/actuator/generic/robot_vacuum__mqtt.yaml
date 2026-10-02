@@ -7,6 +7,23 @@ description: |
   synthetic telemetry such as battery level, bin fill, cleaning progress, and
   human-readable status text.
 
+meta_parameters:
+  mqtt_broker_host:
+    type: str
+    default: mosquitto-server
+  mqtt_broker_port:
+    type: int
+    default: 1883
+  mqtt_topic_prefix:
+    type: str
+    default: "spx/examples/robot_vacuum"
+  mqtt_publish_interval:
+    type: float
+    default: 1.0
+  mqtt_default_qos:
+    type: int
+    default: 1
+
 attributes:
   # Command latches and discrete state (int 0/1 flags)
   desired_cleaning:
@@ -100,11 +117,36 @@ attributes:
     type: str
     default: "DOCKED"
 
+  # Actual simulation time; paused wall-clock time is excluded by the timer.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(desired_cleaning)
     name: clear_clean_request_on_dock_command
-    description: Clear the clean request when a dock command is issued.
-    call: 0 if $in(dock_request) == 1 else $in(desired_cleaning)
+    description: Clear the clean request on docking, automatic return, or a service threshold.
+    call: (
+          0 if (
+            $in(dock_request) == 1
+            or $in(returning_home) == 1
+            or $in(battery_percent) <= $in(low_battery_threshold_percent)
+            or $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
+          ) else $in(desired_cleaning)
+        )
 
   - function: $in(cleaning_active)
     name: update_cleaning_active_state
@@ -128,13 +170,8 @@ actions:
             $in(docked) == 0
             and (
               $in(dock_request) == 1
-              or (
-                $in(cleaning_active) == 1
-                and (
-                  $in(battery_percent) <= $in(low_battery_threshold_percent)
-                  or $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
-                )
-              )
+              or $in(battery_percent) <= $in(low_battery_threshold_percent)
+              or $in(bin_fill_percent) >= $in(bin_full_threshold_percent)
             )
           )
           else (0 if $in(docked) == 1 else $in(returning_home))
@@ -146,7 +183,7 @@ actions:
     call: (
           0.0
           if $in(returning_home) == 0 or $in(docked) == 1
-          else min($in(return_duration_s), $in(return_timer_s) + $in(cycle_time_s))
+          else min($in(return_duration_s), $in(return_timer_s) + $in(_elapsed_step_s))
         )
 
   - function: $in(docked)
@@ -169,7 +206,7 @@ actions:
     call: (
           $in(area_cleaned_m2)
           + (
-              $in(cleaning_rate_m2_per_min) * $in(cycle_time_s) / 60.0
+              $in(cleaning_rate_m2_per_min) * $in(_elapsed_step_s) / 60.0
               if $in(cleaning_active) == 1
               else 0.0
             )
@@ -181,7 +218,7 @@ actions:
     call: (
           $in(runtime_min)
           + (
-              $in(cycle_time_s) / 60.0
+              $in(_elapsed_step_s) / 60.0
               if $in(cleaning_active) == 1
               else 0.0
             )
@@ -196,7 +233,7 @@ actions:
             100.0,
             $in(bin_fill_percent)
             + (
-                $in(bin_fill_rate_percent_per_min) * $in(cycle_time_s) / 60.0
+                $in(bin_fill_rate_percent_per_min) * $in(_elapsed_step_s) / 60.0
                 if $in(cleaning_active) == 1
                 else 0.0
               )
@@ -212,13 +249,13 @@ actions:
             100.0,
             $in(battery_percent)
             + (
-                $in(charge_rate_percent_per_min) * $in(cycle_time_s) / 60.0
+                $in(charge_rate_percent_per_min) * $in(_elapsed_step_s) / 60.0
                 if ($in(docked) == 1 and $in(cleaning_active) == 0 and $in(returning_home) == 0)
                 else (
-                  -$in(discharge_clean_percent_per_min) * $in(cycle_time_s) / 60.0
+                  -$in(discharge_clean_percent_per_min) * $in(_elapsed_step_s) / 60.0
                   if $in(cleaning_active) == 1
                   else (
-                    -$in(discharge_return_percent_per_min) * $in(cycle_time_s) / 60.0
+                    -$in(discharge_return_percent_per_min) * $in(_elapsed_step_s) / 60.0
                     if $in(returning_home) == 1
                     else 0.0
                   )
@@ -273,11 +310,11 @@ actions:
 
 communication:
   - mqtt:
-      broker: "host.docker.internal"
-      port: 1883
-      publish_interval: 1.0
-      topic_prefix: "spx/examples/robot_vacuum"
-      default_qos: 1
+      broker: "$param(mqtt_broker_host)"
+      port: "$param(mqtt_broker_port)"
+      publish_interval: "$param(mqtt_publish_interval)"
+      topic_prefix: "$param(mqtt_topic_prefix)"
+      default_qos: "$param(mqtt_default_qos)"
       default_retain: false
       bindings:
         - name: telemetry_cleaning_active

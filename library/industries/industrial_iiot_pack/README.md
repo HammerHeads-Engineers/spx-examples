@@ -4,6 +4,16 @@ OPC UA/Modbus/MQTT/HTTP-oriented kit for line automation, process control and
 factory monitoring. The present iteration links the models we already maintain;
 additional Redfish device twins can land alongside.
 
+MQTT models use the bundled `mosquitto-server:1883` by default. Set
+`mqtt_broker_host`, `mqtt_broker_port`, and `mqtt_topic_prefix` when provisioning
+an external broker or multiple instances. Demo scenarios are opt-in: start them
+explicitly from the UI or API. AGV motion/battery and line counts use elapsed
+simulation time; their public `cycle_time_s` remains the reference step for slew tuning.
+The AGV steers toward its waypoint and limits each movement step to the remaining
+distance, including after scenario overrides end. Set `k__autonomous_navigation`
+to `false` (MQTT `command/autonomous_navigation`) to use the legacy manual
+`heading_deg` control instead.
+
 - **Protocols**: Modbus TCP, MQTT, HTTP, SCPI, OPC UA.
 - **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, Schneider Electric, WAGO, APC Rack PDU).
 - **OPC UA**: process-focused twins:
