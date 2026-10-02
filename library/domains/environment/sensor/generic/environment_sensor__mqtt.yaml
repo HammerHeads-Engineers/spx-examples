@@ -12,7 +12,7 @@ description: |
 meta_parameters:
   mqtt_broker_host:
     type: str
-    default: host.docker.internal
+    default: mosquitto-server
   mqtt_broker_port:
     type: int
     default: 1883

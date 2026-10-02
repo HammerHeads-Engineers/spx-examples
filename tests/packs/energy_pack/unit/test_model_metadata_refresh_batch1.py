@@ -74,7 +74,7 @@ def test_generic_energy_meter_models_are_typed_and_named() -> None:
     mqtt_meta = mqtt_model["meta_parameters"]
     mqtt_block = mqtt_model["communication"][0]["mqtt"]
     bindings = mqtt_block["bindings"]
-    assert mqtt_meta["mqtt_broker_host"]["default"] == "host.docker.internal"
+    assert mqtt_meta["mqtt_broker_host"]["default"] == "mosquitto-server"
     assert mqtt_model["attributes"]["voltage_l1"]["unit"] == "V"
     assert mqtt_model["attributes"]["reactive_power_kvar"]["unit"] == "kVAR"
     assert bindings[0]["name"] == "publish_voltage_l1"

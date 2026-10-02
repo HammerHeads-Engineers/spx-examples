@@ -8,7 +8,7 @@ description: |
 meta_parameters:
   mqtt_broker_host:
     type: str
-    default: "host.docker.internal"
+    default: "mosquitto-server"
   mqtt_broker_port:
     type: int
     default: 1883
@@ -132,7 +132,7 @@ communication:
 
 scenarios:
   bearing_fault_spike:
-    enabled: true
+    enabled: false
     display_name: "Bearing Fault Spike"
     description: Raise vibration on all axes to emulate a bearing failure signature.
     duration: 12.0
@@ -142,7 +142,7 @@ scenarios:
       $in(vib_rms_z): 6.2
 
   thermal_warning:
-    enabled: true
+    enabled: false
     display_name: "Thermal Warning"
     description: Raise stator temperature into the warning range with moderate vibration.
     duration: 15.0
@@ -153,7 +153,7 @@ scenarios:
       $in(vib_rms_z): 2.6
 
   sensor_dropout:
-    enabled: true
+    enabled: false
     display_name: "Sensor Dropout"
     description: Collapse measured vibration and temperature to emulate a sensor outage.
     duration: 6.0

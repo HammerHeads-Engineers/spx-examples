@@ -8,7 +8,7 @@ description: |
 meta_parameters:
   mqtt_broker_host:
     type: str
-    default: "host.docker.internal"
+    default: "mosquitto-server"
   mqtt_broker_port:
     type: int
     default: 1883
@@ -23,6 +23,9 @@ meta_parameters:
     default: 1
 
 attributes:
+  k__autonomous_navigation:
+    type: bool
+    default: true
   pos_x_m:
     type: float
     default: 0.0
@@ -76,33 +79,77 @@ attributes:
     default: 0.5
     unit: s
 
+  # Actual simulation time; paused wall-clock time is excluded by the timer.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+  _motion_step_m:
+    type: float
+    default: 0.0
+    unit: m
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(speed_mps)
     name: track_speed
     description: Slew actual speed toward target when navigating.
     accel: 0.4
     decel: 0.7
     call: (
-          0.0 if $in(mission_state) != "navigating"
+          0.0 if $in(mission_state) != "navigating" or $in(alarm_obstacle) == 1
           else (
             $in(speed_mps)
             + (
-                min(accel, $in(target_speed_mps) - $in(speed_mps))
+                min(accel * $in(_elapsed_step_s) / max(0.001, $in(cycle_time_s)), $in(target_speed_mps) - $in(speed_mps))
                 if $in(target_speed_mps) > $in(speed_mps)
-                else max(-decel, $in(target_speed_mps) - $in(speed_mps))
+                else max(-decel * $in(_elapsed_step_s) / max(0.001, $in(cycle_time_s)), $in(target_speed_mps) - $in(speed_mps))
               )
           )
+        )
+
+  - function: $in(heading_deg)
+    name: steer_to_waypoint
+    description: Follow the current waypoint; disable autonomous navigation for manual heading commands.
+    imports: {math: math}
+    call: (
+          math.degrees(math.atan2($in(target_y_m) - $in(pos_y_m), $in(target_x_m) - $in(pos_x_m)))
+          if $in(k__autonomous_navigation) and $in(mission_state) == "navigating"
+          else $in(heading_deg)
+        )
+
+  - function: $in(_motion_step_m)
+    name: limit_motion_step
+    description: Do not overshoot the waypoint when the polling interval is long.
+    imports: {math: math}
+    call: (
+          min(max(0.0, $in(speed_mps)) * $in(_elapsed_step_s), math.hypot($in(target_x_m) - $in(pos_x_m), $in(target_y_m) - $in(pos_y_m)))
+          if $in(k__autonomous_navigation)
+          else $in(speed_mps) * $in(_elapsed_step_s)
         )
 
   - function: $in(pos_x_m)
     name: integrate_position_x
     description: Simple kinematics update in X assuming heading defines direction.
-    call: $in(pos_x_m) + $in(speed_mps) * cycle_time_s * cos($in(heading_deg) * 3.14159 / 180.0)
+    imports: {math: math}
+    call: $in(pos_x_m) + $in(_motion_step_m) * math.cos(math.radians($in(heading_deg)))
 
   - function: $in(pos_y_m)
     name: integrate_position_y
     description: Simple kinematics update in Y assuming heading defines direction.
-    call: $in(pos_y_m) + $in(speed_mps) * cycle_time_s * sin($in(heading_deg) * 3.14159 / 180.0)
+    imports: {math: math}
+    call: $in(pos_y_m) + $in(_motion_step_m) * math.sin(math.radians($in(heading_deg)))
 
   - function: $in(battery_soc_percent)
     name: discharge_battery
@@ -110,23 +157,29 @@ actions:
     call: max(
           0.0,
           $in(battery_soc_percent)
-          - $in(battery_discharge_rate) * cycle_time_s * max(0.2, abs($in(speed_mps)))
+          - $in(battery_discharge_rate) * $in(_elapsed_step_s) * max(0.2, abs($in(speed_mps)))
         )
 
   - function: $in(mission_state)
     name: update_mission_state
     description: Switch mission state based on speed and waypoint proximity.
+    imports: {math: math}
     tolerance_m: 0.3
     call: (
           "error" if $in(alarm_obstacle) == 1
           else (
             "idle" if $in(target_speed_mps) <= 0.01
             else (
-              "waiting" if sqrt(($in(target_x_m) - $in(pos_x_m)) ** 2 + ($in(target_y_m) - $in(pos_y_m)) ** 2) <= tolerance_m
+              "waiting" if math.hypot($in(target_x_m) - $in(pos_x_m), $in(target_y_m) - $in(pos_y_m)) <= tolerance_m
               else "navigating"
             )
           )
         )
+
+  - function: $in(speed_mps)
+    name: stop_at_waypoint
+    description: Report zero speed immediately when the waypoint is reached.
+    call: 0.0 if $in(mission_state) != "navigating" else $in(speed_mps)
 
 communication:
   - mqtt:
@@ -181,6 +234,10 @@ communication:
           attribute: $attr(target_speed_mps)
           topic: command/target_speed_mps
           direction: subscribe
+        - name: configure_autonomous_navigation
+          attribute: $attr(k__autonomous_navigation)
+          topic: command/autonomous_navigation
+          direction: subscribe
         - name: subscribe_heading_deg
           attribute: $attr(heading_deg)
           topic: command/heading_deg
@@ -196,7 +253,7 @@ communication:
 
 scenarios:
   mission_run:
-    enabled: true
+    enabled: false
     display_name: "Mission Run"
     description: Drive toward a waypoint with cargo on board at nominal mission speed.
     duration: 30.0
@@ -208,7 +265,7 @@ scenarios:
       $in(load_present): 1
 
   obstacle_stop:
-    enabled: true
+    enabled: false
     display_name: "Obstacle Stop"
     description: Force an obstacle alarm and halt the mission.
     duration: 10.0
@@ -218,7 +275,7 @@ scenarios:
       $in(mission_state): error
 
   battery_service_window:
-    enabled: true
+    enabled: false
     display_name: "Battery Service Window"
     description: Slow the AGV and drop battery state into a maintenance window.
     duration: 20.0

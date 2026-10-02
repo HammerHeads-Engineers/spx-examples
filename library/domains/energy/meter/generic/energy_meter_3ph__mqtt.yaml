@@ -9,7 +9,7 @@ description: |
 meta_parameters:
   mqtt_broker_host:
     type: str
-    default: "host.docker.internal"
+    default: "mosquitto-server"
   mqtt_broker_port:
     type: int
     default: 1883
@@ -134,7 +134,25 @@ attributes:
     default: 1.0
     unit: s
 
+  # Actual simulation time; paused wall-clock time is excluded by the timer.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(active_power_kw)
     name: compute_active_power
     description: Estimate active power from three-phase voltage, currents, and power factor.
@@ -149,7 +167,7 @@ actions:
   - function: $in(energy_import_kwh)
     name: integrate_energy
     description: Integrate cumulative imported energy based on active power.
-    call: $in(energy_import_kwh) + max(0.0, $in(active_power_kw)) * cycle_time_s / 3600.0
+    call: $in(energy_import_kwh) + max(0.0, $in(active_power_kw)) * $in(_elapsed_step_s) / 3600.0
 
   - function: $in(overload_alarm)
     name: detect_overload
@@ -321,7 +339,7 @@ communication:
 
 scenarios:
   balanced_load_step:
-    enabled: true
+    enabled: false
     display_name: "Balanced Load Step"
     description: Raise all three phase currents together for a balanced demand step.
     duration: 20.0
@@ -332,7 +350,7 @@ scenarios:
       $in(power_factor): 0.92
 
   unbalanced_phase_l2:
-    enabled: true
+    enabled: false
     display_name: "Unbalanced Phase L2"
     description: Push most of the load onto phase L2 to exercise unbalance handling.
     duration: 15.0
@@ -343,7 +361,7 @@ scenarios:
       $in(power_factor): 0.88
 
   voltage_sag_event:
-    enabled: true
+    enabled: false
     display_name: "Voltage Sag Event"
     description: Lower the nominal voltage and increase sag sensitivity under load.
     duration: 10.0
@@ -353,7 +371,7 @@ scenarios:
       $in(power_factor): 0.9
 
   pv_backfeed_disturbance:
-    enabled: true
+    enabled: false
     display_name: "PV Backfeed Disturbance"
     description: Emulate export power with leading power factor and higher local voltage.
     duration: 18.0

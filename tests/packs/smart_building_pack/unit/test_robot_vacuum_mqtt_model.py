@@ -42,7 +42,8 @@ def test_robot_vacuum_mqtt_model_loads() -> None:
     assert isinstance(comm, list) and comm
     mqtt = comm[0].get("mqtt")
     assert isinstance(mqtt, dict)
-    assert mqtt.get("topic_prefix") == "spx/examples/robot_vacuum"
+    assert mqtt.get("topic_prefix") == "$param(mqtt_topic_prefix)"
+    assert doc["meta_parameters"]["mqtt_topic_prefix"]["default"] == "spx/examples/robot_vacuum"
 
     bindings = mqtt.get("bindings")
     assert isinstance(bindings, list) and bindings

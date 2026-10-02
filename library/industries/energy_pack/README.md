@@ -4,6 +4,11 @@ Foundation for energy-native DER / e-mobility scenarios. Includes OCPP 1.6 charg
 point + CSMS twins, Modbus EVSEs, and power-meter telemetry for charging and
 power-flow demos.
 
+The MQTT energy meter uses the bundled `mosquitto-server:1883` by default;
+`mqtt_broker_host`, `mqtt_broker_port`, and `mqtt_topic_prefix` remain overridable.
+Energy is integrated from elapsed simulation seconds, independently of polling
+frequency. Load/disturbance scenarios must be started explicitly in the UI or API.
+
 - **Protocols**: MQTT, Modbus TCP, OCPP (SunSpec/OPC UA coming next).
 - **Models**: OCPP 1.6 EVSE + CSMS twins, Siemens VersiCharge AC Modbus EVSE,
   generic three-phase energy meters, a Socomec DIRIS A-10 Modbus energy meter,
