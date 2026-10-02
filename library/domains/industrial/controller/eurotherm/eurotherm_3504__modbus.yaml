@@ -18,6 +18,9 @@ description: |
     - 556 Loop.1.OP.ManualMode (0=track, 1=step, 2=lastMOP)
 
 meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
   modbus_port:
     type: int
     default: 5027
@@ -270,7 +273,7 @@ actions:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: "$param(modbus_port)"
       unit_id: "$param(modbus_unit_id)"
       zero_fill: true
@@ -286,7 +289,6 @@ communication:
 
 scenarios:
   auto_pressurize:
-    enabled: true
     display_name: "Auto Pressurize"
     description: Run the loop in auto mode and step the pressure setpoint upward.
     duration: 20.0
@@ -296,7 +298,6 @@ scenarios:
       $in(manual_out_raw): 0
 
   auto_depressurize:
-    enabled: true
     display_name: "Auto Depressurize"
     description: Run the loop in auto mode and lower the target pressure.
     duration: 18.0
@@ -305,7 +306,6 @@ scenarios:
       $in(target_sp_raw): 8
 
   manual_hold_40:
-    enabled: true
     display_name: "Manual Hold 40%"
     description: Switch to manual mode and hold a fixed 40 percent output command.
     duration: 15.0

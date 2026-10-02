@@ -6,6 +6,14 @@ description: |
   diagnostics. Provides bidirectional commands for speed and targets while
   exposing typical jam and low-film alarms.
 
+meta_parameters:
+  opcua_endpoint:
+    type: str
+    default: opc.tcp://0.0.0.0:4842/spx/packaging-line
+  opcua_namespace_uri:
+    type: str
+    default: urn:spx:examples:opcua:packaging-line
+
 attributes:
   line_state:
     type: str
@@ -80,7 +88,25 @@ attributes:
     default: 1.0
     unit: s
 
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(line_state)
     name: update_line_state
     description: Determine high-level state from alarms and mode.
@@ -118,7 +144,7 @@ actions:
     description: Increment throughput and reject counters based on current rates.
     call: (
           $in(throughput_today)
-          + ($in(cases_per_min) * cycle_time_s / 60.0 if $in(line_state) == "running" else 0.0)
+          + ($in(cases_per_min) * $in(_elapsed_step_s) / 60.0 if $in(line_state) == "running" else 0.0)
         )
 
   - function: $in(reject_today)
@@ -126,7 +152,7 @@ actions:
     description: Assume 2 percent reject rate when running.
     call: (
           $in(reject_today)
-          + (0.02 * $in(cases_per_min) * cycle_time_s / 60.0 if $in(line_state) == "running" else 0.0)
+          + (0.02 * $in(cases_per_min) * $in(_elapsed_step_s) / 60.0 if $in(line_state) == "running" else 0.0)
         )
 
   - function: $in(infeed_queue_count)
@@ -135,7 +161,7 @@ actions:
     call: max(
           0.0,
           $in(infeed_queue_count)
-          + (2.0 if $in(line_state) == "stopped" else -$in(cases_per_min) * cycle_time_s / 120.0)
+          + (2.0 if $in(line_state) == "stopped" else -$in(cases_per_min) * $in(_elapsed_step_s) / 120.0)
         )
 
   - function: $in(pallet_count_ready)
@@ -169,7 +195,7 @@ actions:
     call: max(
           0.0,
           $in(film_roll_percent)
-          - (0.01 * $in(cases_per_min) * cycle_time_s / 60.0)
+          - (0.01 * $in(cases_per_min) * $in(_elapsed_step_s) / 60.0)
         )
 
   - function: $in(alarm_low_film)
@@ -182,8 +208,8 @@ actions:
 
 communication:
   - opcua_server:
-      endpoint: opc.tcp://0.0.0.0:4842/spx/packaging-line
-      namespace_uri: urn:spx:examples:opcua:packaging-line
+      endpoint: "$param(opcua_endpoint)"
+      namespace_uri: "$param(opcua_namespace_uri)"
       security:
         policy: NoSecurity
         user_tokens:
@@ -306,7 +332,6 @@ communication:
 
 scenarios:
   steady_run:
-    enabled: true
     display_name: "Steady Run"
     description: Run the line automatically at a stable target speed and wrapper temperature.
     duration: 40.0
@@ -316,7 +341,6 @@ scenarios:
       $in(wrapper_target_temp_c): 145.0
 
   film_break:
-    enabled: true
     display_name: "Film Break"
     description: Simulate low film and a jammed packaging event.
     duration: 15.0
@@ -326,7 +350,6 @@ scenarios:
       $in(target_speed_mpm): 5.0
 
   changeover_pause:
-    enabled: true
     display_name: "Changeover Pause"
     description: Pause production during a manual changeover and divert to rework.
     duration: 25.0

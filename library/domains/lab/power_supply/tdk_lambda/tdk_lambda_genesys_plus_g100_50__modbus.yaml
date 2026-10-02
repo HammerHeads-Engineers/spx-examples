@@ -10,6 +10,11 @@ description: |
   SPX-facing control/status profile for tests; it does not attempt to reproduce
   the full vendor MDBS register table.
 
+meta_parameters:
+  modbus_host:
+    type: str
+    default: 0.0.0.0
+
 attributes:
   # Remote command and control surface
   k__output_enable: 0
@@ -41,7 +46,25 @@ attributes:
   _voltage_target_v: 0.0
   _effective_current_limit_a: 0.0
 
+  # Elapsed simulation seconds; timer excludes paused wall-clock time.
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
+
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    call: max(0.0, $in(__timer) - $in(_previous_time_s))
+
+  - function: $in(_previous_time_s)
+    name: capture_elapsed_time
+    call: $in(__timer)
+
   - function: $in(alarm_remote_inhibit)
     name: detect_remote_mode_inhibit_alarm
     description: Raise an inhibit alarm when output is requested without remote mode.
@@ -87,9 +110,9 @@ actions:
           (
             $in(voltage_actual_v)
             + max(
-                -$in(voltage_fall_rate_v_per_s) * $in(cycle_time_s),
+                -$in(voltage_fall_rate_v_per_s) * $in(_elapsed_step_s),
                 min(
-                  $in(voltage_rise_rate_v_per_s) * $in(cycle_time_s),
+                  $in(voltage_rise_rate_v_per_s) * $in(_elapsed_step_s),
                   (
                     min(
                       $in(_voltage_target_v),
@@ -144,7 +167,7 @@ actions:
 
 communication:
   - modbus_slave:
-      host: 0.0.0.0
+      host: "$param(modbus_host)"
       port: 5033
       unit_id: 1
       zero_fill: true

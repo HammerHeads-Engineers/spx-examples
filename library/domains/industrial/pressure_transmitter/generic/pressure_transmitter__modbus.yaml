@@ -84,7 +84,6 @@ communication:
 
 scenarios:
   pressure_ramp_up:
-    enabled: true
     display_name: "Pressure Ramp Up"
     description: Ramp the transmitter pressure toward the high alarm region.
     duration: 12.0
@@ -93,7 +92,6 @@ scenarios:
       $in(pressure_slew_rate_bar): 0.45
 
   pressure_ramp_down:
-    enabled: true
     display_name: "Pressure Ramp Down"
     description: Drop the transmitter pressure toward the low alarm region.
     duration: 10.0
@@ -102,7 +100,6 @@ scenarios:
       $in(pressure_slew_rate_bar): 0.35
 
   pressure_spike:
-    enabled: true
     display_name: "Pressure Spike"
     description: Inject a short high-pressure spike to exercise limit handling.
     duration: 2.0
@@ -111,7 +108,6 @@ scenarios:
       $in(pressure_slew_rate_bar): 1.2
 
   pressure_dropout:
-    enabled: true
     display_name: "Pressure Dropout"
     description: Force a brief low-pressure dropout below the configured span.
     duration: 2.5

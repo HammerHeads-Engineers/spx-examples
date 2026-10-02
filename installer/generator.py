@@ -73,6 +73,7 @@ class DeploymentGenerator:
             installation_id=installation_id,
             service_bind_addresses=getattr(selection, "service_bind_addresses", {}),
             telemetry_environment=self.telemetry_environment,
+            model_ids=selection.model_ids,
         )
         compose_path = output_dir / "docker-compose.generated.yml"
         with compose_path.open("w", encoding="utf-8") as handle:
@@ -116,6 +117,7 @@ class DeploymentGenerator:
         installation_id: str = "",
         service_bind_addresses: Dict[str, str] | None = None,
         telemetry_environment: str = "staging",
+        model_ids: List[str] | None = None,
     ) -> Dict[str, Dict]:
         services: Dict[str, Dict] = {}
         builtin_ports: List[str] = []
@@ -155,6 +157,10 @@ class DeploymentGenerator:
                         MODBUS_INSTANCE_PORT_START, MODBUS_INSTANCE_PORT_END + 1
                     )
                 ]
+            )
+            builtin_ports.extend(
+                f"{bind_expression}:{port}:{port}"
+                for port in self._model_modbus_ports(model_ids or [])
             )
 
         labels = self._stack_labels(installation_id)
@@ -323,6 +329,33 @@ class DeploymentGenerator:
                 entry = f"{bind_expression}:{port.host}:{port.container}"
             entries.append(entry)
         return entries
+
+    def _model_modbus_ports(self, model_ids: List[str]) -> List[int]:
+        """Find selected slave endpoints outside the standard published range."""
+        ports: Set[int] = set()
+        for model_id in model_ids:
+            model = self.index.models.get(model_id)
+            if model is None:
+                continue
+            path = self.repo_root / model.path
+            if not path.is_file():
+                continue
+            definition = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            communication = definition.get("communication", [])
+            if isinstance(communication, dict):
+                communication = [communication]
+            for block in communication:
+                config = block.get("modbus_slave", {})
+                port = config.get("port")
+                if isinstance(port, str):
+                    match = re.fullmatch(r"\$param\(([^)]+)\)", port)
+                    if match:
+                        spec = definition.get("meta_parameters", {}).get(match[1], {})
+                        port = spec.get("default") if isinstance(spec, dict) else spec
+                if isinstance(port, int) and not isinstance(port, bool) and 1 <= port <= 65535:
+                    if port != MODBUS_GATEWAY_PORT and not MODBUS_INSTANCE_PORT_START <= port <= MODBUS_INSTANCE_PORT_END:
+                        ports.add(port)
+        return sorted(ports)
 
     def _process_volume(self, entry: str, assets_root: Path) -> str:
         if not entry:
@@ -972,6 +1005,19 @@ exit /b %ERRORLEVEL%
                         "container_port": port.container,
                     }
                 )
+        if "modbus_tcp_gateway" in selection.service_ids:
+            for port in self._model_modbus_ports(selection.model_ids):
+                service_port_mappings.append({
+                    "key": f"modbus_tcp_gateway/tcp/{port}",
+                    "service_id": "modbus_tcp_gateway",
+                    "service_name": "Modbus model endpoint",
+                    "purpose": "selected model custom endpoint",
+                    "compose_service": SPX_SERVER_SERVICE_NAME,
+                    "transport": "tcp",
+                    "default_host_port": port,
+                    "host_port": port,
+                    "container_port": port,
+                })
         if service_port_mappings:
             bundle["service_port_mappings"] = service_port_mappings
         if "modbus_tcp_gateway" in bundle["services"]:

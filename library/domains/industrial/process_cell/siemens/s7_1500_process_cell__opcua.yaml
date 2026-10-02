@@ -6,6 +6,14 @@ description: |
   pressure tags over OPC UA for SCADA and MES demos. The dynamics and alarms
   mirror the generic process cell while providing a vendor-specific endpoint.
 
+meta_parameters:
+  opcua_endpoint:
+    type: str
+    default: opc.tcp://0.0.0.0:4845/spx/s7-1500/process-cell
+  opcua_namespace_uri:
+    type: str
+    default: urn:spx:examples:opcua:siemens:s7-1500:process-cell
+
 attributes:
   temperature_c:
     type: float
@@ -200,8 +208,8 @@ actions:
 
 communication:
   - opcua_server:
-      endpoint: opc.tcp://0.0.0.0:4845/spx/s7-1500/process-cell
-      namespace_uri: urn:spx:examples:opcua:siemens:s7-1500:process-cell
+      endpoint: "$param(opcua_endpoint)"
+      namespace_uri: "$param(opcua_namespace_uri)"
       security:
         policy: NoSecurity
         user_tokens:
@@ -291,7 +299,6 @@ communication:
 
 scenarios:
   heatup_cycle:
-    enabled: true
     display_name: "Heatup Cycle"
     description: Raise temperature demand and pump command for an active process run.
     duration: 20.0
@@ -300,7 +307,6 @@ scenarios:
       $in(pump_command_percent): 55.0
 
   pressure_upset:
-    enabled: true
     display_name: "Pressure Upset"
     description: Apply a pressure override and higher pump command for an upset case.
     duration: 12.0
@@ -310,7 +316,6 @@ scenarios:
       $in(pump_command_percent): 80.0
 
   maintenance_idle:
-    enabled: true
     display_name: "Maintenance Idle"
     description: Return the cell to a low-output maintenance-friendly idle state.
     duration: 15.0

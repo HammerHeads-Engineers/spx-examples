@@ -148,6 +148,31 @@ def build_index() -> manifest.ManifestIndex:
     )
 
 
+def test_selected_model_custom_modbus_port_is_published_and_configurable(tmp_path):
+    index = build_index()
+    generator = DeploymentGenerator(index)
+    generator.repo_root = tmp_path
+    model_path = tmp_path / index.models["sensor"].path
+    model_path.parent.mkdir(parents=True)
+    model_path.write_text("meta_parameters:\n  modbus_port: {type: int, default: 5611}\n"
+                          "attributes: {voltage_v: 0.0}\ncommunication:\n"
+                          "  - modbus_slave:\n      port: '$param(modbus_port)'\n", encoding="utf-8")
+    selection = WizardSelection(
+        packages=[], profiles=[], protocols=["modbus"], install_examples=True,
+        install_spx_ui=False, offline_bundle=False, license_key="test",
+        model_ids=["sensor"], service_ids=["modbus_tcp_gateway"],
+        instances=[], start_instances=[],
+    )
+    generator.generate(selection, tmp_path / "out")
+    compose = yaml.safe_load((tmp_path / "out/docker-compose.generated.yml").read_text())
+    assert "${SPX_BIND_MODBUS_TCP_GATEWAY:-127.0.0.1}:5611:5611" in compose["services"]["spx-server"]["ports"]
+    bundle = json.loads((tmp_path / "out/bundle.json").read_text())
+    assert 5611 in bundle["required_ports"]
+    custom = [r for r in bundle["service_port_mappings"] if r["container_port"] == 5611]
+    assert len(custom) == 1
+    assert custom[0]["host_port"] == 5611
+
+
 def test_generator_creates_compose(tmp_path: Path) -> None:
     index = build_index()
     generator = DeploymentGenerator(index)
