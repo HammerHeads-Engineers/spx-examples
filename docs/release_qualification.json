@@ -2,11 +2,11 @@
   "status": "candidate_sources_validated; production_not_qualified",
   "date": "2026-10-03",
   "published_candidate_images": {
-    "server": "simplephysx/spx-server:v1.0.0-rc.68",
-    "server_digest": "sha256:ecd02dffc726b737cf26a33a2db028e6b585333ef901c29341df9613aba8f263",
+    "server": "simplephysx/spx-server:v1.0.0-rc.69",
+    "server_digest": "sha256:4d28ce986a12fae121a70ee86593bf5ff050e761e77033cb8e4cd0b7f25ca019",
     "ui": "simplephysx/spx-ui:v1.0.0-rc.71",
     "ui_digest": "sha256:41936d505f4baff9eef2a8eacf525b050057d9faf9610bcd26b779896e2c4f34",
-    "publication": "Server PRs 68/69 and UI PR 100 merged; release CI passed; amd64/arm64 manifests verified. Published-image product qualification remains pending."
+    "publication": "Server PRs 68/69/70 and UI PR 100 merged; release CI passed; amd64/arm64 manifests verified. Production installer qualification remains pending."
   },
   "tested_baseline_images": {
     "server_dependency_runtime": "simplephysx/spx-server:v1.0.0-rc.67",
@@ -15,19 +15,40 @@
     "candidate_code": "four separate worktrees based on current develop; server runtime and lwm2m sources combined only for isolated QA"
   },
   "local_results": {
-    "server_lwm2m_general_suite": {"passed": 907, "skipped": 25},
-    "server_required_leshan_suite": {"passed": 11, "skipped": 0},
-    "server_runtime_general_suite": {"passed": 921, "skipped": 24},
-    "server_snapshot_manifest_targeted_suite": {"passed": 93, "skipped": 0},
-    "server_additional_stop_failure_regression": {"passed": 1, "skipped": 0},
-    "examples_fast_suite_linux_container": {"passed": 577, "skipped": 21},
+    "server_lwm2m_general_suite": {
+      "passed": 907,
+      "skipped": 25
+    },
+    "server_required_leshan_suite": {
+      "passed": 11,
+      "skipped": 0
+    },
+    "server_runtime_general_suite": {
+      "passed": 921,
+      "skipped": 24
+    },
+    "server_snapshot_manifest_targeted_suite": {
+      "passed": 93,
+      "skipped": 0
+    },
+    "server_additional_stop_failure_regression": {
+      "passed": 1,
+      "skipped": 0
+    },
+    "examples_fast_suite_linux_container": {
+      "passed": 577,
+      "skipped": 21
+    },
     "examples_runtime_required_suite": {
       "passed": 147,
       "skipped": 0,
       "scope": "97 deterministic action/scenario smoke checks; 42 power-integral/cadence/pause checks; 6 OCPP parsing/cadence regressions; real CSMS-EVSE WebSocket pair; real shipped LwM2M model via Leshan",
       "scope_limit": "Physics smoke tests exclude protocol callbacks/diagnostics and record those exclusions; they do not prove physical fidelity or all transport mappings for every model."
     },
-    "ui_jest": {"passed": 24, "suites": 10},
+    "ui_jest": {
+      "passed": 24,
+      "suites": 10
+    },
     "ui_browser_e2e_windows_chromium": {
       "passed": 8,
       "environment": "local Next.js development server and isolated combined candidate backend",
@@ -42,16 +63,26 @@
     "server_flake8_and_changed_source_numpydoc": "passed"
   },
   "platform_coverage": {
-    "windows": "local browser, UI build/Jest, generator/unit tests, Docker-host ports and restart acceptance",
-    "linux": "Python/runtime/installer tests inside Linux Docker containers on Windows; native Linux installer has not been installed",
-    "macos": "not executed"
+    "windows": "local browser, UI build/Jest, generator/unit tests, Docker-host ports and restart acceptance; Windows 2022/2025 installer smoke CI passed on previous pin pair",
+    "linux": "Linux container runtime tests on Windows and GitHub Ubuntu published-image Chromium E2E; Ubuntu 22/24 installer smoke CI passed on previous pin pair; native product installer qualification pending",
+    "macos": "macOS arm64/x86 installer smoke CI passed on previous pin pair; native full product installation and manual qualification pending"
   },
   "skips": "General suites retain their existing conditional skips. Dedicated required LwM2M and model/protocol qualification runs were explicitly enabled and skipped no tests. Missing fixture readiness or required CI license fails the required job.",
   "remaining_release_gates": [
-    "Require Examples PR CI to pass against the published Server rc.68/UI rc.71 pins; keep the PR draft until the checks are green.",
-    "Add a dedicated bounded test license as the SPX_PRODUCT_KEY secret in spx-ui and run browser-qualification on UI rc.71 with Server rc.68.",
+    "Require Examples PR CI to pass against the published Server rc.69/UI rc.71 pins; keep the PR draft until the checks are green.",
     "Publish one coherent Examples RC; require Windows/macOS/Linux installers, portable archive, release-asset verification and download-page synchronization.",
     "Install the published RC and repeat fresh install/update/rollback, durable snapshot, restart and browser/protocol tests on exactly the published images.",
     "Complete native macOS/Linux coverage and final manual functional/protocol review of the selected models before approving production."
-  ]
+  ],
+  "published_image_ci_results": {
+    "ui_browser_e2e": {
+      "server": "simplephysx/spx-server:v1.0.0-rc.69",
+      "ui": "simplephysx/spx-ui:v1.0.0-rc.71",
+      "passed": 8,
+      "skipped": 0,
+      "environment": "GitHub Actions Ubuntu; Chromium against published Docker images",
+      "run": "https://github.com/HammerHeads-Engineers/spx-ui/actions/runs/37147705932",
+      "scope": "cross-tab Restore/history invalidation, connections/propagation, Start/Stop/CSV, missing instance, disk snapshot/re-save, API and UI file export/import, actual license capacity refusal"
+    }
+  }
 }

@@ -44,9 +44,9 @@ def test_package_builder_supports_versioned_release_archives(tmp_path: Path) -> 
             .read()
             .decode("utf-8")
         )
-    assert 'SPX_SERVER_VERSION = "v1.0.0-rc.68"' in compatibility
+    assert 'SPX_SERVER_VERSION = "v1.0.0-rc.69"' in compatibility
     assert 'SPX_UI_VERSION = "v1.0.0-rc.71"' in compatibility
-    assert "SPX Server `v1.0.0-rc.68` with SPX UI `v1.0.0-rc.71`" in readme
+    assert "SPX Server `v1.0.0-rc.69` with SPX UI `v1.0.0-rc.71`" in readme
 
 
 def test_self_extractors_normalize_tag_versions_in_filenames(tmp_path: Path) -> None:
