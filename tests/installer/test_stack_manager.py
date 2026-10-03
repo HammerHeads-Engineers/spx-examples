@@ -217,12 +217,14 @@ def test_windows_port_owner_includes_services_hosted_by_svchost(
         tmp_path / "compose.yml",
         runner=lambda argv, **kwargs: completed(
             list(argv),
-            json.dumps(payload)
-            if argv[:1] == ["powershell"]
-            else (
-                "Start Port    End Port\n----------    --------\n61600         61699\n"
-                if "ipv4" in argv
-                else "Start Port    End Port\n----------    --------\n"
+            (
+                json.dumps(payload)
+                if argv[:1] == ["powershell"]
+                else (
+                    "Start Port    End Port\n----------    --------\n61600         61699\n"
+                    if "ipv4" in argv
+                    else "Start Port    End Port\n----------    --------\n"
+                )
             ),
         ),
         platform="win32",
@@ -541,6 +543,20 @@ def test_rollback_stops_current_transaction_and_restores_snapshot(
         encoding="utf-8",
     )
 
+    monkeypatch.setattr(
+        manager,
+        "_inspect_ids",
+        lambda ids, deadline: [
+            ContainerInfo(
+                id="old-id",
+                name="spx-server",
+                image="simplephysx/spx-server:previous",
+                state="running",
+                health="healthy",
+            )
+        ],
+    )
+    monkeypatch.setattr(manager, "_probe_api", lambda *args: {"ready": True})
     manager.rollback(snapshot_path)
 
     assert [call[1:3] for call in calls if call[1] in {"stop", "rename", "start"}] == [

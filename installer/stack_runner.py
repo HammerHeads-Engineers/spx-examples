@@ -69,6 +69,9 @@ def _manager_command(
     tcp_ports: str | None = None,
     api_url: str | None = None,
     final_names: list[str] | None = None,
+    transaction_token: str | None = None,
+    diagnostics_path: Path | None = None,
+    failure_stage: str | None = None,
 ) -> list[str]:
     args = [
         sys.executable,
@@ -91,6 +94,12 @@ def _manager_command(
         args.extend(["--tcp-ports", tcp_ports])
     if api_url is not None:
         args.extend(["--api-url", api_url])
+    if transaction_token:
+        args.extend(["--transaction-token", transaction_token])
+    if diagnostics_path is not None:
+        args.extend(["--diagnostics-path", str(diagnostics_path)])
+    if failure_stage:
+        args.extend(["--failure-stage", failure_stage])
     for mapping in final_names or []:
         args.extend(["--final-name", mapping])
     return args
@@ -142,6 +151,9 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
     transaction_compose: Path | None = None
     transaction_prepared = False
     staged_ports_file: Path | None = None
+    diagnostics_path: Path | None = None
+    token = ""
+    api_url = os.environ.get("SPX_BASE_URL") or "http://127.0.0.1:8000"
     runtime_python = sys.executable
     manager = script_dir / "stack_manager.py"
     compose_file = script_dir / "docker-compose.generated.yml"
@@ -220,6 +232,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             )
 
         token = uuid.uuid4().hex
+        diagnostics_path = script_dir / "logs" / f"start-{token}.json"
         transaction_compose = script_dir / f".docker-compose.transaction.{token}.yml"
         transaction_service = f"transaction-{token}-spx-ui"
         staged_ports_file = script_dir / f".spx-modbus-ports.pending.{token}.json"
@@ -362,7 +375,6 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             stage=stage,
         )
 
-        api_url = os.environ.get("SPX_BASE_URL") or "http://localhost:8000"
         stage = "healthcheck"
         _run(
             _manager_command(
@@ -372,6 +384,8 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 env_file=env_file,
                 installation_id=installation_id,
                 api_url=api_url,
+                transaction_token=token,
+                diagnostics_path=diagnostics_path,
             ),
             cwd=script_dir,
             stage=stage,
@@ -481,6 +495,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 installation_id=installation_id,
                 snapshot=snapshot,
                 final_names=[str(mapping) for mapping in final_names],
+                transaction_token=token,
             ),
             cwd=script_dir,
             stage=stage,
@@ -530,19 +545,51 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             _run(
                 _manager_command(
                     manager,
+                    "diagnose",
+                    compose_file=compose_file,
+                    env_file=env_file,
+                    installation_id=installation_id,
+                    transaction_token=token,
+                    diagnostics_path=diagnostics_path,
+                    failure_stage=stage,
+                ),
+                cwd=script_dir,
+                stage="diagnostics",
+            )
+        except (StartFailure, OSError):
+            print("[spx-start] Could not save failure diagnostics.", file=sys.stderr)
+        try:
+            _run(
+                _manager_command(
+                    manager,
                     "rollback",
                     compose_file=compose_file,
                     env_file=env_file,
                     installation_id=installation_id,
                     snapshot=snapshot,
+                    transaction_token=token,
+                    api_url=api_url,
                 ),
                 cwd=script_dir,
                 stage="rollback",
             )
-        except StartFailure:
+        except (StartFailure, OSError):
             print(
                 "[spx-start] stage=rollback: automatic restore was not completed",
                 file=sys.stderr,
+            )
+            print(
+                f"[spx-start] Recovery snapshot retained: {snapshot}", file=sys.stderr
+            )
+            print(
+                "[spx-start] Run SPX Setup from the SPX application / Start menu; inspect the saved diagnostics before retrying.",
+                file=sys.stderr,
+            )
+            # Keep the candidate configuration for recovery after partial rollback.
+            transaction_compose = None
+        if diagnostics_path is not None:
+            print(
+                f"[spx-start] Failure diagnostics: {diagnostics_path}", file=sys.stderr
             )
     if transaction_compose is not None:
         try:

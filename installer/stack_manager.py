@@ -14,6 +14,7 @@ the Python standard library.
 from __future__ import annotations
 
 import argparse
+from http.client import HTTPException
 import json
 import os
 import re
@@ -24,6 +25,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -213,7 +215,10 @@ class PreflightResult:
             if port not in self.required_ports or not owners:
                 continue
             relevant = owners
-            if self.required_tcp_ports is not None and port not in self.required_tcp_ports:
+            if (
+                self.required_tcp_ports is not None
+                and port not in self.required_tcp_ports
+            ):
                 relevant = [
                     owner
                     for owner in owners
@@ -255,6 +260,7 @@ class StackManager:
         installation_id: str = "",
         runner: Runner | None = None,
         platform: str | None = None,
+        transaction_token: str = "",
     ) -> None:
         self.compose_file = Path(compose_file)
         self.env_file = Path(env_file) if env_file else None
@@ -263,27 +269,46 @@ class StackManager:
         self._runner = runner or subprocess.run
         self.platform = platform or sys.platform
         self._fallback_warnings: list[str] = []
+        self.transaction_token = transaction_token
+        self.last_readiness: dict[str, Any] = {}
+        self._secrets: list[str] = []
+        if self.env_file and self.env_file.is_file():
+            for line in self.env_file.read_text(encoding="utf-8").splitlines():
+                key, separator, value = line.partition("=")
+                if separator and any(
+                    word in key.upper()
+                    for word in ("KEY", "TOKEN", "SECRET", "PASSWORD")
+                ):
+                    value = value.strip().strip("\"'")
+                    if value:
+                        self._secrets.append(value)
 
     # Command and inspection primitives ---------------------------------
     def _run(
-        self, command: Sequence[str], *, check: bool = True
+        self, command: Sequence[str], *, check: bool = True, timeout: float = 30.0
     ) -> subprocess.CompletedProcess[str]:
-        result = self._runner(
-            list(command),
-            capture_output=True,
-            text=True,
-            errors="replace",
-            check=False,
-        )
+        try:
+            result = self._runner(
+                list(command),
+                capture_output=True,
+                text=True,
+                errors="replace",
+                check=False,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise StackManagerError(
+                f"{command[0]} {command[1] if len(command) > 1 else ''} timed out after {timeout:.1f}s"
+            ) from exc
         if check and result.returncode != 0:
             output = "\n".join(part for part in (result.stdout, result.stderr) if part)
             raise CommandError(command, result.returncode, output)
         return result
 
     def docker(
-        self, args: Sequence[str], *, check: bool = True
+        self, args: Sequence[str], *, check: bool = True, timeout: float = 30.0
     ) -> subprocess.CompletedProcess[str]:
-        return self._run(["docker", *args], check=check)
+        return self._run(["docker", *args], check=check, timeout=timeout)
 
     def compose(
         self, args: Sequence[str], *, check: bool = True
@@ -609,9 +634,7 @@ class StackManager:
                 owners.setdefault(port, []).append(owner)
         return owners
 
-    def _add_windows_excluded_tcp_ports(
-        self, owners: dict[int, list[str]]
-    ) -> None:
+    def _add_windows_excluded_tcp_ports(self, owners: dict[int, list[str]]) -> None:
         for family in ("ipv4", "ipv6"):
             command = [
                 "netsh",
@@ -814,11 +837,7 @@ class StackManager:
             None
             if required_tcp_ports is None
             else sorted(
-                {
-                    int(port)
-                    for port in required_tcp_ports
-                    if 1 <= int(port) <= 65535
-                }
+                {int(port) for port in required_tcp_ports if 1 <= int(port) <= 65535}
             )
         )
         if input_fn is not None:
@@ -830,9 +849,7 @@ class StackManager:
             except (AttributeError, OSError):
                 can_prompt = False
             prompt = input
-        result = self.preflight(
-            required_ports, required_tcp_ports=normalized_tcp_ports
-        )
+        result = self.preflight(required_ports, required_tcp_ports=normalized_tcp_ports)
         self.describe(result, output)
         while result.unrelated_conflicts:
             if not can_prompt:
@@ -903,12 +920,163 @@ class StackManager:
     def transaction_containers(self) -> list[ContainerInfo]:
         if not self.installation_id:
             return []
+        if self.transaction_token:
+            # Compose service labels survive commit's container renames.
+            return self._readiness_containers(time.monotonic() + 15.0)
         return [
             container
             for container in self.list_containers()
             if container.installation_id == self.installation_id
             and container.name.startswith("spx-transaction-")
         ]
+
+    def _remaining(self, deadline: float, maximum: float = 5.0) -> float:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise StackManagerError("Readiness deadline reached")
+        return min(maximum, remaining)
+
+    def _inspect_ids(self, ids: Sequence[str], deadline: float) -> list[ContainerInfo]:
+        if not ids:
+            return []
+        result = self.docker(["inspect", *ids], timeout=self._remaining(deadline))
+        try:
+            payload = json.loads(result.stdout)
+            if not isinstance(payload, list) or len(payload) != len(ids):
+                raise ValueError("Unexpected Docker inspect result")
+            return [self._container_from_inspect(item) for item in payload]
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise StackManagerError("Could not decode Docker inspect result") from exc
+
+    def _readiness_containers(self, deadline: float) -> list[ContainerInfo]:
+        if not self.installation_id:
+            raise StackManagerError("Installation ID is missing")
+        prefix = "spx-transaction-" + (
+            self.transaction_token + "-" if self.transaction_token else ""
+        )
+        result = self.docker(
+            [
+                "ps",
+                "-aq",
+                "--filter",
+                f"label={LABEL_INSTALLATION_ID}={self.installation_id}",
+                "--filter",
+                f"label=com.docker.compose.project={self.project}",
+            ],
+            timeout=self._remaining(deadline),
+        )
+        return [
+            item
+            for item in self._inspect_ids(result.stdout.split(), deadline)
+            if item.installation_id == self.installation_id
+            and (
+                item.name.startswith(prefix)
+                or (
+                    self.transaction_token
+                    and item.service.startswith(
+                        f"transaction-{self.transaction_token}-"
+                    )
+                )
+            )
+        ]
+
+    def _is_server(self, item: ContainerInfo) -> bool:
+        return (
+            item.name == "spx-server"
+            or item.service == "spx-server"
+            or item.service.endswith("-spx-server")
+            or self._image_compatible_with_service(item.image, "spx-server")
+        )
+
+    def _safe_text(self, value: Any) -> str:
+        text = redact(value)
+        for secret in self._secrets:
+            text = text.replace(secret, "<redacted>")
+        text = re.sub(
+            r"(?i)(authorization\s*[:=]\s*(?:bearer\s+)?)[^\s\"',;]+",
+            r"\1<redacted>",
+            text,
+        )
+        return re.sub(r"(https?://)[^/@\s]+@", r"\1<redacted>@", text)
+
+    def _error_detail(self, exc: Exception) -> str:
+        detail = str(exc)
+        if isinstance(exc, CommandError) and exc.output:
+            detail += ": " + exc.output.strip()[:600]
+        return self._safe_text(detail)
+
+    def _probe_api(self, api_url: str, timeout: float = 3.0) -> dict[str, Any]:
+        url = api_url.rstrip("/") + "/health"
+        result: dict[str, Any] = {"url": self._safe_text(url), "ready": False}
+        try:
+            request = urllib.request.Request(url, method="GET")
+            # A local readiness request must never be forwarded to a corporate proxy.
+            if urlsplit(url).hostname in {"localhost", "127.0.0.1", "::1"}:
+                open_url = urllib.request.build_opener(
+                    urllib.request.ProxyHandler({})
+                ).open
+            else:
+                open_url = urllib.request.urlopen
+            with open_url(request, timeout=timeout) as response:
+                result.update(
+                    status=response.status, ready=200 <= response.status < 300
+                )
+        except urllib.error.HTTPError as exc:
+            result.update(status=exc.code, error=f"HTTP {exc.code}")
+        except (OSError, urllib.error.URLError, ValueError, HTTPException) as exc:
+            result.update(
+                error_type=type(exc).__name__, error=self._safe_text(str(exc))
+            )
+        return result
+
+    def capture_diagnostics(self, path: Path, reason: str = "") -> None:
+        """Preserve curated state and bounded logs before removing failed containers."""
+        report: dict[str, Any] = {
+            "installation_id": self.installation_id,
+            "reason": reason,
+            "readiness": self.last_readiness,
+            "containers": [],
+        }
+        if path.exists():
+            try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+                if not report["readiness"]:
+                    report["readiness"] = previous.get("readiness", {})
+            except (OSError, ValueError):
+                pass
+        try:
+            for item in self._readiness_containers(time.monotonic() + 15.0):
+                entry = {
+                    "id": item.id,
+                    "name": item.name,
+                    "image": item.image,
+                    "state": item.state,
+                    "health": item.health,
+                }
+                if self._is_server(item) or item.service.endswith("-spx-ui"):
+                    try:
+                        logs = self.docker(
+                            ["logs", "--tail", "60", item.id], check=False, timeout=5.0
+                        )
+                        entry["logs"] = (logs.stdout + logs.stderr)[-12000:]
+                    except (StackManagerError, OSError) as exc:
+                        entry["log_error"] = self._error_detail(exc)
+                report["containers"].append(entry)
+        except (StackManagerError, OSError) as exc:
+            report["inspection_error"] = self._error_detail(exc)
+
+        def clean(value: Any) -> Any:
+            if isinstance(value, str):
+                return self._safe_text(value)
+            if isinstance(value, dict):
+                return {key: clean(item) for key, item in value.items()}
+            if isinstance(value, list):
+                return [clean(item) for item in value]
+            return value
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(clean(report), indent=2), encoding="utf-8")
+        print(f"[spx-preflight] Diagnostics saved to {path}")
 
     def stop_stack(self) -> None:
         current = [
@@ -977,7 +1145,12 @@ class StackManager:
                 )
         snapshot_path.unlink(missing_ok=True)
 
-    def rollback(self, snapshot_path: Path) -> None:
+    def rollback(
+        self,
+        snapshot_path: Path,
+        api_url: str = "http://127.0.0.1:8000",
+        timeout: float = 120.0,
+    ) -> None:
         current = self.transaction_containers()
         for container in current:
             if container.running:
@@ -991,16 +1164,23 @@ class StackManager:
             self._detach_snapshot_container(container.id)
             # Remove only the failed transaction container. Docker volumes are
             # preserved because this command deliberately omits -v.
-            self._run(["docker", "rm", "-f", container.id], check=False)
+            result = self._run(["docker", "rm", "-f", container.id], check=False)
+            if result.returncode:
+                raise StackManagerError(
+                    f"Could not remove failed transaction container {container.name}; snapshot retained"
+                )
         if not snapshot_path.exists():
-            return
+            raise StackManagerError(f"Rollback snapshot is missing: {snapshot_path}")
         snapshot = StackSnapshot.load(snapshot_path)
-        restored = True
+        failures: list[str] = []
+        ids: list[str] = []
         for entry in snapshot.containers:
             container_id = str(entry.get("id", ""))
             original_name = str(entry.get("name", ""))
             if not container_id or not original_name:
+                failures.append("Invalid snapshot container entry")
                 continue
+            ids.append(container_id)
             result = self._run(
                 ["docker", "rename", container_id, original_name], check=False
             )
@@ -1009,50 +1189,123 @@ class StackManager:
                     self._run(["docker", "start", container_id], check=False).returncode
                     != 0
                 ):
-                    restored = False
+                    failures.append(f"Could not start {original_name}")
             else:
-                restored = False
-        if restored:
-            snapshot_path.unlink(missing_ok=True)
+                failures.append(f"Could not restore name {original_name}")
+        if failures:
+            raise StackManagerError(
+                "Rollback incomplete: "
+                + "; ".join(failures)
+                + f". Snapshot retained: {snapshot_path}"
+            )
+        if ids:
+            deadline = time.monotonic() + timeout
+            reason = "Restored containers are not ready"
+            while time.monotonic() < deadline:
+                try:
+                    restored = self._inspect_ids(ids, deadline)
+                    server = next(
+                        (item for item in restored if self._is_server(item)), None
+                    )
+                    reason = "; ".join(
+                        f"{item.name} state={item.state} health={item.health or 'none'}"
+                        for item in restored
+                    )
+                    if len(restored) == len(ids) and all(
+                        item.state == "running" and item.health in {"", "healthy"}
+                        for item in restored
+                    ):
+                        api = (
+                            self._probe_api(api_url, self._remaining(deadline, 3.0))
+                            if server
+                            else {"ready": True}
+                        )
+                        if api["ready"] and time.monotonic() < deadline:
+                            break
+                        reason += "; " + api.get(
+                            "error", "Host API not ready before deadline"
+                        )
+                except (StackManagerError, OSError) as exc:
+                    reason = self._error_detail(exc)
+                time.sleep(max(0.0, min(2.0, deadline - time.monotonic())))
+            else:
+                raise StackManagerError(
+                    f"Rollback not ready: {reason}. Snapshot retained: {snapshot_path}"
+                )
+            versions = ", ".join(f"{item.name}: {item.image}" for item in restored)
+            readiness = "host API ready" if server else "containers ready"
+            print(
+                f"[spx-preflight] Rollback verified: previous stack restored ({versions}); {readiness}."
+            )
+        else:
+            print(
+                "[spx-preflight] Failed installation removed; no previous stack to restore."
+            )
+        snapshot_path.unlink(missing_ok=True)
+        print(
+            "[spx-preflight] Run SPX Setup from the SPX application / Start menu to retry setup."
+        )
 
     def wait_health(
-        self, api_url: str = "http://localhost:8000", timeout: float = 120.0
+        self, api_url: str = "http://127.0.0.1:8000", timeout: float = 120.0
     ) -> None:
         deadline = time.monotonic() + timeout
+        started = time.monotonic()
+        last_message = ""
+        last_log = started
         while time.monotonic() < deadline:
-            containers = self.transaction_containers()
-            server = next(
-                (
-                    item
-                    for item in containers
-                    if item.name == "spx-server"
-                    or item.service == "spx-server"
-                    or item.service.endswith("-spx-server")
-                    or self._image_compatible_with_service(item.image, "spx-server")
-                ),
-                None,
-            )
-            if (
-                server
-                and server.running
-                and (not server.health or server.health == "healthy")
-                and self._api_healthy(api_url)
-            ):
+            state: dict[str, Any] = {"url": self._safe_text(api_url), "ready": False}
+            try:
+                containers = self._readiness_containers(deadline)
+                servers = [item for item in containers if self._is_server(item)]
+                if len(servers) != 1:
+                    state["reason"] = (
+                        f"Expected one transaction SPX server; found {len(servers)}"
+                    )
+                else:
+                    server = servers[0]
+                    state["server"] = {
+                        "id": server.id,
+                        "name": server.name,
+                        "state": server.state,
+                        "health": server.health,
+                    }
+                    if server.state != "running" or server.health not in {
+                        "",
+                        "healthy",
+                    }:
+                        state["reason"] = (
+                            f"{server.name}: state={server.state}, health={server.health or 'none'}"
+                        )
+                    else:
+                        api = self._probe_api(api_url, self._remaining(deadline, 3.0))
+                        state["api"] = api
+                        state["ready"] = api["ready"] and time.monotonic() < deadline
+                        state["reason"] = (
+                            "Host API ready"
+                            if state["ready"]
+                            else api.get("error", "Host API not ready")
+                        )
+            except (StackManagerError, OSError) as exc:
+                state["reason"] = self._error_detail(exc)
+            state["elapsed_s"] = round(time.monotonic() - started, 1)
+            self.last_readiness = state
+            message = self._safe_text(state["reason"])
+            if message != last_message or time.monotonic() - last_log >= 15.0:
+                print(
+                    f"[spx-preflight] Readiness ({state['elapsed_s']:.1f}s): {message}; API={self._safe_text(api_url)}",
+                    flush=True,
+                )
+                last_message, last_log = message, time.monotonic()
+            if state["ready"]:
                 return
-            time.sleep(2.0)
+            time.sleep(max(0.0, min(2.0, deadline - time.monotonic())))
         raise StackManagerError(
-            f"SPX healthcheck/API did not become ready within {timeout:.0f} seconds"
+            f"SPX healthcheck/API did not become ready within {timeout:.0f} seconds: {last_message or 'deadline reached'}"
         )
 
     def _api_healthy(self, api_url: str) -> bool:
-        try:
-            request = urllib.request.Request(
-                api_url.rstrip("/") + "/health", method="GET"
-            )
-            with urllib.request.urlopen(request, timeout=3.0) as response:
-                return 200 <= response.status < 300
-        except (OSError, urllib.error.URLError, ValueError):
-            return False
+        return bool(self._probe_api(api_url)["ready"])
 
 
 def _parse_ports(raw: str) -> list[int]:
@@ -1073,19 +1326,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "command",
-        choices=["preflight", "prepare", "rollback", "commit", "stop", "wait-health"],
+        choices=[
+            "preflight",
+            "prepare",
+            "rollback",
+            "commit",
+            "stop",
+            "wait-health",
+            "diagnose",
+        ],
     )
     parser.add_argument("--compose-file", required=True)
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--project", default=PROJECT)
     parser.add_argument("--installation-id", default="")
+    parser.add_argument("--transaction-token", default="")
+    parser.add_argument("--diagnostics-path", type=Path)
+    parser.add_argument("--failure-stage", default="")
     parser.add_argument("--snapshot", default=".spx-stack-snapshot.json")
     parser.add_argument("--ports", default="")
     parser.add_argument("--tcp-ports", default=None)
     parser.add_argument(
         "--yes", action="store_true", help="Accept replacement of an existing stack"
     )
-    parser.add_argument("--api-url", default="http://localhost:8000")
+    parser.add_argument("--api-url", default="http://127.0.0.1:8000")
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument(
         "--final-name", action="append", default=[], metavar="SERVICE=CONTAINER"
@@ -1100,6 +1364,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.env_file,
         project=args.project,
         installation_id=args.installation_id,
+        transaction_token=args.transaction_token,
     )
     snapshot_path = Path(args.snapshot)
     if args.command == "preflight":
@@ -1120,7 +1385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 0
     if args.command == "rollback":
-        manager.rollback(snapshot_path)
+        manager.rollback(snapshot_path, args.api_url, args.timeout)
         return 0
     if args.command == "commit":
         final_names = {}
@@ -1136,7 +1401,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         manager.stop_stack()
         return 0
     if args.command == "wait-health":
-        manager.wait_health(args.api_url, args.timeout)
+        try:
+            manager.wait_health(args.api_url, args.timeout)
+        except (StackManagerError, OSError):
+            if args.diagnostics_path:
+                try:
+                    manager.capture_diagnostics(
+                        args.diagnostics_path, "healthcheck failed"
+                    )
+                except OSError as exc:
+                    print(
+                        f"[spx-preflight] Could not save diagnostics: {manager._safe_text(str(exc))}",
+                        file=sys.stderr,
+                    )
+            raise
+        return 0
+    if args.command == "diagnose":
+        if not args.diagnostics_path:
+            raise StackManagerError("Diagnostics path is required")
+        manager.capture_diagnostics(args.diagnostics_path, args.failure_stage)
         return 0
     return 2
 

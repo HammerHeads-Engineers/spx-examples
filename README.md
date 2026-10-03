@@ -335,6 +335,19 @@ unrelated containers. Legacy `spx-rollback-*` containers from
 RC65 are detected as SPX snapshots and are not left behind after a successful
 rerun. `spx-stop` stops only containers carrying the generated installation ID.
 
+If startup fails, Setup saves the API readiness result, Docker state and recent
+server/UI logs to `logs/start-<transaction>.json` in the generated folder before
+removing failed containers. Secret values from `.env` are redacted. Readiness
+messages distinguish a missing or unhealthy server, Docker errors and host API
+failures such as connection refusal or HTTP 503. Local API checks bypass proxies.
+
+Rollback is reported as successful only after the previous containers and host
+API are ready. If restoration fails, Setup retains `.spx-stack-snapshot.json`
+and the transaction Compose file for recovery and reports the failure explicitly.
+After a verified rollback, launch **SPX Setup** from the SPX application or the
+Windows Start menu to retry; include the saved diagnostic file when reporting
+the failure.
+
 The installer launcher uses a private Python interpreter, while generated
 start/stop scripts use their own runtime. This separation keeps paths with
 spaces working on macOS. To select a system interpreter for a generated
