@@ -340,6 +340,9 @@ server/UI logs to `logs/start-<transaction>.json` in the generated folder before
 removing failed containers. Secret values from `.env` are redacted. Readiness
 messages distinguish a missing or unhealthy server, Docker errors and host API
 failures such as connection refusal or HTTP 503. Local API checks bypass proxies.
+Plain HTTP loopback checks do not initialize TLS, so an inaccessible inherited
+`SSLKEYLOGFILE` cannot block them. Configured HTTPS endpoints retain normal TLS
+handling.
 
 Rollback is reported as successful only after the previous containers and host
 API are ready. If restoration fails, Setup retains `.spx-stack-snapshot.json`

@@ -14,7 +14,7 @@ the Python standard library.
 from __future__ import annotations
 
 import argparse
-from http.client import HTTPException
+from http.client import HTTPConnection, HTTPException
 import json
 import os
 import re
@@ -1010,17 +1010,34 @@ class StackManager:
         result: dict[str, Any] = {"url": self._safe_text(url), "ready": False}
         try:
             request = urllib.request.Request(url, method="GET")
-            # A local readiness request must never be forwarded to a corporate proxy.
-            if urlsplit(url).hostname in {"localhost", "127.0.0.1", "::1"}:
-                open_url = urllib.request.build_opener(
-                    urllib.request.ProxyHandler({})
-                ).open
-            else:
-                open_url = urllib.request.urlopen
-            with open_url(request, timeout=timeout) as response:
-                result.update(
-                    status=response.status, ready=200 <= response.status < 300
+            parsed = urlsplit(url)
+            loopback = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+            if parsed.scheme == "http" and loopback:
+                # urllib builds an HTTPS handler even for plain HTTP. On Python
+                # 3.12 that opens SSLKEYLOGFILE, which may be inaccessible in a
+                # GUI launcher's environment. A local HTTP probe needs no TLS.
+                connection = HTTPConnection(
+                    parsed.hostname, parsed.port, timeout=timeout
                 )
+                try:
+                    connection.request("GET", request.selector)
+                    with connection.getresponse() as response:
+                        status = response.status
+                finally:
+                    connection.close()
+            else:
+                # Preserve normal HTTPS handling, without proxying local probes.
+                if loopback:
+                    open_url = urllib.request.build_opener(
+                        urllib.request.ProxyHandler({})
+                    ).open
+                else:
+                    open_url = urllib.request.urlopen
+                with open_url(request, timeout=timeout) as response:
+                    status = response.status
+            result.update(status=status, ready=200 <= status < 300)
+            if not result["ready"]:
+                result["error"] = f"HTTP {status}"
         except urllib.error.HTTPError as exc:
             result.update(status=exc.code, error=f"HTTP {exc.code}")
         except (OSError, urllib.error.URLError, ValueError, HTTPException) as exc:
