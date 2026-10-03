@@ -13,7 +13,7 @@ from installer.compatibility import (
 
 def test_supported_server_ui_pair_is_explicit() -> None:
     validate_version_pair(SPX_SERVER_VERSION, SPX_UI_VERSION)
-    assert SPX_SERVER_VERSION == "v1.0.0-rc.66"
+    assert SPX_SERVER_VERSION == "v1.0.0-rc.67"
     assert SPX_UI_VERSION == "v1.0.0-rc.70"
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import subprocess
+import tarfile
 from pathlib import Path
 
 
@@ -32,6 +33,20 @@ def test_package_builder_supports_versioned_release_archives(tmp_path: Path) -> 
     assert "spx-installer-1.2.3.tgz" in result.stdout
     assert (output_dir / "spx-installer-1.2.3.tgz").is_file()
     assert not (output_dir / "spx-installer.tgz").exists()
+    with tarfile.open(output_dir / "spx-installer-1.2.3.tgz") as archive:
+        compatibility = (
+            archive.extractfile("spx-installer/installer/compatibility.py")
+            .read()
+            .decode("utf-8")
+        )
+        readme = (
+            archive.extractfile("spx-installer/INSTALLER_README.md")
+            .read()
+            .decode("utf-8")
+        )
+    assert 'SPX_SERVER_VERSION = "v1.0.0-rc.67"' in compatibility
+    assert 'SPX_UI_VERSION = "v1.0.0-rc.70"' in compatibility
+    assert "SPX Server `v1.0.0-rc.67` with SPX UI `v1.0.0-rc.70`" in readme
 
 
 def test_self_extractors_normalize_tag_versions_in_filenames(tmp_path: Path) -> None:
