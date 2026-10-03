@@ -115,7 +115,7 @@ def test_release_requires_all_fast_jobs_and_only_runs_on_main_branches() -> None
     workflow = _workflow(CI_WORKFLOW_PATH)
     job = _job(workflow, "release", "build-windows-installer")
 
-    assert "needs: [tests, core-integration, pack-tests, embedded-lab-smoke]" in job
+    assert "needs: [tests, core-integration, pack-tests, embedded-lab-smoke, protocol-qualification]" in job
     assert "github.ref == 'refs/heads/develop'" in job
     assert "github.ref == 'refs/heads/main'" in job
     for required_job in (
@@ -123,6 +123,7 @@ def test_release_requires_all_fast_jobs_and_only_runs_on_main_branches() -> None
         "needs.core-integration.result == 'success'",
         "needs.pack-tests.result == 'success'",
         "needs.embedded-lab-smoke.result == 'success'",
+        "needs.protocol-qualification.result == 'success'",
     ):
         assert required_job in job
 

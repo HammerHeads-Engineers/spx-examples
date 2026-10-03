@@ -106,7 +106,7 @@ services:
   #   restart: unless-stopped
 
   spx-server:
-    image: simplephysx/spx-server:v1.0.0-rc.67
+    image: simplephysx/spx-server:v1.0.0-rc.69
     container_name: spx-server
     ports:
       - "8000:8000"
@@ -131,7 +131,7 @@ services:
       ["--address", "0.0.0.0", "--product-key", "${SPX_PRODUCT_KEY}", "--extensions", "/app/extensions"]
 
   # spx-ui:
-  #   image: simplephysx/spx-ui:v1.0.0-rc.70   # or use `build: .` to build from the local repo
+  #   image: simplephysx/spx-ui:v1.0.0-rc.71   # or use `build: .` to build from the local repo
   #   container_name: spx-ui-server
   #   depends_on:
   #     spx-server:

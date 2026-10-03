@@ -52,6 +52,8 @@ class DeploymentGenerator:
 
     def generate(self, selection, output_dir: Path) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
+        (output_dir / "library").mkdir(exist_ok=True)
+        (output_dir / "data" / "snapshots").mkdir(parents=True, exist_ok=True)
         spx_python_requirement = self._resolve_spx_python_requirement()
 
         installation_id = uuid.uuid4().hex
@@ -215,6 +217,9 @@ class DeploymentGenerator:
         volumes = [
             self._process_volume("./extensions:/app/extensions", assets_root),
             "./telemetry.json:/app/telemetry.json:ro",
+            "./library:/app/library:ro",
+            "./startup-models.json:/app/startup-models.json:ro",
+            "./data/snapshots:/app/snapshots",
         ]
         service = {
             "image": SPX_SERVER_IMAGE,
@@ -248,6 +253,8 @@ class DeploymentGenerator:
                 "${SPX_PRODUCT_KEY}",
                 "--extensions",
                 "/app/extensions",
+                "--models-manifest",
+                "/app/startup-models.json",
             ],
         }
         return service
@@ -1054,6 +1061,14 @@ exit /b %ERRORLEVEL%
             }
         bundle_path = output_dir / "bundle.json"
         bundle_path.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
+        # The server receives only public catalog identifiers and paths, never
+        # bundle instance settings or the installer product key.
+        startup_manifest = {"models": [{"id": item["id"],
+                                        "path": Path(item["path"]).as_posix()}
+                                       for item in model_entries]}
+        (output_dir / "startup-models.json").write_text(
+            json.dumps(startup_manifest, indent=2), encoding="utf-8"
+        )
         self._copy_model_sources(model_paths, output_dir)
 
     def _collect_instances(self, selection) -> list[dict[str, str]]:

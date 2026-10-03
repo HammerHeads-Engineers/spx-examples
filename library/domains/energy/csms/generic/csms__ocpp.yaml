@@ -85,42 +85,14 @@ attributes:
 actions:
   - function: $in(last_energy_wh)
     name: derive_energy_from_meter_values
-    description: Extract energy register from the most recent MeterValues payload.
-    call: (
-          float($in(last_meter_values)[0]["sampledValue"][0]["value"])
-          if (
-            isinstance($in(last_meter_values), list)
-            and len($in(last_meter_values)) > 0
-            and isinstance($in(last_meter_values)[0], dict)
-            and "sampledValue" in $in(last_meter_values)[0]
-            and len($in(last_meter_values)[0]["sampledValue"]) > 0
-            and isinstance($in(last_meter_values)[0]["sampledValue"][0], dict)
-            and "value" in $in(last_meter_values)[0]["sampledValue"][0]
-          )
-          else $in(last_energy_wh)
-        )
-
+    description: Read the energy measurand in Wh, retaining the last valid sample.
+    imports: {meter_reading: "extensions.ocpp_meter_values.meter_reading"}
+    call: meter_reading($in(last_meter_values), "Energy.Active.Import.Register", $in(last_energy_wh))
   - function: $in(last_power_w)
     name: derive_power_from_meter_values
-    description: Capture instantaneous power from the latest sampled value list.
-    call: (
-          float(
-            next(
-              (
-                entry.get("value")
-                for entry in $in(last_meter_values)[0].get("sampledValue", [])
-                if entry.get("measurand") == "Power.Active.Import"
-              ),
-              $in(last_power_w),
-            )
-          )
-          if (
-            isinstance($in(last_meter_values), list)
-            and len($in(last_meter_values)) > 0
-            and isinstance($in(last_meter_values)[0], dict)
-          )
-          else $in(last_power_w)
-        )
+    description: Read the power measurand in W, retaining the last valid sample.
+    imports: {meter_reading: "extensions.ocpp_meter_values.meter_reading"}
+    call: meter_reading($in(last_meter_values), "Power.Active.Import", $in(last_power_w))
 
   - function: $in(status_text)
     name: render_status_text
@@ -199,7 +171,7 @@ communication:
 
 scenarios:
   accept_evse:
-    enabled: true
+    enabled: false
     display_name: "Accept EVSE Registration"
     description: Accept the charge-point boot request with the nominal heartbeat interval.
     duration: 15.0
@@ -208,7 +180,7 @@ scenarios:
       $in(heartbeat_interval_s): 30
       $in(csms_current_time): "2025-01-01T00:00:00Z"
   reject_evse:
-    enabled: true
+    enabled: false
     display_name: "Reject EVSE Registration"
     description: Reject the boot request to exercise charge-point onboarding failure handling.
     duration: 10.0
@@ -216,7 +188,7 @@ scenarios:
       $in(registration_status): "Rejected"
       $in(heartbeat_interval_s): 0
   fast_heartbeat:
-    enabled: true
+    enabled: false
     display_name: "Fast Heartbeat"
     description: Shorten the heartbeat interval for a more chatty demo session.
     duration: 20.0

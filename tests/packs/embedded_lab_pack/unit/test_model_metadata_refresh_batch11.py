@@ -90,6 +90,7 @@ def _missing_lwm2m_endpoint(
     if not isinstance(config, dict):
         return None
     expected_parameters = (
+        ("lwm2m_local_port", "int"),
         ("lwm2m_endpoint", "str"),
         ("lwm2m_server_host", "str"),
         ("lwm2m_server_port", "int"),
@@ -98,13 +99,13 @@ def _missing_lwm2m_endpoint(
     if any(not _has_meta_parameter(meta_parameters, name, type_name)
            for name, type_name in expected_parameters):
         return f"{model_id}:lwm2m"
-    if config.get("client", {}).get("endpoint") != "$param(lwm2m_endpoint)":
+    if config.get("port") != "$param(lwm2m_local_port)":
         return f"{model_id}:lwm2m"
     if config.get("server", {}).get("host") != "$param(lwm2m_server_host)":
         return f"{model_id}:lwm2m"
     if config.get("server", {}).get("port") != "$param(lwm2m_server_port)":
         return f"{model_id}:lwm2m"
-    if config.get("server", {}).get("endpoint") != "$param(lwm2m_server_endpoint)":
+    if config.get("server", {}).get("endpoint") != "$param(lwm2m_endpoint)":
         return f"{model_id}:lwm2m"
     return None
 

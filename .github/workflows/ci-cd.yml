@@ -46,6 +46,10 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         run: echo "Skipping PR title validation for event '${{ github.event_name }}'."
 
+  protocol-qualification:
+    needs: pr-title-gate
+    uses: ./.github/workflows/protocol-qualification.yml
+
   tests:
     needs: pr-title-gate
     runs-on: ubuntu-latest
@@ -413,7 +417,7 @@ jobs:
       tag: ${{ steps.release_result.outputs.tag }}
     runs-on: ubuntu-latest
     concurrency: release
-    needs: [tests, core-integration, pack-tests, embedded-lab-smoke]
+    needs: [tests, core-integration, pack-tests, embedded-lab-smoke, protocol-qualification]
     if: >-
       always() &&
       github.event_name == 'push' &&
@@ -421,7 +425,8 @@ jobs:
       needs.tests.result == 'success' &&
       needs.core-integration.result == 'success' &&
       needs.pack-tests.result == 'success' &&
-      needs.embedded-lab-smoke.result == 'success'
+      needs.embedded-lab-smoke.result == 'success' &&
+      needs.protocol-qualification.result == 'success'
     env:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
     steps:

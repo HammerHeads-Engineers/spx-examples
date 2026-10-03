@@ -101,8 +101,23 @@ attributes:
   meter_values_payload:
     type: list
     default: []
+  _elapsed_step_s:
+    type: float
+    default: 0.0
+    unit: s
+  _previous_time_s:
+    type: float
+    default: 0.0
+    unit: s
 
 actions:
+  - function: $in(_elapsed_step_s)
+    name: measure_elapsed_step
+    description: Measure elapsed simulation time; paused time contributes no energy.
+    call: ($in(__timer) - $in(_previous_time_s) if $in(__timer) >= $in(_previous_time_s) else max(0.0, $in(__timer)))
+  - function: $in(_previous_time_s)
+    name: capture_previous_time
+    call: $in(__timer)
   - function: $in(ocpp_status)
     name: derive_status_from_session
     description: Derive connector status from session / fault flags.
@@ -127,10 +142,10 @@ actions:
 
   - function: $in(energy_wh)
     name: accumulate_energy
-    description: Integrate energy while charging (approx 1 s cadence).
+    description: Integrate energy over actual elapsed simulation time.
     call: (
           $in(energy_wh)
-          + (($in(power_kw) * 1000.0) / 3600.0)
+          + (($in(power_kw) * 1000.0 * $in(_elapsed_step_s)) / 3600.0)
           if $in(ocpp_status) == "Charging"
           else $in(energy_wh)
         )
@@ -141,7 +156,7 @@ actions:
     call: (
           0.0
           if $in(session_active) == 0 or $in(ocpp_status) != "Charging"
-          else $in(session_energy_wh) + (($in(power_kw) * 1000.0) / 3600.0)
+          else $in(session_energy_wh) + (($in(power_kw) * 1000.0 * $in(_elapsed_step_s)) / 3600.0)
         )
 
   - function: $in(meter_timestamp)
@@ -266,7 +281,7 @@ communication:
 
 scenarios:
   idle_available:
-    enabled: true
+    enabled: false
     display_name: "Idle Available"
     description: Keep the charge point available with no active EV session.
     duration: 15.0
@@ -276,7 +291,7 @@ scenarios:
       $in(error_code): "NoError"
       $in(status_info): "waiting for EV"
   session_charging:
-    enabled: true
+    enabled: false
     display_name: "Session Charging"
     description: Run a nominal charging session with a single active transaction.
     duration: 25.0
@@ -286,7 +301,7 @@ scenarios:
       $in(transaction_id): 9001
       $in(status_info): "charging demo session"
   fault_ground:
-    enabled: true
+    enabled: false
     display_name: "Ground Fault"
     description: Put the EVSE into a ground-fault state without an active charging session.
     duration: 10.0
