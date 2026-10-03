@@ -83,6 +83,9 @@ server/UI logs to `logs/start-<transaction>.json` in the generated directory
 before cleaning up failed containers. Secret values from `.env` are redacted.
 Terminal messages identify Docker, container health and host API errors.
 Loopback API checks bypass proxies and use IPv4 by default.
+Plain HTTP loopback checks use a direct HTTP connection without initializing TLS,
+so an inaccessible inherited `SSLKEYLOGFILE` cannot block readiness or rollback.
+Configured HTTPS endpoints keep their normal TLS handling.
 
 Rollback success is verified against the restored containers and host API.
 An incomplete restore is reported as an error and retains the recovery snapshot

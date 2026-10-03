@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import json
 from http.client import BadStatusLine
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import urllib.error
 from pathlib import Path
+from threading import Thread
 from unittest.mock import Mock
 
 import pytest
@@ -183,10 +185,73 @@ def test_api_probe_bypasses_proxy_only_on_loopback(manager, monkeypatch, url, lo
     opener.open.return_value = response
     build = Mock(return_value=opener)
     external = Mock(return_value=response)
+    connection = Mock()
+    connection.getresponse.return_value = response
+    connect = Mock(return_value=connection)
+    monkeypatch.setattr(sm, "HTTPConnection", connect)
     monkeypatch.setattr(sm.urllib.request, "build_opener", build)
     monkeypatch.setattr(sm.urllib.request, "urlopen", external)
     assert manager._probe_api(url)["ready"] is True
+    assert connect.called == local and external.called != local
+    assert not build.called
+    if local:
+        connection.request.assert_called_once_with("GET", "/health")
+        connection.close.assert_called_once()
+
+
+@pytest.mark.parametrize("status", [200, 302, 503])
+def test_local_http_health_ignores_inaccessible_tls_key_log(
+    manager, tmp_path, monkeypatch, status
+):
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            assert self.path == "/health"
+            self.send_response(status)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), HealthHandler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    # A directory is an inaccessible log-file target on both Windows and Linux.
+    monkeypatch.setenv("SSLKEYLOGFILE", str(tmp_path))
+    monkeypatch.setenv("http_proxy", "http://127.0.0.1:1")
+    try:
+        result = manager._probe_api(f"http://127.0.0.1:{server.server_port}")
+        assert result["ready"] == (status == 200)
+        assert result["status"] == status
+        if status != 200:
+            assert result["error"] == f"HTTP {status}"
+        assert sm.os.environ["SSLKEYLOGFILE"] == str(tmp_path)
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+
+
+@pytest.mark.parametrize(
+    "host,local", [("localhost", True), ("configured-host", False)]
+)
+def test_https_health_preserves_standard_tls_handler(manager, monkeypatch, host, local):
+    response = Mock()
+    response.status = 200
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=False)
+    opener = Mock()
+    opener.open.return_value = response
+    build = Mock(return_value=opener)
+    external = Mock(return_value=response)
+    connect = Mock()
+    monkeypatch.setattr(sm, "HTTPConnection", connect)
+    monkeypatch.setattr(sm.urllib.request, "build_opener", build)
+    monkeypatch.setattr(sm.urllib.request, "urlopen", external)
+    assert manager._probe_api(f"https://{host}:8000")["ready"]
+    assert not connect.called
     assert build.called == local and external.called != local
+    client = opener.open if local else external
+    assert client.call_args.args[0].full_url == f"https://{host}:8000/health"
 
 
 @pytest.mark.parametrize(
