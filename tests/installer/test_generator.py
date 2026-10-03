@@ -154,18 +154,33 @@ def test_selected_model_custom_modbus_port_is_published_and_configurable(tmp_pat
     generator.repo_root = tmp_path
     model_path = tmp_path / index.models["sensor"].path
     model_path.parent.mkdir(parents=True)
-    model_path.write_text("meta_parameters:\n  modbus_port: {type: int, default: 5611}\n"
-                          "attributes: {voltage_v: 0.0}\ncommunication:\n"
-                          "  - modbus_slave:\n      port: '$param(modbus_port)'\n", encoding="utf-8")
+    model_path.write_text(
+        "meta_parameters:\n  modbus_port: {type: int, default: 5611}\n"
+        "attributes: {voltage_v: 0.0}\ncommunication:\n"
+        "  - modbus_slave:\n      port: '$param(modbus_port)'\n",
+        encoding="utf-8",
+    )
     selection = WizardSelection(
-        packages=[], profiles=[], protocols=["modbus"], install_examples=True,
-        install_spx_ui=False, offline_bundle=False, license_key="test",
-        model_ids=["sensor"], service_ids=["modbus_tcp_gateway"],
-        instances=[], start_instances=[],
+        packages=[],
+        profiles=[],
+        protocols=["modbus"],
+        install_examples=True,
+        install_spx_ui=False,
+        offline_bundle=False,
+        license_key="test",
+        model_ids=["sensor"],
+        service_ids=["modbus_tcp_gateway"],
+        instances=[],
+        start_instances=[],
     )
     generator.generate(selection, tmp_path / "out")
-    compose = yaml.safe_load((tmp_path / "out/docker-compose.generated.yml").read_text())
-    assert "${SPX_BIND_MODBUS_TCP_GATEWAY:-127.0.0.1}:5611:5611" in compose["services"]["spx-server"]["ports"]
+    compose = yaml.safe_load(
+        (tmp_path / "out/docker-compose.generated.yml").read_text()
+    )
+    assert (
+        "${SPX_BIND_MODBUS_TCP_GATEWAY:-127.0.0.1}:5611:5611"
+        in compose["services"]["spx-server"]["ports"]
+    )
     bundle = json.loads((tmp_path / "out/bundle.json").read_text())
     assert 5611 in bundle["required_ports"]
     custom = [r for r in bundle["service_port_mappings"] if r["container_port"] == 5611]
@@ -330,7 +345,6 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         {"model_id": "sensor", "instance_key": "inst_001"}
     ]
 
-
     assert bundle.get("start_instances") == ["inst_001"]
 
     start_path = output_dir / "spx-start.sh"
@@ -353,6 +367,12 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "--final-name" in start_content
     assert "stack_manager.py" in start_content
     assert "wait-health" in start_content
+    assert '--transaction-token "$TRANSACTION_TOKEN"' in start_content
+    assert '--diagnostics-path "$DIAGNOSTICS"' in start_content
+    assert start_content.index('"$MANAGER" diagnose') < start_content.index(
+        '"$MANAGER" rollback'
+    )
+    assert "Recovery snapshot retained:" in start_content
     assert "--installation-id" in start_content
     assert "bootstrap_runner.py" in start_content
     assert "stack_manager.py" in stop_content
@@ -369,7 +389,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert 'modbus_port_configurator.py" stage' in start_content
     assert 'modbus_port_configurator.py" commit' in start_content
     assert 'PREPARE_ARGS+=("--ports" "$REQUIRED_PORTS")' in start_content
-    assert 'required-tcp-ports' in start_content
+    assert "required-tcp-ports" in start_content
     assert 'PREPARE_ARGS+=("--tcp-ports" "$REQUIRED_TCP_PORTS")' in start_content
     assert "__REQUIRED_PORTS__" not in start_content
     assert "ASSUME_ARGS" not in start_content
@@ -395,7 +415,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     assert "runtime_bootstrap.py" in stack_runner_content
     assert "modbus_port_configurator.py" in stack_runner_content
     assert '"required-tcp-ports"' in stack_runner_content
-    assert 'tcp_ports=tcp_ports' in stack_runner_content
+    assert "tcp_ports=tcp_ports" in stack_runner_content
     assert "wait-health" in stack_runner_content
     assert '"--services"' in stack_runner_content
     assert '"--status"' in stack_runner_content
@@ -529,7 +549,11 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         "#!/bin/sh\n"
         'if [ "$1" = "-" ]; then exit 1; fi\n'
         'case "$1" in\n'
-        '  *stack_manager.py) printf \'%s\\n\' "$2 $*" >> "$FAKE_RUNTIME_LOG"; exit 0 ;;\n'
+        '  *stack_manager.py) printf \'%s\\n\' "$2 $*" >> "$FAKE_RUNTIME_LOG"; '
+        'if [ "$2" = "wait-health" ] && [ "${FAKE_HEALTH_FAIL:-0}" = 1 ]; then exit 1; fi; '
+        'if [ "$2" = "rollback" ]; then '
+        'if [ "${FAKE_ROLLBACK_FAIL:-0}" = 1 ]; then exit 1; fi; '
+        'echo "Rollback verified: previous stack restored; host API ready. Run SPX Setup to retry."; fi; exit 0 ;;\n'
         "  *bootstrap_runner.py) printf '%s\\n' bootstrap >> \"$FAKE_RUNTIME_LOG\"; exit 0 ;;\n"
         "esac\n"
         "exit 0\n",
@@ -626,6 +650,40 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     log = log_path.read_text(encoding="utf-8")
     assert "prepare" in log
     assert "--yes" in log
+
+    # Exercise the actual ERR trap and preserve recovery files if restoration fails.
+    for rollback_fails in (False, True):
+        log_path.write_text("", encoding="utf-8")
+        failed = subprocess.run(
+            [*command_prefix, str(output_dir / "spx-start.sh"), "--yes"],
+            cwd=output_dir,
+            env={
+                **environment,
+                "FAKE_HEALTH_FAIL": "1",
+                "FAKE_ROLLBACK_FAIL": str(int(rollback_fails)),
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert failed.returncode != 0
+        failure_log = log_path.read_text(encoding="utf-8")
+        assert failure_log.index("diagnose") < failure_log.index("rollback")
+        assert (
+            "--transaction-token" in failure_log and "--diagnostics-path" in failure_log
+        )
+        assert "Failure diagnostics:" in failed.stderr
+        remaining = list(output_dir.glob(".docker-compose.transaction.*.yml"))
+        assert bool(remaining) == rollback_fails
+        if rollback_fails:
+            assert "automatic restore was not completed" in failed.stderr
+            assert (
+                "Recovery snapshot retained" in failed.stderr
+                and "SPX Setup" in failed.stderr
+            )
+        else:
+            assert "Rollback verified" in failed.stdout and "SPX Setup" in failed.stdout
 
 
 def test_generator_includes_ui_when_requested(tmp_path: Path) -> None:
@@ -826,7 +884,7 @@ def test_generator_applies_per_service_bind_addresses(tmp_path: Path) -> None:
     transaction_prepare = start_sh.index("TRANSACTION_PREPARED=1")
     assert network_preflight < manager_preflight < transaction_prepare
     assert start_sh.index('modbus_port_configurator.py" stage') < network_preflight
-    assert start_sh.index('required-tcp-ports') < manager_preflight
+    assert start_sh.index("required-tcp-ports") < manager_preflight
     assert start_sh.index('modbus_port_configurator.py" commit') > transaction_prepare
     stack_runner = (output_dir / "stack_runner.py").read_text(encoding="utf-8")
     network_preflight_python = stack_runner.index('stage = "preflight"')

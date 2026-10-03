@@ -580,6 +580,8 @@ SNAPSHOT="$SCRIPT_DIR/.spx-stack-snapshot.json"
 MANAGER="$SCRIPT_DIR/stack_manager.py"
 TRANSACTION_COMPOSE_TEMPLATE="$SCRIPT_DIR/docker-compose.transaction.yml"
 TRANSACTION_TOKEN="$(date +%s)-$$"
+API_URL="${SPX_BASE_URL:-http://127.0.0.1:8000}"
+DIAGNOSTICS="$SCRIPT_DIR/logs/start-${TRANSACTION_TOKEN}.json"
 STAGED_PORTS_FILE="$SCRIPT_DIR/.spx-modbus-ports.pending-${TRANSACTION_TOKEN}.json"
 TRANSACTION_COMPOSE="$SCRIPT_DIR/.docker-compose.transaction.${TRANSACTION_TOKEN}.yml"
 TRANSACTION_UI_SERVICE="transaction-${TRANSACTION_TOKEN}-spx-ui"
@@ -638,13 +640,23 @@ cleanup_on_failure() {
     kill "$BLE_ADAPTER_PID" >/dev/null 2>&1 || true
   fi
   if [ "$TRANSACTION_PREPARED" -eq 1 ] && [ -n "$RUNTIME_PYTHON_BIN" ] && { [ -x "$MANAGER" ] || [ -f "$MANAGER" ]; }; then
-    "$RUNTIME_PYTHON_BIN" "$MANAGER" rollback \
+    "$RUNTIME_PYTHON_BIN" "$MANAGER" diagnose \
+      --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
+      --env-file "$SCRIPT_DIR/.env" --installation-id "$INSTALLATION_ID" \
+      --transaction-token "$TRANSACTION_TOKEN" --diagnostics-path "$DIAGNOSTICS" \
+      --failure-stage "$STAGE" || echo "[spx-start] Could not save failure diagnostics." >&2
+    if ! "$RUNTIME_PYTHON_BIN" "$MANAGER" rollback \
       --compose-file "$SCRIPT_DIR/docker-compose.generated.yml" \
       --env-file "$SCRIPT_DIR/.env" \
       --project spx \
       --installation-id "$INSTALLATION_ID" \
-      --snapshot "$SNAPSHOT" >/dev/null 2>&1 || \
+      --snapshot "$SNAPSHOT" --transaction-token "$TRANSACTION_TOKEN" --api-url "$API_URL"; then
       echo "[spx-start] stage=rollback: automatic restore was not completed" >&2
+      echo "[spx-start] Recovery snapshot retained: $SNAPSHOT" >&2
+      echo "[spx-start] Run SPX Setup from the SPX application / application menu; inspect the saved diagnostics before retrying." >&2
+      TRANSACTION_COMPOSE=""
+    fi
+    echo "[spx-start] Failure diagnostics: $DIAGNOSTICS" >&2
   fi
   if [ -n "${TRANSACTION_COMPOSE:-}" ]; then
     rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
@@ -731,7 +743,9 @@ STAGE="healthcheck"
   --env-file "$SCRIPT_DIR/.env" \
   --project spx \
   --installation-id "$INSTALLATION_ID" \
-  --api-url "${SPX_BASE_URL:-http://localhost:8000}"
+  --transaction-token "$TRANSACTION_TOKEN" \
+  --diagnostics-path "$DIAGNOSTICS" \
+  --api-url "$API_URL"
 
 if [ "__UI_ENABLED__" = "yes" ]; then
   STAGE="ui"
@@ -744,7 +758,7 @@ fi
 STAGE="bootstrap"
 "$RUNTIME_PYTHON_BIN" "$SCRIPT_DIR/bootstrap_runner.py" \
   --bundle "$SCRIPT_DIR/bundle.json" \
-  --api-url "${SPX_BASE_URL:-http://localhost:8000}"
+  --api-url "$API_URL"
 
 STAGE="start"
 RUNNING_SERVICES="$(docker compose -p spx -f "$TRANSACTION_COMPOSE" --env-file "$SCRIPT_DIR/.env" ps --services --status running)" || {
@@ -765,6 +779,7 @@ STAGE="commit"
   --project spx \
   --installation-id "$INSTALLATION_ID" \
   --snapshot "$SNAPSHOT" \
+  --transaction-token "$TRANSACTION_TOKEN" \
   "${FINAL_NAME_ARGS[@]}"
 rm -f "$TRANSACTION_COMPOSE" >/dev/null 2>&1 || true
 

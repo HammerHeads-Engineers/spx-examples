@@ -78,6 +78,18 @@ healthcheck, or bootstrap stage restores the saved container names when
 possible. Legacy `spx-rollback-*` snapshots from RC65 are detected as SPX
 containers and can be replaced safely.
 
+On a startup failure, Setup saves the readiness result, Docker state and recent
+server/UI logs to `logs/start-<transaction>.json` in the generated directory
+before cleaning up failed containers. Secret values from `.env` are redacted.
+Terminal messages identify Docker, container health and host API errors.
+Loopback API checks bypass proxies and use IPv4 by default.
+
+Rollback success is verified against the restored containers and host API.
+An incomplete restore is reported as an error and retains the recovery snapshot
+and transaction Compose file. After a verified rollback, run **SPX Setup** from
+the SPX application or Windows Start menu to retry. Include the saved diagnostic
+file when reporting a startup failure.
+
 Release artifacts are distinct: `.tgz` is the portable archive, `.run` is the
 Unix self-extractor, and macOS `.pkg` is the signed/notarized native package.
 See `docs/MACOS_INSTALLER_RELEASE_GATE.md` for the release checklist.
