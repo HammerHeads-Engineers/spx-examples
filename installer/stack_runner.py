@@ -179,6 +179,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             script_dir / "modbus_port_configurator.py",
             script_dir / "runtime_bootstrap.py",
             script_dir / "bootstrap_runner.py",
+            script_dir / "product_key.py",
         ):
             if not required.is_file():
                 raise StartFailure(
@@ -191,6 +192,16 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             raise StartFailure(
                 stage, "Bundle configuration is missing its installation ID"
             )
+        _run(
+            [
+                runtime_python,
+                str(script_dir / "product_key.py"),
+                "--env-file",
+                str(env_file),
+            ],
+            cwd=script_dir,
+            stage="product-key",
+        )
         requirement = str(bundle.get("spx_python_requirement") or "spx-python")
         bootstrap = script_dir / "runtime_bootstrap.py"
         print("[spx-start] Preparing the isolated SPX runtime...")

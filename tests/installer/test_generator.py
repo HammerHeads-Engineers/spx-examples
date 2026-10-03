@@ -527,7 +527,7 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         install_examples=True,
         install_spx_ui=False,
         offline_bundle=False,
-        license_key="KEY-SPACE",
+        license_key="AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA",
         model_ids=["sensor"],
         service_ids=["mqtt_broker"],
         instances=[],
@@ -624,6 +624,32 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         ),
     }
     command_prefix = [bash] if bash else []
+    environment.pop("SPX_PRODUCT_KEY", None)
+
+    # Invalid input must leave the running stack and runtime bootstrap untouched.
+    env_file = output_dir / ".env"
+    original_env = env_file.read_text(encoding="utf-8")
+    env_file.write_text(
+        original_env.replace(selection.license_key, "PRIVATE-invalid-input"),
+        encoding="utf-8",
+    )
+    invalid = subprocess.run(
+        [*command_prefix, str(output_dir / "spx-start.sh"), "--yes"],
+        cwd=output_dir,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert invalid.returncode != 0
+    assert "30 uppercase characters" in invalid.stderr
+    assert "stage=product-key" in invalid.stderr
+    assert "PRIVATE-invalid-input" not in invalid.stdout + invalid.stderr
+    assert "attempting rollback" not in invalid.stderr
+    assert not log_path.exists()
+    assert not list(output_dir.glob(".docker-compose.transaction.*.yml"))
+    env_file.write_text(original_env, encoding="utf-8")
 
     first = subprocess.run(
         [*command_prefix, str(output_dir / "spx-start.sh")],

@@ -31,6 +31,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+if __package__:
+    from .product_key import runtime_product_key, validate_product_key_format
+else:
+    from product_key import runtime_product_key, validate_product_key_format
+
 
 PROJECT = "spx"
 LABEL_STACK = "com.simplephysx.spx.stack"
@@ -827,6 +832,11 @@ class StackManager:
         input_fn: Callable[[str], str] | None = None,
         output: Callable[[str], None] = print,
     ) -> PreflightResult:
+        if self.env_file is not None:
+            try:
+                validate_product_key_format(runtime_product_key(self.env_file))
+            except ValueError as exc:
+                raise PreflightError(str(exc)) from exc
         normalized_ports: set[int] = set()
         for port in required_ports:
             value = int(port)

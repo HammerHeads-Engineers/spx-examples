@@ -507,6 +507,9 @@ class DeploymentGenerator:
         shutil.copy2(
             Path(__file__).with_name("stack_runner.py"), output_dir / "stack_runner.py"
         )
+        shutil.copy2(
+            Path(__file__).with_name("product_key.py"), output_dir / "product_key.py"
+        )
         shutil.copy2(Path(__file__).with_name("network.py"), output_dir / "network.py")
         shutil.copy2(
             Path(__file__).with_name("modbus_port_configurator.py"),
@@ -675,6 +678,9 @@ need_cmd() {
 
 need_cmd docker
 need_cmd "$SYSTEM_PYTHON_BIN"
+STAGE="product-key"
+"$SYSTEM_PYTHON_BIN" "$SCRIPT_DIR/product_key.py" --env-file "$SCRIPT_DIR/.env"
+STAGE="runtime"
 if [ ! -f "$SCRIPT_DIR/runtime_bootstrap.py" ]; then
   echo "[spx-start] stage=runtime: missing runtime bootstrap helper" >&2
   exit 1

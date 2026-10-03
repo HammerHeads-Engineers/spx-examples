@@ -303,6 +303,7 @@ Inside `build/spx-generated/` you will see:
 - `docker-compose.generated.yml` – only the services selected in the wizard.
 - `.env` – contains `SPX_PRODUCT_KEY=REPLACE_ME` and per-service `SPX_BIND_<SERVICE_ID>=127.0.0.1` defaults; update the product key from [simplephysx.com](https://simplephysx.com), and edit a bind value to a current private host IPv4 address for LAN access. Startup validates that the address is still assigned. `BACNET_BIND_ADDR` remains a supported compatibility override. New bundles do not duplicate the raw key in `bundle.json`.
 - `bundle.json` – consumed by `bootstrap_runner.py`; older bundles containing `license_key` remain supported.
+- `product_key.py` – checks product key format before preparing or replacing a stack.
 - `stack_manager.py`, `stack_runner.py` and `.spx-stack-snapshot.json` – used for exact-container preflight, replacement and rollback.
 - `spx-start.sh` / `spx-stop.sh` and `spx-start.bat` / `spx-stop.bat` – start/stop helpers for Bash/zsh and Windows.
 - `spx-start.ps1` / `spx-stop.ps1` – small PowerShell wrappers for users who prefer PowerShell.
@@ -320,6 +321,13 @@ From inside the generated folder:
 - **Stop:**  
   - macOS/Linux: `./spx-stop.sh`  
   - Windows: double-click `spx-stop.bat` or run `py -3 .\stack_runner.py stop`
+
+The wizard rejects malformed product keys and asks for a corrected entry without
+echoing the key. The expected format is 30 uppercase characters (`A-Z`, `2-7`),
+continuous or grouped as `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`. Generated start
+commands also validate the effective environment/`.env` key before preparing
+the runtime or touching existing containers. License validity and expiry are
+still checked by the server.
 
 `spx-start` performs a Docker/Compose/configuration/port preflight, reports any
 existing SPX stack, and asks before replacement. After confirmation it snapshots
