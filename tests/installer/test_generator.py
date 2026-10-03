@@ -279,7 +279,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
         if name.endswith("-knx_gateway")
     )
     assert transaction_server["container_name"].startswith("spx-transaction-")
-    assert transaction_server["image"] == "simplephysx/spx-server:v1.0.0-rc.67"
+    assert transaction_server["image"] == "simplephysx/spx-server:v1.0.0-rc.68"
     assert (
         transaction_server["container_name"] != services["spx-server"]["container_name"]
     )
@@ -317,8 +317,8 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
 
     bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
     assert "license_key" not in bundle
-    assert bundle["server_version"] == "v1.0.0-rc.67"
-    assert bundle["ui_version"] == "v1.0.0-rc.70"
+    assert bundle["server_version"] == "v1.0.0-rc.68"
+    assert bundle["ui_version"] == "v1.0.0-rc.71"
     assert bundle["compose_project"] == "spx"
     assert {1883, 502, 3671, 6720, 8000}.issubset(set(bundle["required_ports"]))
     service_mappings = {

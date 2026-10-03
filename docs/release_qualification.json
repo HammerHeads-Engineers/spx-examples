@@ -1,6 +1,13 @@
 {
   "status": "candidate_sources_validated; production_not_qualified",
   "date": "2026-10-03",
+  "published_candidate_images": {
+    "server": "simplephysx/spx-server:v1.0.0-rc.68",
+    "server_digest": "sha256:ecd02dffc726b737cf26a33a2db028e6b585333ef901c29341df9613aba8f263",
+    "ui": "simplephysx/spx-ui:v1.0.0-rc.71",
+    "ui_digest": "sha256:41936d505f4baff9eef2a8eacf525b050057d9faf9610bcd26b779896e2c4f34",
+    "publication": "Server PRs 68/69 and UI PR 100 merged; release CI passed; amd64/arm64 manifests verified. Published-image product qualification remains pending."
+  },
   "tested_baseline_images": {
     "server_dependency_runtime": "simplephysx/spx-server:v1.0.0-rc.67",
     "ui_baseline": "v1.0.0-rc.70",
@@ -41,9 +48,8 @@
   },
   "skips": "General suites retain their existing conditional skips. Dedicated required LwM2M and model/protocol qualification runs were explicitly enabled and skipped no tests. Missing fixture readiness or required CI license fails the required job.",
   "remaining_release_gates": [
-    "Review and merge both Server PRs and the UI PR; wait for their actual released tags and published images.",
-    "Update Examples/installer pins everywhere from those actual releases. Existing Server rc.67 cannot consume --models-manifest or pass the new LwM2M regressions; keep the Examples PR draft until the pins and CI are green.",
-    "Run UI browser-qualification with the actual published Server tag and a dedicated bounded test license.",
+    "Require Examples PR CI to pass against the published Server rc.68/UI rc.71 pins; keep the PR draft until the checks are green.",
+    "Add a dedicated bounded test license as the SPX_PRODUCT_KEY secret in spx-ui and run browser-qualification on UI rc.71 with Server rc.68.",
     "Publish one coherent Examples RC; require Windows/macOS/Linux installers, portable archive, release-asset verification and download-page synchronization.",
     "Install the published RC and repeat fresh install/update/rollback, durable snapshot, restart and browser/protocol tests on exactly the published images.",
     "Complete native macOS/Linux coverage and final manual functional/protocol review of the selected models before approving production."
