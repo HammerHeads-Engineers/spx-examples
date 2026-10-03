@@ -11,7 +11,7 @@ from installer.wizard import InstallerWizard
 
 @pytest.fixture(autouse=True)
 def _product_key_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SPX_PRODUCT_KEY", "TEST-KEY")
+    monkeypatch.setenv("SPX_PRODUCT_KEY", "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA")
 
 
 @pytest.fixture()
@@ -182,7 +182,7 @@ def test_wizard_with_inputs(
     assert selection.start_instances == []
     assert selection.install_spx_ui is False
     assert selection.offline_bundle is False
-    assert selection.license_key == "TEST-KEY"
+    assert selection.license_key == "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
     assert selection.model_ids == ["sensor"]
     assert selection.service_ids == ["mqtt_broker"]
 
@@ -267,7 +267,7 @@ def test_wizard_protocol_selection(
     assert selection.install_examples is True
     assert selection.install_spx_ui is True
     assert selection.offline_bundle is False
-    assert selection.license_key == "TEST-KEY"
+    assert selection.license_key == "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
     assert selection.model_ids == [
         "bacnet_device",
         "modbus_device",
@@ -408,10 +408,10 @@ def test_wizard_masks_env_product_key_in_output(
     selection = wizard.run()
     captured = capsys.readouterr()
 
-    assert selection.license_key == "TEST-KEY"
+    assert selection.license_key == "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
     assert "Detected SPX_PRODUCT_KEY in environment:" in captured.out
-    assert "TEST-KEY" not in captured.out
-    assert "****-KEY" in captured.out
+    assert "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA" not in captured.out
+    assert "*" * 31 + "AAAA" in captured.out
 
 
 def test_wizard_prints_runtime_notices(

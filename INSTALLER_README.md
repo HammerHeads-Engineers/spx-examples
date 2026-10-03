@@ -70,6 +70,16 @@ embedding a per-install PowerShell program.
 
 New `bundle.json` files do not contain the raw Product Key. Bootstrap reads it
 from `.env` or `SPX_PRODUCT_KEY` and accepts older bundles with `license_key`.
+The wizard checks the key format and asks again for malformed input without
+echoing it: 30 uppercase Base32 characters (`A-Z`, `2-7`), either continuous or
+in six groups of five separated by dashes. Pasted surrounding whitespace is
+trimmed in the wizard. Generated start commands check the effective key before
+runtime preparation or replacement of an existing stack. The wizard's selected
+key takes precedence over an inherited `SPX_PRODUCT_KEY` when it launches the
+stack; standalone start commands retain Compose's environment-over-`.env`
+precedence. Format validation does not confirm license validity or expiry;
+the server still checks those.
+
 Community defaults auto-start at most five instances. Profiles remain additive
 to the selected pack. During an update, old containers are held temporarily as
 `spx-snapshot-*`; after a successful bootstrap they are removed by exact

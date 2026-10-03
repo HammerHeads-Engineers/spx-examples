@@ -14,6 +14,7 @@ from typing import Dict, List, Sequence
 from . import paths, terminal_selection, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .network import discover_ipv4_addresses
+from .product_key import validate_product_key_format
 from .selection import (
     COMMUNITY_AUTO_START_LIMIT,
     apply_platform_compatibility,
@@ -771,9 +772,14 @@ class InstallerWizard:
     def _prompt_license_key(self) -> str:
         env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
         if env_value:
-            masked = self._mask_secret(env_value)
-            print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {masked}"))
-            return env_value
+            try:
+                validate_product_key_format(env_value)
+            except ValueError as exc:
+                print(ui.warn(f"\nSPX_PRODUCT_KEY in the environment is invalid. {exc}"))
+            else:
+                masked = self._mask_secret(env_value)
+                print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {masked}"))
+                return env_value
 
         print(ui.heading("\nSPX Product Key"))
         while True:
@@ -782,7 +788,11 @@ class InstallerWizard:
             ).strip()
             self._check_quit(raw)
             if raw:
-                return raw
+                try:
+                    return validate_product_key_format(raw)
+                except ValueError as exc:
+                    print(ui.warn(f"  {exc}"))
+                continue
             print(ui.warn("  Product key cannot be empty."))
 
     def _check_quit(self, raw: str) -> None:

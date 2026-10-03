@@ -28,6 +28,7 @@ def test_failure_captures_diagnostics_before_rollback_and_retains_recovery_files
         "modbus_port_configurator.py",
         "runtime_bootstrap.py",
         "bootstrap_runner.py",
+        "product_key.py",
     )
     for name in files:
         (tmp_path / name).write_text("__TRANSACTION_TOKEN__", encoding="utf-8")

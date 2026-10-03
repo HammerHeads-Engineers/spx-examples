@@ -15,6 +15,7 @@ from typing import Iterable, List, Optional
 
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
+from .product_key import validate_product_key_format
 from .selection import (
     apply_platform_compatibility,
     resolve_default_instances,
@@ -416,6 +417,14 @@ def run(args: argparse.Namespace) -> int:
                 raise RuntimeError("Manifest index unavailable after wizard run.")
             index = wizard.index
 
+        if getattr(args, "start", False):
+            try:
+                selection.license_key = validate_product_key_format(
+                    selection.license_key.strip()
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+
         generator = DeploymentGenerator(index)
         output_dir = Path(args.output)
         generator.generate(selection, output_dir)
@@ -504,6 +513,9 @@ def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     # contains spaces (for example macOS Application Support).
     child_env.pop("PYTHON_BIN", None)
     child_env.pop("SPX_INSTALLER_PYTHON_BIN", None)
+    # Selection is already resolved and written to .env; an inherited key must
+    # not override the explicit CLI key or a corrected wizard entry.
+    child_env.pop("SPX_PRODUCT_KEY", None)
     try:
         subprocess.run(cmd, check=True, env=child_env)
     except subprocess.CalledProcessError as exc:

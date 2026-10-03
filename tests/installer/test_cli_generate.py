@@ -189,6 +189,7 @@ def test_launch_stack_does_not_forward_installer_python_path_with_spaces(
         script.write_text(
             "import os\n"
             "from pathlib import Path\n"
+            "assert 'SPX_PRODUCT_KEY' not in os.environ\n"
             f"Path({str(marker)!r}).write_text(os.environ.get('SPX_SYSTEM_PYTHON_BIN', ''))\n",
             encoding="utf-8",
         )
@@ -198,6 +199,7 @@ def test_launch_stack_does_not_forward_installer_python_path_with_spaces(
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
             'if [[ -n "${PYTHON_BIN+x}" ]]; then exit 17; fi\n'
+            'if [[ -n "${SPX_PRODUCT_KEY+x}" ]]; then exit 18; fi\n'
             'printf \'%s\' "${SPX_SYSTEM_PYTHON_BIN:-}" > "' + str(marker) + '"\n',
             encoding="utf-8",
         )
@@ -207,9 +209,43 @@ def test_launch_stack_does_not_forward_installer_python_path_with_spaces(
         str(tmp_path / "Library" / "Application Support" / "installer-python"),
     )
     monkeypatch.setenv("SPX_SYSTEM_PYTHON_BIN", "/usr/bin/python3")
+    monkeypatch.setenv("SPX_PRODUCT_KEY", "PRIVATE-invalid-env")
 
     assert cli._launch_stack(output_dir)
     assert marker.read_text(encoding="utf-8") == "/usr/bin/python3"
+    assert os.environ["SPX_PRODUCT_KEY"] == "PRIVATE-invalid-env"
+
+
+def test_generate_start_rejects_invalid_key_before_overwriting_artifacts(
+    tmp_path: Path,
+    manifest_dirs: dict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SPX_PRODUCT_KEY", raising=False)
+    output_dir = tmp_path / "out"
+    output_dir.mkdir()
+    env_file = output_dir / ".env"
+    env_file.write_text("previous installation", encoding="utf-8")
+    with pytest.raises(SystemExit, match="30 uppercase characters") as error:
+        cli.main(
+            [
+                "generate",
+                "--catalog",
+                str(manifest_dirs["catalog_dir"]),
+                "--profiles",
+                str(manifest_dirs["profiles_dir"]),
+                "--output",
+                str(output_dir),
+                "--packages",
+                "test_pack",
+                "--product-key",
+                "PRIVATE-invalid-input",
+                "--start",
+            ]
+        )
+    assert "PRIVATE-invalid-input" not in str(error.value)
+    assert env_file.read_text(encoding="utf-8") == "previous installation"
+    assert not (output_dir / "docker-compose.generated.yml").exists()
 
 
 def test_generate_allows_missing_product_key_when_flag_set(

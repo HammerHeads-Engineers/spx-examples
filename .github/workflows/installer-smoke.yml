@@ -76,7 +76,8 @@ jobs:
       - name: Exercise the interactive wizard with scripted stdin
         shell: bash
         env:
-          SPX_PRODUCT_KEY: CI-WIZARD-TEST-KEY
+          # Synthetic format-only key; the wizard smoke does not start a server.
+          SPX_PRODUCT_KEY: AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA
         run: |
           set -euo pipefail
           printf '0\n\nn\nn\nn\n\n\n' | \
