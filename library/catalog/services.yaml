@@ -130,6 +130,8 @@ services:
       runtime: docker
       image: corfr/leshan:latest
       container_name: leshan-server
+      environment:
+        JAVA_TOOL_OPTIONS: "--add-opens=java.base/java.util=ALL-UNNAMED"
       hostname: leshan
       restart: unless-stopped
   - id: http_gateway
@@ -145,6 +147,10 @@ services:
         host: 8092
         container: 8092
         purpose: Air-quality API `/v1/air-quality`
+      - transport: tcp
+        host: 8093
+        container: 8093
+        purpose: Vision quality station HTTP API
     deployment:
       runtime: builtin
       provider: spx-server

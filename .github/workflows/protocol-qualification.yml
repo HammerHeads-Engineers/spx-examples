@@ -1,0 +1,54 @@
+name: Required protocol qualification
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  shipped-model-protocols:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read the actual pinned Server tag
+        id: server
+        run: |
+          python -c 'from installer.compatibility import SPX_SERVER_VERSION; print("tag=" + SPX_SERVER_VERSION)' >> "$GITHUB_OUTPUT"
+      - name: Start the reference Leshan server
+        run: |
+          docker network create spx-protocol-qa
+          docker run -d --name leshan-qa --network spx-protocol-qa -p 127.0.0.1:18080:8080 -e JAVA_TOOL_OPTIONS=--add-opens=java.base/java.util=ALL-UNNAMED corfr/leshan:latest
+      - name: Require reference server readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:18080/api/clients >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs leshan-qa
+          exit 1
+      - name: Require real runtime and protocol regressions
+        run: |
+          mkdir -p build/protocol-qa
+          docker run --rm --network spx-protocol-qa \
+            --mount type=bind,source="$PWD",target=/examples,readonly \
+            --mount type=bind,source="$PWD/build/protocol-qa",target=/results \
+            -w /examples -e PYTHONPATH=/app:/examples \
+            -e SPX_MODEL_RUNTIME_TESTS=1 -e LWM2M_TEST_HOST=leshan-qa \
+            --entrypoint sh simplephysx/spx-server:${{ steps.server.outputs.tag }} -c '
+              pip install pytest && python -m pytest -q \
+                tests/core/runtime/test_catalog_physics.py \
+                tests/core/runtime/test_catalog_energy.py \
+                tests/packs/energy_pack/test_ocpp_model_regressions.py \
+                tests/packs/energy_pack/test_ocpp_pair_regression.py \
+                tests/packs/smart_building_pack/test_lwm2m_model_regression.py \
+                --junitxml=/results/protocol.xml -o junit_family=xunit1
+            '
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: protocol-qualification
+          path: build/protocol-qa/
+      - if: always()
+        run: |
+          docker rm -f leshan-qa
+          docker network rm spx-protocol-qa

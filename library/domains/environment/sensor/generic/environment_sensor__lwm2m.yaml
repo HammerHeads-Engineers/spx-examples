@@ -8,15 +8,19 @@ description: >
   exposes temperature, humidity, comfort, and HVAC control resources over CoAP.
 
 meta_parameters:
+  lwm2m_local_port:
+    type: int
+    default: 0
   lwm2m_endpoint:
     type: str
     default: "generic-lwm2m-env-001"
   lwm2m_server_host:
     type: str
-    default: host.docker.internal
+    default: leshan-server
   lwm2m_server_port:
     type: int
     default: 5683
+  # Legacy parameter retained for existing instance configurations; device identity uses lwm2m_endpoint.
   lwm2m_server_endpoint:
     type: str
     default: leshan
@@ -108,7 +112,28 @@ attributes:
     type: int
     default: 0
 
+  _lwm2m_manufacturer:
+    type: str
+    default: "Hammerheads Engineers"
+  _lwm2m_model_number:
+    type: str
+    default: "generic-lwm2m-env"
+  _lwm2m_time_s:
+    type: int
+    default: 1735732800
+    unit: s
+
 actions:
+  - function: $in(lwm2m_connected)
+    name: read_registration_diagnostic
+    call: int($attr(communication.lwm2m.registered))
+  - function: $in(lwm2m_request_counter)
+    name: read_resource_operation_counter
+    call: int($attr(communication.lwm2m.request_counter))
+  - function: $in(_lwm2m_time_s)
+    name: encode_lwm2m_timestamp
+    imports: {datetime: datetime}
+    call: int(datetime.datetime.fromisoformat($in(current_timestamp).replace("Z", "+00:00")).timestamp())
   - function: $in(k__temperature_c)
     name: update_temperature
     description: Glide the temperature toward the setpoint with ambient influence.
@@ -208,87 +233,107 @@ actions:
         )
 
 communication:
-  - lwm2m:
-      description: |
-        Realistic LwM2M client that performs Register/Update/Delete exchanges
-        with a Leshan server and exposes standard environmental objects.
-      client:
-        endpoint: "$param(lwm2m_endpoint)"
-        lifetime: 120
-        queue_mode: false
-      server:
-        scheme: coap
-        host: "$param(lwm2m_server_host)"
-        port: "$param(lwm2m_server_port)"    # CoAP port exposed by docker-compose Leshan service.
-        endpoint: "$param(lwm2m_server_endpoint)"
-      security:
-        mode: nosec   # Switch to "psk" and provide identity/key when using DTLS.
-        psk_identity: ""
-        psk_key: ""
-      resources:
-        - path: "3/0/0"
-          name: manufacturer
-          properties: [read]
-          value: "Hammerheads Engineers"
-        - path: "3/0/1"
-          name: model_number
-          properties: [read]
-          value: "generic-lwm2m-env"
-        - path: "3/0/13"
-          name: current_time
-          properties: [read, notify]
-          attribute: $ext(current_timestamp)
-        - path: "3303/0/5700"
-          name: temperature_c
-          properties: [read, notify]
-          attribute: $ext(k__temperature_c)
-        - path: "3303/0/5601"
-          name: temperature_min
-          properties: [read]
-          attribute: $ext(temperature_min_c)
-        - path: "3303/0/5602"
-          name: temperature_max
-          properties: [read]
-          attribute: $ext(temperature_max_c)
-        - path: "3304/0/5700"
-          name: humidity_percent
-          properties: [read, notify]
-          attribute: $ext(k__humidity_percent)
-        - path: "3304/0/5601"
-          name: humidity_min
-          properties: [read]
-          attribute: $ext(humidity_min_percent)
-        - path: "3304/0/5602"
-          name: humidity_max
-          properties: [read]
-          attribute: $ext(humidity_max_percent)
-        - path: "3308/0/5900"
-          name: temperature_setpoint
-          properties: [read, write]
-          attribute: $attr(k__target_c)
-        - path: "3308/0/5903"
-          name: hvac_mode
-          properties: [read, write]
-          attribute: $attr(k__hvac_mode)
-        - path: "3340/0/5851"
-          name: fan_speed_command
-          properties: [read, write]
-          attribute: $attr(k__fan_speed_target)
-        - path: "3340/0/5900"
-          name: fan_speed_percent
-          properties: [read, notify]
-          attribute: $ext(k__fan_speed_percent)
-        - path: "3342/0/5500"
-          name: lwm2m_connected
-          properties: [read]
-          attribute: $ext(lwm2m_connected)
+- lwm2m:
+    description: Register and serve resources from the same local CoAP endpoint.
+    port: $param(lwm2m_local_port)
+    server:
+      host: $param(lwm2m_server_host)
+      port: $param(lwm2m_server_port)
+      endpoint: $param(lwm2m_endpoint)
+      lifetime: 120
+    bindings:
+    - name: query_manufacturer
+      path: 3/0/0
+      operation: read
+      read_attribute: '#attr(_lwm2m_manufacturer)'
+      content_format: text/plain
+    - name: query_model_number
+      path: 3/0/1
+      operation: read
+      read_attribute: '#attr(_lwm2m_model_number)'
+      content_format: text/plain
+    - name: query_current_time
+      path: 3/0/13
+      operation: read
+      read_attribute: '#attr(_lwm2m_time_s)'
+      content_format: text/plain
+    - name: query_temperature_c
+      path: 3303/0/5700
+      operation: read
+      read_attribute: '#attr(k__temperature_c)'
+      content_format: text/plain
+    - name: query_temperature_min
+      path: 3303/0/5601
+      operation: read
+      read_attribute: '#attr(temperature_min_c)'
+      content_format: text/plain
+    - name: query_temperature_max
+      path: 3303/0/5602
+      operation: read
+      read_attribute: '#attr(temperature_max_c)'
+      content_format: text/plain
+    - name: query_humidity_percent
+      path: 3304/0/5700
+      operation: read
+      read_attribute: '#attr(k__humidity_percent)'
+      content_format: text/plain
+    - name: query_humidity_min
+      path: 3304/0/5601
+      operation: read
+      read_attribute: '#attr(humidity_min_percent)'
+      content_format: text/plain
+    - name: query_humidity_max
+      path: 3304/0/5602
+      operation: read
+      read_attribute: '#attr(humidity_max_percent)'
+      content_format: text/plain
+    - name: query_temperature_setpoint
+      path: 3308/0/5900
+      operation: read
+      read_attribute: '#attr(k__target_c)'
+      content_format: text/plain
+    - name: set_temperature_setpoint
+      path: 3308/0/5900
+      operation: write
+      write_attribute: '#attr(k__target_c)'
+      content_format: text/plain
+    - name: query_hvac_mode
+      path: 3308/0/5903
+      operation: read
+      read_attribute: '#attr(k__hvac_mode)'
+      content_format: text/plain
+    - name: set_hvac_mode
+      path: 3308/0/5903
+      operation: write
+      write_attribute: '#attr(k__hvac_mode)'
+      content_format: text/plain
+    - name: query_fan_speed_command
+      path: 3340/0/5851
+      operation: read
+      read_attribute: '#attr(k__fan_speed_target)'
+      content_format: text/plain
+    - name: set_fan_speed_command
+      path: 3340/0/5851
+      operation: write
+      write_attribute: '#attr(k__fan_speed_target)'
+      content_format: text/plain
+    - name: query_fan_speed_percent
+      path: 3340/0/5900
+      operation: read
+      read_attribute: '#attr(k__fan_speed_percent)'
+      content_format: text/plain
+    - name: query_lwm2m_connected
+      path: 3342/0/5500
+      operation: read
+      read_attribute: '#attr(lwm2m_connected)'
+      content_format: text/plain
 
 scenarios:
   lwm2m_reconnect:
     name: LwM2M Reconnect
     display_name: "LwM2M Reconnect"
-    description: Temporarily detaches the LwM2M client to exercise reconnect handling.
+    description: Temporarily stops the LwM2M client to exercise reconnect handling.
     duration: 3.0
     call:
-      path: communication.lwm2m_client.detach
-      stop_path: communication.lwm2m_client.attach
+      path: communication.lwm2m.stop
+      stop_path: communication.lwm2m.start

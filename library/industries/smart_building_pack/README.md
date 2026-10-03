@@ -10,6 +10,12 @@ independently of the wizard's host/LAN port binding. Override `mqtt_broker_host`
 Robot-vacuum cleaning, charging, and docking use elapsed simulation seconds;
 low battery and a full bin trigger a return to the dock and clear the clean request.
 
+The LwM2M sensor defaults to the bundled `leshan-server`; override
+`lwm2m_server_host`/`lwm2m_server_port` for an external server. Set a unique
+`lwm2m_endpoint` for each instance. `lwm2m_local_port=0` assigns a free local
+CoAP port. Registration and request diagnostics come from the live driver;
+the reconnect scenario performs Stop/Start of that same component.
+
 ## What is inside
 
 - Protocols: MQTT, LwM2M/CoAP, HTTP, Modbus TCP, OPC UA, KNX, Matter, BACnet.
