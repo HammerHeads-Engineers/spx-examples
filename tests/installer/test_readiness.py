@@ -190,19 +190,24 @@ def test_api_probe_bypasses_proxy_only_on_loopback(manager, monkeypatch, url, lo
 
 
 @pytest.mark.parametrize(
-    "error,expected",
+    "error_factory,expected",
     [
         (
-            urllib.error.HTTPError(
+            lambda: urllib.error.HTTPError(
                 "http://remote/health", 503, "unavailable", {}, None
             ),
             "HTTP 503",
         ),
-        (urllib.error.URLError(ConnectionRefusedError("refused")), "refused"),
-        (BadStatusLine("malformed HTTP status"), "malformed HTTP status"),
+        (lambda: urllib.error.URLError(ConnectionRefusedError("refused")), "refused"),
+        (lambda: BadStatusLine("malformed HTTP status"), "malformed HTTP status"),
     ],
+    ids=["http-503", "connection-refused", "malformed-http-status"],
 )
-def test_api_probe_preserves_error_detail(manager, monkeypatch, error, expected):
+def test_api_probe_preserves_error_detail(
+    manager, monkeypatch, error_factory, expected
+):
+    # Python 3.9 HTTPError attribute lookup can fail during pytest ID discovery.
+    error = error_factory()
     monkeypatch.setattr(sm.urllib.request, "urlopen", Mock(side_effect=error))
     result = manager._probe_api("http://remote:8000")
     assert result["ready"] is False and expected in result["error"]
