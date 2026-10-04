@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import getpass
 import os
 import re
 from dataclasses import dataclass, field
@@ -15,6 +14,7 @@ from . import paths, terminal_selection, ui
 from .manifest import IndustryManifest, ManifestIndex, ManifestLoader
 from .network import discover_ipv4_addresses
 from .product_key import validate_product_key_format
+from .secret_input import read_secret
 from .selection import (
     COMMUNITY_AUTO_START_LIMIT,
     apply_platform_compatibility,
@@ -782,8 +782,9 @@ class InstallerWizard:
                 return env_value
 
         print(ui.heading("\nSPX Product Key"))
+        print("The key is hidden while typing. Paste it, then press Enter.")
         while True:
-            raw = getpass.getpass(
+            raw = read_secret(
                 "Enter SPX product key (required, q to quit): "
             ).strip()
             self._check_quit(raw)
