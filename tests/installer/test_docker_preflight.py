@@ -315,7 +315,8 @@ spx_docker_preflight_required generate --protocols bacnet --no-start && exit 1
 spx_docker_preflight_required bootstrap --bundle bundle.json && exit 1
 spx_docker_preflight_required generate --protocols bacnet && exit 1
 spx_docker_preflight_required generate --protocols bacnet --start || exit 1
-spx_docker_preflight_required generate || exit 1
+spx_docker_preflight_required generate && exit 1
+spx_docker_preflight_required generate --wizard-mode agent && exit 1
 exit 0
 """
     result = _run_bash(script)
