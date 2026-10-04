@@ -8,6 +8,8 @@ from importlib.util import find_spec
 import json
 import sys
 from typing import Iterable, Optional
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from .config import MIN_MCP_PYTHON, SpxMcpConfig, python_supports_mcp, runtime_requirement_message
 from .toolsets import get_tool_specs
@@ -33,6 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit diagnostics as JSON.",
     )
+    doctor_parser.add_argument('--check-server', action='store_true',
+                               help='Verify authenticated API v3 access with a 5 second timeout.')
 
     list_parser = subparsers.add_parser(
         "list-tools",
@@ -68,7 +72,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     if args.command == "doctor":
         config = _config_from_args(args)
-        report = doctor_report(config)
+        report = doctor_report(config, check_server=args.check_server)
         if args.json:
             print(json.dumps(report, indent=2, sort_keys=True))
         else:
@@ -89,7 +93,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     return 2
 
 
-def doctor_report(config: SpxMcpConfig):
+def doctor_report(config: SpxMcpConfig, *, check_server: bool = False):
     """Return a structured diagnostics report for the local MCP runtime."""
     problems = []
     if not python_supports_mcp():
@@ -113,8 +117,30 @@ def doctor_report(config: SpxMcpConfig):
         )
     problems.extend(runtime_backend["problems"])
 
+    server_check = {'checked': False, 'ok': None,
+                    'message': 'Server connection was not checked (local diagnostics only).'}
+    if check_server:
+        server_check = {'checked': True, 'ok': False, 'message': 'Server check failed.'}
+        try:
+            if not config.has_valid_product_key:
+                raise ValueError('Product key unavailable')
+            request = Request(config.spx_base_url + '/api/v3/system',
+                              headers={'Authorization': 'Bearer ' + config.product_key})
+            with urlopen(request, timeout=5) as response:
+                payload = json.load(response)
+                if not isinstance(payload, dict) or 'name' not in payload:
+                    raise ValueError('Unexpected API v3 response')
+            server_check.update(ok=True, message='Authenticated API v3 access verified.')
+        except HTTPError as exc:
+            server_check.update(status=exc.code, message=f'API v3 rejected the request (HTTP {exc.code}).')
+        except (URLError, OSError, ValueError):
+            server_check['message'] = 'API v3 is unavailable or its response is invalid.'
+        if not server_check['ok']:
+            problems.append(server_check['message'])
+
     return {
         "ok": not problems,
+        "server_check": server_check,
         "python_version": ".".join(str(part) for part in sys.version_info[:3]),
         "repo_root": str(config.repo_root),
         "spx_base_url": config.spx_base_url,
@@ -143,6 +169,7 @@ def _print_doctor_report(report) -> None:
     print(f"spx_python_available: {report['spx_python_available']}")
     print(f"spx_python_importable: {report['spx_python_importable']}")
     print(f"runtime_backend_usable: {report['runtime_backend_usable']}")
+    print(f"server_check: {report['server_check']['message']}")
     print("runtime_backend_checks:")
     for check in report["runtime_backend_checks"]:
         print(f"- {check}")

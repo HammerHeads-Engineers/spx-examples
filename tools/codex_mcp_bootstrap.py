@@ -12,6 +12,8 @@ import re
 import shutil
 import subprocess
 import sys
+import os
+import tempfile
 from typing import Callable, Optional, Sequence, Tuple
 
 
@@ -97,6 +99,11 @@ def detect_server_invocation(
     which = which or shutil.which
     repo_root = repo_root.resolve()
     args = stdio_args(allow_write=allow_write)
+    marker_path = repo_root / '.spx-mcp-workspace.json'
+    if marker_path.exists():
+        marker = json.loads(marker_path.read_text(encoding='utf-8'))
+        if marker.get('workspace_kind', marker.get('workspace_mode')) == 'managed':
+            args.extend(['--repo-root', repo_root.as_posix()])
 
     if platform_name.startswith("win"):
         venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
@@ -238,7 +245,17 @@ def bootstrap_codex_mcp(
     rendered = render_mcp_server_block(server_name, invocation)
     updated_config = upsert_named_mcp_server(existing_config, server_name, rendered)
     config_changed = updated_config != existing_config
-    config_path.write_text(updated_config, encoding="utf-8")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=config_path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(updated_config)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, config_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
     exclude_path: Optional[Path] = None
     exclude_changed = False

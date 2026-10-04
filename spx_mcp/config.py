@@ -106,18 +106,20 @@ class SpxMcpConfig:
         marker = _read_workspace_marker(root)
         source_root = _marker_source_root(marker)
         source_dotenv = {}
-        if _marker_workspace_kind(marker) == WORKSPACE_KIND_MANAGED and source_root is not None:
+        managed = _marker_workspace_kind(marker) == WORKSPACE_KIND_MANAGED
+        if managed and source_root is not None:
             source_dotenv = _read_dotenv(source_root / ".env")
 
         resolved_base_url = normalize_base_url(
             spx_base_url
-            or os.environ.get("SPX_BASE_URL")
+            or (None if managed else os.environ.get("SPX_BASE_URL"))
             or workspace_dotenv.get("SPX_BASE_URL")
+            or source_dotenv.get("SPX_BASE_URL")
             or DEFAULT_SPX_BASE_URL
         )
         resolved_product_key, product_key_source, product_key_status, search_details = _resolve_product_key(
             explicit=product_key,
-            process_env=os.environ.get("SPX_PRODUCT_KEY"),
+            process_env=None if managed else os.environ.get("SPX_PRODUCT_KEY"),
             workspace_env=workspace_dotenv.get("SPX_PRODUCT_KEY"),
             workspace_env_path=root / ".env",
             source_env=source_dotenv.get("SPX_PRODUCT_KEY"),
@@ -214,9 +216,7 @@ def _mask_product_key(value: Optional[str]) -> str:
         return "empty"
     if is_placeholder_product_key(stripped):
         return f"placeholder {stripped}"
-    if len(stripped) <= 6:
-        return "<masked>"
-    return f"{stripped[:3]}...{stripped[-2:]}"
+    return "<masked>"
 
 
 def _format_candidate_detail(label: str, value: Optional[str]) -> str:
