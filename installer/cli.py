@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import webbrowser
+from dataclasses import replace
 
 from pathlib import Path
 import os
@@ -81,6 +82,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Interactive installer for SPX example packages.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+    from .setup_cli import add_parser
+
+    add_parser(subparsers)
 
     wizard_parser = subparsers.add_parser(
         "wizard", help="Launch the interactive console wizard."
@@ -384,6 +388,10 @@ def _print_selection(selection: WizardSelection, *, index) -> None:
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.command == "setup":
+        from .setup_cli import run as run_setup
+
+        return run_setup(args)
     if args.command == "wizard":
         loader = ManifestLoader(
             catalog_dir=(
@@ -429,15 +437,44 @@ def run(args: argparse.Namespace) -> int:
 
         if getattr(args, "start", False):
             try:
-                selection.license_key = validate_product_key_format(
-                    selection.license_key.strip()
+                selection = replace(
+                    selection,
+                    license_key=validate_product_key_format(
+                        selection.license_key.strip()
+                    ),
                 )
             except ValueError as exc:
                 raise SystemExit(str(exc)) from exc
 
-        generator = DeploymentGenerator(index)
         output_dir = Path(args.output)
-        generator.generate(selection, output_dir)
+        from .setup_local import execute_selection
+
+        start_requested = bool(getattr(args, "start", False)) or (
+            not noninteractive
+            and not getattr(args, "no_start", False)
+            and not selection.offline_bundle
+        )
+        outcome = execute_selection(
+            selection,
+            output_dir,
+            catalog=getattr(args, "catalog", None),
+            profiles=getattr(args, "profiles", None),
+            start_callback=(
+                (
+                    lambda directory, journal: _launch_stack(
+                        directory, stream=info_stream, journal=journal
+                    )
+                )
+                if start_requested
+                else None
+            ),
+        )
+        if outcome["status"] != "SUCCEEDED":
+            print(
+                f"[spx-installer] {outcome.get('diagnostic', 'Setup failed')}",
+                file=info_stream,
+            )
+            return 1
 
         if getattr(args, "print_selection", None) == "json":
             _print_selection(selection, index=index)
@@ -465,20 +502,13 @@ def run(args: argparse.Namespace) -> int:
             file=info_stream,
         )
 
-        if getattr(args, "start", False):
-            if not _launch_stack(output_dir, stream=info_stream):
-                return 1
+        if start_requested:
             _open_ui_browser(selection, stream=info_stream)
             return 0
 
         if noninteractive or getattr(args, "no_start", False):
             return 0
 
-        if not selection.offline_bundle:
-            if not _launch_stack(output_dir, stream=info_stream):
-                return 1
-            _open_ui_browser(selection, stream=info_stream)
-            return 0
         return 0
     if args.command == "bootstrap":
         from .bootstrap import bootstrap
@@ -498,7 +528,7 @@ def main(argv: list[str] | None = None) -> int:
     return run(args)
 
 
-def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
+def _launch_stack(output_dir: Path, *, stream=sys.stdout, journal=None) -> bool:
     # Defer Docker startup until after presentation/configuration selection.
     if _is_interactive_session(stream):
         from . import paths
@@ -552,6 +582,9 @@ def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
     # Selection is already resolved and written to .env; an inherited key must
     # not override the explicit CLI key or a corrected wizard entry.
     child_env.pop("SPX_PRODUCT_KEY", None)
+    child_env.pop("SPX_SETUP_JOURNAL", None)
+    if journal is not None:
+        child_env["SPX_SETUP_JOURNAL"] = str(journal)
     try:
         subprocess.run(cmd, check=True, env=child_env)
     except subprocess.CalledProcessError as exc:

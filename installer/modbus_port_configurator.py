@@ -28,7 +28,8 @@ INSTANCE_SUGGESTION_START = 15020
 SERVICE_PORT_SUGGESTION_START = 15000
 
 _PORT_BINDING = re.compile(
-    r"^(?P<prefix>.*:)(?P<host>\d+):(?P<container>\d+)" r"(?P<suffix>/(?:tcp|udp))?$"
+    r"^(?P<prefix>(?:.*:)?)(?P<host>\d+):(?P<container>\d+)"
+    r"(?P<suffix>/(?:tcp|udp))?$"
 )
 
 
@@ -232,9 +233,7 @@ def _resolve_compose_service(compose: dict, service_name: str) -> dict | None:
 def _service_mapping_binding(
     compose: dict, record: Mapping[str, object]
 ) -> tuple[dict, int, int] | None:
-    service = _resolve_compose_service(
-        compose, str(record.get("compose_service", ""))
-    )
+    service = _resolve_compose_service(compose, str(record.get("compose_service", "")))
     if service is None:
         return None
     container_port = int(record.get("container_port", 0))
@@ -595,9 +594,7 @@ def _stage_settings(
         for key, host in service_hosts.items():
             reasons = list(conflicts.get(host, []))
             other_keys = [
-                other
-                for other in host_to_service_keys.get(host, [])
-                if other != key
+                other for other in host_to_service_keys.get(host, []) if other != key
             ]
             if other_keys:
                 reasons.extend(
@@ -617,8 +614,7 @@ def _stage_settings(
                     f"{current.gateway_host_port}: {_owner_text(conflicts[current.gateway_host_port])}"
                 )
             conflict_details.extend(
-                f"{port}: {_owner_text(conflicts[port])}"
-                for port in instance_conflicts
+                f"{port}: {_owner_text(conflicts[port])}" for port in instance_conflicts
             )
             conflict_details.extend(
                 f"{service_hosts[key]}: "
@@ -629,9 +625,11 @@ def _stage_settings(
             kind = (
                 "Modbus TCP and selected service host ports"
                 if modbus_selected and service_conflicts
-                else "selected TCP service host ports"
-                if service_conflicts
-                else "Modbus TCP host ports"
+                else (
+                    "selected TCP service host ports"
+                    if service_conflicts
+                    else "Modbus TCP host ports"
+                )
             )
             raise PortConfigurationError(
                 f"{kind} are occupied ({details}). Run spx-start interactively "
@@ -942,7 +940,9 @@ def main(argv: list[str] | None = None) -> int:
                     f"{INSTANCE_CONTAINER_START + INSTANCE_PORT_COUNT - 1}/TCP"
                 )
             for record in _service_mapping_records(bundle):
-                host_port = int(record.get("host_port", record.get("default_host_port", 0)))
+                host_port = int(
+                    record.get("host_port", record.get("default_host_port", 0))
+                )
                 container_port = int(record.get("container_port", 0))
                 default_host_port = int(record.get("default_host_port", container_port))
                 if host_port != default_host_port:
