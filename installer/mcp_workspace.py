@@ -841,12 +841,17 @@ def run_command(
     cwd: Optional[Path] = None,
     capture_output: bool = False,
 ) -> subprocess.CompletedProcess[str]:
+    environment = os.environ.copy()
+    # Also covers the editable MCP pip install, which runs outside the runtime
+    # helper. Do not alter the parent process or certificate/proxy settings.
+    environment.pop("SSLKEYLOGFILE", None)
     return subprocess.run(
         argv,
         check=True,
         cwd=str(cwd) if cwd else None,
         text=True,
         capture_output=capture_output,
+        env=environment,
     )
 
 

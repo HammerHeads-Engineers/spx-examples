@@ -4,9 +4,34 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from installer import runtime_bootstrap
+from installer import mcp_workspace
+import pytest
+
+
+@pytest.mark.parametrize("runner", [runtime_bootstrap.run_command, mcp_workspace.run_command])
+def test_runtime_children_ignore_inaccessible_tls_keylog_without_changing_parent(
+    tmp_path: Path, monkeypatch, runner
+) -> None:
+    # A directory is an invalid keylog file on every supported platform. This
+    # reproduces the GUI launcher's inaccessible virtual-file path without TLS
+    # traffic, package downloads or changing the host environment.
+    monkeypatch.setenv("SSLKEYLOGFILE", str(tmp_path))
+    monkeypatch.setenv("SPX_BOOTSTRAP_ENV_PROBE", "preserved")
+    runner([
+        runtime_bootstrap.sys.executable,
+        "-c",
+        "import os, ssl; "
+        "context = ssl.create_default_context(); "
+        "assert context.verify_mode == ssl.CERT_REQUIRED; "
+        "assert context.check_hostname; "
+        "assert 'SSLKEYLOGFILE' not in os.environ; "
+        "assert os.environ['SPX_BOOTSTRAP_ENV_PROBE'] == 'preserved'",
+    ])
+    assert os.environ["SSLKEYLOGFILE"] == str(tmp_path)
 
 
 def test_is_healthy_virtualenv_rejects_missing_pyvenv_cfg(tmp_path: Path) -> None:

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -51,7 +52,13 @@ def write_stamp(path: Path, payload: dict[str, Any]) -> None:
 
 
 def run_command(argv: list[str]) -> None:
-    subprocess.run(argv, check=True, stdout=sys.stderr, stderr=sys.stderr)
+    environment = os.environ.copy()
+    # GUI launchers can inherit an inaccessible TLS keylog path. Package
+    # installation needs verified HTTPS, not the launcher's TLS diagnostics.
+    environment.pop("SSLKEYLOGFILE", None)
+    subprocess.run(
+        argv, check=True, stdout=sys.stderr, stderr=sys.stderr, env=environment
+    )
 
 
 def has_module(python_bin: Path, module_name: str) -> bool:

@@ -206,6 +206,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
         bootstrap = script_dir / "runtime_bootstrap.py"
         print("[spx-start] Preparing the isolated SPX runtime...")
         bootstrap_environment = os.environ.copy()
+        bootstrap_environment.pop("SSLKEYLOGFILE", None)
         bootstrap_environment["PYTHONIOENCODING"] = "utf-8"
         try:
             runtime_result = subprocess.run(
