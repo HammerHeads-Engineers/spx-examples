@@ -516,6 +516,18 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
         except OSError:
             pass
         transaction_compose = None
+        try:
+            try:
+                from installer.mcp_workspace import synchronize_managed_workspace
+            except ImportError:
+                from mcp_workspace import synchronize_managed_workspace
+            if synchronize_managed_workspace(env_file):
+                print('[spx-start] Managed MCP configuration refreshed. Reconnect MCP in Codex.')
+        except Exception:
+            # The stack is already committed and healthy. MCP setup failure
+            # must not roll it back or disclose configuration/secret values.
+            print('[spx-start] SPX stack is healthy; MCP configuration could not be refreshed. '
+                  'Run SPX MCP Setup, then reconnect MCP in Codex.', file=sys.stderr)
         print()
         print("[spx-start] SPX started successfully.")
         print(

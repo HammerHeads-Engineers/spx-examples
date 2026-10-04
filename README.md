@@ -281,7 +281,7 @@ subnet; firewalls and inter-subnet routing remain the user's responsibility.
 Non-interactive generation always uses local-only binds.
 
 The generated stack always uses Compose project `spx` and installer labels. The
-server/UI contract is SPX Server `v1.0.0-rc.70` with SPX UI `v1.0.0-rc.71`;
+server/UI contract is SPX Server `v1.0.0-rc.71` with SPX UI `v1.0.0-rc.72`;
 unsupported version pairs are rejected during generation. Community defaults
 auto-start at most five instances. A profile is additive to its selected pack,
 not a replacement for the pack.

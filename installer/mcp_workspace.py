@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Mapping, Optional, Sequence
 
 
@@ -347,7 +348,55 @@ def read_process_seed_env() -> dict[str, str]:
 
 def write_dotenv(path: Path, values: Mapping[str, str]) -> None:
     lines = [f"{key}={values[key]}" for key in sorted(values)]
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(path, "\n".join(lines) + "\n")
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Replace one configuration file without exposing partially written data."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                         prefix=f'.{path.name}.', delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def merge_workspace_seed_env(seeded, process, *, workspace_kind, explicit_seed):
+    """An explicit installer seed owns managed settings; repo_dev keeps precedence."""
+    if workspace_kind == WORKSPACE_KIND_MANAGED and explicit_seed:
+        return {**process, **seeded}
+    return {**seeded, **process}
+
+
+def synchronize_managed_workspace(seed_env: Path, *, workspace_dir: Optional[Path] = None) -> bool:
+    """Refresh an existing managed workspace after a successful stack commit."""
+    workspace = workspace_dir or default_workspace_dir()
+    marker_path = workspace / WORKSPACE_MARKER_NAME
+    if not marker_path.exists() or is_git_workspace(workspace):
+        return False
+    marker = json.loads(marker_path.read_text(encoding='utf-8'))
+    if marker.get('workspace_kind', marker.get('workspace_mode')) != WORKSPACE_KIND_MANAGED:
+        return False
+    source = Path(marker['source_root'])
+    validate_source_root(source)
+    sync_payload(source, workspace)
+    seeded = read_seeded_workspace_env(primary_seed_env_path=seed_env, fallback_seed_env_path=None)
+    values = build_workspace_env(existing=read_dotenv(workspace / '.env'), seeded=seeded)
+    write_dotenv(workspace / '.env', values)
+    python = workspace / '.venv' / ('Scripts/python.exe' if sys.platform.startswith('win') else 'bin/python')
+    server_name = str(marker.get('server_name') or DEFAULT_SERVER_NAME)
+    allow_write = bool(marker.get('allow_write', True))
+    bootstrap_codex(workspace, str(python), server_name=server_name,
+                    allow_write=allow_write, update_git_exclude=False)
+    write_claude_mcp_config(workspace, python, server_name=server_name, allow_write=allow_write)
+    return True
 
 
 def validate_source_root(source_root: Path) -> None:
@@ -890,7 +939,7 @@ def write_claude_mcp_config(
         "env": {},
     }
     payload["mcpServers"] = servers
-    config_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    atomic_write_text(config_path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def read_codex_server_args(config_path: Path, server_name: str) -> list[str]:
@@ -1272,7 +1321,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fallback_seed_env_path=fallback_seed_env_path,
     )
     process_seed_env = read_process_seed_env()
-    seeded_env.update(process_seed_env)
+    seeded_env = merge_workspace_seed_env(
+        seeded_env, process_seed_env,
+        workspace_kind=workspace_kind, explicit_seed=seed_env_path is not None,
+    )
     workspace_env = build_workspace_env(existing=existing_env, seeded=seeded_env)
     write_dotenv(workspace_dir / ".env", workspace_env)
 

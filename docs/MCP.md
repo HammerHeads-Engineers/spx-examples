@@ -177,6 +177,22 @@ poetry run spx-mcp doctor --json
 poetry run python -m spx_mcp doctor
 ```
 
+This checks local prerequisites only; `server_check.checked` is false. To verify
+the configured server and product key through API v3, use:
+
+```powershell
+poetry run spx-mcp doctor --check-server --json
+```
+
+The authenticated request has a five-second timeout. Unreachable servers and
+HTTP 401/403 return `ok: false` and exit code 1. Product keys are not included
+in the report or command arguments. In installer-managed workspaces, the local
+`.env` takes priority over inherited `SPX_PRODUCT_KEY` and `SPX_BASE_URL` values.
+After a successful stack replacement, existing managed MCP configuration is
+refreshed from the committed installation; reconnect MCP in Codex afterward.
+If that refresh fails while the stack is healthy, run **SPX MCP Setup** and
+reconnect. Rollback retains the previous MCP configuration.
+
 Run the MCP server over `stdio`:
 
 ```powershell
