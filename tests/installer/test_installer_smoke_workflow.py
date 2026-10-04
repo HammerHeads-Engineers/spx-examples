@@ -101,13 +101,15 @@ def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:
 
 def test_full_stack_job_is_secret_gated_and_cleans_up() -> None:
     workflow = _workflow()
-    job = _job("full-stack-smoke")
+    caller = _job("full-stack-smoke")
+    job = (REPO_ROOT / ".github/workflows/installer-stack-qualification.yml").read_text(encoding="utf-8")
 
     assert 'cron: "17 3 * * *"' in workflow
-    assert "inputs.run_full_stack" in job
+    assert "inputs.run_full_stack" in caller
+    assert "uses: ./.github/workflows/installer-stack-qualification.yml" in caller
     assert "secrets.SPX_TEST_PRODUCT_KEY" in job
     assert "docker compose" in job
     assert "spx-start.sh" in job
     assert "tests/packs/industrial_iiot_pack" in job
     assert "if: ${{ always() }}" in job
-    assert "docker compose down --remove-orphans --volumes" in job
+    assert "down --remove-orphans --volumes" in job

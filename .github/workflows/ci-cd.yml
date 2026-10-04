@@ -411,13 +411,23 @@ jobs:
         run: |
           "${OUT_DIR}/spx-stop.sh"
 
+  installer-stack-qualification:
+    needs: pr-title-gate
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == 'refs/heads/develop' ||
+      github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/installer-stack-qualification.yml
+    secrets:
+      SPX_TEST_PRODUCT_KEY: ${{ secrets.SPX_TEST_PRODUCT_KEY }}
+
   release:
     outputs:
       released: ${{ steps.release_result.outputs.released }}
       tag: ${{ steps.release_result.outputs.tag }}
     runs-on: ubuntu-latest
     concurrency: release
-    needs: [tests, core-integration, pack-tests, embedded-lab-smoke, protocol-qualification]
+    needs: [tests, core-integration, pack-tests, embedded-lab-smoke, protocol-qualification, installer-stack-qualification]
     if: >-
       always() &&
       github.event_name == 'push' &&
@@ -426,7 +436,8 @@ jobs:
       needs.core-integration.result == 'success' &&
       needs.pack-tests.result == 'success' &&
       needs.embedded-lab-smoke.result == 'success' &&
-      needs.protocol-qualification.result == 'success'
+      needs.protocol-qualification.result == 'success' &&
+      needs.installer-stack-qualification.result == 'success'
     env:
       SPX_RELEASE_TOKEN: ${{ secrets.SPX_RELEASE_TOKEN }}
     steps:
