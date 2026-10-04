@@ -13,6 +13,15 @@ from tools.codex_mcp_bootstrap import (
 )
 
 
+def test_fresh_workspace_command_has_explicit_root_before_marker_exists(tmp_path):
+    invocation, _ = detect_server_invocation(
+        tmp_path, allow_write=True, startup_timeout_sec=20, tool_timeout_sec=120,
+        platform_name="linux", which=lambda name: "/usr/bin/python" if name == "python" else None,
+    )
+    assert not (tmp_path / ".spx-mcp-workspace.json").exists()
+    assert invocation.args[-2:] == ["--repo-root", tmp_path.resolve().as_posix()]
+
+
 def test_detect_server_invocation_prefers_local_venv_windows(tmp_path) -> None:
     python_exe = tmp_path / ".venv" / "Scripts" / "python.exe"
     python_exe.parent.mkdir(parents=True)
@@ -29,7 +38,7 @@ def test_detect_server_invocation_prefers_local_venv_windows(tmp_path) -> None:
 
     assert strategy == "local-venv"
     assert invocation.command == python_exe.as_posix()
-    assert invocation.args == ["-m", "spx_mcp", "stdio", "--allow-write"]
+    assert invocation.args == ["-m", "spx_mcp", "stdio", "--allow-write", "--repo-root", tmp_path.resolve().as_posix()]
     assert invocation.cwd == tmp_path.resolve().as_posix()
 
 
@@ -49,7 +58,7 @@ def test_detect_server_invocation_prefers_local_venv_posix_without_resolving_sym
 
     assert strategy == "local-venv"
     assert invocation.command == python_exe.as_posix()
-    assert invocation.args == ["-m", "spx_mcp", "stdio"]
+    assert invocation.args == ["-m", "spx_mcp", "stdio", "--repo-root", tmp_path.resolve().as_posix()]
     assert invocation.cwd == tmp_path.resolve().as_posix()
 
 
@@ -65,7 +74,7 @@ def test_detect_server_invocation_falls_back_to_poetry(tmp_path) -> None:
 
     assert strategy == "poetry"
     assert invocation.command == "poetry"
-    assert invocation.args == ["run", "python", "-m", "spx_mcp", "stdio"]
+    assert invocation.args == ["run", "python", "-m", "spx_mcp", "stdio", "--repo-root", tmp_path.resolve().as_posix()]
 
 
 def test_upsert_named_mcp_server_replaces_existing_section() -> None:

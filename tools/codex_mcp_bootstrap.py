@@ -99,11 +99,9 @@ def detect_server_invocation(
     which = which or shutil.which
     repo_root = repo_root.resolve()
     args = stdio_args(allow_write=allow_write)
-    marker_path = repo_root / '.spx-mcp-workspace.json'
-    if marker_path.exists():
-        marker = json.loads(marker_path.read_text(encoding='utf-8'))
-        if marker.get('workspace_kind', marker.get('workspace_mode')) == 'managed':
-            args.extend(['--repo-root', repo_root.as_posix()])
+    # A fresh managed workspace has no marker until bootstrap finishes.
+    # Pin the root for every launcher; repo_dev credential precedence is unchanged.
+    args.extend(['--repo-root', repo_root.as_posix()])
 
     if platform_name.startswith("win"):
         venv_python = repo_root / ".venv" / "Scripts" / "python.exe"
