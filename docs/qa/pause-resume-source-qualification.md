@@ -92,5 +92,7 @@ Server #74 is mergeable with passing required checks. UI #103 and Examples
 released Server rc.71: UI browser CI fails its new Pause/Resume test, and Examples
 protocol CI reports the three new clock/energy/scenario pause regressions failing
 (147 other tests pass). The source-patched stack passes these checks locally.
+The full-stack installer CI also reaches the new catalog gate and fails the
+paused-state assertions against rc.71 after its starter checks pass.
 Publish the Server fix and update the actual image selection before rerunning;
 do not skip or relax the new assertions to make the old images pass.
