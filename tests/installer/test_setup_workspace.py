@@ -234,6 +234,9 @@ def test_bootstrap_uses_utf8_and_can_retry_failed_download(tmp_path, monkeypatch
     engine = SetupEngine(tmp_path / "private")
     session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
     calls = []
+    # This is a bootstrap/decoder contract, not a live SDK installation; the
+    # real 3.9 fallback is checked separately below.
+    monkeypatch.setattr("installer.setup_workspace.sys.version_info", (3, 12))
 
     def run(command, **kwargs):
         calls.append(kwargs)
@@ -248,6 +251,16 @@ def test_bootstrap_uses_utf8_and_can_retry_failed_download(tmp_path, monkeypatch
     assert (root / ".spx-setup-workspace.json").is_file()
     prepare_workspace(root, engine, session["session_id"])
     assert len(calls) == 3  # failed bootstrap, retry, doctor
+
+
+def test_unsupported_python_reports_agent_fallback(tmp_path, monkeypatch):
+    from installer.setup_session import SetupError
+
+    engine = SetupEngine(tmp_path / "private")
+    session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
+    monkeypatch.setattr("installer.setup_workspace.sys.version_info", (3, 9))
+    with pytest.raises(SetupError, match="Python 3.10.*legacy"):
+        prepare_workspace(tmp_path / "workspace", engine, session["session_id"])
 
 
 def test_workspace_cannot_contain_credentials_or_active_configuration(tmp_path):
