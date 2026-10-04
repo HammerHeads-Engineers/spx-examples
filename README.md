@@ -246,6 +246,13 @@ Choose the artifact that matches your platform:
 
 ### 2. Run the installer / setup wizard
 
+Setup first offers **Interactive (default)**, **Legacy**, and **Configure with
+your own agent**. The agent option prepares a separate local Setup workspace;
+after collecting the product key locally, all configuration, approval and
+progress happen in your agent conversation. See
+[Conversational Setup](docs/CONVERSATIONAL_SETUP.md) for client configuration,
+transaction behavior and qualification requirements.
+
 - **Windows:** launch `spx-installer-<version>.exe`, finish installation, then
   use the `Launch SPX Setup` button on the success screen. The same wizard is
   also available later from the Start Menu or Windows Apps.

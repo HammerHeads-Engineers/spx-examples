@@ -230,6 +230,12 @@ def build_parser() -> argparse.ArgumentParser:
         target.add_argument(
             "--wizard-mode", choices=["interactive", "legacy", "agent"], default=None
         )
+        target.add_argument(
+            "--setup-workspace",
+            type=Path,
+            default=None,
+            help="Optional directory for the managed agent Setup workspace.",
+        )
     return parser
 
 
@@ -402,6 +408,11 @@ def run(args: argparse.Namespace) -> int:
             ),
         )
         mode = choose_wizard_mode(getattr(args, "wizard_mode", None))
+        if mode == "agent":
+            result = _agent_handoff(args, loader)
+            if result is not None:
+                return result
+            mode = "interactive"
         wizard = InstallerWizard(loader=loader, mode=mode)
         wizard.run()
         return 0
@@ -429,6 +440,11 @@ def run(args: argparse.Namespace) -> int:
             selection = _build_noninteractive_selection(args, index=index)
         else:
             mode = choose_wizard_mode(getattr(args, "wizard_mode", None))
+            if mode == "agent":
+                result = _agent_handoff(args, loader)
+                if result is not None:
+                    return result
+                mode = "interactive"
             wizard = InstallerWizard(loader=loader, mode=mode)
             selection = wizard.run()
             if wizard.index is None:
@@ -526,6 +542,29 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return run(args)
+
+
+def _agent_handoff(args, loader):
+    from .setup_workspace import launch_handoff
+    from .setup_session import SetupError
+
+    if getattr(args, "product_key", None) is not None:
+        print(
+            "[spx-setup] Agent Setup collects the key locally; do not pass --product-key.",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        return launch_handoff(args, loader)
+    except SetupError as exc:
+        print(f"[spx-setup] {exc}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError):
+        print(
+            "[spx-setup] Could not prepare the agent workspace. Check its location and run SPX Setup again.",
+            file=sys.stderr,
+        )
+        return 1
 
 
 def _launch_stack(output_dir: Path, *, stream=sys.stdout, journal=None) -> bool:
