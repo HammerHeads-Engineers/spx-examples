@@ -325,3 +325,39 @@ def test_replacing_workspace_invalidates_old_agent_draft(workspace, tmp_path):
         engine.apply(
             previous["session_id"], plan["plan_id"], plan["revision"], launch=False
         )
+
+
+def test_return_to_wizard_invalidates_reviewed_agent_plan(workspace, monkeypatch):
+    from installer.setup_session import SetupError
+    from installer.setup_workspace import monitor
+
+    _, engine, session = workspace
+    plan = engine.plan(session["session_id"])
+    monkeypatch.setattr("installer.terminal_selection.is_interactive", lambda: True)
+    monkeypatch.setattr("installer.setup_workspace._return_requested", lambda: True)
+    assert monitor(engine, session["session_id"]) is None
+    assert engine.get(session["session_id"])["status"] == "HANDED_BACK"
+    with pytest.raises(SetupError):
+        engine.apply(
+            session["session_id"], plan["plan_id"], plan["revision"], launch=False
+        )
+
+
+def test_closing_monitor_does_not_cancel_queued_job(workspace, monkeypatch):
+    from installer.setup_workspace import monitor
+
+    _, engine, session = workspace
+    plan = engine.plan(session["session_id"])
+    job = engine.apply(
+        session["session_id"], plan["plan_id"], plan["revision"], launch=False
+    )
+    monkeypatch.setattr("installer.terminal_selection.is_interactive", lambda: True)
+
+    def close():
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr("installer.setup_workspace._return_requested", close)
+    assert monitor(engine, session["session_id"]) == 0
+    assert engine.get(session["session_id"])["status"] == "APPLYING"
+    engine.run_job(session["session_id"], job["job_id"])
+    assert engine.get(session["session_id"])["status"] == "SUCCEEDED"
