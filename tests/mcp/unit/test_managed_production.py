@@ -23,7 +23,7 @@ def test_managed_workspace_ignores_inherited_key_and_url(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize('error', [HTTPError('http://server', 401, 'Unauthorized', {}, None),
                                   HTTPError('http://server', 403, 'Forbidden', {}, None),
-                                  URLError('offline')])
+                                  URLError('offline')], ids=['unauthorized', 'forbidden', 'offline'])
 def test_live_doctor_rejects_authentication_and_connection_failures(tmp_path, monkeypatch, error):
     catalog = tmp_path / 'library/catalog'
     catalog.mkdir(parents=True)
