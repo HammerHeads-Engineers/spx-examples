@@ -13,8 +13,8 @@ open. This report is not qualification of a newly published RC.
   app source commit `eb8810b`; polling fix included. Later commits add required
   Jest CI and capture browser evidence. Separate worktree from `216d173`.
 - Examples: separate worktree from develop `9024f12`; required catalog,
-  energy and scenario gates added. Existing released image pins are retained
-  until Server and UI fixes have actually been published.
+  energy and scenario gates added. Installer pins now select the actually
+  released Server `v1.0.0-rc.72` and UI `v1.0.0-rc.73`.
 - Isolated Linux Docker Server: released rc.71 image with this PR's `spx_core`
   mounted read-only, plus the installed manifest, library and extensions.
   This is a source test, not an official released image.
@@ -68,10 +68,10 @@ are removed before the catalog gate. This prevents occupied ports and license
 slots from invalidating one-at-a-time catalog tests. Installed models are kept;
 the standalone catalog test never removes a user's existing instances.
 
-1. Merge and publish Server, then point the UI browser qualification at its
-   actual published tag. Finish UI CI, merge and publish UI.
-2. Pin both actual tags in all Examples installer manifests and qualification
-   defaults, then publish a coherent RC. Do not predict version numbers.
+1. Confirm both published image manifests and run browser qualification against
+   the released Server/UI pair. Server and UI fixes have been merged.
+2. Require Examples CI with the actual pinned tags, then publish a coherent RC.
+   Do not predict version numbers.
 3. Verify release assets, signatures, checksums and download synchronization.
 4. Repeat the tests against exactly those published images. The new required
    catalog gate must run on the complete selected catalog without skips.
@@ -87,12 +87,26 @@ Keep production NO-GO until all these gates pass.
 
 ## PR CI handoff
 
-Server #74 is mergeable with passing required checks. UI #103 and Examples
-#129 remain drafts. Their required image-based checks intentionally still use
-released Server rc.71: UI browser CI fails its new Pause/Resume test, and Examples
-protocol CI reports the three new clock/energy/scenario pause regressions failing
-(147 other tests pass). The source-patched stack passes these checks locally.
-The full-stack installer CI also reaches the new catalog gate and fails the
-paused-state assertions against rc.71 after its starter checks pass.
-Publish the Server fix and update the actual image selection before rerunning;
-do not skip or relax the new assertions to make the old images pass.
+The initial UI and Examples checks reproduced the pause defect on released
+Server rc.71: the browser Pause/Resume test failed, protocol qualification
+reported three new pause regressions failing (147 other tests passed), and the
+full-stack catalog gate failed after its starter checks passed. Assertions were
+preserved.
+
+Server #74 and UI #103 are now merged. UI PR browser qualification passed 14/14
+tests against published Server rc.72 and a production UI build from the PR:
+[run 37221073380](https://github.com/HammerHeads-Engineers/spx-ui/actions/runs/37221073380).
+Server rc.72 and UI rc.73 are released; Examples #129 pins this pair in the
+compatibility contract, Compose, package builder and their regression tests.
+Examples required CI and browser qualification of the released UI image remain
+the next gates before merging Examples and publishing the coherent installer RC.
+
+The complete installed 89-model gate was repeated against the unmodified
+published Server rc.72 image: **89/89 passed, zero skips**, in 145.95 seconds.
+Evidence: `D:/Repos/HHE/.qa/rc96-20261004/pause-catalog-released-rc72.xml` and
+`pause-catalog-released-rc72.log`. Its OCI index is
+`sha256:b19cd7760298c1887ed5ade79ca88c60c5429eb7ba50b4727821211774734b05`;
+amd64 and arm64 manifests were verified. This isolated test did not modify the
+user's installed stack. The changed compatibility/generator/release-gate units
+passed 22/22. Windows package-shell tests still select WSL without `/bin/bash`;
+required Linux CI must qualify package creation rather than suppressing failures.

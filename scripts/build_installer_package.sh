@@ -213,7 +213,7 @@ removed by exact container ID after a successful update; legacy RC65
 auto-start at most five instances. Installer and generated-stack Python
 runtimes are kept separate so paths with spaces work on macOS; use
 `SPX_SYSTEM_PYTHON_BIN` to override the generated script's system interpreter.
-The bundle uses SPX Server `v1.0.0-rc.71` with SPX UI `v1.0.0-rc.72`.
+The bundle uses SPX Server `v1.0.0-rc.72` with SPX UI `v1.0.0-rc.73`.
 
 New `bundle.json` files do not contain the raw Product Key; bootstrap reads it
 from `.env` or `SPX_PRODUCT_KEY` and still accepts older bundles with
