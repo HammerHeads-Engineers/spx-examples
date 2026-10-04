@@ -13,6 +13,34 @@ from installer import stack_runner as sr
 from installer import mcp_workspace as mw
 
 
+def test_bootstrap_does_not_inherit_launcher_tls_keylog(tmp_path, monkeypatch):
+    for name in ("stack_manager.py", "docker-compose.generated.yml", ".env",
+                 "docker-compose.transaction.yml", "network.py", "modbus_port_configurator.py",
+                 "runtime_bootstrap.py", "bootstrap_runner.py", "product_key.py"):
+        (tmp_path / name).write_text("__TRANSACTION_TOKEN__", encoding="utf-8")
+    (tmp_path / "bundle.json").write_text(json.dumps({"installation_id": "install"}))
+    monkeypatch.setenv("SSLKEYLOGFILE", str(tmp_path))
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:3128")
+    checked = []
+
+    def run(argv, **kwargs):
+        if Path(str(argv[1])).name == "runtime_bootstrap.py":
+            env = kwargs["env"]
+            assert bool("SSLKEYLOGFILE" not in env), "Launcher keylog must not reach bootstrap"
+            assert env["HTTPS_PROXY"] == "http://proxy.example:3128"
+            assert env["PYTHONIOENCODING"] == "utf-8"
+            checked.append(True)
+            return subprocess.CompletedProcess(argv, 1, b"", b"")
+        assert argv[0] != "docker", "Runtime failure must precede stack replacement"
+        return subprocess.CompletedProcess(argv, 0, b"", b"")
+
+    monkeypatch.setattr(sr.subprocess, "run", run)
+    monkeypatch.setattr(sr.shutil, "which", lambda name: name)
+    assert sr._start(tmp_path, assume_yes=True) == 1
+    assert checked == [True]
+    assert sr.os.environ["SSLKEYLOGFILE"] == str(tmp_path)
+
+
 @pytest.mark.parametrize(
     "failure_stage", ["compose", "healthcheck", "bootstrap", "commit"]
 )

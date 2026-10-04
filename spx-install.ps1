@@ -138,8 +138,17 @@ function Check-PythonModules {
     $moduleNames = $missing | ForEach-Object { $_.Module }
     $packages = $missing | ForEach-Object { $_.Package }
     Write-Host "[spx-install] Missing Python modules: $($moduleNames -join ', '). Installing via pip..."
-    & $InstallerPythonBin -m pip install --user @($packages)
-    if ($LASTEXITCODE -ne 0) {
+    # Keep launcher TLS diagnostics out of pip, including a first installation
+    # where the prerequisite modules are not yet available.
+    $previousKeylog = [Environment]::GetEnvironmentVariable("SSLKEYLOGFILE", "Process")
+    try {
+        [Environment]::SetEnvironmentVariable("SSLKEYLOGFILE", $null, "Process")
+        & $InstallerPythonBin -m pip install --user @($packages)
+        $pipExitCode = $LASTEXITCODE
+    } finally {
+        [Environment]::SetEnvironmentVariable("SSLKEYLOGFILE", $previousKeylog, "Process")
+    }
+    if ($pipExitCode -ne 0) {
         throw "[spx-install] pip install failed"
     }
 
