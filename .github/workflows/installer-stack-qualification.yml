@@ -118,6 +118,41 @@ jobs:
         shell: bash
         run: poetry run pytest -q -rs tests/packs/industrial_iiot_pack
 
+      - name: Reset disposable CI instances before catalog qualification
+        shell: bash
+        run: |
+          poetry run python - <<'PY'
+          import os
+          from urllib.parse import quote
+          import requests
+          base = os.environ['SPX_BASE_URL'].rstrip('/') + '/api/v3/system'
+          session = requests.Session()
+          session.trust_env = False
+          session.headers['Authorization'] = 'Bearer ' + os.environ['SPX_PRODUCT_KEY']
+          # The preceding tests already qualified the starter. The stack is
+          # disposable and owned by this job; free its ports and license slots.
+          for container in ('connections', 'instances'):
+              response = session.get(base + '/' + container, timeout=30)
+              response.raise_for_status()
+              for child in response.json()['children']:
+                  removed = session.delete(base + '/' + container + '/' + quote(child['name'], safe=''), timeout=30)
+                  removed.raise_for_status()
+              response = session.get(base + '/' + container, timeout=30)
+              response.raise_for_status()
+              assert not response.json()['children'], f'{container} cleanup incomplete'
+          session.close()
+          PY
+
+      - name: Require Pause and Resume for the complete selected catalog
+        shell: bash
+        env:
+          SPX_PAUSE_QUALIFICATION: "1"
+        run: |
+          export SPX_PAUSE_MANIFEST="${OUTPUT_DIR}/startup-models.json"
+          poetry run python -m tools.required_pytest -q -rs \
+            tests/core/runtime/test_catalog_pause.py \
+            --junitxml="${RUNNER_TEMP}/spx-pause.xml" -o junit_family=xunit1
+
       - name: Show full-stack diagnostics on failure
         if: ${{ failure() }}
         shell: bash
@@ -151,6 +186,14 @@ jobs:
           name: installer-full-stack-diagnostics
           path: ${{ runner.temp }}/spx-full-*.log
           if-no-files-found: ignore
+
+      - name: Upload Pause qualification results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: installed-catalog-pause-qualification
+          path: ${{ runner.temp }}/spx-pause.xml
+          if-no-files-found: warn
 
       - name: Stop and clean up the generated stack
         if: ${{ always() }}
