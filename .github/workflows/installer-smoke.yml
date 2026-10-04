@@ -505,7 +505,7 @@ jobs:
 
   full-stack-smoke:
     name: Full stack installer smoke (Ubuntu)
-    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_full_stack) }}
+    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_full_stack) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
