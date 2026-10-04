@@ -28,6 +28,29 @@ def test_release_requires_licensed_stack_qualification() -> None:
     assert qualification["secrets"]["SPX_TEST_PRODUCT_KEY"] == "${{ secrets.SPX_TEST_PRODUCT_KEY }}"
 
 
+def test_pause_qualification_requires_the_entire_selected_manifest() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/installer-stack-qualification.yml").read_text())
+    steps = workflow["jobs"]["full-stack-smoke"]["steps"]
+    pause = next(step for step in steps if step["name"] == "Require Pause and Resume for the complete selected catalog")
+    assert pause["env"]["SPX_PAUSE_QUALIFICATION"] == "1"
+    assert "startup-models.json" in pause["run"]
+    assert "python -m tools.required_pytest" in pause["run"]
+    assert "test_catalog_pause.py" in pause["run"]
+    assert pause.get("continue-on-error", False) is False
+    cleanup = next(step for step in steps if step["name"] == "Reset disposable CI instances before catalog qualification")
+    assert steps.index(cleanup) < steps.index(pause)
+    assert "('connections', 'instances')" in cleanup["run"]
+    assert "cleanup incomplete" in cleanup["run"]
+    assert "models" not in cleanup["run"]
+
+
+def test_pause_scenarios_are_required_in_protocol_runtime() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/protocol-qualification.yml").read_text())
+    runs = "\n".join(step.get("run", "") for step in workflow["jobs"]["shipped-model-protocols"]["steps"])
+    assert "python -m tools.required_pytest" in runs
+    assert "test_pause_scenarios.py" in runs
+
+
 def test_licensed_stack_artifacts_exclude_unredacted_generated_configuration() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/installer-stack-qualification.yml").read_text())
     steps = workflow["jobs"]["full-stack-smoke"]["steps"]
