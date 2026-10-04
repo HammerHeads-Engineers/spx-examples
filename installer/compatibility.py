@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 SPX_SERVER_VERSION = "v1.0.0-rc.72"
-SPX_UI_VERSION = "v1.0.0-rc.73"
+SPX_UI_VERSION = "v1.0.0-rc.74"
 
 # Keep this table explicit.  A future image bump must be reviewed as a pair,
 # rather than silently producing a bundle with an unsupported combination.
