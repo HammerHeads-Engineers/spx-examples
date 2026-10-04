@@ -300,3 +300,28 @@ def test_cli_launcher_preserves_unicode_paths(workspace):
     public = json.loads(result.stdout)
     assert public["ok"] and public["result"]["session_id"] == session["session_id"]
     assert KEY not in result.stdout
+
+
+def test_agent_key_prompt_does_not_reuse_stale_host_environment(monkeypatch, capsys):
+    from installer.wizard import InstallerWizard
+
+    monkeypatch.setenv("SPX_PRODUCT_KEY", "BBBBB-BBBBB-BBBBB-BBBBB-BBBBB-BBBBB")
+    monkeypatch.setattr("installer.wizard.read_secret", lambda *a: KEY)
+    assert (
+        InstallerWizard(mode="legacy")._prompt_license_key(use_environment=False) == KEY
+    )
+    assert "Detected SPX_PRODUCT_KEY" not in capsys.readouterr().out
+
+
+def test_replacing_workspace_invalidates_old_agent_draft(workspace, tmp_path):
+    from installer.setup_session import SetupError
+
+    root, engine, previous = workspace
+    plan = engine.plan(previous["session_id"])
+    new = engine.create(tmp_path / "other-output", KEY, initial={"start": False})
+    prepare_workspace(root, engine, new["session_id"], bootstrap=False)
+    assert engine.get(previous["session_id"])["status"] == "HANDED_BACK"
+    with pytest.raises(SetupError):
+        engine.apply(
+            previous["session_id"], plan["plan_id"], plan["revision"], launch=False
+        )

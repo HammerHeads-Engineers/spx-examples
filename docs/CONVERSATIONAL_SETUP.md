@@ -142,3 +142,10 @@ Perform an actual conversation-led stack installation in Codex, Claude Code and
 OpenCode v2. Verify no secrets in public artifacts/logs/process command lines.
 CI smoke tests and SDK transport tests do not replace those client/native cases.
 The pre-existing SPX product qualification gates also remain in force.
+
+The installer smoke workflow includes dedicated Setup contracts on Windows 2025,
+Ubuntu 24.04, macOS 15 arm64 and macOS 15 Intel. Each runs the real MCP reconnect
+regression and creates a fresh isolated workspace, then generates configuration
+through the independent CLI worker. These jobs install dependencies normally and
+retain only JUnit results, not private session state. They do not start a licensed
+stack or claim native end-user installer/client qualification.

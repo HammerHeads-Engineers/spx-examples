@@ -457,7 +457,9 @@ def launch_handoff(args, loader):
         key = validate_product_key_format(saved)
         print("[spx-setup] Reusing the saved product key (hidden).")
     except ValueError:
-        key = InstallerWizard(loader=loader, mode="legacy")._prompt_license_key()
+        key = InstallerWizard(loader=loader, mode="legacy")._prompt_license_key(
+            use_environment=False
+        )
     initial = {}
     if getattr(args, "no_start", False):
         initial["start"] = False
