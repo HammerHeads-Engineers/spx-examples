@@ -163,8 +163,8 @@ try {
     . (Join-Path $RepoDir "installer/docker_preflight.ps1")
     Need-Command $InstallerPythonBin
 
-    if ($args.Count -eq 0) {
-        $installerArgs = @("generate", "--output", "build/spx-generated")
+    if ($args.Count -eq 0 -or $args[0] -like "--wizard-mode*") {
+        $installerArgs = @("generate", "--output", "build/spx-generated") + @($args)
     } else {
         $installerArgs = @($args)
     }

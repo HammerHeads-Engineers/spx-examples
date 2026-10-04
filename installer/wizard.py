@@ -83,7 +83,17 @@ class WizardSelection:
 class InstallerWizard:
     """Text-based wizard operating purely in the console."""
 
-    def __init__(self, loader: ManifestLoader | None = None) -> None:
+    def __init__(
+        self, loader: ManifestLoader | None = None, *, mode: str = "auto"
+    ) -> None:
+        if mode not in {"auto", "interactive", "legacy"}:
+            raise ValueError("Wizard mode must be interactive or legacy")
+        if mode == "interactive" and not terminal_selection.is_interactive():
+            print(
+                "[spx-installer] Interactive controls unavailable; using legacy mode."
+            )
+            mode = "legacy"
+        self.mode = mode
         self.loader = loader or ManifestLoader()
         self.index: ManifestIndex | None = None
 
@@ -232,6 +242,20 @@ class InstallerWizard:
             service_bind_addresses=service_bind_addresses,
         )
 
+    def _select_many(self, *args, **kwargs):
+        if self.mode == "legacy":
+            return None
+        return terminal_selection.select_many(*args, **kwargs)
+
+    def _select_one(self, *args, **kwargs):
+        if self.mode == "legacy":
+            return None
+        return terminal_selection.select_one(*args, **kwargs)
+
+    @property
+    def legacy_screen(self) -> bool:
+        return self.mode == "legacy" or not terminal_selection.is_interactive()
+
     # Internal helpers -------------------------------------------------------
     def _print_banner(self) -> None:
         width = max(60, min(get_terminal_size((80, 20)).columns, 120))
@@ -292,24 +316,27 @@ class InstallerWizard:
         )
         width = max(60, min(get_terminal_size((80, 20)).columns, 120))
 
-        print(ui.heading("Available packages:\n"))
-        for idx, ind in enumerate(entries, start=1):
-            print(
-                f"  [{ui.accent(str(idx))}] {ui.heading(ind.name)}"
-                f" {self._format_package_overview(ind, width)}"
-            )
+        if self.legacy_screen:
+            print(ui.heading("Available packages:\n"))
+            for idx, ind in enumerate(entries, start=1):
+                print(
+                    f"  [{ui.accent(str(idx))}] {ui.heading(ind.name)}"
+                    f" {self._format_package_overview(ind, width)}"
+                )
 
-        if default_protocol_label:
-            print(
-                f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')} "
-                f"{ui.accent(f'(default: {default_protocol_label})')}\n"
-            )
-        else:
-            print(f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')}\n")
+            if default_protocol_label:
+                print(
+                    f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')} "
+                    f"{ui.accent(f'(default: {default_protocol_label})')}\n"
+                )
+            else:
+                print(
+                    f"  [{ui.accent('0')}] {ui.heading('Choose by protocols instead')}\n"
+                )
 
         while True:
             protocol_choice = len(entries) + 1
-            interactive = terminal_selection.select_many(
+            interactive = self._select_many(
                 "Select packages or choose protocols instead:",
                 [ind.name for ind in entries] + ["Choose by protocols instead"],
                 allow_empty=True,
@@ -395,17 +422,18 @@ class InstallerWizard:
             return []
         width = max(60, min(get_terminal_size((80, 20)).columns, 120))
 
-        print(ui.heading("\nOptional starter scenarios for your package:\n"))
-        for idx, profile_id in enumerate(sorted(available_profiles), start=1):
-            profile = index.profiles[profile_id]
-            print(
-                f"  [{ui.accent(str(idx))}] {ui.heading(profile.name)} "
-                f"(pack: {profile.pack_id}) {self._format_profile_overview(profile, width)}"
-            )
+        if self.legacy_screen:
+            print(ui.heading("\nOptional starter scenarios for your package:\n"))
+            for idx, profile_id in enumerate(sorted(available_profiles), start=1):
+                profile = index.profiles[profile_id]
+                print(
+                    f"  [{ui.accent(str(idx))}] {ui.heading(profile.name)} "
+                    f"(pack: {profile.pack_id}) {self._format_profile_overview(profile, width)}"
+                )
 
         while True:
             sorted_profiles = sorted(available_profiles)
-            interactive = terminal_selection.select_many(
+            interactive = self._select_many(
                 "Select starter scenarios; Enter keeps package defaults only:",
                 [
                     f"{index.profiles[profile_id].name} (pack: {index.profiles[profile_id].pack_id})"
@@ -498,7 +526,7 @@ class InstallerWizard:
         if not instance_keys:
             return []
         while True:
-            interactive = terminal_selection.select_many(
+            interactive = self._select_many(
                 "Select instances to auto-start:",
                 list(instance_keys),
                 initial_indices=range(1, len(instance_keys) + 1),
@@ -556,11 +584,12 @@ class InstallerWizard:
             self._format_protocol_label(p) for p in default_protocols
         )
 
-        print(ui.heading("\nAvailable protocols:\n"))
-        for idx, proto in enumerate(sorted_protocols, start=1):
-            print(f"  [{ui.accent(str(idx))}] {self._format_protocol_label(proto)}")
+        if self.legacy_screen:
+            print(ui.heading("\nAvailable protocols:\n"))
+            for idx, proto in enumerate(sorted_protocols, start=1):
+                print(f"  [{ui.accent(str(idx))}] {self._format_protocol_label(proto)}")
         while True:
-            interactive = terminal_selection.select_many(
+            interactive = self._select_many(
                 "Select protocols; Enter with defaults selected keeps the default set:",
                 [self._format_protocol_label(proto) for proto in sorted_protocols],
                 initial_indices=[
@@ -612,22 +641,25 @@ class InstallerWizard:
             return []
 
         candidates.sort(key=lambda svc: (svc.protocol or "", svc.name.lower()))
-        print(ui.heading("\nServices matching selected protocols:\n"))
-        for idx, service in enumerate(candidates, start=1):
-            runtime = service.deployment.runtime if service.deployment else "docker"
-            ports = ", ".join(f"{port.host}/{port.transport}" for port in service.ports)
-            print(
-                f"  [{ui.accent(str(idx))}] {ui.heading(service.name)} "
-                f"({service.protocol}, {runtime})"
-            )
-            if service.description:
-                print(f"      {service.description}")
-            if ports:
-                print(f"      Ports: {ports}")
-            print()
+        if self.legacy_screen:
+            print(ui.heading("\nServices matching selected protocols:\n"))
+            for idx, service in enumerate(candidates, start=1):
+                runtime = service.deployment.runtime if service.deployment else "docker"
+                ports = ", ".join(
+                    f"{port.host}/{port.transport}" for port in service.ports
+                )
+                print(
+                    f"  [{ui.accent(str(idx))}] {ui.heading(service.name)} "
+                    f"({service.protocol}, {runtime})"
+                )
+                if service.description:
+                    print(f"      {service.description}")
+                if ports:
+                    print(f"      Ports: {ports}")
+                print()
 
         while True:
-            interactive = terminal_selection.select_many(
+            interactive = self._select_many(
                 "Select services to enable:",
                 [f"{service.name} ({service.protocol})" for service in candidates],
                 initial_indices=range(1, len(candidates) + 1),
@@ -711,11 +743,12 @@ class InstallerWizard:
                 bindings[service.id] = "127.0.0.1"
                 continue
 
-            print(f"  Select the host address for {service.name}:")
-            for position, address in enumerate(addresses, start=1):
-                print(
-                    f"    [{ui.accent(str(position))}] {address.interface} — {address.address}"
-                )
+            if self.legacy_screen:
+                print(f"  Select the host address for {service.name}:")
+                for position, address in enumerate(addresses, start=1):
+                    print(
+                        f"    [{ui.accent(str(position))}] {address.interface} — {address.address}"
+                    )
             choice = self._prompt_indices(
                 "  Address (required, q to quit): ",
                 len(addresses),
@@ -775,7 +808,9 @@ class InstallerWizard:
             try:
                 validate_product_key_format(env_value)
             except ValueError as exc:
-                print(ui.warn(f"\nSPX_PRODUCT_KEY in the environment is invalid. {exc}"))
+                print(
+                    ui.warn(f"\nSPX_PRODUCT_KEY in the environment is invalid. {exc}")
+                )
             else:
                 masked = self._mask_secret(env_value)
                 print(ui.accent(f"\nDetected SPX_PRODUCT_KEY in environment: {masked}"))
@@ -784,9 +819,7 @@ class InstallerWizard:
         print(ui.heading("\nSPX Product Key"))
         print("The key is hidden while typing. Paste it, then press Enter.")
         while True:
-            raw = read_secret(
-                "Enter SPX product key (required, q to quit): "
-            ).strip()
+            raw = read_secret("Enter SPX product key (required, q to quit): ").strip()
             self._check_quit(raw)
             if raw:
                 try:
@@ -818,7 +851,7 @@ class InstallerWizard:
         options: Sequence[str] | None = None,
     ) -> List[int]:
         while True:
-            interactive = terminal_selection.select_one(
+            interactive = self._select_one(
                 prompt,
                 (
                     list(options)

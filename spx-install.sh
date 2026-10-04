@@ -118,10 +118,10 @@ print_python_runtime_hint() {
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"
 
-if [ $# -eq 0 ]; then
+if [ $# -eq 0 ] || [[ "${1:-}" == --wizard-mode* ]]; then
   DEFAULT_OUTPUT_DIR="$(resolve_default_output)"
   echo "[spx-install] Using output directory: ${DEFAULT_OUTPUT_DIR}"
-  set -- generate --output "${DEFAULT_OUTPUT_DIR}"
+  set -- generate --output "${DEFAULT_OUTPUT_DIR}" "$@"
 fi
 
 if spx_docker_preflight_required "$@"; then

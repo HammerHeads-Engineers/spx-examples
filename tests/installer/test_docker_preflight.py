@@ -830,7 +830,8 @@ if (Test-DockerPreflightRequired @('--help')) { throw 'help should not need Dock
 if (Test-DockerPreflightRequired @('generate','--protocols','bacnet','--no-start')) { throw 'no-start should not need Docker' }
 if (Test-DockerPreflightRequired @('generate','--protocols','bacnet')) { throw 'noninteractive generation should not need Docker' }
 if (Test-DockerPreflightRequired @('bootstrap','--bundle','bundle.json')) { throw 'bootstrap should not need Docker' }
-if (-not (Test-DockerPreflightRequired @())) { throw 'interactive setup should need Docker' }
+if (Test-DockerPreflightRequired @()) { throw 'mode selection should precede Docker' }
+if (Test-DockerPreflightRequired @('generate','--wizard-mode','agent')) { throw 'agent workspace should not need Docker' }
 if (-not (Test-DockerPreflightRequired @('generate','--protocols','bacnet','--start'))) { throw '--start should need Docker' }
 'PREFLIGHT_TEST_PASSED'
 """

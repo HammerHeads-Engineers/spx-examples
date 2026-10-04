@@ -509,7 +509,7 @@ function Test-DockerPreflightRequired {
     param([string[]]$Arguments = @())
 
     if ($Arguments -contains "-h" -or $Arguments -contains "--help") { return $false }
-    if ($Arguments.Count -eq 0) { return $true }
+    if ($Arguments.Count -eq 0) { return $false }
     if ($Arguments[0] -ne "generate") { return $false }
 
     $hasSelector = $false
@@ -522,7 +522,8 @@ function Test-DockerPreflightRequired {
         if ($argument -eq "--no-start") { $hasNoStart = $true }
     }
 
-    if ($hasStart) { return $true }
+    if ($Arguments -contains "agent" -or $Arguments -contains "--wizard-mode=agent") { return $false }
+    if ($hasStart -and $hasSelector) { return $true }
     if ($hasNoStart -or $hasSelector) { return $false }
-    return $true
+    return $false
 }
