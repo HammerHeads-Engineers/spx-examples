@@ -325,3 +325,33 @@ def test_retained_rollback_snapshot_blocks_new_plan(engine, tmp_path):
     plan = engine.plan(session["session_id"])
     assert not plan["ready"]
     assert plan["errors"][0]["code"] == "RECOVERY_REQUIRED"
+
+
+def test_worker_passes_approval_and_redacts_diagnostics(engine, tmp_path, monkeypatch):
+    import io
+
+    session = draft(engine, tmp_path)
+    engine.plan(session["session_id"])
+    private = engine._read(session["session_id"])
+    private["job"] = {"job_id": "test"}
+
+    class Process:
+        stdout = io.StringIO(
+            f"SPX_PRODUCT_KEY={KEY}\nMCP configuration could not be refreshed\n"
+        )
+
+        def wait(self):
+            return 0
+
+    def launch(command, **kwargs):
+        assert KEY not in json.dumps(command)
+        assert "SPX_PRODUCT_KEY" not in kwargs["env"]
+        seal = json.loads(kwargs["env"]["SPX_SETUP_APPROVED_STACK"])
+        assert seal["containers"] == [] and 8000 in seal["ports"]
+        return Process()
+
+    monkeypatch.setattr("installer.setup_session.subprocess.Popen", launch)
+    engine._execute_stack(private, Path(private["output"]))
+    public = engine.get(session["session_id"])
+    assert KEY not in json.dumps(public)
+    assert public["diagnostics"]["exit_code"] == 0 and public["mcp_warning"]

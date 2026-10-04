@@ -26,6 +26,51 @@ def completed(
     return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr="")
 
 
+@pytest.mark.parametrize("changed", ["container", "ports", None])
+def test_agent_approval_is_rechecked_before_stopping_stack(
+    tmp_path, monkeypatch, changed
+):
+    from installer.stack_manager import PreflightError
+
+    container = ContainerInfo(
+        id="approved-id", name="spx-server", image="image", state="running"
+    )
+    result = PreflightResult(
+        existing=[ExistingStack(project="spx", containers=[container])]
+    )
+    seal = {
+        "containers": [["approved-id", "spx-server", "image", "running"]],
+        "ports": [8000],
+    }
+    monkeypatch.setenv("SPX_SETUP_APPROVED_STACK", json.dumps(seal))
+    if changed == "container":
+        container.id = "unapproved-id"
+    calls = []
+    manager = StackManager(
+        tmp_path / "compose.yml", runner=lambda argv, **kwargs: completed(list(argv))
+    )
+    monkeypatch.setattr(manager, "preflight", lambda *a, **k: result)
+    monkeypatch.setattr(
+        manager, "snapshot_existing", lambda *a: calls.append("snapshot")
+    )
+    if changed is not None:
+        with pytest.raises(PreflightError, match="approved plan"):
+            manager.prepare(
+                tmp_path / "snapshot.json",
+                required_ports=[18000 if changed == "ports" else 8000],
+                assume_yes=True,
+            )
+        assert not calls and not (tmp_path / "snapshot.json").exists()
+    else:
+        manager.prepare(
+            tmp_path / "snapshot.json",
+            required_ports=[8000],
+            assume_yes=True,
+            input_fn=lambda *a: pytest.fail("Agent execution must not prompt"),
+        )
+        assert calls == ["snapshot"]
+
+
 def test_preflight_detects_labelled_stack_and_ignores_unrelated_container(
     tmp_path: Path,
 ) -> None:

@@ -890,6 +890,17 @@ class SetupEngine:
 
     def _execute_stack(self, session, output):
         env = clean_environment()
+        approved = session["plan"]["preflight"]
+        env["SPX_SETUP_APPROVED_STACK"] = json.dumps(
+            {
+                "containers": sorted(
+                    [c["id"], c["name"], c["image"], c["state"]]
+                    for stack in approved["existing"]
+                    for c in stack["containers"]
+                ),
+                "ports": sorted({p["host_port"] for p in approved["port_options"]}),
+            }
+        )
         env["SPX_SETUP_JOURNAL"] = str(
             self._directory(session["session_id"])
             / f"backup-{session['job']['job_id']}"
