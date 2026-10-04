@@ -890,6 +890,7 @@ class SetupEngine:
 
     def _execute_stack(self, session, output):
         env = clean_environment()
+        env["PYTHONUNBUFFERED"] = "1"  # Stream progress to the agent/monitor immediately.
         approved = session["plan"]["preflight"]
         env["SPX_SETUP_APPROVED_STACK"] = json.dumps(
             {
