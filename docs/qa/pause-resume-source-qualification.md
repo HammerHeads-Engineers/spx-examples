@@ -84,3 +84,13 @@ container tests and Linux CI do not qualify a native Linux installation.
 No native macOS station was tested. Transport reconnect stress and earlier
 snapshot/import/platform gates must be repeated on published images.
 Keep production NO-GO until all these gates pass.
+
+## PR CI handoff
+
+Server #74 is mergeable with passing required checks. UI #103 and Examples
+#129 remain drafts. Their required image-based checks intentionally still use
+released Server rc.71: UI browser CI fails its new Pause/Resume test, and Examples
+protocol CI reports the three new clock/energy/scenario pause regressions failing
+(147 other tests pass). The source-patched stack passes these checks locally.
+Publish the Server fix and update the actual image selection before rerunning;
+do not skip or relax the new assertions to make the old images pass.
