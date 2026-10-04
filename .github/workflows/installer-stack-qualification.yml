@@ -107,9 +107,16 @@ jobs:
           docker compose -f "${OUTPUT_DIR}/docker-compose.generated.yml" \
             --env-file "${OUTPUT_DIR}/.env" ps
 
-      - name: Run one representative pack integration suite
+      - name: Require installed starter and PLC integration tests
         shell: bash
-        run: poetry run pytest -q tests/packs/industrial_iiot_pack
+        run: |
+          poetry run python -m tools.required_pytest -q -rs \
+            tests/packs/industrial_iiot_pack/integration/test_pack_instances_running.py \
+            tests/packs/industrial_iiot_pack/integration/test_modbus_master_plc_demo_smoke.py
+
+      - name: Report full pack including models outside the installed starter
+        shell: bash
+        run: poetry run pytest -q -rs tests/packs/industrial_iiot_pack
 
       - name: Show full-stack diagnostics on failure
         if: ${{ failure() }}

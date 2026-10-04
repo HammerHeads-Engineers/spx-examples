@@ -8,6 +8,15 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_required_installer_checks_cannot_pass_by_skipping() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/installer-stack-qualification.yml").read_text())
+    steps = workflow["jobs"]["full-stack-smoke"]["steps"]
+    required = next(step for step in steps if step["name"] == "Require installed starter and PLC integration tests")
+    assert "python -m tools.required_pytest" in required["run"]
+    assert "test_pack_instances_running.py" in required["run"]
+    assert "test_modbus_master_plc_demo_smoke.py" in required["run"]
+
+
 def test_release_requires_licensed_stack_qualification() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci-cd.yml").read_text())
     jobs = workflow["jobs"]
