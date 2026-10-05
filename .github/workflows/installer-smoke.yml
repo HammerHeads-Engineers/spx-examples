@@ -20,6 +20,36 @@ permissions:
   contents: read
 
 jobs:
+  conversational-setup-contract:
+    name: Setup workspace and worker (${{ matrix.os }})
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12.10'
+      - name: Install normal Setup test dependencies
+        run: python -m pip install pytest pyyaml requests "mcp>=1.26,<2"
+      - name: Test sessions, client profiles and real MCP reconnect
+        run: >-
+          python -m pytest -q tests/installer/test_setup_sessions.py
+          tests/installer/test_setup_workspace.py tests/installer/test_wizard_modes.py
+          tests/mcp/unit/test_codex_mcp_bootstrap.py --junitxml=setup-contract.xml
+      - name: Bootstrap a fresh isolated Unicode workspace and independent CLI job
+        run: python tests/installer/setup_bootstrap_smoke.py
+      - name: Retain test result without private session state
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: setup-contract-${{ matrix.os }}
+          path: setup-contract.xml
+
   linux-installer-smoke:
     name: Linux installer smoke (${{ matrix.os }})
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}

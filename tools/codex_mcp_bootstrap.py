@@ -172,7 +172,7 @@ def upsert_named_mcp_server(config_text: str, server_name: str, block: str) -> s
     block = block.rstrip() + "\n"
 
     if section_re.search(config_text):
-        updated = section_re.sub(block + "\n", config_text, count=1)
+        updated = section_re.sub(lambda _: block + "\n", config_text, count=1)
         return updated.rstrip() + "\n"
 
     if not config_text.strip():

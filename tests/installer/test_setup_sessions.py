@@ -265,3 +265,93 @@ def test_udp_mapping_keeps_binding_and_transport(engine, tmp_path):
         str(binding).endswith("47900:47808/udp")
         for binding in compose["services"]["spx-server"]["ports"]
     )
+
+
+def test_stack_change_and_replacement_rejection_never_modify_active(
+    engine, tmp_path, monkeypatch
+):
+    session = draft(engine, tmp_path)
+    engine.update(session["session_id"], {"start": True})
+    preflight = {
+        "checked": True,
+        "existing": [],
+        "conflicts": [],
+        "port_options": [],
+        "errors": [],
+    }
+    monkeypatch.setattr(engine, "_preflight", lambda *a: preflight)
+    plan = engine.plan(session["session_id"])
+    preflight["existing"] = [{"project": "old", "containers": []}]
+    with pytest.raises(SetupError, match="conditions changed"):
+        engine.apply(
+            session["session_id"], plan["plan_id"], plan["revision"], launch=False
+        )
+    replacement = engine.plan(session["session_id"])
+    assert not replacement["ready"]
+    assert replacement["errors"][0]["code"] == "REPLACEMENT_REQUIRED"
+    assert not (tmp_path / "generated").exists()
+
+
+def test_new_revision_after_success_can_apply_and_clears_old_diagnostics(
+    engine, tmp_path
+):
+    from installer.setup_session import atomic_json
+
+    session = draft(engine, tmp_path)
+    plan = engine.plan(session["session_id"])
+    job = engine.apply(
+        session["session_id"], plan["plan_id"], plan["revision"], launch=False
+    )
+    engine.run_job(session["session_id"], job["job_id"])
+    atomic_json(
+        engine._directory(session["session_id"]) / "diagnostics.json", {"old": True}
+    )
+    changed = engine.update(session["session_id"], {"install_spx_ui": False})
+    assert "diagnostics" not in changed and "endpoints" not in changed
+    plan = engine.plan(session["session_id"])
+    new_job = engine.apply(
+        session["session_id"], plan["plan_id"], plan["revision"], launch=False
+    )
+    assert new_job["job_id"] != job["job_id"]
+    engine.run_job(session["session_id"], new_job["job_id"])
+    assert engine.get(session["session_id"])["status"] == "SUCCEEDED"
+
+
+def test_retained_rollback_snapshot_blocks_new_plan(engine, tmp_path):
+    session = draft(engine, tmp_path)
+    output = tmp_path / "generated"
+    output.mkdir()
+    (output / ".spx-stack-snapshot.json").write_text('{"rolled_back":false}')
+    plan = engine.plan(session["session_id"])
+    assert not plan["ready"]
+    assert plan["errors"][0]["code"] == "RECOVERY_REQUIRED"
+
+
+def test_worker_passes_approval_and_redacts_diagnostics(engine, tmp_path, monkeypatch):
+    import io
+
+    session = draft(engine, tmp_path)
+    engine.plan(session["session_id"])
+    private = engine._read(session["session_id"])
+    private["job"] = {"job_id": "test"}
+
+    class Process:
+        stdout = io.StringIO(
+            f"SPX_PRODUCT_KEY={KEY}\nMCP configuration could not be refreshed\n"
+        )
+
+        def wait(self):
+            return 0
+
+    def launch(command, **kwargs):
+        assert KEY not in json.dumps(command)
+        assert "SPX_PRODUCT_KEY" not in kwargs["env"]
+        seal = json.loads(kwargs["env"]["SPX_SETUP_APPROVED_STACK"])
+        assert seal["containers"] == [] and 8000 in seal["ports"]
+        return Process()
+
+    monkeypatch.setattr("installer.setup_session.subprocess.Popen", launch)
+    engine._execute_stack(private, Path(private["output"]))
+    public = engine.get(session["session_id"])
+    assert KEY not in json.dumps(public)
+    assert public["diagnostics"]["exit_code"] == 0 and public["mcp_warning"]

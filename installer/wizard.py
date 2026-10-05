@@ -802,8 +802,8 @@ class InstallerWizard:
                 "endpoint separately before using dependent models."
             )
 
-    def _prompt_license_key(self) -> str:
-        env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip()
+    def _prompt_license_key(self, *, use_environment: bool = True) -> str:
+        env_value = os.environ.get("SPX_PRODUCT_KEY", "").strip() if use_environment else ""
         if env_value:
             try:
                 validate_product_key_format(env_value)

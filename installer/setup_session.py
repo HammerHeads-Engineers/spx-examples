@@ -85,6 +85,8 @@ def private_directory(path: Path) -> None:
             ["whoami", "/user", "/fo", "csv", "/nh"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
             timeout=10,
         )
@@ -424,7 +426,7 @@ class SetupEngine:
     def update(self, session_id, patch):
         with file_lock(self.root / "sessions.lock"):
             session = self._read(session_id)
-            if session["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
+            if session["status"] in {"APPLYING", "RECOVERY_REQUIRED", "HANDED_BACK"}:
                 raise SetupError(
                     "An installation or recovery is already in progress", "SETUP_BUSY"
                 )
@@ -450,6 +452,10 @@ class SetupEngine:
                 stage="configuration",
                 job=None,
             )
+            for name in ("diagnostic", "endpoints", "mcp_warning"):
+                session.pop(name, None)
+            for name in ("progress.json", "diagnostics.json"):
+                (self._directory(session_id) / name).unlink(missing_ok=True)
             self._write(session)
         return self.get(session_id)
 
@@ -491,8 +497,12 @@ class SetupEngine:
                 "errors": [],
             }
         try:
+            from functools import partial
+
             manager = StackManager(
-                directory / "docker-compose.generated.yml", directory / ".env"
+                directory / "docker-compose.generated.yml",
+                directory / ".env",
+                runner=partial(subprocess.run, env=clean_environment()),
             )
             result = manager.preflight(
                 ports, required_tcp_ports=_tcp_ports_from_compose(compose)
@@ -543,13 +553,20 @@ class SetupEngine:
     def plan(self, session_id):
         with file_lock(self.root / "sessions.lock"):
             session = self._read(session_id)
-            if session["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
+            if session["status"] in {"APPLYING", "RECOVERY_REQUIRED", "HANDED_BACK"}:
                 raise SetupError(
                     "Setup is already applying or requires recovery", "SETUP_BUSY"
                 )
             directory, selection, warnings = self._generate(session)
             preflight = self._preflight(directory, session["selection"]["start"])
             errors = list(preflight["errors"])
+            if (Path(session["output"]) / ".spx-stack-snapshot.json").exists():
+                errors.append(
+                    {
+                        "code": "RECOVERY_REQUIRED",
+                        "message": "A previous stack transaction retained its recovery snapshot. Inspect rollback diagnostics before replacing this installation.",
+                    }
+                )
             if preflight["conflicts"]:
                 errors.append(
                     {
@@ -641,7 +658,11 @@ class SetupEngine:
             if active.exists():
                 owner = json.loads(active.read_text(encoding="utf-8"))
                 previous = self._read(owner["session_id"])
-                if previous.get("job") and previous["job"]["job_id"] == owner["job_id"] and previous["status"] not in {"SUCCEEDED", "FAILED"}:
+                if (
+                    previous.get("job")
+                    and previous["job"]["job_id"] == owner["job_id"]
+                    and previous["status"] not in {"SUCCEEDED", "FAILED"}
+                ):
                     raise SetupError(
                         "Another installation is active or requires recovery",
                         "SETUP_BUSY",
@@ -663,28 +684,80 @@ class SetupEngine:
                         "--job-id",
                         job["job_id"],
                     ]
-                    kwargs = (
-                        {
-                            "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP
-                            | subprocess.DETACHED_PROCESS
-                            | subprocess.CREATE_NO_WINDOW
+                    if os.name == "nt":
+                        allowed = {
+                            "PATH",
+                            "PATHEXT",
+                            "COMSPEC",
+                            "SYSTEMROOT",
+                            "WINDIR",
+                            "TEMP",
+                            "TMP",
+                            "USERPROFILE",
+                            "LOCALAPPDATA",
+                            "APPDATA",
+                            "HOME",
+                            "HTTP_PROXY",
+                            "HTTPS_PROXY",
+                            "NO_PROXY",
+                            "REQUESTS_CA_BUNDLE",
+                            "SSL_CERT_FILE",
+                            "SSL_CERT_DIR",
                         }
-                        if os.name == "nt"
-                        else {"start_new_session": True}
-                    )
-                    process = subprocess.Popen(
-                        command,
-                        cwd=session["source_root"],
-                        env=clean_environment(),
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        **kwargs,
-                    )
-                    job["pid"] = process.pid
+                        atomic_json(
+                            self._directory(session_id) / "execution-environment.json",
+                            {
+                                k: v
+                                for k, v in clean_environment().items()
+                                if k.upper() in allowed
+                            },
+                        )
+                        launched = subprocess.run(
+                            [
+                                "powershell.exe",
+                                "-NoProfile",
+                                "-ExecutionPolicy",
+                                "Bypass",
+                                "-File",
+                                str(
+                                    Path(session["source_root"])
+                                    / "installer/setup_worker_launch.ps1"
+                                ),
+                                "-PythonExecutable",
+                                sys.executable,
+                                "-StateRoot",
+                                str(self.root),
+                                "-SessionId",
+                                session_id,
+                                "-JobId",
+                                job["job_id"],
+                                "-WorkingDirectory",
+                                session["source_root"],
+                            ],
+                            capture_output=True,
+                            text=True,
+                            encoding="utf-8",
+                            errors="replace",
+                            timeout=20,
+                            check=True,
+                            creationflags=subprocess.CREATE_NO_WINDOW,
+                            env=clean_environment(),
+                        )
+                        job["pid"] = json.loads(launched.stdout)["pid"]
+                    else:
+                        process = subprocess.Popen(
+                            command,
+                            cwd=session["source_root"],
+                            env=clean_environment(),
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            start_new_session=True,
+                        )
+                        job["pid"] = process.pid
                     session["job"] = job
                     self._write(session)
-                except OSError:
+                except (OSError, subprocess.SubprocessError, ValueError, KeyError):
                     session.update(
                         status="FAILED",
                         stage="launch",
@@ -724,7 +797,11 @@ class SetupEngine:
             backup = directory / f"backup-{job_id}"
             changed = []
             try:
-                previous_api = _endpoints(output)["api"] if (output / "docker-compose.generated.yml").is_file() else None
+                previous_api = (
+                    _endpoints(output)["api"]
+                    if (output / "docker-compose.generated.yml").is_file()
+                    else None
+                )
             except (ValueError, KeyError, TypeError, OSError):
                 previous_api = None
             journal = {
@@ -813,6 +890,18 @@ class SetupEngine:
 
     def _execute_stack(self, session, output):
         env = clean_environment()
+        env["PYTHONUNBUFFERED"] = "1"  # Stream progress to the agent/monitor immediately.
+        approved = session["plan"]["preflight"]
+        env["SPX_SETUP_APPROVED_STACK"] = json.dumps(
+            {
+                "containers": sorted(
+                    [c["id"], c["name"], c["image"], c["state"]]
+                    for stack in approved["existing"]
+                    for c in stack["containers"]
+                ),
+                "ports": sorted({p["host_port"] for p in approved["port_options"]}),
+            }
+        )
         env["SPX_SETUP_JOURNAL"] = str(
             self._directory(session["session_id"])
             / f"backup-{session['job']['job_id']}"
@@ -875,6 +964,9 @@ class SetupEngine:
 
 def clean_environment():
     env = os.environ.copy()
+    for name in list(env):
+        if name.startswith("SPX_"):
+            env.pop(name)
     for name in (
         "SPX_PRODUCT_KEY",
         "SPX_BASE_URL",
@@ -892,12 +984,20 @@ def _pid_alive(pid):
     if os.name == "nt":
         import ctypes
 
-        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+        kernel.GetExitCodeProcess.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_ulong),
+        ]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel.OpenProcess(0x1000, False, pid)
         if not handle:
             return False
         code = ctypes.c_ulong()
-        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
-        ctypes.windll.kernel32.CloseHandle(handle)
+        kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel.CloseHandle(handle)
         return code.value == 259
     try:
         os.kill(pid, 0)

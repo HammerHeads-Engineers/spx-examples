@@ -860,6 +860,28 @@ class StackManager:
                 can_prompt = False
             prompt = input
         result = self.preflight(required_ports, required_tcp_ports=normalized_tcp_ports)
+        approved = os.environ.get("SPX_SETUP_APPROVED_STACK")
+        if approved is not None:
+            # Dependencies may have been installed since the agent reviewed its
+            # plan. Recheck immediately before snapshot/stop, not only at queue time.
+            current = {
+                "containers": sorted(
+                    [c.id, c.name, c.image, c.state]
+                    for stack in result.existing
+                    if stack.source != "snapshot"
+                    for c in stack.containers
+                ),
+                "ports": required_ports,
+            }
+            try:
+                matches = json.loads(approved) == current
+            except (ValueError, TypeError):
+                matches = False
+            if not matches:
+                raise PreflightError(
+                    "Stack or ports changed after the approved plan. Request a new Setup plan and approval; no containers were stopped."
+                )
+            can_prompt = False
         self.describe(result, output)
         while result.unrelated_conflicts:
             if not can_prompt:
