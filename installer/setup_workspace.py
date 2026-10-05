@@ -602,7 +602,9 @@ def launch_handoff(args, loader):
     prepare_workspace(workspace, engine, session["session_id"])
     print(f"\n[spx-setup] Open this directory in your local agent: {workspace}")
     print("[spx-setup] Say: Complete SPX setup and installation")
-    print("[spx-setup] Describe the devices, protocols and integrations you need in that conversation.")
+    print(
+        "[spx-setup] Describe the devices, protocols and integrations you need in that conversation."
+    )
     print(
         "[spx-setup] All configuration and approval now happen in the conversation. R returns to the ordinary wizard before installation."
     )
