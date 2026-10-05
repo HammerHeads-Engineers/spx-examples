@@ -282,7 +282,8 @@ def test_workspace_cannot_contain_credentials_or_active_configuration(tmp_path):
             prepare_workspace(root, engine, session["session_id"], bootstrap=False)
 
 
-def test_cli_launcher_preserves_unicode_paths(workspace):
+@pytest.mark.parametrize("stdio_encoding", ["utf-8", "cp1252"])
+def test_cli_launcher_preserves_unicode_paths(workspace, stdio_encoding):
     import os
     import subprocess
 
@@ -304,10 +305,12 @@ def test_cli_launcher_preserves_unicode_paths(workspace):
         encoding="utf-8",
         errors="replace",
         timeout=30,
+        env={**os.environ, "PYTHONIOENCODING": stdio_encoding},
     )
     assert result.returncode == 0, result.stderr
     public = json.loads(result.stdout)
     assert public["ok"] and public["result"]["session_id"] == session["session_id"]
+    assert public["result"]["workspace"] == str(root)
     assert KEY not in result.stdout
 
 

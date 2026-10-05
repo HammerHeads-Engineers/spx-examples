@@ -111,5 +111,7 @@ def run(args):
                 "message": "Invalid or inaccessible Setup selection file.",
             },
         }
-    print(json.dumps(result, ensure_ascii=False, default=str))
+    # JSON escapes preserve Unicode paths even when a Windows launcher uses
+    # a legacy output code page; consumers recover the original string.
+    print(json.dumps(result, ensure_ascii=True, default=str))
     return 0 if result["ok"] else 1
