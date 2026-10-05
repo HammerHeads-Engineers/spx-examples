@@ -313,7 +313,7 @@ def prepare_workspace(
         import re
 
         existing = re.sub(
-            r"(?ms)^\[mcp_servers\.spx_setup(?:\.[^\]]+)?\]\s*$.*?(?=^\[|\Z)",
+            r"(?ms)^\[mcp_servers\.(?:spx_setup|spx)(?:\.[^\]]+)?\]\s*$.*?(?=^\[|\Z)",
             "",
             existing,
         )

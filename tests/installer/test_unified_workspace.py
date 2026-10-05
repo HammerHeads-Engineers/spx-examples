@@ -329,6 +329,12 @@ def test_migration_preserves_settings_and_moves_credentials_outside_workspace(tm
     root.mkdir()
     (root / ".spx-mcp-workspace.json").write_text('{"workspace_kind":"managed"}')
     (root / ".env").write_text("SPX_PRODUCT_KEY=" + KEY + "\nKEEP_SETTING=1\n")
+    (root / ".codex").mkdir()
+    (root / ".codex/config.toml").write_text(
+        '[mcp_servers.spx]\ncommand = "old"\n[mcp_servers.spx.env]\nSPX_PRODUCT_KEY = "'
+        + KEY
+        + '"\n'
+    )
     (root / ".mcp.json").write_text(
         '{"extra":true,"mcpServers":{"other":{"command":"other"}}}'
     )
@@ -338,6 +344,10 @@ def test_migration_preserves_settings_and_moves_credentials_outside_workspace(tm
         root, engine, session["session_id"], bootstrap=False, preserve_session=True
     )
     assert (root / ".env").read_text() == "KEEP_SETTING=1\n"
+    assert KEY not in (root / ".codex/config.toml").read_text(encoding="utf-8")
+    assert "[mcp_servers.spx.env]" not in (root / ".codex/config.toml").read_text(
+        encoding="utf-8"
+    )
     profile = json.loads((root / ".mcp.json").read_text())
     assert (
         profile["extra"]
