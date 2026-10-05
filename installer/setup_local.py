@@ -6,7 +6,13 @@ from .setup_session import SetupEngine
 
 
 def execute_selection(
-    selection, output, *, catalog=None, profiles=None, start_callback=None
+    selection,
+    output,
+    *,
+    catalog=None,
+    profiles=None,
+    start_callback=None,
+    workspace=None
 ):
     resolved = asdict(selection)
     resolved.pop("license_key")
@@ -28,6 +34,10 @@ def execute_selection(
         profiles=profiles,
         validate_key=False,
     )
+    if workspace is not None:
+        private = engine._read(session["session_id"])
+        private["workspace"] = str(workspace)
+        engine._write(private)
     plan = engine.plan(session["session_id"])
     job = engine.apply(
         session["session_id"], plan["plan_id"], plan["revision"], launch=False

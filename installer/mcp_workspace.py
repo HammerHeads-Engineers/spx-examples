@@ -378,6 +378,14 @@ def merge_workspace_seed_env(seeded, process, *, workspace_kind, explicit_seed):
 def synchronize_managed_workspace(seed_env: Path, *, workspace_dir: Optional[Path] = None) -> bool:
     """Refresh an existing managed workspace after a successful stack commit."""
     workspace = workspace_dir or default_workspace_dir()
+    reference = seed_env.parent / ".spx-tools.json"
+    if workspace_dir is None and reference.is_file():
+        workspace = Path(json.loads(reference.read_text(encoding='utf-8'))['workspace'])
+    if (workspace / ".spx-setup-workspace.json").is_file():
+        if str(workspace) not in sys.path:
+            sys.path.insert(0, str(workspace))
+        from installer.setup_runtime import mark_runtime_started
+        return mark_runtime_started(seed_env, workspace)
     marker_path = workspace / WORKSPACE_MARKER_NAME
     if not marker_path.exists() or is_git_workspace(workspace):
         return False
@@ -1291,6 +1299,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.seed_env
         else None
     )
+
+    if (workspace_dir / ".spx-setup-workspace.json").is_file() and args.workspace_kind != WORKSPACE_KIND_GIT:
+        from installer.setup_workspace import prepare_workspace, read_descriptor
+        from installer.setup_session import SetupEngine
+        descriptor = read_descriptor(workspace_dir)
+        engine = SetupEngine(Path(descriptor['state_root']))
+        prepare_workspace(workspace_dir, engine, descriptor['session_id'], python=Path(args.python), preserve_session=True)
+        print(f"[spx-mcp-workspace] SPX MCP and CLI repaired in {workspace_dir}.")
+        return 0
 
     workspace_kind, work_mode = resolve_workspace_selection(
         workspace_dir=workspace_dir,

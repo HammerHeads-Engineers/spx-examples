@@ -25,8 +25,8 @@ def build_server(workspace):
     session_id = descriptor["session_id"]
     engine.get(session_id)
     server = FastMCP(
-        "SPX Setup",
-        instructions="Configure and approve installation in conversation. Never request or disclose the product key. setup_apply requires explicit approval of the current plan.",
+        "SPX",
+        instructions="Install and work with SPX in this same workspace/connection. Before installation use setup_*; after success use repo_* and server_* on user request. Never request or disclose the product key. setup_apply requires explicit approval of the current plan. Runtime tools resolve committed configuration automatically; no reconnect is needed after installation.",
     )
     read = ToolAnnotations(
         readOnlyHint=True,
@@ -45,6 +45,7 @@ def build_server(workspace):
     )
 
     def call(action, requested, **arguments):
+        requested = requested or session_id
         if requested != session_id:
             return {
                 "ok": False,
@@ -56,12 +57,12 @@ def build_server(workspace):
         return invoke(engine, action, requested, **arguments)
 
     @server.tool(annotations=read)
-    def setup_get_session(session_id: str) -> dict:
+    def setup_get_session(session_id: str = "") -> dict:
         """Read the public draft and installation state without accessing credentials."""
         return call("get-session", session_id)
 
     @server.tool(annotations=read)
-    def setup_list_options(session_id: str, compact: bool = False) -> dict:
+    def setup_list_options(session_id: str = "", compact: bool = True) -> dict:
         """Use compact for recommended settings and counts; full catalog only for custom choices."""
         return call("list-options", session_id, compact=compact)
 
@@ -97,6 +98,11 @@ def build_server(workspace):
             compact=compact,
         )
 
+    # Publish the stable runtime toolset before installation: the connected
+    # client need not rediscover servers/tools when deployment completes.
+    from installer.setup_runtime import register_runtime_tools
+
+    register_runtime_tools(server, workspace)
     return server
 
 

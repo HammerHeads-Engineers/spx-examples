@@ -475,6 +475,7 @@ def run(args: argparse.Namespace) -> int:
             output_dir,
             catalog=getattr(args, "catalog", None),
             profiles=getattr(args, "profiles", None),
+            workspace=getattr(args, "setup_workspace", None),
             start_callback=(
                 (
                     lambda directory, journal: _launch_stack(
@@ -496,25 +497,35 @@ def run(args: argparse.Namespace) -> int:
             _print_selection(selection, index=index)
 
         print(f"\nArtifacts generated in {output_dir}", file=info_stream)
-        print("Next steps:", file=info_stream)
+        tools = outcome.get("tools", {})
+        if tools.get("ok"):
+            print(
+                f"SPX MCP and CLI are ready. Open workspace: {tools['workspace']}",
+                file=info_stream,
+            )
+            print(
+                "Use spx.ps1 (Windows) or spx.sh (macOS/Linux) for CLI commands.",
+                file=info_stream,
+            )
+        elif outcome.get("mcp_warning"):
+            print(outcome["mcp_warning"], file=info_stream)
+        if start_requested:
+            print(
+                "SPX is running."
+                + (
+                    " Continue working in the workspace above."
+                    if tools.get("ok")
+                    else ""
+                ),
+                file=info_stream,
+            )
+        else:
+            print(
+                f"SPX was not started. To start it, run '{output_dir}/spx-start.command' (macOS), '{output_dir}/spx-start.sh' (Linux), or '{output_dir}/spx-start.bat' (Windows).",
+                file=info_stream,
+            )
         print(
-            f"  1. Update '{output_dir}/.env' with your SPX product key if needed.",
-            file=info_stream,
-        )
-        print(
-            f"  2. Run '{output_dir}/spx-start.sh' (macOS/Linux) or '{output_dir}/spx-start.bat' (Windows) to start the stack.",
-            file=info_stream,
-        )
-        print(
-            f"  3. Use '{output_dir}/spx-stop.sh' or '{output_dir}/spx-stop.bat' to shut everything down.",
-            file=info_stream,
-        )
-        print(
-            f"     (You can also double-click '{output_dir}/spx-start.command' or '{output_dir}/spx-start.bat',",
-            file=info_stream,
-        )
-        print(
-            f"      and '{output_dir}/spx-stop.command' or '{output_dir}/spx-stop.bat'.)",
+            f"To shut down SPX, use '{output_dir}/spx-stop.command' (macOS), '{output_dir}/spx-stop.sh' (Linux), or '{output_dir}/spx-stop.bat' (Windows).",
             file=info_stream,
         )
 

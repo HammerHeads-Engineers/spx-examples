@@ -43,11 +43,10 @@ def test_profiles_and_instructions_do_not_contain_key(workspace):
         assert KEY not in (root / name).read_text(encoding="utf-8")
     claude = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
     assert any(
-        value.endswith("setup_mcp.py")
-        for value in claude["mcpServers"]["spx_setup"]["args"]
+        value.endswith("setup_mcp.py") for value in claude["mcpServers"]["spx"]["args"]
     )
     opencode = json.loads((root / "opencode.jsonc").read_text(encoding="utf-8"))
-    assert opencode["mcp"]["servers"]["spx_setup"]["type"] == "local"
+    assert opencode["mcp"]["servers"]["spx"]["type"] == "local"
     assert "mcp.servers" not in opencode
 
 
@@ -80,20 +79,22 @@ def test_preparation_preserves_other_client_settings(workspace):
     sys.version_info < (3, 10),
     reason="Setup MCP requires Python >=3.10; required 3.12 tests cover the MCP server",
 )
-def test_mcp_exposes_only_setup_tools_without_api(workspace):
+def test_mcp_exposes_setup_and_runtime_tools_without_api(workspace):
     import asyncio
     from installer.setup_mcp import build_server
 
     root, _, _ = workspace
     server = build_server(root)
     names = {tool.name for tool in asyncio.run(server.list_tools())}
-    assert names == {
+    assert names >= {
         "setup_get_session",
         "setup_list_options",
         "setup_update_selection",
         "setup_plan",
         "setup_apply",
         "setup_get_status",
+        "health",
+        "server_list_instances",
     }
 
 
@@ -130,7 +131,7 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
     root, engine, session = workspace
     profile = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
         "mcpServers"
-    ]["spx_setup"]
+    ]["spx"]
     parameters = StdioServerParameters(
         command=profile["command"],
         args=profile["args"],
