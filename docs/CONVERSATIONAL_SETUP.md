@@ -115,7 +115,8 @@ the full diagnostics for failure investigation. Report changed phases only.
 Selection fields: `packages`, `profiles`, `protocols`, `install_models`,
 `install_instances`, `install_spx_ui`, `model_ids`, `service_ids`, `instances`,
 `start_instances`, `service_bind_addresses`, `port_mappings`, `start`,
-`replace_existing`, `requirements`. Null model/service/instance lists select manifest defaults;
+`replace_existing`, `requirements`. Without a requirements record, null
+model/service/instance lists select manifest defaults;
 explicit empty lists select none. Instance definitions retain the generator's
 existing shape. Bind addresses must be local; host port mapping keys are
 `service:container_port/tcp|udp`. Modbus's port range must move consistently.
@@ -123,10 +124,14 @@ existing shape. Bind addresses must be local; host port mapping keys are
 
 ### Requirements record
 
-Agent handoff marks the session `requirements_required:true`. Existing ordinary
-wizards and explicit CLI generation remain compatible without a conversation
-record. A requirements-bearing plan is checked by the same engine through MCP
-and CLI; it cannot bypass missing decisions merely by changing adapters.
+Agent handoff marks the session `requirements_required:true`. Conversational MCP
+and `installer setup` CLI also enforce this contract when a workspace originated
+in an ordinary wizard. Ordinary wizards and explicit `installer generate` remain
+compatible without a conversation record. A requirements-bearing plan is checked
+by the same engine through MCP and CLI; it cannot bypass missing decisions merely
+by changing adapters. With a requirements record, `service_ids:null` resolves
+needed local dependencies, while `full_catalog` with `model_ids:null` selects
+every model supported on the host platform.
 
 Example selection patch for a local KNX testing environment (no instances):
 
