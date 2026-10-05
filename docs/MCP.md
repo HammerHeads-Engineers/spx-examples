@@ -62,6 +62,21 @@ poetry install --with dev
 
 ## Bootstrap MCP client configs
 
+Packaged SPX Setup automatically prepares a shared workspace for installation
+and live work, in all wizard modes. Its project-local `spx` stdio server publishes
+`setup_*`, catalog and runtime tools before deployment. Runtime calls read the
+committed installation's private binding on each operation, so installation and
+key/URL updates do not require reconnecting an already connected agent. A failed
+installation does not publish new runtime settings; active/recovery transactions
+block live operations. Explicit no-start installs prepare tools but report
+`SPX_NOT_STARTED` until the supported Start helper commits successfully.
+
+The workspace also contains `spx.ps1` / `spx.sh` for JSON CLI diagnostics and
+runtime tool calls. `doctor --check-server` verifies authenticated access, and
+`call <tool> --arguments-file <JSON file>` uses the same implementation as MCP.
+Tool readiness failures are separate from stack success. Use SPX MCP Setup for
+repair, or the repository bootstrap below for development checkout workflows.
+
 To generate a local Codex MCP config for this repository without committing
 machine-specific paths, use one of the bootstrap scripts below. They create
 `<repo>/.codex/config.toml` and add local client config files to the worktree's
@@ -186,12 +201,14 @@ poetry run spx-mcp doctor --check-server --json
 
 The authenticated request has a five-second timeout. Unreachable servers and
 HTTP 401/403 return `ok: false` and exit code 1. Product keys are not included
-in the report or command arguments. In installer-managed workspaces, the local
-`.env` takes priority over inherited `SPX_PRODUCT_KEY` and `SPX_BASE_URL` values.
-After a successful stack replacement, existing managed MCP configuration is
-refreshed from the committed installation; reconnect MCP in Codex afterward.
-If that refresh fails while the stack is healthy, run **SPX MCP Setup** and
-reconnect. Rollback retains the previous MCP configuration.
+in the report or command arguments. New installer-managed workspaces use
+`spx.ps1 doctor --check-server --json` (Windows) or the equivalent `spx.sh`
+command. They resolve credentials from private committed installation state on
+every operation; inherited host variables are ignored and no reconnect is
+required after installation. Older managed workspaces still prioritize their
+local `.env` over inherited values until upgraded. If tool preparation fails
+while the stack is healthy, run **SPX MCP Setup** to repair it. Rollback retains
+the previous runtime binding.
 
 Run the MCP server over `stdio`:
 

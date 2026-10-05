@@ -11,6 +11,12 @@ class WriteAccessError(RuntimeError):
     """Raised when a write tool is used without explicit write enablement."""
 
 
+class RuntimeAvailabilityError(RuntimeError):
+    def __init__(self, message: str, code: str):
+        super().__init__(message)
+        self.code = code
+
+
 @dataclass
 class ProductKeyConfigError(RuntimeError):
     """Raised when the MCP runtime cannot resolve a usable SPX product key."""
@@ -60,6 +66,8 @@ def error_response(
 
 def exception_to_response(exc: Exception) -> Dict[str, Any]:
     """Map known exception types into a structured MCP tool error payload."""
+    if isinstance(exc, RuntimeAvailabilityError):
+        return error_response(str(exc), code=exc.code)
     if isinstance(exc, WriteAccessError):
         return error_response(str(exc), code="write_disabled")
 

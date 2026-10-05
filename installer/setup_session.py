@@ -533,6 +533,7 @@ class SetupEngine:
                     "progress_warning",
                     "endpoints",
                     "mcp_warning",
+                    "tools",
                     "progress",
                     "diagnostics",
                     "verification",
@@ -1207,6 +1208,22 @@ class SetupEngine:
                     self._execute_stack(session, output)
                 stack_completed = True
                 with file_lock(self.root / "sessions.lock"):
+                    current = self._read(session_id)
+                    current["stage"] = "tools"
+                    self._write(current)
+                try:
+                    tools = self._prepare_tools(
+                        session,
+                        started=bool(session["selection"]["start"] or start_callback),
+                    )
+                except Exception:
+                    # Tool preparation is separate from the committed deployment.
+                    # Never roll back a healthy stack for a download/MCP failure.
+                    tools = {
+                        "ok": False,
+                        "message": "SPX configuration was installed, but MCP/CLI preparation failed. Run SPX MCP Setup to repair the workspace.",
+                    }
+                with file_lock(self.root / "sessions.lock"):
                     session = self._read(session_id)
                     session.update(
                         status="SUCCEEDED",
@@ -1228,6 +1245,9 @@ class SetupEngine:
                             session["selection"].get("requirements")
                         ),
                     }
+                    session["tools"] = tools
+                    if not tools["ok"]:
+                        session["mcp_warning"] = tools["message"]
                     self._write(session)
             except Exception as error:
                 from .stack_manager import redact
@@ -1292,6 +1312,11 @@ class SetupEngine:
                     )
                     session["error"] = safe_error
                     self._write(session)
+
+    def _prepare_tools(self, session, *, started):
+        from .setup_runtime import prepare_tools
+
+        return prepare_tools(self, session, started=started)
 
     def _execute_stack(self, session, output):
         env = clean_environment()

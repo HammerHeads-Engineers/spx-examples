@@ -523,7 +523,7 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
             except ImportError:
                 from mcp_workspace import synchronize_managed_workspace
             if synchronize_managed_workspace(env_file):
-                print('[spx-start] Managed MCP configuration refreshed. Reconnect MCP in Codex.')
+                print('[spx-start] SPX tools configuration refreshed. Continue in your SPX workspace.')
         except Exception:
             # The stack is already committed and healthy. MCP setup failure
             # must not roll it back or disclose configuration/secret values.
