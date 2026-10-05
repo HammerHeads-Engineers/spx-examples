@@ -61,9 +61,9 @@ def build_server(workspace):
         return call("get-session", session_id)
 
     @server.tool(annotations=read)
-    def setup_list_options(session_id: str) -> dict:
-        """List shipped packages, profiles, models, protocols and local addresses."""
-        return call("list-options", session_id)
+    def setup_list_options(session_id: str, compact: bool = False) -> dict:
+        """Use compact for recommended settings and counts; full catalog only for custom choices."""
+        return call("list-options", session_id, compact=compact)
 
     @server.tool(annotations=draft)
     def setup_update_selection(session_id: str, selection: dict) -> dict:
@@ -81,9 +81,21 @@ def build_server(workspace):
         return call("apply", session_id, plan_id=plan_id, revision=revision)
 
     @server.tool(annotations=read)
-    def setup_get_status(session_id: str) -> dict:
-        """Read durable job progress; SUCCEEDED alone means installation succeeded."""
-        return call("status", session_id)
+    async def setup_get_status(
+        session_id: str,
+        after_cursor: str | None = None,
+        wait_seconds: float = 0,
+        compact: bool = False,
+    ) -> dict:
+        """Wait up to 30s for a lifecycle/phase change. Reuse cursor; compact omits catalog/log history."""
+        return await asyncio.to_thread(
+            call,
+            "status",
+            session_id,
+            after_cursor=after_cursor,
+            wait_seconds=wait_seconds,
+            compact=compact,
+        )
 
     return server
 

@@ -38,15 +38,23 @@ def add_parser(subparsers):
         if name == "apply":
             action.add_argument("--plan-id", required=True)
             action.add_argument("--revision", required=True, type=int)
+        if name == "status":
+            action.add_argument("--after-cursor", default=None)
+            action.add_argument("--wait-seconds", type=float, default=0)
+            action.add_argument("--compact", action="store_true")
+        if name == "list-options":
+            action.add_argument("--compact", action="store_true")
     return parser
 
 
 def invoke(engine, action, session_id, **arguments):
     try:
-        if action in {"get-session", "status"}:
+        if action == "get-session":
             value = engine.get(session_id)
+        elif action == "status":
+            value = engine.status(session_id, **arguments)
         elif action == "list-options":
-            value = engine.options(session_id)
+            value = engine.options(session_id, **arguments)
         elif action == "update-selection":
             value = engine.update(session_id, arguments["selection"])
         elif action == "plan":
@@ -86,6 +94,14 @@ def run(args):
             arguments["selection"] = json.loads(content)
         if args.setup_action == "apply":
             arguments.update(plan_id=args.plan_id, revision=args.revision)
+        if args.setup_action == "status":
+            arguments.update(
+                after_cursor=args.after_cursor,
+                wait_seconds=args.wait_seconds,
+                compact=args.compact,
+            )
+        if args.setup_action == "list-options":
+            arguments["compact"] = args.compact
         result = invoke(engine, args.setup_action, args.session_id, **arguments)
     except (OSError, ValueError):
         result = {

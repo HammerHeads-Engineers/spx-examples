@@ -12,6 +12,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -27,7 +28,7 @@ from . import paths
 from .generator import DeploymentGenerator
 from .manifest import ManifestLoader
 from .network import discover_ipv4_addresses, is_local_bind_address
-from .product_key import validate_product_key_format
+from .product_key import product_key_summary, validate_product_key_format
 from .selection import (
     apply_platform_compatibility,
     resolve_model_ids,
@@ -177,6 +178,36 @@ def artifact_digest(root: Path) -> str:
         [
             (p.relative_to(root).as_posix(), hashlib.sha256(p.read_bytes()).hexdigest())
             for p in artifact_files(root)
+        ]
+    )
+
+
+def configuration_digest(root: Path) -> str:
+    """Guard installation configuration, excluding writable service runtime data.
+
+    Do not change artifact_files: it also enumerates staged promotion/rollback
+    files. Home Assistant configuration YAML, Compose, models and .env remain
+    protected; its logs, recorder and .storage are not installation decisions.
+    """
+
+    def relevant(path):
+        relative = path.relative_to(root)
+        parts = relative.parts
+        if parts[:3] == ("assets", "matter", "data"):
+            return False
+        if parts[:3] == ("assets", "homeassistant", "config"):
+            return not (
+                ".storage" in parts[3:]
+                or path.name.startswith(("home-assistant.log", "home-assistant_v2.db"))
+                or path.name == ".HA_VERSION"
+            )
+        return True
+
+    return _digest(
+        [
+            (p.relative_to(root).as_posix(), hashlib.sha256(p.read_bytes()).hexdigest())
+            for p in artifact_files(root)
+            if relevant(p)
         ]
     )
 
@@ -380,6 +411,7 @@ class SetupEngine:
                 for k, v in session.items()
                 if k not in {"source_root", "catalog", "profiles"}
             }
+            public["license"] = product_key_summary(self._key(session))
             if public.get("plan"):
                 public["plan"] = {
                     k: v for k, v in public["plan"].items() if not k.startswith("_")
@@ -394,9 +426,98 @@ class SetupEngine:
                 )
             return public
 
-    def options(self, session_id):
+    def status(self, session_id, *, after_cursor=None, wait_seconds=0, compact=False):
+        """Wait outside session locks for meaningful progress, not each log line."""
+        if (
+            not isinstance(wait_seconds, (int, float))
+            or isinstance(wait_seconds, bool)
+            or not math.isfinite(wait_seconds)
+            or not 0 <= wait_seconds <= 30
+        ):
+            raise SetupError("wait_seconds must be between 0 and 30")
+        if after_cursor is not None and not isinstance(after_cursor, str):
+            raise SetupError("after_cursor must be a string")
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            current = self.get(session_id)
+            cursor = _digest(
+                {
+                    "session_id": session_id,
+                    "revision": current["revision"],
+                    "status": current["status"],
+                    "stage": current["stage"],
+                    "job_id": (current.get("job") or {}).get("job_id"),
+                    "progress_stage": current.get("progress", {}).get("stage"),
+                    "diagnostic": current.get("diagnostic"),
+                    "mcp_warning": current.get("mcp_warning"),
+                }
+            )
+            changed = cursor != after_cursor
+            if changed or current["status"] in TERMINAL or time.monotonic() >= deadline:
+                break
+            time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+        if compact:
+            current = {
+                k: v
+                for k, v in current.items()
+                if k
+                in {
+                    "session_id",
+                    "revision",
+                    "status",
+                    "stage",
+                    "job",
+                    "diagnostic",
+                    "endpoints",
+                    "mcp_warning",
+                    "progress",
+                    "diagnostics",
+                }
+            }
+            if "progress" in current:
+                current["progress"] = {
+                    k: v
+                    for k, v in current["progress"].items()
+                    if k in {"stage", "last_message"}
+                }
+            if "diagnostics" in current:
+                current["diagnostics"] = {
+                    "exit_code": current["diagnostics"].get("exit_code"),
+                    "tail": current["diagnostics"].get("output", "").splitlines()[-30:],
+                }
+        return {**current, "cursor": cursor, "changed": changed}
+
+    def options(self, session_id, *, compact=False):
         session = self._read(session_id)
         index = self._index(session)
+        if compact:
+            return {
+                "packages": [
+                    {"id": v.id, "name": v.name} for v in index.industries.values()
+                ],
+                "model_count": len(index.models),
+                "protocols": sorted(
+                    {p for m in index.models.values() for p in m.protocols}
+                    | {s.protocol for s in index.services.values()}
+                ),
+                "services": [
+                    {"id": v.id, "name": v.name, "protocol": v.protocol}
+                    for v in index.services.values()
+                ],
+                "local_addresses": [asdict(v) for v in discover_ipv4_addresses()],
+                "recommended_selection": {
+                    "packages": list(index.industries),
+                    "profiles": [],
+                    "protocols": [],
+                    "install_models": True,
+                    "install_instances": False,
+                    "instances": [],
+                    "start_instances": [],
+                    "service_ids": [],
+                    "install_spx_ui": session["selection"]["install_spx_ui"],
+                    "start": session["selection"]["start"],
+                },
+            }
         return {
             "packages": [asdict(v) for v in index.industries.values()],
             "profiles": [
@@ -466,6 +587,14 @@ class SetupEngine:
         selection, warnings = resolve_selection(
             session["selection"], self._key(session), self._index(session)
         )
+        license = product_key_summary(self._key(session))
+        limit = license["instance_limit"]
+        if limit is not None and len(selection.instances) > limit:
+            raise SetupError(
+                "Selected instances exceed the license budget; install with zero instances or explicitly select fewer.",
+                "LICENSE_INSTANCE_LIMIT",
+                {"requested": len(selection.instances), "limit": limit},
+            )
         DeploymentGenerator(self._index(session)).generate(selection, directory)
         _map_ports(directory, session["selection"]["port_mappings"])
         _validate_ports(directory)
@@ -519,12 +648,20 @@ class SetupEngine:
                 if stack.source != "snapshot"
             ]
             unavailable = set(result.occupied_ports) | set(ports)
+            proposed = suggest_port_mappings(
+                mappings, set(result.unrelated_conflicts), unavailable
+            )
             conflicts = [
                 {
                     "port": port,
                     "owners": owners,
-                    "suggested_host_port": _suggest_port(
-                        max(1024, port + 1), unavailable
+                    "suggested_host_port": next(
+                        (
+                            proposed[p["key"]]
+                            for p in mappings
+                            if p["host_port"] == port and p["key"] in proposed
+                        ),
+                        None,
                     ),
                 }
                 for port, owners in sorted(result.unrelated_conflicts.items())
@@ -535,6 +672,7 @@ class SetupEngine:
                 "conflicts": conflicts,
                 "port_options": mappings,
                 "errors": [],
+                "suggested_port_mappings": proposed,
             }
         except (StackManagerError, OSError) as exc:
             return {
@@ -588,6 +726,7 @@ class SetupEngine:
                 "revision": session["revision"],
                 "ready": not errors,
                 "selection": summary,
+                "license": product_key_summary(self._key(session)),
                 "start": session["selection"]["start"],
                 "replace_existing": session["selection"]["replace_existing"],
                 "output": session["output"],
@@ -603,7 +742,7 @@ class SetupEngine:
                 ),
                 "_stage": str(directory),
                 "_stage_digest": artifact_digest(directory),
-                "_output_digest": artifact_digest(Path(session["output"])),
+                "_output_digest": configuration_digest(Path(session["output"])),
                 "_source_digest": _source_digest(session),
                 "_preflight_digest": _digest(preflight),
             }
@@ -630,7 +769,7 @@ class SetupEngine:
         preflight = self._preflight(directory, session["selection"]["start"])
         if (
             artifact_digest(directory) != plan["_stage_digest"]
-            or artifact_digest(Path(session["output"])) != plan["_output_digest"]
+            or configuration_digest(Path(session["output"])) != plan["_output_digest"]
             or _source_digest(session) != plan["_source_digest"]
             or _digest(preflight) != plan["_preflight_digest"]
         ):
@@ -890,7 +1029,9 @@ class SetupEngine:
 
     def _execute_stack(self, session, output):
         env = clean_environment()
-        env["PYTHONUNBUFFERED"] = "1"  # Stream progress to the agent/monitor immediately.
+        env["PYTHONUNBUFFERED"] = (
+            "1"  # Stream progress to the agent/monitor immediately.
+        )
         approved = session["plan"]["preflight"]
         env["SPX_SETUP_APPROVED_STACK"] = json.dumps(
             {
@@ -922,6 +1063,7 @@ class SetupEngine:
         from .stack_manager import redact
 
         lines = []
+        progress_stage = "installing"
         process = subprocess.Popen(
             command,
             cwd=output,
@@ -940,9 +1082,28 @@ class SetupEngine:
                 )
             )
             lines.append(safe.rstrip())
+            lowered = safe.lower()
+            if "mcp" in lowered:
+                progress_stage = "runtime_mcp"
+            elif (
+                "[bootstrap]" in lowered
+                or "registered model " in lowered
+                or "updated model " in lowered
+            ):
+                progress_stage = "catalog"
+            elif "readiness" in lowered or "healthcheck" in lowered:
+                progress_stage = "verification"
+            elif "container " in lowered:
+                progress_stage = "services"
+            elif "pulling" in lowered or "pulled" in lowered:
+                progress_stage = "images"
             atomic_json(
                 self._directory(session["session_id"]) / "progress.json",
-                {"last_message": safe.rstrip(), "tail": lines[-30:]},
+                {
+                    "stage": progress_stage,
+                    "last_message": safe.rstrip(),
+                    "tail": lines[-30:],
+                },
             )
         process.stdout.close()
         returncode = process.wait()
@@ -1036,6 +1197,39 @@ def _source_digest(session):
 
 def _suggest_port(start, unavailable):
     return next((port for port in range(start, 65536) if port not in unavailable), None)
+
+
+def suggest_port_mappings(options, conflicts, unavailable):
+    """Return an applicable patch, including a complete contiguous Modbus range."""
+    unavailable = set(unavailable)
+    proposed = {}
+    group = [
+        p
+        for p in options
+        if p["service"] == "spx-server" and 5020 <= p["container_port"] <= 5120
+    ]
+    if any(p["host_port"] in conflicts for p in group):
+        low, high = min(p["container_port"] for p in group), max(
+            p["container_port"] for p in group
+        )
+        width = high - low + 1
+        start = max(p["host_port"] for p in group) + 1
+        while start + width - 1 <= 65535:
+            blocked = unavailable.intersection(range(start, start + width))
+            if not blocked:
+                for p in group:
+                    proposed[p["key"]] = start + p["container_port"] - low
+                unavailable.update(proposed.values())
+                break
+            start = max(blocked) + 1
+    for p in options:
+        if p in group or p["host_port"] not in conflicts:
+            continue
+        port = _suggest_port(max(1024, p["host_port"] + 1), unavailable)
+        if port is not None:
+            proposed[p["key"]] = port
+            unavailable.add(port)
+    return proposed
 
 
 def _port_options(compose):
