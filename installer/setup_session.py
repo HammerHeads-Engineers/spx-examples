@@ -113,7 +113,21 @@ def atomic_json(path: Path, value) -> None:
             json.dump(value, handle, ensure_ascii=False, indent=2)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
+        # Windows readers may temporarily deny DELETE sharing. Keep the old
+        # complete document visible while retrying its atomic replacement.
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                os.replace(temporary, path)
+                break
+            except OSError as error:
+                if (
+                    os.name != "nt"
+                    or getattr(error, "winerror", None) not in {5, 32, 33}
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.025)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -391,40 +405,51 @@ class SetupEngine:
         ).load()
 
     def get(self, session_id):
-        with file_lock(self.root / "sessions.lock"):
-            session = self._read(session_id)
-            job = session.get("job")
-            if (
-                session["status"] == "APPLYING"
-                and job
-                and job.get("pid")
-                and not _pid_alive(job["pid"])
-            ):
-                session.update(
-                    status="RECOVERY_REQUIRED",
-                    stage="recovery",
-                    diagnostic="Setup worker exited before recording a final result. Do not retry blindly; inspect the transaction and retained backup.",
-                )
-                self._write(session)
-            public = {
-                k: v
-                for k, v in session.items()
-                if k not in {"source_root", "catalog", "profiles"}
+        # Atomic documents allow monitors to read the last committed state
+        # while planning/preflight owns the mutation lock for several seconds.
+        session = self._read(session_id)
+        job = session.get("job")
+        if (
+            session["status"] == "APPLYING"
+            and job
+            and job.get("pid")
+            and not _pid_alive(job["pid"])
+        ):
+            with file_lock(self.root / "sessions.lock"):
+                session = self._read(session_id)
+                current_job = session.get("job") or {}
+                if (
+                    session["status"] == "APPLYING"
+                    and current_job.get("job_id") == job["job_id"]
+                    and current_job.get("pid") == job["pid"]
+                    and not _pid_alive(job["pid"])
+                ):
+                    session.update(
+                        status="RECOVERY_REQUIRED",
+                        stage="recovery",
+                        diagnostic="Setup worker exited before recording a final result. Do not retry blindly; inspect the transaction and retained backup.",
+                    )
+                    self._write(session)
+        public = {
+            k: v
+            for k, v in session.items()
+            if k not in {"source_root", "catalog", "profiles"}
+        }
+        public["license"] = product_key_summary(self._key(session))
+        if public.get("plan"):
+            public["plan"] = {
+                k: v for k, v in public["plan"].items() if not k.startswith("_")
             }
-            public["license"] = product_key_summary(self._key(session))
-            if public.get("plan"):
-                public["plan"] = {
-                    k: v for k, v in public["plan"].items() if not k.startswith("_")
-                }
-            progress = self._directory(session_id) / "progress.json"
-            if progress.is_file():
-                public["progress"] = json.loads(progress.read_text(encoding="utf-8"))
-            diagnostics = self._directory(session_id) / "diagnostics.json"
-            if diagnostics.is_file():
-                public["diagnostics"] = json.loads(
-                    diagnostics.read_text(encoding="utf-8")
+        for name in ("progress", "diagnostics"):
+            try:
+                public[name] = json.loads(
+                    (self._directory(session_id) / f"{name}.json").read_text(
+                        encoding="utf-8"
+                    )
                 )
-            return public
+            except FileNotFoundError:
+                pass
+        return public
 
     def status(self, session_id, *, after_cursor=None, wait_seconds=0, compact=False):
         """Wait outside session locks for meaningful progress, not each log line."""
@@ -450,6 +475,7 @@ class SetupEngine:
                     "progress_stage": current.get("progress", {}).get("stage"),
                     "diagnostic": current.get("diagnostic"),
                     "mcp_warning": current.get("mcp_warning"),
+                    "progress_warning": current.get("progress_warning"),
                 }
             )
             changed = cursor != after_cursor
@@ -468,6 +494,8 @@ class SetupEngine:
                     "stage",
                     "job",
                     "diagnostic",
+                    "error",
+                    "progress_warning",
                     "endpoints",
                     "mcp_warning",
                     "progress",
@@ -949,6 +977,7 @@ class SetupEngine:
                 "previous_api_url": previous_api,
                 "files": changed,
             }
+            stack_completed = False
             try:
                 private_directory(backup)
                 output.mkdir(parents=True, exist_ok=True)
@@ -981,6 +1010,7 @@ class SetupEngine:
                         raise SetupError("Stack installation failed", "INSTALL_FAILED")
                 elif session["selection"]["start"]:
                     self._execute_stack(session, output)
+                stack_completed = True
                 with file_lock(self.root / "sessions.lock"):
                     session = self._read(session_id)
                     session.update(
@@ -994,9 +1024,36 @@ class SetupEngine:
                     )
                     session["endpoints"] = _endpoints(stage)
                     self._write(session)
-            except Exception:
+            except Exception as error:
+                from .stack_manager import redact
+
+                key = self._key(session)
+                safe_error = redact(
+                    str(error)
+                    .replace(key, "<redacted>")
+                    .replace(key.replace("-", ""), "<redacted>")
+                )
+                try:
+                    diagnostic_path = directory / "diagnostics.json"
+                    diagnostics = (
+                        json.loads(diagnostic_path.read_text(encoding="utf-8"))
+                        if diagnostic_path.exists()
+                        else {}
+                    )
+                    diagnostics.update(
+                        error_type=type(error).__name__, error=safe_error
+                    )
+                    atomic_json(diagnostic_path, diagnostics)
+                except (OSError, ValueError):
+                    pass  # Recovery status still records the sanitized failure.
+                # Never change files underneath a live runner, or undo the
+                # files of a stack already committed by that runner.
+                retain_files = stack_completed or (
+                    isinstance(error, SetupError)
+                    and error.code in {"SETUP_CHILD_ACTIVE", "SETUP_STACK_COMMITTED"}
+                )
                 restored = True
-                for entry in reversed(changed):
+                for entry in reversed(changed) if not retain_files else []:
                     destination = output / entry["path"]
                     try:
                         if entry["existed"]:
@@ -1007,24 +1064,28 @@ class SetupEngine:
                         restored = False
                 recovery = output / ".spx-stack-snapshot.json"
                 # Stack runner retains its snapshot if rollback did not complete.
-                rollback_ok = not recovery.exists() or json.loads(
-                    recovery.read_text(encoding="utf-8")
-                ).get("rolled_back", False)
+                try:
+                    rollback_ok = not recovery.exists() or json.loads(
+                        recovery.read_text(encoding="utf-8")
+                    ).get("rolled_back", False)
+                except (OSError, ValueError):
+                    rollback_ok = False
                 with file_lock(self.root / "sessions.lock"):
                     session = self._read(session_id)
                     session.update(
                         status=(
                             "FAILED"
-                            if restored and rollback_ok
+                            if restored and rollback_ok and not retain_files
                             else "RECOVERY_REQUIRED"
                         ),
                         stage="rollback",
                         diagnostic=(
                             "Installation failed; previous generated files restored. See sanitized job diagnostics. Run SPX Setup to retry."
-                            if restored and rollback_ok
+                            if restored and rollback_ok and not retain_files
                             else "Rollback requires inspection; previous configuration backup was retained. Do not start another installation."
                         ),
                     )
+                    session["error"] = safe_error
                     self._write(session)
 
     def _execute_stack(self, session, output):
@@ -1063,6 +1124,7 @@ class SetupEngine:
         from .stack_manager import redact
 
         lines = []
+        progress_warning = None
         progress_stage = "installing"
         process = subprocess.Popen(
             command,
@@ -1075,7 +1137,9 @@ class SetupEngine:
             encoding="utf-8",
             errors="replace",
         )
-        for line in process.stdout:
+
+        def collect(line):
+            nonlocal progress_stage, progress_warning
             safe = redact(
                 line.replace(key, "<redacted>").replace(
                     key.replace("-", ""), "<redacted>"
@@ -1097,30 +1161,72 @@ class SetupEngine:
                 progress_stage = "services"
             elif "pulling" in lowered or "pulled" in lowered:
                 progress_stage = "images"
-            atomic_json(
-                self._directory(session["session_id"]) / "progress.json",
-                {
-                    "stage": progress_stage,
-                    "last_message": safe.rstrip(),
-                    "tail": lines[-30:],
-                },
-            )
-        process.stdout.close()
+            try:
+                atomic_json(
+                    self._directory(session["session_id"]) / "progress.json",
+                    {
+                        "stage": progress_stage,
+                        "last_message": safe.rstrip(),
+                        "tail": lines[-30:],
+                    },
+                )
+            except OSError:
+                progress_warning = (
+                    "Progress file could not be updated; stack execution continued."
+                )
+
+        try:
+            for line in process.stdout:
+                collect(line)
+        except Exception as error:
+            # Closing the pipe informs the runner of the stream failure. Wait
+            # for its own rollback before touching deployment files.
+            process.stdout.close()
+            try:
+                process.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                raise SetupError(
+                    "Setup runner is still active; retain configuration and inspect recovery.",
+                    "SETUP_CHILD_ACTIVE",
+                    {"pid": process.pid},
+                ) from error
+            raise
+        finally:
+            process.stdout.close()
         returncode = process.wait()
         text = "\n".join(lines)
-        atomic_json(
-            self._directory(session["session_id"]) / "diagnostics.json",
-            {"exit_code": returncode, "output": text},
-        )
+        try:
+            atomic_json(
+                self._directory(session["session_id"]) / "diagnostics.json",
+                {
+                    "exit_code": returncode,
+                    "output": text,
+                    "progress_warning": progress_warning,
+                },
+            )
+        except OSError:
+            # A reporting failure cannot roll back a successfully committed stack.
+            progress_warning = (
+                "Job diagnostics could not be saved; stack execution completed."
+            )
         if returncode:
             raise SetupError("Stack installation failed", "INSTALL_FAILED")
-        if "MCP configuration could not be refreshed" in text:
-            with file_lock(self.root / "sessions.lock"):
-                current = self._read(session["session_id"])
-                current["mcp_warning"] = (
-                    "Stack is healthy. Run SPX MCP Setup and reconnect MCP in your agent."
-                )
-                self._write(current)
+        if progress_warning or "MCP configuration could not be refreshed" in text:
+            try:
+                with file_lock(self.root / "sessions.lock"):
+                    current = self._read(session["session_id"])
+                    if progress_warning:
+                        current["progress_warning"] = progress_warning
+                    if "MCP configuration could not be refreshed" in text:
+                        current["mcp_warning"] = (
+                            "Stack is healthy. Run SPX MCP Setup and reconnect MCP in your agent."
+                        )
+                    self._write(current)
+            except Exception as error:
+                raise SetupError(
+                    "Stack execution succeeded but its reporting state could not be saved; inspect recovery before retrying.",
+                    "SETUP_STACK_COMMITTED",
+                ) from error
 
 
 def clean_environment():

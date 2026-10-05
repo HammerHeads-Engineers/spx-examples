@@ -511,11 +511,21 @@ def monitor(engine, session_id):
     previous = None
     try:
         while True:
-            current = engine.get(session_id)
+            try:
+                current = engine.get(session_id)
+            except SetupError as error:
+                if error.code != "SETUP_BUSY":
+                    raise
+                time.sleep(1)
+                continue
             message = (
                 current["status"],
                 current["stage"],
-                current.get("progress", {}).get("last_message"),
+                (
+                    current.get("diagnostic")
+                    if current["status"] in {"SUCCEEDED", "FAILED", "RECOVERY_REQUIRED"}
+                    else current.get("progress", {}).get("last_message")
+                ),
             )
             if message != previous:
                 print(
@@ -525,16 +535,23 @@ def monitor(engine, session_id):
             if current["status"] in {"SUCCEEDED", "FAILED", "RECOVERY_REQUIRED"}:
                 return 0 if current["status"] == "SUCCEEDED" else 1
             if _return_requested():
-                with file_lock(engine.root / "sessions.lock"):
-                    latest = engine._read(session_id)
-                    if latest["status"] == "APPLYING":
-                        print(
-                            "[spx-setup] Installation is running; continue in your agent conversation."
-                        )
-                    else:
-                        latest.update(status="HANDED_BACK", plan=None)
-                        engine._write(latest)
-                        return None
+                try:
+                    with file_lock(engine.root / "sessions.lock"):
+                        latest = engine._read(session_id)
+                        if latest["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
+                            print(
+                                "[spx-setup] Installation or recovery is in progress; continue in your agent conversation."
+                            )
+                        else:
+                            latest.update(status="HANDED_BACK", plan=None)
+                            engine._write(latest)
+                            return None
+                except SetupError as error:
+                    if error.code != "SETUP_BUSY":
+                        raise
+                    print(
+                        "[spx-setup] Planning is in progress. Press R again after it completes to return to the wizard."
+                    )
             time.sleep(1)
     except KeyboardInterrupt:
         print(
