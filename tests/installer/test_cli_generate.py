@@ -15,6 +15,14 @@ import installer.selection as selection
 from installer import cli
 
 
+@pytest.fixture(autouse=True)
+def isolated_setup_state(tmp_path, monkeypatch):
+    # CLI generation must not read/write the user's live Setup transaction.
+    monkeypatch.setattr(
+        "installer.setup_session.default_state_root", lambda: tmp_path / "setup-state"
+    )
+
+
 @pytest.fixture()
 def manifest_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     repo_root = tmp_path / "repo"
