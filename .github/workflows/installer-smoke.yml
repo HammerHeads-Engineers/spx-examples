@@ -41,6 +41,7 @@ jobs:
           python -m pytest -q tests/installer/test_setup_sessions.py
           tests/installer/test_setup_workspace.py tests/installer/test_wizard_modes.py
           tests/installer/test_setup_requirements.py tests/installer/test_readiness.py
+          tests/installer/test_setup_context.py
           tests/installer/test_unified_workspace.py
           tests/mcp/unit/test_codex_mcp_bootstrap.py --junitxml=setup-contract.xml
       - name: Bootstrap a fresh isolated Unicode workspace and independent CLI job

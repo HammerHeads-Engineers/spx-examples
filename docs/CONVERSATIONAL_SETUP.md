@@ -32,6 +32,19 @@ schema; full options expose model/service dependencies. Existing gateways are
 preserved unless their removal is explicitly recorded and disclosed in the plan.
 Existing explicit choices, including no-start/no-UI, take precedence. Simulation
 setup follows successful installation on a separate runtime request.
+The agent starts with `setup_get_context` (CLI `get-context`) rather than fetching
+the session, status and catalog separately. This response separates the current
+draft from the last committed installation and reports missing decisions,
+license, defaults and installed selections. It never probes Docker or the API;
+`runtime_available:true` means tools may be used, not that health or communication
+has just been verified. An earlier `SUCCEEDED` does not complete a new `DRAFT`.
+
+Persistent MCP processes resolve the current workspace descriptor on each call.
+After workspace migration, an owner-only pointer for the same installation
+identifies the current workspace. Explicit old session IDs are rejected with
+the current ID, so approval of an old plan cannot affect a new draft. An already
+running client process from an older release still needs the client to load the
+new implementation once; new code cannot hot-upgrade an old Python process.
 Use `setup_list_options(compact:false, protocols:["knx"])` or CLI
 `list-options --protocol knx --json` to inspect just the needed models. Filters
 are repeatable; unrelated model lists need not enter the conversation. In a
@@ -83,6 +96,7 @@ alone does not grant local process access. No public installer endpoint is added
 
 | MCP | CLI action | Behavior |
 | --- | --- | --- |
+| `setup_get_context` | `get-context` | Current draft, separate installed state, missing decisions, license and defaults; no Docker/API probe |
 | `setup_get_session` | `get-session` | Public selection, revision, stage, plan and diagnostics |
 | `setup_list_options` | `list-options` | Full catalog, or `compact:true` for recommended selections/counts |
 | `setup_update_selection` | `update-selection` | Validated patch; invalidates earlier plans |
@@ -91,9 +105,12 @@ alone does not grant local process access. No public installer endpoint is added
 | `setup_get_status` | `status` | Durable progress; optional compact response and bounded wait for changes |
 
 Direct form: `python -m installer setup --state-root <private-state> <action>
---session-id <id> --json`. The generated `setup-cli.ps1` / `setup-cli.sh` supply
-state location and session ID. Updates use `--selection-file <JSON>` (or `-` for
-stdin); apply requires `--plan-id <id> --revision <number>`. Results use
+--session-id <id> --json`. The generated `setup-cli.ps1` / `setup-cli.sh` use
+`--workspace-root <directory>` to resolve the current descriptor for every
+command. `--session-id` remains required for the direct state-root form;
+explicitly supplied old IDs are rejected in workspace mode.
+Updates use `--selection-file <JSON>` (or `-` for stdin); apply requires
+`--plan-id <id> --revision <number>`. Results use
 `{"ok":true,"result":...}` or `{"ok":false,"error":...}` and nonzero CLI exit.
 No CLI credential argument or MCP session-creation tool is exposed.
 
@@ -133,6 +150,16 @@ by changing adapters. With a requirements record, `service_ids:null` resolves
 needed local dependencies, while `full_catalog` with `model_ids:null` selects
 every model supported on the host platform.
 
+`catalog_scope:preserve` with `model_ids:null` keeps the installed catalog;
+`service_ids:null` keeps its existing services and adds dependencies for protocols
+needed now. Explicit `remove_services` remains required for removal. Additional
+models can be selected with an explicit list containing old and new IDs. Preserve
+rejects silently dropping installed models and cannot be used on a fresh install.
+In every scope, a library entry alone does not require deploying its protocol
+services. Required protocols and all explicitly configured instances (even those
+not set to autostart) determine infrastructure. Ordinary generate/wizard selection
+without requirements retains its previous service-resolution behavior.
+
 Example selection patch for a local KNX testing environment (no instances):
 
 ```json
@@ -158,7 +185,7 @@ Example selection patch for a local KNX testing environment (no instances):
 }
 ```
 
-`catalog_scope` is `selected`, `full_catalog` or `base`. Full catalog scope must
+`catalog_scope` is `selected`, `full_catalog`, `base` or `preserve`. Full catalog scope must
 include every supported model on the current platform, but only protocols needed
 now provision infrastructure. `base` deliberately selects no catalog models.
 With full scope and `model_ids:null`, the complete catalog is resolved, including

@@ -13,7 +13,7 @@ if not __package__:
 
 from installer.setup_cli import invoke
 from installer.setup_session import SetupEngine, SetupError
-from installer.setup_workspace import read_descriptor
+from installer.setup_workspace import read_descriptor, current_descriptor
 
 
 def build_server(workspace):
@@ -26,7 +26,7 @@ def build_server(workspace):
     engine.get(session_id)
     server = FastMCP(
         "SPX",
-        instructions="Install and work with SPX in this same workspace/connection. Runtime tools resolve committed configuration automatically; no reconnect is needed after installation. Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan.",
+        instructions="Install and work with SPX in this same workspace/connection. Start with setup_get_context once: distinguish the current draft from a previous committed installation. Descriptor changes are resolved per call; old explicit session IDs cannot mutate the new draft. Runtime tools resolve committed configuration automatically; no reconnect is needed after installation. Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Preserve the installed library with catalog_scope=preserve, model_ids=null, service_ids=null; dormant catalog models do not require infrastructure. Needed protocols and explicitly requested instances determine services. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan.",
     )
     read = ToolAnnotations(
         readOnlyHint=True,
@@ -45,16 +45,45 @@ def build_server(workspace):
     )
 
     def call(action, requested, **arguments):
-        requested = requested or session_id
-        if requested != session_id:
+        # Setup can replace its descriptor while this stdio process remains
+        # connected. Explicit IDs still protect already-reviewed plans.
+        try:
+            current_workspace, current = current_descriptor(workspace)
+            current_engine = SetupEngine(
+                Path(current["state_root"]), require_conversation=True
+            )
+            current_id = current["session_id"]
+        except (SetupError, OSError, ValueError, TypeError):
+            return {
+                "ok": False,
+                "error": {
+                    "code": "SETUP_NOT_READY",
+                    "message": "Setup workspace changed or is unavailable. Run SPX Setup to repair it.",
+                },
+            }
+        requested = requested or current_id
+        if requested != current_id:
             return {
                 "ok": False,
                 "error": {
                     "code": "SESSION_MISMATCH",
-                    "message": "Use the session in this Setup workspace.",
+                    "message": "This session is no longer current. Read setup_get_context and review the current plan.",
+                    "details": {"current_session_id": current_id},
                 },
             }
-        return invoke(engine, action, requested, **arguments)
+        result = invoke(current_engine, action, requested, **arguments)
+        if action == "get-context" and result["ok"]:
+            result["result"]["workspace"] = {
+                "path": str(current_workspace),
+                "version": current.get("workspace_version", 0),
+                "redirected": Path(workspace).resolve() != current_workspace,
+            }
+        return result
+
+    @server.tool(annotations=read)
+    def setup_get_context(session_id: str = "") -> dict:
+        """Start here: current draft, committed installation, needs, defaults and license in one response. No Docker/API probe."""
+        return call("get-context", session_id)
 
     @server.tool(annotations=read)
     def setup_get_session(session_id: str = "") -> dict:
