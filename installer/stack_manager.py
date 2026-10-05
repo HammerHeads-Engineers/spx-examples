@@ -1199,6 +1199,15 @@ class StackManager:
         if not snapshot_path.exists():
             raise StackManagerError(f"Rollback snapshot is missing: {snapshot_path}")
         snapshot = StackSnapshot.load(snapshot_path)
+        setup_journal = os.environ.get("SPX_SETUP_JOURNAL")
+        if setup_journal:
+            if __package__:
+                from .deployment_journal import restore_files
+            else:
+                from deployment_journal import restore_files
+            previous_api_url = restore_files(Path(setup_journal), mounts_only=True)
+            if previous_api_url and snapshot.containers:
+                api_url = previous_api_url
         failures: list[str] = []
         ids: list[str] = []
         for entry in snapshot.containers:

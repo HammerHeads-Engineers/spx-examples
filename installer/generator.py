@@ -514,6 +514,7 @@ class DeploymentGenerator:
         shutil.copy2(
             Path(__file__).with_name("stack_runner.py"), output_dir / "stack_runner.py"
         )
+        shutil.copy2(Path(__file__).with_name("deployment_journal.py"), output_dir / "deployment_journal.py")
         shutil.copy2(Path(__file__).with_name("mcp_workspace.py"), output_dir / "mcp_workspace.py")
         shutil.copy2(
             Path(__file__).with_name("product_key.py"), output_dir / "product_key.py"
