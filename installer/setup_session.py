@@ -38,6 +38,13 @@ from .selection import (
 )
 from .stack_manager import StackManager, StackManagerError
 from .wizard import WizardSelection
+from .setup_requirements import (
+    SCHEMA,
+    assess_requirements,
+    external_summary,
+    required_services,
+    validate_requirements,
+)
 
 DEFAULTS = {
     "packages": [],
@@ -54,6 +61,7 @@ DEFAULTS = {
     "service_bind_addresses": {},
     "port_mappings": {},
     "replace_existing": False,
+    "requirements": None,
 }
 TERMINAL = {"SUCCEEDED", "FAILED", "RECOVERY_REQUIRED"}
 
@@ -230,6 +238,10 @@ def resolve_selection(
     value: dict, key: str, index
 ) -> tuple[WizardSelection, list[str]]:
     """Resolve and validate a secret-free draft against the shipped catalog."""
+    try:
+        validate_requirements(value.get("requirements"), index)
+    except ValueError as exc:
+        raise SetupError(str(exc), "INVALID_REQUIREMENTS") from exc
     for field in (
         "install_models",
         "install_instances",
@@ -259,18 +271,39 @@ def resolve_selection(
             raise SetupError(f"Invalid {field}; use setup_list_options")
     models = value["model_ids"]
     if models is None:
-        models = resolve_model_ids(
-            value["packages"], value["profiles"], value["protocols"], index
+        models = (
+            sorted(index.models)
+            if (value.get("requirements") or {}).get("catalog_scope") == "full_catalog"
+            else resolve_model_ids(
+                value["packages"], value["profiles"], value["protocols"], index
+            )
         )
+        requirements = value.get("requirements") or {}
+        filters = value["protocols"] or requirements.get("protocols", [])
+        if requirements.get("catalog_scope") == "selected" and filters:
+            scope = (
+                resolve_model_ids(value["packages"], value["profiles"], [], index)
+                if value["packages"] or value["profiles"]
+                else list(index.models)
+            )
+            models = sorted(
+                mid
+                for mid in scope
+                if set(filters).intersection(index.models[mid].protocols)
+            )
     if not value["install_models"]:
         models = []
     services = value["service_ids"]
     if services is None:
         services = (
-            resolve_protocol_service_ids(value["protocols"], index)
-            if value["protocols"] and not value["packages"]
-            else resolve_service_ids(
-                models, value["packages"], value["profiles"], index
+            required_services(value["requirements"], models, index)
+            if value.get("requirements")
+            else (
+                resolve_protocol_service_ids(value["protocols"], index)
+                if value["protocols"] and not value["packages"]
+                else resolve_service_ids(
+                    models, value["packages"], value["profiles"], index
+                )
             )
         )
     instances = value["instances"]
@@ -336,8 +369,9 @@ def resolve_selection(
 
 
 class SetupEngine:
-    def __init__(self, state_root: Path | None = None):
+    def __init__(self, state_root: Path | None = None, *, require_conversation=False):
         self.root = (state_root or default_state_root()).expanduser().absolute()
+        self.require_conversation = require_conversation
         private_directory(self.root)
 
     def _directory(self, session_id):
@@ -365,6 +399,7 @@ class SetupEngine:
         catalog=None,
         profiles=None,
         validate_key=True,
+        requirements_required=False,
     ):
         # Artifact-only legacy CLI retains its explicit allow-missing behavior.
         # Agent handoff always uses the default strict validation.
@@ -386,6 +421,7 @@ class SetupEngine:
             "profiles": str(profiles) if profiles else None,
             "plan": None,
             "job": None,
+            "requirements_required": requirements_required,
         }
         atomic_json(directory / "session.json", session)
         if initial is not None:
@@ -436,6 +472,9 @@ class SetupEngine:
             if k not in {"source_root", "catalog", "profiles"}
         }
         public["license"] = product_key_summary(self._key(session))
+        public["requirements_required"] = bool(
+            self.require_conversation or session.get("requirements_required")
+        )
         if public.get("plan"):
             public["plan"] = {
                 k: v for k, v in public["plan"].items() if not k.startswith("_")
@@ -498,8 +537,10 @@ class SetupEngine:
                     "progress_warning",
                     "endpoints",
                     "mcp_warning",
+                    "tools",
                     "progress",
                     "diagnostics",
+                    "verification",
                 }
             }
             if "progress" in current:
@@ -515,46 +556,94 @@ class SetupEngine:
                 }
         return {**current, "cursor": cursor, "changed": changed}
 
-    def options(self, session_id, *, compact=False):
+    def options(self, session_id, *, compact=False, protocols=None):
         session = self._read(session_id)
         index = self._index(session)
+        available_protocols = {
+            p for m in index.models.values() for p in m.protocols
+        } | {s.protocol for s in index.services.values()}
+        if protocols is not None and (
+            not isinstance(protocols, list)
+            or any(
+                not isinstance(p, str) or p not in available_protocols
+                for p in protocols
+            )
+        ):
+            raise SetupError(
+                "Invalid protocol filter; use the available protocols in setup_list_options"
+            )
+        models = [
+            m
+            for m in index.models.values()
+            if not protocols or set(protocols).intersection(m.protocols)
+        ]
+        installed = self._installed_selection(session, index)
+        recommendation = {
+            "packages": [],
+            "profiles": [],
+            "protocols": [],
+            "install_models": True,
+            "install_instances": False,
+            "instances": [],
+            "start_instances": [],
+            "service_ids": None,
+            **installed,
+            "install_spx_ui": installed.get(
+                "install_spx_ui", session["selection"]["install_spx_ui"]
+            ),
+            "start": session["selection"]["start"],
+        }
+        for field in session.get("explicit_selection_fields", []):
+            if field in recommendation:
+                recommendation[field] = session["selection"][field]
+        context = {
+            "requirements_schema": SCHEMA,
+            "requirements_required": bool(
+                self.require_conversation or session.get("requirements_required")
+            ),
+            "installed_selection": installed,
+        }
         if compact:
             return {
+                **context,
                 "packages": [
                     {"id": v.id, "name": v.name} for v in index.industries.values()
                 ],
-                "model_count": len(index.models),
+                "model_count": len(models),
+                "catalog_model_count": len(index.models),
                 "protocols": sorted(
                     {p for m in index.models.values() for p in m.protocols}
                     | {s.protocol for s in index.services.values()}
                 ),
                 "services": [
-                    {"id": v.id, "name": v.name, "protocol": v.protocol}
+                    {
+                        "id": v.id,
+                        "name": v.name,
+                        "protocol": v.protocol,
+                        "runtime": v.deployment.runtime if v.deployment else None,
+                        "depends_on": v.deployment.depends_on if v.deployment else [],
+                    }
                     for v in index.services.values()
                 ],
                 "local_addresses": [asdict(v) for v in discover_ipv4_addresses()],
-                "recommended_selection": {
-                    "packages": list(index.industries),
-                    "profiles": [],
-                    "protocols": [],
-                    "install_models": True,
-                    "install_instances": False,
-                    "instances": [],
-                    "start_instances": [],
-                    "service_ids": [],
-                    "install_spx_ui": session["selection"]["install_spx_ui"],
-                    "start": session["selection"]["start"],
-                },
+                "recommended_selection": recommendation,
             }
         return {
+            **context,
             "packages": [asdict(v) for v in index.industries.values()],
             "profiles": [
                 {"id": v.id, "name": v.name, "package": v.pack_id}
                 for v in index.profiles.values()
             ],
             "models": [
-                {"id": v.id, "name": v.name, "protocols": v.protocols}
-                for v in index.models.values()
+                {
+                    "id": v.id,
+                    "name": v.name,
+                    "protocols": v.protocols,
+                    "services": v.services,
+                    "packages": v.packages,
+                }
+                for v in models
             ],
             "protocols": sorted(
                 {p for m in index.models.values() for p in m.protocols}
@@ -565,12 +654,41 @@ class SetupEngine:
                     "id": v.id,
                     "name": v.name,
                     "protocol": v.protocol,
+                    "runtime": v.deployment.runtime if v.deployment else None,
+                    "depends_on": v.deployment.depends_on if v.deployment else [],
                     "ports": [asdict(p) for p in v.ports],
                 }
                 for v in index.services.values()
             ],
             "local_addresses": [asdict(v) for v in discover_ipv4_addresses()],
         }
+
+    def _installed_selection(self, session, index):
+        """Read public bundle metadata, never credentials or container environments."""
+        file = Path(session["output"]) / "bundle.json"
+        if not file.exists():
+            return {}
+        try:
+            bundle = json.loads(file.read_text(encoding="utf-8"))
+            models = [m["id"] for m in bundle["models"]]
+            services = bundle["services"]
+            if (
+                not isinstance(services, list)
+                or any(s not in index.services for s in services)
+                or any(m not in index.models for m in models)
+            ):
+                raise ValueError("Invalid installed catalog metadata")
+            return {
+                "model_ids": models,
+                "service_ids": services,
+                "install_models": bool(models),
+                "install_spx_ui": bool(bundle.get("ui_enabled", True)),
+            }
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise SetupError(
+                "Installed bundle metadata is unavailable or incompatible; review the existing installation before replacing it.",
+                "INSTALLED_SELECTION_UNAVAILABLE",
+            ) from exc
 
     def update(self, session_id, patch):
         with file_lock(self.root / "sessions.lock"):
@@ -600,8 +718,11 @@ class SetupEngine:
                 status="DRAFT",
                 stage="configuration",
                 job=None,
+                explicit_selection_fields=sorted(
+                    set(session.get("explicit_selection_fields", [])) | set(patch)
+                ),
             )
-            for name in ("diagnostic", "endpoints", "mcp_warning"):
+            for name in ("diagnostic", "endpoints", "mcp_warning", "verification"):
                 session.pop(name, None)
             for name in ("progress.json", "diagnostics.json"):
                 (self._directory(session_id) / name).unlink(missing_ok=True)
@@ -624,6 +745,33 @@ class SetupEngine:
                 {"requested": len(selection.instances), "limit": limit},
             )
         DeploymentGenerator(self._index(session)).generate(selection, directory)
+        if session["selection"].get("requirements"):
+            external = session["selection"]["requirements"].get("external_services", {})
+            compose_path = directory / "docker-compose.generated.yml"
+            compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+            for service in compose["services"].values():
+                dependencies = service.get("depends_on")
+                if isinstance(dependencies, list):
+                    service["depends_on"] = [
+                        d for d in dependencies if d not in external
+                    ]
+                elif isinstance(dependencies, dict):
+                    service["depends_on"] = {
+                        d: v for d, v in dependencies.items() if d not in external
+                    }
+            compose_path.write_text(
+                yaml.safe_dump(compose, sort_keys=False), encoding="utf-8"
+            )
+            bundle_path = directory / "bundle.json"
+            bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+            bundle.update(
+                setup_requirements=session["selection"]["requirements"],
+                required_compose_services=sorted(compose["services"]),
+                external_services=external_summary(
+                    session["selection"]["requirements"]
+                ),
+            )
+            atomic_json(bundle_path, bundle)
         _map_ports(directory, session["selection"]["port_mappings"])
         _validate_ports(directory)
         env = directory / ".env"
@@ -723,6 +871,24 @@ class SetupEngine:
                 raise SetupError(
                     "Setup is already applying or requires recovery", "SETUP_BUSY"
                 )
+            if self.require_conversation:
+                # Persist the adapter's contract for the independent worker.
+                session["requirements_required"] = True
+            installed = self._installed_selection(session, self._index(session))
+            requirement_errors = self._requirement_errors(session, installed)
+            if requirement_errors:
+                plan = {
+                    "plan_id": uuid.uuid4().hex,
+                    "revision": session["revision"],
+                    "ready": False,
+                    "requirements": session["selection"].get("requirements"),
+                    "errors": requirement_errors,
+                    "warnings": [],
+                    "preflight": {"checked": False},
+                }
+                session.update(plan=plan, status="PLANNED", stage="requirements")
+                self._write(session)
+                return plan
             directory, selection, warnings = self._generate(session)
             preflight = self._preflight(directory, session["selection"]["start"])
             errors = list(preflight["errors"])
@@ -760,6 +926,26 @@ class SetupEngine:
                 "output": session["output"],
                 "preflight": preflight,
                 "warnings": warnings,
+                "requirements": session["selection"].get("requirements"),
+                "external_services": external_summary(
+                    session["selection"].get("requirements")
+                ),
+                "changes": {
+                    "added_services": sorted(
+                        set(selection.service_ids)
+                        - set(installed.get("service_ids", []))
+                    ),
+                    "removed_services": sorted(
+                        set(installed.get("service_ids", []))
+                        - set(selection.service_ids)
+                    ),
+                    "added_model_count": len(
+                        set(selection.model_ids) - set(installed.get("model_ids", []))
+                    ),
+                    "removed_model_count": len(
+                        set(installed.get("model_ids", [])) - set(selection.model_ids)
+                    ),
+                },
                 "errors": errors,
                 "notices": __import__("installer.wizard", fromlist=["InstallerWizard"])
                 .InstallerWizard()
@@ -778,6 +964,19 @@ class SetupEngine:
             self._write(session)
         return self.get(session_id)["plan"]
 
+    def _requirement_errors(self, session, installed):
+        if not (
+            self.require_conversation
+            or session.get("requirements_required")
+            or session["selection"].get("requirements")
+        ):
+            return []  # Ordinary generate and wizard retain their contract.
+        index = self._index(session)
+        selection, _ = resolve_selection(
+            session["selection"], self._key(session), index
+        )
+        return assess_requirements(session["selection"], selection, index, installed)
+
     def _validate_plan(self, session, plan_id, revision):
         plan = session.get("plan")
         if (
@@ -791,6 +990,12 @@ class SetupEngine:
                 "STALE_PLAN",
             )
         directory = Path(plan["_stage"])
+        if self._requirement_errors(
+            session, self._installed_selection(session, self._index(session))
+        ):
+            raise SetupError(
+                "Setup requirements changed; review a new plan", "STALE_PLAN"
+            )
         selection, _ = resolve_selection(
             session["selection"], self._key(session), self._index(session)
         )
@@ -1012,6 +1217,22 @@ class SetupEngine:
                     self._execute_stack(session, output)
                 stack_completed = True
                 with file_lock(self.root / "sessions.lock"):
+                    current = self._read(session_id)
+                    current["stage"] = "tools"
+                    self._write(current)
+                try:
+                    tools = self._prepare_tools(
+                        session,
+                        started=bool(session["selection"]["start"] or start_callback),
+                    )
+                except Exception:
+                    # Tool preparation is separate from the committed deployment.
+                    # Never roll back a healthy stack for a download/MCP failure.
+                    tools = {
+                        "ok": False,
+                        "message": "SPX configuration was installed, but MCP/CLI preparation failed. Run SPX MCP Setup to repair the workspace.",
+                    }
+                with file_lock(self.root / "sessions.lock"):
                     session = self._read(session_id)
                     session.update(
                         status="SUCCEEDED",
@@ -1023,6 +1244,19 @@ class SetupEngine:
                         ),
                     )
                     session["endpoints"] = _endpoints(stage)
+                    session["verification"] = {
+                        "required_services_checked": bool(
+                            session["selection"].get("requirements")
+                        )
+                        and session["selection"]["start"],
+                        "protocol_communication_checked": False,
+                        "external_services": external_summary(
+                            session["selection"].get("requirements")
+                        ),
+                    }
+                    session["tools"] = tools
+                    if not tools["ok"]:
+                        session["mcp_warning"] = tools["message"]
                     self._write(session)
             except Exception as error:
                 from .stack_manager import redact
@@ -1087,6 +1321,11 @@ class SetupEngine:
                     )
                     session["error"] = safe_error
                     self._write(session)
+
+    def _prepare_tools(self, session, *, started):
+        from .setup_runtime import prepare_tools
+
+        return prepare_tools(self, session, started=started)
 
     def _execute_stack(self, session, output):
         env = clean_environment()

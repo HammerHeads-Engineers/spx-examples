@@ -16,25 +16,39 @@ questions, choices, approval, progress and diagnostics happen in the conversatio
 The terminal monitors progress; R returns to the ordinary wizard before execution.
 Closing the monitor or disconnecting MCP does not cancel or restart a running job.
 
-Agent defaults are Server, UI and the model catalog, localhost, normal ports,
-and **zero instances with no instance autostart**. Optional protocol services
-are chosen for the user's stated use case. The compact options response supplies
-recommended selections without enumerating every model/profile. Existing explicit
-choices (including no-start/no-UI) take precedence. Ask missing decisions together,
-show a short plan, and obtain one approval covering replacement and port changes.
-Simulation setup belongs to the runtime workspace after successful installation.
+The conversation starts with the user's application, devices, protocols and
+integrations. If these are absent, the agent asks what SPX will be used for before
+selecting a catalog. It groups unanswered setup details: local versus external
+infrastructure, UI, start now, local/LAN service access, addresses/ports and update
+behavior. Proposed defaults can be accepted together in the final concrete plan;
+the agent must not assume that opening the workspace supplies requirements.
+
+The full catalog is an explicit choice, not a default. Installation creates
+**zero instances with no instance autostart** unless separately requested.
+Model registration and service deployment are distinct: a KNX use case needs
+the gateway, and MQTT needs a local broker or an explicit external provider.
+The compact options response exposes installed selections and a requirements
+schema; full options expose model/service dependencies. Existing gateways are
+preserved unless their removal is explicitly recorded and disclosed in the plan.
+Existing explicit choices, including no-start/no-UI, take precedence. Simulation
+setup follows successful installation on a separate runtime request.
+Use `setup_list_options(compact:false, protocols:["knx"])` or CLI
+`list-options --protocol knx --json` to inspect just the needed models. Filters
+are repeatable; unrelated model lists need not enter the conversation. In a
+requirements-driven selected scope, protocol filters narrow the chosen packs or
+profiles instead of adding every unrelated model from those packs.
 Generated handoff text is English; the conversation can use the user's language.
 
 Defaults:
 
 | Platform | Setup workspace | Private session/credential state |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\SPX\setup-workspace` | `%LOCALAPPDATA%\SPX\setup-state` |
-| macOS | `~/Documents/spx-setup-workspace` | `~/Library/Application Support/SPX/setup-state` |
-| Linux | `~/spx-setup-workspace` | `~/.local/share/SPX/setup-state` |
+| Windows | `%LOCALAPPDATA%\SPX\workspace` | `%LOCALAPPDATA%\SPX\setup-state` |
+| macOS | `~/Documents/SPX MCP Workspace` | `~/Library/Application Support/SPX/setup-state` |
+| Linux | `~/spx-mcp-workspace` | `~/.local/share/SPX/setup-state` |
 
 `--setup-workspace` can choose another separate directory. Setup refuses an
-unmanaged nonempty directory, a runtime workspace, or overlap with private state
+unmanaged nonempty directory or overlap with private state
 or the installation directory. Failed dependency downloads can be retried in
 the same managed directory. Starting another handoff invalidates the old draft;
 an active job must instead be reconnected to.
@@ -44,7 +58,7 @@ an active job must instead be reconnected to.
 The workspace contains `AGENTS.md`, `CLAUDE.md`, `INSTALLATION.md`, a private-state
 reference in `setup-session.json`, and PowerShell/POSIX JSON CLI launchers. Setup
 uses the existing MCP bootstrap mechanism to install a normal isolated Python
-environment with YAML, HTTP and MCP dependencies. Python >=3.10 is required for
+environment with YAML, HTTP, MCP and the SPX runtime client. Python >=3.10 is required for
 MCP; ordinary installer modes retain the repository's Python 3.9 support.
 
 Only project settings are created/updated; other settings and other MCP servers
@@ -53,14 +67,16 @@ Agents and global settings are never installed or modified automatically.
 
 | Client | Generated project settings | Official reference |
 | --- | --- | --- |
-| Codex | `.codex/config.toml`, `mcp_servers.spx_setup` | [Local MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) |
-| Claude Code | `.mcp.json`, `mcpServers.spx_setup` | [Project MCP servers](https://code.claude.com/docs/en/mcp) |
-| OpenCode v2 | `opencode.jsonc`, `mcp.servers.spx_setup` | [MCP servers](https://opencode.ai/v2/docs/mcp-servers) |
+| Codex | `.codex/config.toml`, `mcp_servers.spx` | [Local MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) |
+| Claude Code | `.mcp.json`, `mcpServers.spx` | [Project MCP servers](https://code.claude.com/docs/en/mcp) |
+| OpenCode v2 | `opencode.jsonc`, `mcp.servers.spx` | [MCP servers](https://opencode.ai/v2/docs/mcp-servers) |
 
 The command uses an absolute local script path and interpreter, so starting the
 client outside the workspace does not break imports. Reconnect/restart MCP after
 opening the workspace. Other local clients may use the same stdio entrypoint or
-the JSON CLI. ChatGPT web requires a local execution bridge; attaching a folder
+the JSON CLI. The same project connection provides runtime MCP after deployment;
+there is no workspace switch or routine reconnect after successful tool setup.
+ChatGPT web requires a local execution bridge; attaching a folder
 alone does not grant local process access. No public installer endpoint is added.
 
 ## Shared engine and tools
@@ -99,11 +115,83 @@ the full diagnostics for failure investigation. Report changed phases only.
 Selection fields: `packages`, `profiles`, `protocols`, `install_models`,
 `install_instances`, `install_spx_ui`, `model_ids`, `service_ids`, `instances`,
 `start_instances`, `service_bind_addresses`, `port_mappings`, `start`,
-`replace_existing`. Null model/service/instance lists select manifest defaults;
+`replace_existing`, `requirements`. Without a requirements record, null
+model/service/instance lists select manifest defaults;
 explicit empty lists select none. Instance definitions retain the generator's
 existing shape. Bind addresses must be local; host port mapping keys are
 `service:container_port/tcp|udp`. Modbus's port range must move consistently.
 `start:false` generates configuration without Docker readiness or starting SPX.
+
+### Requirements record
+
+Agent handoff marks the session `requirements_required:true`. Conversational MCP
+and `installer setup` CLI also enforce this contract when a workspace originated
+in an ordinary wizard. Ordinary wizards and explicit `installer generate` remain
+compatible without a conversation record. A requirements-bearing plan is checked
+by the same engine through MCP and CLI; it cannot bypass missing decisions merely
+by changing adapters. With a requirements record, `service_ids:null` resolves
+needed local dependencies, while `full_catalog` with `model_ids:null` selects
+every model supported on the host platform.
+
+Example selection patch for a local KNX testing environment (no instances):
+
+```json
+{
+  "protocols": ["knx"],
+  "service_ids": null,
+  "requirements": {
+    "description": "Test KNX switch actuators from my automation application",
+    "catalog_scope": "selected",
+    "protocols": ["knx"],
+    "required_services": [],
+    "external_services": {},
+    "remove_services": [],
+    "unresolved": [],
+    "decisions": {
+      "install_spx_ui": true,
+      "start": true,
+      "service_bind_addresses": {},
+      "port_mappings": {},
+      "replace_existing": false
+    }
+  }
+}
+```
+
+`catalog_scope` is `selected`, `full_catalog` or `base`. Full catalog scope must
+include every supported model on the current platform, but only protocols needed
+now provision infrastructure. `base` deliberately selects no catalog models.
+With full scope and `model_ids:null`, the complete catalog is resolved, including
+models not assigned to a pack.
+`required_services` adds infrastructure outside model dependencies. Dependencies
+are resolved transitively for local services; missing required services block
+explicit incomplete selections. Unsupported required protocols also block the
+plan instead of silently disappearing from the configuration.
+
+`decisions` records the exact proposed/reviewed UI, start, service-bind, port-map
+and replacement values. It is not approval to execute. Changed values need an
+updated record and a new plan. Unanswered questions in `unresolved`, missing
+requirements or unconfirmed installed-service removals make `ready:false` before
+generation or Docker inspection. Actual installation still needs one explicit
+approval of the complete ready plan.
+
+For external MQTT, declare for example:
+`"external_services":{"mqtt_broker":{"endpoint":"mqtt://192.0.2.10:1883",
+"provisioning":"Set mqtt_broker_host and mqtt_broker_port when creating instances"}}`.
+Only separately deployed services can be external. Endpoints require an explicit
+port and the matching transport; credentials, URL query parameters and fragments
+are rejected. The external provider owns its dependencies. Local Compose peers
+are not generated for it, and dangling external Compose dependencies are removed.
+The record is persisted in the public bundle for subsequent provisioning. It does
+not rewrite model YAML or automatically configure/create instances. External
+providers have `verified:false` until a separate runtime communication test.
+
+Requirement-aware bundles list every required Compose service. Transaction
+readiness verifies each is running and, when available, healthy before commit;
+a healthy Server API cannot conceal a missing/exited/unhealthy gateway. This
+remains container/API readiness, not proof of device protocol communication.
+No-start reports `required_services_checked:false`. Ordinary bundles retain
+their existing readiness contract.
 
 The agent must present the complete ready plan and receive explicit approval
 in conversation before calling apply. The engine checks identity, revision,
@@ -148,7 +236,10 @@ silently retry it. Backups and diagnostic state are retained for inspection.
 
 Only `SUCCEEDED` is success. A healthy stack with failed runtime MCP refresh
 reports a separate warning and instructs the user to run SPX MCP Setup/reconnect.
-Setup and runtime MCP workspaces remain separate.
+Setup and runtime tools share the workspace and MCP connection. Conversational
+Setup MCP and `installer setup` CLI always require the needs record, including
+workspaces prepared by an ordinary wizard. Ordinary `installer generate` and
+the interactive/legacy wizards retain their existing explicit selection flow.
 
 Credential files and staging/backup files live in owner-only private state
 (Windows caller SID ACL / POSIX 0700 directories and 0600 files). The product

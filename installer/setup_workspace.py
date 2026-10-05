@@ -24,18 +24,13 @@ from tools.codex_mcp_bootstrap import (
     upsert_named_mcp_server,
 )
 
-SERVER_NAME = "spx_setup"
+SERVER_NAME = "spx"
 
 
 def default_workspace():
-    if os.name == "nt":
-        return (
-            Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
-            / "SPX/setup-workspace"
-        )
-    if sys.platform == "darwin":
-        return Path.home() / "Documents/spx-setup-workspace"
-    return Path.home() / "spx-setup-workspace"
+    from .mcp_workspace import resolve_default_workspace_dir
+
+    return resolve_default_workspace_dir()
 
 
 def default_output():
@@ -154,6 +149,7 @@ def prepare_workspace(
     *,
     python=None,
     bootstrap=True,
+    preserve_session=False,
 ):
     workspace = workspace.expanduser().absolute()
     source = paths.repo_root()
@@ -169,14 +165,24 @@ def prepare_workspace(
         raise SetupError(
             "Setup workspace must be separate from the active installation"
         )
-    if workspace.resolve() == source.resolve() or workspace.is_symlink():
+    if (
+        workspace.resolve() == source.resolve() and not preserve_session
+    ) or workspace.is_symlink():
         raise SetupError("Setup requires a separate managed workspace")
     if workspace.exists() and any(workspace.iterdir()):
-        if not marker.is_file() or _read_config(marker).get("purpose") != "setup":
+        legacy_marker = workspace / ".spx-mcp-workspace.json"
+        managed_runtime = (
+            legacy_marker.is_file()
+            and _read_config(legacy_marker).get("workspace_kind") == "managed"
+            and not (workspace / ".git").exists()
+        )
+        if (
+            not marker.is_file() or _read_config(marker).get("purpose") != "setup"
+        ) and not managed_runtime:
             raise SetupError(
                 "Existing directory is not a managed Setup workspace; choose a different workspace"
             )
-        old = _read_config(marker)
+        old = _read_config(marker) if marker.is_file() else {}
         old_session = old.get("session_id")
         if old_session:
             previous_engine = engine
@@ -187,12 +193,20 @@ def prepare_workspace(
                 previous = previous_engine.get(old_session)
             except SetupError:
                 previous = None
-            if previous and previous["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
+            if (
+                previous
+                and previous["status"] in {"APPLYING", "RECOVERY_REQUIRED"}
+                and not (
+                    preserve_session
+                    and old_session == session_id
+                    and previous["status"] == "APPLYING"
+                )
+            ):
                 raise SetupError(
                     "An existing Setup workspace job is active or requires recovery; reconnect to that workspace",
                     "SETUP_BUSY",
                 )
-            if previous and old_session != session_id:
+            if previous and old_session != session_id and not preserve_session:
                 with file_lock(previous_engine.root / "sessions.lock"):
                     old_state = previous_engine._read(old_session)
                     if old_state["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
@@ -234,7 +248,7 @@ def prepare_workspace(
         "pyproject.toml",
         "LICENSE",
     ):
-        if (source / name).exists():
+        if source.resolve() != workspace.resolve() and (source / name).exists():
             destination = workspace / name
             if destination.is_symlink() or not destination.resolve().is_relative_to(
                 workspace.resolve()
@@ -261,7 +275,7 @@ def prepare_workspace(
                 copy_path(source / name, destination)
     interpreter = Path(python or sys.executable)
     if bootstrap:
-        # Same isolated-runtime bootstrap as SPX MCP Setup, with Setup-only deps.
+        # Bootstrap the complete Setup/runtime toolset once for this workspace.
         result = subprocess.run(
             [
                 str(interpreter),
@@ -274,6 +288,8 @@ def prepare_workspace(
                 "requests",
                 "--package",
                 "mcp>=1.26,<2",
+                "--package",
+                "spx-python==1.0.0-rc.3",
             ],
             capture_output=True,
             text=True,
@@ -293,6 +309,16 @@ def prepare_workspace(
     args = [str(script), "stdio", "--workspace-root", str(workspace)]
     codex_path = workspace / ".codex/config.toml"
     existing = codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
+    if marker.is_file():
+        import re
+
+        existing = re.sub(
+            r"(?ms)^\[mcp_servers\.(?:spx_setup|spx)(?:\.[^\]]+)?\]\s*$.*?(?=^\[|\Z)",
+            "",
+            existing,
+        )
+        claude.setdefault("mcpServers", {}).pop("spx_setup", None)
+        opencode.setdefault("mcp", {}).setdefault("servers", {}).pop("spx_setup", None)
     invocation = ServerInvocation(
         str(interpreter),
         args,
@@ -330,10 +356,26 @@ def prepare_workspace(
     atomic_json(workspace / "setup-session.json", descriptor)
     atomic_json(marker, {"purpose": "setup", "session_id": session_id})
     _write_instructions(workspace, interpreter, engine.root, session_id)
+    # Migration from the older runtime workspace: the shared gateway reads
+    # credentials only from private Setup state, never a workspace .env.
+    if (workspace / ".env").is_file():
+        lines = (workspace / ".env").read_text(encoding="utf-8").splitlines()
+        _atomic_text(
+            workspace / ".env",
+            "\n".join(
+                line
+                for line in lines
+                if line.partition("=")[0].strip() != "SPX_PRODUCT_KEY"
+            )
+            + "\n",
+        )
     with file_lock(engine.root / "sessions.lock"):
         session = engine._read(session_id)
-        session["source_root"] = str(workspace)
-        session.update(plan=None, status="DRAFT", stage="configuration", job=None)
+        session["workspace"] = str(workspace)
+        if not preserve_session:
+            session["requirements_required"] = True
+            session["source_root"] = str(workspace)
+            session.update(plan=None, status="DRAFT", stage="configuration", job=None)
         engine._write(session)
     if bootstrap:
         verified = subprocess.run(
@@ -363,7 +405,9 @@ def _write_instructions(workspace, interpreter, state_root, session_id):
     instructions = """# SPX conversational Setup
 
 This installer-managed workspace configures SPX; it is not a development checkout.
-Read INSTALLATION.md and use the local spx_setup MCP tools. Do not edit installer
+Read INSTALLATION.md and use the project-local spx MCP tools. This same connection
+provides setup_* and runtime server_* tools. Do not use an inherited/global SPX
+connection for this installation. Do not edit installer
 code, credentials or generated files, and do not run Docker replacement directly.
 
 1. Read setup_get_session and setup_list_options(compact=true). Use these tools,
@@ -371,43 +415,89 @@ code, credentials or generated files, and do not run Docker replacement directly
    is already stored privately. Never ask for it in chat. The public license field
    gives planning limits: Community (CO) allows at most five instances; the server
    still validates entitlement. Do not read or infer the key yourself.
-2. Default to Server, UI and the model catalog with zero instances, no instance
-   autostart, localhost and normal ports. Use recommended_selection for a new
-   unconfigured draft; preserve explicit user choices, including no-start/no-UI.
-   Additional protocol services are optional: select them for the user's stated
-   use case, or set service_ids=null to resolve services for their chosen scope.
-   Ask only unanswered setup decisions in one short group. Do not propose demo
-   instances, profiles or autostart as defaults, even for paid licenses. Request
-   the full options catalog only for custom selections. Create/run simulations
-   later in runtime MCP, on a separate user request.
-3. Update the draft once and call setup_plan. Port conflicts return a complete
+2. Discover requirements BEFORE choosing the catalog or proposing installation.
+   If the initial message does not describe the application, ask:
+   "What would you like to use SPX for? Describe the devices, protocols and
+   applications you want to connect." Reuse information already supplied.
+   Never select the full catalog unless the user explicitly asks for it. Select
+   appropriate models/packs after identifying the use case. A base-only Server/UI
+   installation is also an explicit choice, not a guess about unknown needs.
+   Group missing details into one short follow-up: relevant protocols/devices,
+   local test services versus existing external services, UI, start now versus
+   generate only, local versus LAN service access, and standard versus custom
+   addresses/ports. Propose sensible defaults and explain them together; do not
+   ask again about decisions already supplied. Preserve no-start/no-UI choices.
+   Always default to zero instances and no instance autostart, even for paid
+   licenses. Instances and simulations are created later on a separate request.
+3. Use setup_list_options(compact=false, protocols=[...]) when matching needs to
+   exact model IDs; omit the protocol filter only for a broader catalog choice.
+   Model entries expose services; service entries expose runtime and depends_on.
+   Record the use case in selection.requirements using requirements_schema:
+   description, catalog_scope (selected/full_catalog/base), protocols actually
+   needed now, required_services, external_services, remove_services, unresolved,
+   and decisions containing the proposed/reviewed install_spx_ui, start,
+   service_bind_addresses, port_mappings and replace_existing values.
+   The decisions record documents configuration, NOT permission to execute.
+   external_services must include a credential-free endpoint with explicit port
+   and provisioning instructions for future instance parameters. Never request
+   service passwords in conversation. External connectivity is not yet verified.
+   A registered model is not an active protocol: install the infrastructure needed
+   for the user's intended operation, while keeping instances at zero. For KNX
+   testing this includes knx_gateway; MQTT needs a local broker or an explicitly
+   chosen external broker. Use service_ids=null to resolve required dependencies,
+   or an explicit complete list when preserving existing services.
+   On update use installed_selection to preserve the installed catalog and services
+   unless the user changes scope. Do not silently remove existing gateways;
+   record agreed removals in remove_services and show them in the approval plan.
+4. Update the draft and call setup_plan only after needs and details are known.
+   Resolve REQUIREMENTS_INCOMPLETE, SETUP_DECISION_REQUIRED and missing-service
+   errors with the user; do not bypass the gate or retry unchanged drafts.
+   Port conflicts return a complete
    suggested_port_mappings patch: propose that patch, never handwrite a range.
    You may set replace_existing=true to prepare a reviewable replacement proposal
    before approval; this only prepares a plan and authorizes no execution. Respect
    any explicit refusal. Include replacement and changed ports in final approval,
    without an extra question merely to prepare the plan. If Docker is unavailable,
    help start it and re-plan; required OS permissions remain user actions.
-4. Present a short summary: components/catalog, zero instances, local/LAN access,
-   changed ports, whether an existing stack is replaced, and whether it will start.
+5. Present a short summary linking the user's needs to selected models, protocols
+   and services, with external-provider provisioning, zero instances, UI,
+   local/LAN service access, ports, removed services/models, whether an existing
+   stack is replaced, and whether it will start.
    Keep full per-port/model details available on request. Obtain one approval of
    this concrete ready plan in chat, then call setup_apply with its plan_id/revision.
    Never infer approval from opening the workspace or the initial setup request.
    Obtain new approval only when the reviewed configuration or installation
    conditions actually change. Never stop a service to silence changing logs.
-5. Call setup_get_status(compact=true), then reuse its cursor as after_cursor with
+6. Call setup_get_status(compact=true), then reuse its cursor as after_cursor with
    wait_seconds=30 and compact=true. Wait for phase changes or timeout; do not
    busy-poll or repeatedly fetch the full session/catalog. Report meaningful phase
    changes only, not unchanged status or each registered model. Keep all progress
    and diagnostics in this conversation; do not return to terminal questions.
-6. Report success only for SUCCEEDED, with the UI link and runtime workspace.
+7. Report stack success only for SUCCEEDED. Check tools.ok separately: when true,
+   MCP and CLI are ready in THIS workspace. Never ask the user to switch workspace,
+   reconnect MCP, or run MCP Setup after successful tool preparation. On the next
+   user request, use this same MCP's repo_* and server_* tools to work with SPX.
+   Verify runtime access with health/server_list_models/server_list_instances.
+   Installation approval does not authorize creating demo instances. Protocol
+   requests must check required services; zero-instance installation does not
+   imply all optional gateways are installed. For no-start, explain that tools
+   are ready but the stack needs starting before live operations.
+   Report service verification separately from device/protocol communication.
+   A running gateway alone does not prove device communication. For no-start,
+   report configuration generated; do not claim services are running. External
+   providers require the recorded provisioning when creating instances and a
+   subsequent communication check on user request. Do not create demo instances
+   merely to report installation success.
    FAILED requires reviewing diagnostics and a new plan; RECOVERY_REQUIRED must
    not be retried blindly. A repeated apply of the same plan returns the same job.
-   Explain MCP warnings separately. Reconnect to resume after disconnect.
+   Explain MCP warnings separately. SPX MCP Setup is a repair tool, not a routine
+   follow-up step. Reconnect only if the client itself disconnected.
 
 Use the JSON CLI equivalents only if the host cannot connect local MCP. Do not
 change global client configuration or request product keys in CLI arguments.
 """
     _atomic_text(workspace / "AGENTS.md", instructions)
+    _atomic_text(workspace / ".spx/workspace_mode.toml", 'mode = "runtime_mcp"\n')
     _atomic_text(
         workspace / "CLAUDE.md",
         "# SPX Setup\nRead @AGENTS.md and @INSTALLATION.md before using Setup tools.\n",
@@ -418,13 +508,19 @@ change global client configuration or request product keys in CLI arguments.
 
 Open this directory as a trusted local workspace in Codex, Claude Code, or
 OpenCode v2 and say: **Complete SPX setup and installation**.
+Describe what you need SPX for (devices, protocols and integrations). The agent
+will clarify missing details and propose an environment for those requirements.
+The complete catalog is optional; no simulation instances are created by default.
 Restart/reconnect the project's MCP if your client does not reload its configuration.
 All further decisions and final approval happen in the conversation. Setup's
 terminal is only a progress monitor; R returns to the ordinary wizard before apply.
 
 Your SPX key is outside this workspace. Do not paste keys into the conversation.
-Setup MCP works before Docker or SPX API is running. This is not runtime MCP;
-after installing use the separate SPX MCP Setup workspace for live product work.
+The project's spx MCP works before Docker or SPX API is running and also provides
+runtime tools. After successful installation, continue working in this SAME
+workspace and conversation. No second MCP Setup or reconnect is needed. Runtime
+operations resolve the committed installation's private configuration per call.
+For no-start, tools are prepared but live calls wait until SPX is started.
 
 Other local agents can launch `{interpreter}` with arguments
 `installer/setup_mcp.py stdio --workspace-root <this directory>` using local stdio.
@@ -446,8 +542,18 @@ a directory does not give them access to local stdio or Docker.
 
     sh = f'#!/usr/bin/env sh\ncd "$(dirname "$0")" || exit 1\naction="$1"; shift\nexec {shlex.quote(str(interpreter))} -m installer setup --state-root {shlex.quote(str(state_root))} "$action" --session-id {session_id} "$@"\n'
     _atomic_text(workspace / "setup-cli.sh", sh)
+    runtime_script = workspace / "installer/spx_cli.py"
+    ps = f"& '{str(interpreter).replace(chr(39), chr(39)*2)}' '{str(runtime_script).replace(chr(39), chr(39)*2)}' @args --workspace-root $PSScriptRoot\nexit $LASTEXITCODE\n"
+    _atomic_text(workspace / "spx.ps1", ps)
+    sh = f'#!/usr/bin/env sh\nexec {shlex.quote(str(interpreter))} {shlex.quote(str(runtime_script))} "$@" --workspace-root "$(dirname "$0")"\n'
+    _atomic_text(workspace / "spx.sh", sh)
     if os.name != "nt":
         (workspace / "setup-cli.sh").chmod(0o755)
+        (workspace / "spx.sh").chmod(0o755)
+    with (workspace / "INSTALLATION.md").open("a", encoding="utf-8") as file:
+        file.write(
+            "\nRuntime CLI: `spx.ps1` (Windows) or `spx.sh` (macOS/Linux).\nCommands: `doctor --check-server --json`, `list-tools --json`, and\n`call server_list_instances --json`. For tool arguments use\n`call <tool> --arguments-file <JSON file> --json`; never supply a product key.\n"
+        )
 
 
 def launch_handoff(args, loader):
@@ -496,6 +602,9 @@ def launch_handoff(args, loader):
     prepare_workspace(workspace, engine, session["session_id"])
     print(f"\n[spx-setup] Open this directory in your local agent: {workspace}")
     print("[spx-setup] Say: Complete SPX setup and installation")
+    print(
+        "[spx-setup] Describe the devices, protocols and integrations you need in that conversation."
+    )
     print(
         "[spx-setup] All configuration and approval now happen in the conversation. R returns to the ordinary wizard before installation."
     )

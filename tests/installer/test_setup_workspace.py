@@ -12,11 +12,34 @@ from installer.setup_workspace import prepare_workspace, read_descriptor
 KEY = "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
 
 
+def use_case(protocols=(), scope="base"):
+    return {
+        "description": "Explicit configuration-generation test",
+        "catalog_scope": scope,
+        "protocols": list(protocols),
+        "required_services": [],
+        "external_services": {},
+        "remove_services": [],
+        "unresolved": [],
+        "decisions": {
+            "install_spx_ui": True,
+            "start": False,
+            "service_bind_addresses": {},
+            "port_mappings": {},
+            "replace_existing": False,
+        },
+    }
+
+
 @pytest.fixture
 def workspace(tmp_path):
     root = tmp_path / "Workspace with spaces Łódź"
     engine = SetupEngine(tmp_path / "private")
-    session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
+    session = engine.create(
+        tmp_path / "generated",
+        KEY,
+        initial={"start": False, "requirements": use_case()},
+    )
     prepare_workspace(
         root,
         engine,
@@ -43,11 +66,10 @@ def test_profiles_and_instructions_do_not_contain_key(workspace):
         assert KEY not in (root / name).read_text(encoding="utf-8")
     claude = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))
     assert any(
-        value.endswith("setup_mcp.py")
-        for value in claude["mcpServers"]["spx_setup"]["args"]
+        value.endswith("setup_mcp.py") for value in claude["mcpServers"]["spx"]["args"]
     )
     opencode = json.loads((root / "opencode.jsonc").read_text(encoding="utf-8"))
-    assert opencode["mcp"]["servers"]["spx_setup"]["type"] == "local"
+    assert opencode["mcp"]["servers"]["spx"]["type"] == "local"
     assert "mcp.servers" not in opencode
 
 
@@ -80,20 +102,22 @@ def test_preparation_preserves_other_client_settings(workspace):
     sys.version_info < (3, 10),
     reason="Setup MCP requires Python >=3.10; required 3.12 tests cover the MCP server",
 )
-def test_mcp_exposes_only_setup_tools_without_api(workspace):
+def test_mcp_exposes_setup_and_runtime_tools_without_api(workspace):
     import asyncio
     from installer.setup_mcp import build_server
 
     root, _, _ = workspace
     server = build_server(root)
     names = {tool.name for tool in asyncio.run(server.list_tools())}
-    assert names == {
+    assert names >= {
         "setup_get_session",
         "setup_list_options",
         "setup_update_selection",
         "setup_plan",
         "setup_apply",
         "setup_get_status",
+        "health",
+        "server_list_instances",
     }
 
 
@@ -128,9 +152,15 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
     from mcp.client.stdio import StdioServerParameters, stdio_client
 
     root, engine, session = workspace
+    engine.update(session["session_id"], {"requirements": None})
+    # Ordinary wizards also create shared tool workspaces. Their subsequent
+    # conversational installer tools must enforce discovery independently.
+    private = engine._read(session["session_id"])
+    private["requirements_required"] = False
+    engine._write(private)
     profile = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
         "mcpServers"
-    ]["spx_setup"]
+    ]["spx"]
     parameters = StdioServerParameters(
         command=profile["command"],
         args=profile["args"],
@@ -151,11 +181,21 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
                 )
                 assert json.loads(options.content[0].text)["ok"]
                 assert KEY not in options.content[0].text
+                blocked = await client.call_tool(
+                    "setup_plan", {"session_id": session["session_id"]}
+                )
+                blocked_plan = json.loads(blocked.content[0].text)["result"]
+                assert not blocked_plan["ready"]
+                assert blocked_plan["errors"][0]["code"] == "REQUIREMENTS_INCOMPLETE"
                 result = await client.call_tool(
                     "setup_update_selection",
                     {
                         "session_id": session["session_id"],
-                        "selection": {"protocols": ["http"], "start": False},
+                        "selection": {
+                            "protocols": ["http"],
+                            "start": False,
+                            "requirements": use_case(["http"], "selected"),
+                        },
                     },
                 )
                 assert json.loads(result.content[0].text)["ok"]
@@ -281,7 +321,8 @@ def test_workspace_cannot_contain_credentials_or_active_configuration(tmp_path):
             prepare_workspace(root, engine, session["session_id"], bootstrap=False)
 
 
-def test_cli_launcher_preserves_unicode_paths(workspace):
+@pytest.mark.parametrize("stdio_encoding", ["utf-8", "cp1252"])
+def test_cli_launcher_preserves_unicode_paths(workspace, stdio_encoding):
     import os
     import subprocess
 
@@ -303,10 +344,12 @@ def test_cli_launcher_preserves_unicode_paths(workspace):
         encoding="utf-8",
         errors="replace",
         timeout=30,
+        env={**os.environ, "PYTHONIOENCODING": stdio_encoding},
     )
     assert result.returncode == 0, result.stderr
     public = json.loads(result.stdout)
     assert public["ok"] and public["result"]["session_id"] == session["session_id"]
+    assert public["result"]["workspace"] == str(root)
     assert KEY not in result.stdout
 
 

@@ -1311,6 +1311,21 @@ class StackManager:
         started = time.monotonic()
         last_message = ""
         last_log = started
+        required_services = []
+        bundle_path = self.compose_file.parent / "bundle.json"
+        if bundle_path.exists():
+            try:
+                required_services = json.loads(
+                    bundle_path.read_text(encoding="utf-8")
+                ).get("required_compose_services", [])
+                if not isinstance(required_services, list) or any(
+                    not isinstance(s, str) or not s for s in required_services
+                ):
+                    raise ValueError("Invalid required service list")
+            except (OSError, ValueError, AttributeError) as exc:
+                raise StackManagerError(
+                    "Could not validate required services in the installation bundle"
+                ) from exc
         while time.monotonic() < deadline:
             state: dict[str, Any] = {"url": self._safe_text(api_url), "ready": False}
             try:
@@ -1343,6 +1358,37 @@ class StackManager:
                             "Host API ready"
                             if state["ready"]
                             else api.get("error", "Host API not ready")
+                        )
+                if required_services:
+                    checked = {}
+                    for service in required_services:
+                        service_label = (
+                            f"transaction-{self.transaction_token}-{service}"
+                            if self.transaction_token
+                            else service
+                        )
+                        matches = [
+                            item for item in containers if item.service == service_label
+                        ]
+                        item = matches[0] if len(matches) == 1 else None
+                        checked[service] = {
+                            "state": item.state if item else "missing",
+                            "health": item.health if item else "",
+                            "ready": bool(
+                                item
+                                and item.state == "running"
+                                and item.health in {None, "", "healthy"}
+                            ),
+                        }
+                    state["services"] = checked
+                    failed = [
+                        sid for sid, result in checked.items() if not result["ready"]
+                    ]
+                    if failed:
+                        state["ready"] = False
+                        state["reason"] = "Required services not ready: " + ", ".join(
+                            f"{sid} ({checked[sid]['state']}, {checked[sid]['health'] or 'no healthcheck'})"
+                            for sid in failed
                         )
             except (StackManagerError, OSError) as exc:
                 state["reason"] = self._error_detail(exc)

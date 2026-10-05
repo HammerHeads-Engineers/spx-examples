@@ -44,6 +44,12 @@ def add_parser(subparsers):
             action.add_argument("--compact", action="store_true")
         if name == "list-options":
             action.add_argument("--compact", action="store_true")
+            action.add_argument(
+                "--protocol",
+                dest="protocols",
+                action="append",
+                help="Limit model options to a needed protocol (repeatable)",
+            )
     return parser
 
 
@@ -83,7 +89,7 @@ def invoke(engine, action, session_id, **arguments):
 
 def run(args):
     try:
-        engine = SetupEngine(args.state_root)
+        engine = SetupEngine(args.state_root, require_conversation=True)
         arguments = {}
         if args.setup_action == "update-selection":
             content = (
@@ -101,7 +107,7 @@ def run(args):
                 compact=args.compact,
             )
         if args.setup_action == "list-options":
-            arguments["compact"] = args.compact
+            arguments.update(compact=args.compact, protocols=args.protocols)
         result = invoke(engine, args.setup_action, args.session_id, **arguments)
     except (OSError, ValueError):
         result = {
@@ -111,5 +117,7 @@ def run(args):
                 "message": "Invalid or inaccessible Setup selection file.",
             },
         }
-    print(json.dumps(result, ensure_ascii=False, default=str))
+    # JSON escapes preserve Unicode paths even when a Windows launcher uses
+    # a legacy output code page; consumers recover the original string.
+    print(json.dumps(result, ensure_ascii=True, default=str))
     return 0 if result["ok"] else 1

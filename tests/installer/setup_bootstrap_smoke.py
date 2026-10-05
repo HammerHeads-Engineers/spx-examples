@@ -20,7 +20,28 @@ def main():
     # Format-only fixture: configuration generation is not server qualification.
     key = "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
     session = engine.create(
-        root / "generated", key, initial={"protocols": ["http"], "start": False}
+        root / "generated",
+        key,
+        initial={
+            "protocols": ["http"],
+            "start": False,
+            "requirements": {
+                "description": "Generate a local HTTP testing environment",
+                "catalog_scope": "selected",
+                "protocols": ["http"],
+                "required_services": [],
+                "external_services": {},
+                "remove_services": [],
+                "unresolved": [],
+                "decisions": {
+                    "install_spx_ui": True,
+                    "start": False,
+                    "service_bind_addresses": {},
+                    "port_mappings": {},
+                    "replace_existing": False,
+                },
+            },
+        },
     )
     workspace = prepare_workspace(
         root / "Workspace with spaces Łódź", engine, session["session_id"]
@@ -97,6 +118,36 @@ def main():
         raise AssertionError("Independent Setup worker did not complete")
     assert (root / "generated/bundle.json").is_file()
     assert key in (root / "generated/.env").read_text(encoding="utf-8")
+    assert current["tools"]["ok"], current.get("mcp_warning")
+    runtime_launcher = (
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(workspace / "spx.ps1"),
+        ]
+        if os.name == "nt"
+        else ["sh", str(workspace / "spx.sh")]
+    )
+    diagnostic = subprocess.run(
+        [*runtime_launcher, "doctor", "--json"],
+        capture_output=True,
+        encoding="utf-8",
+        check=True,
+        timeout=30,
+    )
+    assert json.loads(diagnostic.stdout)["ok"]
+    blocked = subprocess.run(
+        [*runtime_launcher, "call", "health", "--json"],
+        capture_output=True,
+        encoding="utf-8",
+        timeout=30,
+    )
+    assert blocked.returncode == 1
+    assert json.loads(blocked.stdout)["error"]["code"] == "SPX_NOT_STARTED"
+    assert key not in diagnostic.stdout + blocked.stdout
     print(
         json.dumps(
             {

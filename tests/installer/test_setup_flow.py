@@ -225,10 +225,10 @@ def test_compact_options_preserve_no_start_no_ui_and_omit_model_enumeration(draf
     recommended = options["recommended_selection"]
     assert not recommended["install_spx_ui"] and not recommended["start"]
     assert not recommended["install_instances"] and recommended["instances"] == []
-    assert recommended["service_ids"] == []
+    assert recommended["service_ids"] is None
     engine.update(session["session_id"], recommended)
     plan = engine.plan(session["session_id"])
-    assert plan["selection"]["model_ids"] and plan["selection"]["service_ids"] == []
+    assert not plan["selection"]["model_ids"] and plan["selection"]["service_ids"] == []
 
 
 @pytest.mark.parametrize(

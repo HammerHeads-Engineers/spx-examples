@@ -112,6 +112,37 @@ def test_readiness_retries_host_api_until_ready(manager, server, clock, monkeypa
     assert manager.last_readiness["ready"] is True
 
 
+@pytest.mark.parametrize("condition", ["missing", "exited", "unhealthy", "healthy"])
+def test_required_gateway_must_be_ready_before_stack_commit(
+    manager, server, clock, monkeypatch, condition
+):
+    (manager.compose_file.parent / "bundle.json").write_text(
+        json.dumps({"required_compose_services": ["spx-server", "knx_gateway"]})
+    )
+    gateway = sm.ContainerInfo(
+        id="gateway",
+        name="spx-transaction-current-knx_gateway",
+        image="knxd",
+        state="exited" if condition == "exited" else "running",
+        health="unhealthy" if condition == "unhealthy" else "",
+        labels={"com.docker.compose.service": "transaction-current-knx_gateway"},
+    )
+    monkeypatch.setattr(
+        manager,
+        "_readiness_containers",
+        lambda deadline: [server] + ([] if condition == "missing" else [gateway]),
+    )
+    monkeypatch.setattr(
+        manager, "_probe_api", lambda *a: {"ready": True, "status": 200}
+    )
+    if condition == "healthy":
+        manager.wait_health(timeout=3)
+        assert manager.last_readiness["services"]["knx_gateway"]["ready"]
+    else:
+        with pytest.raises(sm.StackManagerError, match="knx_gateway"):
+            manager.wait_health(timeout=3)
+
+
 @pytest.mark.parametrize(
     "cause", ["missing", "unhealthy", "paused", "refused", "http503", "docker_error"]
 )

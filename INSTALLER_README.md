@@ -13,6 +13,23 @@ existing labelled/legacy stacks, and asks before replacement. It preserves
 images and volumes; a failed model or instance bootstrap can restore the
 previous stack.
 
+All Setup modes (interactive, legacy text prompts, and agent conversation) also
+prepare MCP and CLI tools automatically. The final result reports stack and tool
+readiness separately. Open the reported workspace in your local agent; its
+project-local `spx` MCP contains both installation and runtime tools. With agent
+Setup, continue using the same workspace and conversation after installation.
+No second MCP Setup or reconnect is needed. Initial project trust/tool permissions
+still belong to your agent client. Keys remain in private per-user Setup state.
+
+Use `spx.ps1` on Windows or `spx.sh` on macOS/Linux in that workspace:
+`doctor --check-server --json`, `list-tools --json`, or
+`call server_list_instances --json`. Supply runtime tool arguments through
+`--arguments-file <JSON file>`, never a product-key process argument. With
+`--no-start`, tools are still installed and live commands report `SPX_NOT_STARTED`
+until SPX Start completes. MCP requires Python 3.10+; packaged desktop installers
+prepare the supported interpreter. SPX MCP Setup remains available for repair
+and repository-development workspaces rather than as a required follow-up step.
+
 Before changing a stack, Setup checks whether required host ports are already
 used. If an unrelated application or container holds a port, Setup shows the
 port and owner when available, asks you to stop or reconfigure it yourself,

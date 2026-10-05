@@ -21,12 +21,12 @@ def build_server(workspace):
     from mcp.types import ToolAnnotations
 
     descriptor = read_descriptor(workspace)
-    engine = SetupEngine(Path(descriptor["state_root"]))
+    engine = SetupEngine(Path(descriptor["state_root"]), require_conversation=True)
     session_id = descriptor["session_id"]
     engine.get(session_id)
     server = FastMCP(
-        "SPX Setup",
-        instructions="Configure and approve installation in conversation. Never request or disclose the product key. setup_apply requires explicit approval of the current plan.",
+        "SPX",
+        instructions="Install and work with SPX in this same workspace/connection. Runtime tools resolve committed configuration automatically; no reconnect is needed after installation. Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan.",
     )
     read = ToolAnnotations(
         readOnlyHint=True,
@@ -45,6 +45,7 @@ def build_server(workspace):
     )
 
     def call(action, requested, **arguments):
+        requested = requested or session_id
         if requested != session_id:
             return {
                 "ok": False,
@@ -56,18 +57,20 @@ def build_server(workspace):
         return invoke(engine, action, requested, **arguments)
 
     @server.tool(annotations=read)
-    def setup_get_session(session_id: str) -> dict:
+    def setup_get_session(session_id: str = "") -> dict:
         """Read the public draft and installation state without accessing credentials."""
         return call("get-session", session_id)
 
     @server.tool(annotations=read)
-    def setup_list_options(session_id: str, compact: bool = False) -> dict:
-        """Use compact for recommended settings and counts; full catalog only for custom choices."""
-        return call("list-options", session_id, compact=compact)
+    def setup_list_options(
+        session_id: str = "", compact: bool = True, protocols: list[str] | None = None
+    ) -> dict:
+        """Read requirements schema and installed scope; full options map models to services/dependencies."""
+        return call("list-options", session_id, compact=compact, protocols=protocols)
 
     @server.tool(annotations=draft)
     def setup_update_selection(session_id: str, selection: dict) -> dict:
-        """Patch draft choices. Never include credentials. Changes invalidate prior plans."""
+        """Record needs and setup decisions in selection.requirements; patch draft choices, never credentials."""
         return call("update-selection", session_id, selection=selection)
 
     @server.tool(annotations=draft)
@@ -97,6 +100,11 @@ def build_server(workspace):
             compact=compact,
         )
 
+    # Publish the stable runtime toolset before installation: the connected
+    # client need not rediscover servers/tools when deployment completes.
+    from installer.setup_runtime import register_runtime_tools
+
+    register_runtime_tools(server, workspace)
     return server
 
 

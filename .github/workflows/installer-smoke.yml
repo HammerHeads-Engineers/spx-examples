@@ -35,11 +35,13 @@ jobs:
         with:
           python-version: '3.12.10'
       - name: Install normal Setup test dependencies
-        run: python -m pip install pytest pyyaml requests "mcp>=1.26,<2"
+        run: python -m pip install pytest pyyaml requests "mcp>=1.26,<2" "spx-python==1.0.0-rc.3"
       - name: Test sessions, client profiles and real MCP reconnect
         run: >-
           python -m pytest -q tests/installer/test_setup_sessions.py
           tests/installer/test_setup_workspace.py tests/installer/test_wizard_modes.py
+          tests/installer/test_setup_requirements.py tests/installer/test_readiness.py
+          tests/installer/test_unified_workspace.py
           tests/mcp/unit/test_codex_mcp_bootstrap.py --junitxml=setup-contract.xml
       - name: Bootstrap a fresh isolated Unicode workspace and independent CLI job
         run: python tests/installer/setup_bootstrap_smoke.py
