@@ -24,7 +24,7 @@ from .selection import (
     resolve_start_instances,
 )
 from .wizard import InstallerWizard, WizardSelection
-
+from .wizard_modes import choose_wizard_mode
 
 SPX_UI_URL = "http://localhost:3000"
 
@@ -58,7 +58,9 @@ def _open_ui_browser(selection: WizardSelection, *, stream=sys.stdout) -> None:
 
     try:
         opened = webbrowser.open(SPX_UI_URL, new=2)
-    except Exception as exc:  # pragma: no cover - browser backends are platform-specific
+    except (
+        Exception
+    ) as exc:  # pragma: no cover - browser backends are platform-specific
         print(
             f"[spx-installer] Could not open {SPX_UI_URL} automatically: {exc}",
             file=stream,
@@ -220,6 +222,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Register models only (do not create instances from bundle.json).",
     )
 
+    for target in (wizard_parser, generate_parser):
+        target.add_argument(
+            "--wizard-mode", choices=["interactive", "legacy", "agent"], default=None
+        )
     return parser
 
 
@@ -322,7 +328,9 @@ def _build_noninteractive_selection(
             raise SystemExit("--instance-limit must be zero or greater")
         instances = instances[:instance_limit]
         allowed = {entry.get("instance_key") for entry in instances}
-        start_instances = [key for key in start_instances if key in allowed][:instance_limit]
+        start_instances = [key for key in start_instances if key in allowed][
+            :instance_limit
+        ]
     compatibility = apply_platform_compatibility(
         model_ids=model_ids,
         service_ids=service_ids,
@@ -385,7 +393,8 @@ def run(args: argparse.Namespace) -> int:
                 None if getattr(args, "profiles", None) is None else args.profiles
             ),
         )
-        wizard = InstallerWizard(loader=loader)
+        mode = choose_wizard_mode(getattr(args, "wizard_mode", None))
+        wizard = InstallerWizard(loader=loader, mode=mode)
         wizard.run()
         return 0
     if args.command == "generate":
@@ -411,7 +420,8 @@ def run(args: argparse.Namespace) -> int:
             index = loader.load()
             selection = _build_noninteractive_selection(args, index=index)
         else:
-            wizard = InstallerWizard(loader=loader)
+            mode = choose_wizard_mode(getattr(args, "wizard_mode", None))
+            wizard = InstallerWizard(loader=loader, mode=mode)
             selection = wizard.run()
             if wizard.index is None:
                 raise RuntimeError("Manifest index unavailable after wizard run.")
@@ -489,6 +499,32 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
+    # Defer Docker startup until after presentation/configuration selection.
+    if _is_interactive_session(stream):
+        from . import paths
+
+        root = paths.repo_root()
+        if os.name == "nt":
+            preflight = [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(root / "installer/docker_ready.ps1"),
+                "-Helper",
+                str(root / "installer/docker_preflight.ps1"),
+            ]
+        else:
+            preflight = [
+                "bash",
+                "-c",
+                '. "$1"; check_docker',
+                "spx-preflight",
+                str(root / "installer/docker_preflight.sh"),
+            ]
+        if subprocess.run(preflight, check=False).returncode:
+            return False
     if os.name == "nt":
         script = output_dir / "stack_runner.py"
         if not script.exists():
@@ -531,7 +567,9 @@ def _launch_stack(output_dir: Path, *, stream=sys.stdout) -> bool:
         if os.name == "nt" and not _is_readable_file(script):
             _report_windows_script_block(script, stream=stream)
         else:
-            print(f"[spx-installer] Could not launch the start script: {exc}", file=stream)
+            print(
+                f"[spx-installer] Could not launch the start script: {exc}", file=stream
+            )
         return False
     return True
 

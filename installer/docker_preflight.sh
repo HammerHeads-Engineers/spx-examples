@@ -313,7 +313,7 @@ spx_docker_preflight_required() {
     esac
   done
 
-  [[ $# -gt 0 ]] || return 0
+  [[ $# -gt 0 ]] || return 1
   command_name="$1"
   [[ "${command_name}" == "generate" ]] || return 1
 
@@ -329,14 +329,17 @@ spx_docker_preflight_required() {
       --start)
         has_start=1
         ;;
+      agent|--wizard-mode=agent)
+        return 1
+        ;;
       --no-start)
         has_no_start=1
         ;;
     esac
   done
 
-  (( has_start == 1 )) && return 0
+  (( has_start == 1 && has_selector == 1 )) && return 0
   (( has_no_start == 1 )) && return 1
   (( has_selector == 1 )) && return 1
-  return 0
+  return 1
 }

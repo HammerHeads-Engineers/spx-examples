@@ -119,11 +119,12 @@ internal static class Program
             scriptPath,
         };
 
-        if (extraArgs.Count == 0)
+        if (extraArgs.Count == 0 || extraArgs[0].StartsWith("--", StringComparison.Ordinal))
         {
             arguments.Add("generate");
             arguments.Add("--output");
             arguments.Add(GetGeneratedDirectory());
+            arguments.AddRange(extraArgs);
         }
         else
         {

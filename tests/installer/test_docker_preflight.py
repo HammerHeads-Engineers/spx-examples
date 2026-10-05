@@ -315,7 +315,8 @@ spx_docker_preflight_required generate --protocols bacnet --no-start && exit 1
 spx_docker_preflight_required bootstrap --bundle bundle.json && exit 1
 spx_docker_preflight_required generate --protocols bacnet && exit 1
 spx_docker_preflight_required generate --protocols bacnet --start || exit 1
-spx_docker_preflight_required generate || exit 1
+spx_docker_preflight_required generate && exit 1
+spx_docker_preflight_required generate --wizard-mode agent && exit 1
 exit 0
 """
     result = _run_bash(script)
@@ -830,7 +831,8 @@ if (Test-DockerPreflightRequired @('--help')) { throw 'help should not need Dock
 if (Test-DockerPreflightRequired @('generate','--protocols','bacnet','--no-start')) { throw 'no-start should not need Docker' }
 if (Test-DockerPreflightRequired @('generate','--protocols','bacnet')) { throw 'noninteractive generation should not need Docker' }
 if (Test-DockerPreflightRequired @('bootstrap','--bundle','bundle.json')) { throw 'bootstrap should not need Docker' }
-if (-not (Test-DockerPreflightRequired @())) { throw 'interactive setup should need Docker' }
+if (Test-DockerPreflightRequired @()) { throw 'mode selection should precede Docker' }
+if (Test-DockerPreflightRequired @('generate','--wizard-mode','agent')) { throw 'agent workspace should not need Docker' }
 if (-not (Test-DockerPreflightRequired @('generate','--protocols','bacnet','--start'))) { throw '--start should need Docker' }
 'PREFLIGHT_TEST_PASSED'
 """
