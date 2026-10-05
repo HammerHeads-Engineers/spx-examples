@@ -236,7 +236,11 @@ def assess_requirements(value, selection, index, installed):
     ).model_ids
     if req["catalog_scope"] == "selected" and (
         set(model_ids) == set(available_models)
-        or (index.industries and set(value["packages"]) == set(index.industries))
+        or (
+            index.industries
+            and set(value["packages"]) == set(index.industries)
+            and not (value["protocols"] or req.get("protocols"))
+        )
     ):
         error(
             "CATALOG_SCOPE_MISMATCH",

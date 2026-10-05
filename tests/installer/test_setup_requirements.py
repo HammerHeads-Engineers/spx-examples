@@ -273,7 +273,10 @@ def test_handoff_marks_requirements_mandatory_and_asks_needs_first(agent, tmp_pa
 def test_full_catalog_cannot_be_silently_labelled_selected(agent):
     engine, sid = agent
     configure(
-        agent, packages=[p["id"] for p in engine.options(sid, compact=True)["packages"]]
+        agent,
+        packages=[p["id"] for p in engine.options(sid, compact=True)["packages"]],
+        protocols=[],
+        requirements=requirements(protocols=[]),
     )
     assert any(
         e["code"] == "CATALOG_SCOPE_MISMATCH" for e in engine.plan(sid)["errors"]

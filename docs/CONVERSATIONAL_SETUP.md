@@ -43,12 +43,12 @@ Defaults:
 
 | Platform | Setup workspace | Private session/credential state |
 | --- | --- | --- |
-| Windows | `%LOCALAPPDATA%\SPX\setup-workspace` | `%LOCALAPPDATA%\SPX\setup-state` |
-| macOS | `~/Documents/spx-setup-workspace` | `~/Library/Application Support/SPX/setup-state` |
-| Linux | `~/spx-setup-workspace` | `~/.local/share/SPX/setup-state` |
+| Windows | `%LOCALAPPDATA%\SPX\workspace` | `%LOCALAPPDATA%\SPX\setup-state` |
+| macOS | `~/Documents/SPX MCP Workspace` | `~/Library/Application Support/SPX/setup-state` |
+| Linux | `~/spx-mcp-workspace` | `~/.local/share/SPX/setup-state` |
 
 `--setup-workspace` can choose another separate directory. Setup refuses an
-unmanaged nonempty directory, a runtime workspace, or overlap with private state
+unmanaged nonempty directory or overlap with private state
 or the installation directory. Failed dependency downloads can be retried in
 the same managed directory. Starting another handoff invalidates the old draft;
 an active job must instead be reconnected to.
@@ -58,7 +58,7 @@ an active job must instead be reconnected to.
 The workspace contains `AGENTS.md`, `CLAUDE.md`, `INSTALLATION.md`, a private-state
 reference in `setup-session.json`, and PowerShell/POSIX JSON CLI launchers. Setup
 uses the existing MCP bootstrap mechanism to install a normal isolated Python
-environment with YAML, HTTP and MCP dependencies. Python >=3.10 is required for
+environment with YAML, HTTP, MCP and the SPX runtime client. Python >=3.10 is required for
 MCP; ordinary installer modes retain the repository's Python 3.9 support.
 
 Only project settings are created/updated; other settings and other MCP servers
@@ -67,14 +67,16 @@ Agents and global settings are never installed or modified automatically.
 
 | Client | Generated project settings | Official reference |
 | --- | --- | --- |
-| Codex | `.codex/config.toml`, `mcp_servers.spx_setup` | [Local MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) |
-| Claude Code | `.mcp.json`, `mcpServers.spx_setup` | [Project MCP servers](https://code.claude.com/docs/en/mcp) |
-| OpenCode v2 | `opencode.jsonc`, `mcp.servers.spx_setup` | [MCP servers](https://opencode.ai/v2/docs/mcp-servers) |
+| Codex | `.codex/config.toml`, `mcp_servers.spx` | [Local MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli) |
+| Claude Code | `.mcp.json`, `mcpServers.spx` | [Project MCP servers](https://code.claude.com/docs/en/mcp) |
+| OpenCode v2 | `opencode.jsonc`, `mcp.servers.spx` | [MCP servers](https://opencode.ai/v2/docs/mcp-servers) |
 
 The command uses an absolute local script path and interpreter, so starting the
 client outside the workspace does not break imports. Reconnect/restart MCP after
 opening the workspace. Other local clients may use the same stdio entrypoint or
-the JSON CLI. ChatGPT web requires a local execution bridge; attaching a folder
+the JSON CLI. The same project connection provides runtime MCP after deployment;
+there is no workspace switch or routine reconnect after successful tool setup.
+ChatGPT web requires a local execution bridge; attaching a folder
 alone does not grant local process access. No public installer endpoint is added.
 
 ## Shared engine and tools
