@@ -389,3 +389,31 @@ def test_protocol_filters_narrow_a_chosen_pack_in_agent_mode(agent):
         "knx" in index.models[mid].protocols for mid in plan["selection"]["model_ids"]
     )
     assert plan["selection"]["service_ids"] == ["knx_gateway"]
+
+
+def test_conversational_cli_requires_needs_after_ordinary_wizard(tmp_path, capsys):
+    from installer.__main__ import main
+
+    engine = SetupEngine(tmp_path / "private")
+    session = engine.create(tmp_path / "active", KEY, initial={"start": False})
+    sid = session["session_id"]
+    assert not session["requirements_required"]
+    assert (
+        main(
+            [
+                "setup",
+                "--state-root",
+                str(engine.root),
+                "plan",
+                "--session-id",
+                sid,
+                "--json",
+            ]
+        )
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["ok"] and not result["result"]["ready"]
+    assert result["result"]["errors"][0]["code"] == "REQUIREMENTS_INCOMPLETE"
+    assert engine.get(sid)["requirements_required"]
+    assert not Path(session["output"]).exists()

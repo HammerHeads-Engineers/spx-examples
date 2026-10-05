@@ -89,7 +89,7 @@ def invoke(engine, action, session_id, **arguments):
 
 def run(args):
     try:
-        engine = SetupEngine(args.state_root)
+        engine = SetupEngine(args.state_root, require_conversation=True)
         arguments = {}
         if args.setup_action == "update-selection":
             content = (

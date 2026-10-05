@@ -369,8 +369,9 @@ def resolve_selection(
 
 
 class SetupEngine:
-    def __init__(self, state_root: Path | None = None):
+    def __init__(self, state_root: Path | None = None, *, require_conversation=False):
         self.root = (state_root or default_state_root()).expanduser().absolute()
+        self.require_conversation = require_conversation
         private_directory(self.root)
 
     def _directory(self, session_id):
@@ -471,6 +472,9 @@ class SetupEngine:
             if k not in {"source_root", "catalog", "profiles"}
         }
         public["license"] = product_key_summary(self._key(session))
+        public["requirements_required"] = bool(
+            self.require_conversation or session.get("requirements_required")
+        )
         if public.get("plan"):
             public["plan"] = {
                 k: v for k, v in public["plan"].items() if not k.startswith("_")
@@ -594,7 +598,9 @@ class SetupEngine:
                 recommendation[field] = session["selection"][field]
         context = {
             "requirements_schema": SCHEMA,
-            "requirements_required": session.get("requirements_required", False),
+            "requirements_required": bool(
+                self.require_conversation or session.get("requirements_required")
+            ),
             "installed_selection": installed,
         }
         if compact:
@@ -865,6 +871,9 @@ class SetupEngine:
                 raise SetupError(
                     "Setup is already applying or requires recovery", "SETUP_BUSY"
                 )
+            if self.require_conversation:
+                # Persist the adapter's contract for the independent worker.
+                session["requirements_required"] = True
             installed = self._installed_selection(session, self._index(session))
             requirement_errors = self._requirement_errors(session, installed)
             if requirement_errors:
@@ -956,12 +965,12 @@ class SetupEngine:
         return self.get(session_id)["plan"]
 
     def _requirement_errors(self, session, installed):
-        if not session.get("requirements_required") and not session["selection"].get(
-            "requirements"
+        if not (
+            self.require_conversation
+            or session.get("requirements_required")
+            or session["selection"].get("requirements")
         ):
-            return (
-                []
-            )  # Existing explicit CLI and ordinary wizard retain their contract.
+            return []  # Ordinary generate and wizard retain their contract.
         index = self._index(session)
         selection, _ = resolve_selection(
             session["selection"], self._key(session), index

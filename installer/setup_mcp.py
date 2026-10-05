@@ -21,7 +21,7 @@ def build_server(workspace):
     from mcp.types import ToolAnnotations
 
     descriptor = read_descriptor(workspace)
-    engine = SetupEngine(Path(descriptor["state_root"]))
+    engine = SetupEngine(Path(descriptor["state_root"]), require_conversation=True)
     session_id = descriptor["session_id"]
     engine.get(session_id)
     server = FastMCP(

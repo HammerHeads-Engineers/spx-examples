@@ -153,6 +153,11 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
 
     root, engine, session = workspace
     engine.update(session["session_id"], {"requirements": None})
+    # Ordinary wizards also create shared tool workspaces. Their subsequent
+    # conversational installer tools must enforce discovery independently.
+    private = engine._read(session["session_id"])
+    private["requirements_required"] = False
+    engine._write(private)
     profile = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
         "mcpServers"
     ]["spx"]

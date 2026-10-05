@@ -231,7 +231,10 @@ silently retry it. Backups and diagnostic state are retained for inspection.
 
 Only `SUCCEEDED` is success. A healthy stack with failed runtime MCP refresh
 reports a separate warning and instructs the user to run SPX MCP Setup/reconnect.
-Setup and runtime MCP workspaces remain separate.
+Setup and runtime tools share the workspace and MCP connection. Conversational
+Setup MCP and `installer setup` CLI always require the needs record, including
+workspaces prepared by an ordinary wizard. Ordinary `installer generate` and
+the interactive/legacy wizards retain their existing explicit selection flow.
 
 Credential files and staging/backup files live in owner-only private state
 (Windows caller SID ACL / POSIX 0700 directories and 0600 files). The product
