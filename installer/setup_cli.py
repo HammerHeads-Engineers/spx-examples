@@ -44,6 +44,12 @@ def add_parser(subparsers):
             action.add_argument("--compact", action="store_true")
         if name == "list-options":
             action.add_argument("--compact", action="store_true")
+            action.add_argument(
+                "--protocol",
+                dest="protocols",
+                action="append",
+                help="Limit model options to a needed protocol (repeatable)",
+            )
     return parser
 
 
@@ -101,7 +107,7 @@ def run(args):
                 compact=args.compact,
             )
         if args.setup_action == "list-options":
-            arguments["compact"] = args.compact
+            arguments.update(compact=args.compact, protocols=args.protocols)
         result = invoke(engine, args.setup_action, args.session_id, **arguments)
     except (OSError, ValueError):
         result = {

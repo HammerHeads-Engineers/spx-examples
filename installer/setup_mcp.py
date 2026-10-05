@@ -26,7 +26,7 @@ def build_server(workspace):
     engine.get(session_id)
     server = FastMCP(
         "SPX Setup",
-        instructions="Configure and approve installation in conversation. Never request or disclose the product key. setup_apply requires explicit approval of the current plan.",
+        instructions="Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan.",
     )
     read = ToolAnnotations(
         readOnlyHint=True,
@@ -61,13 +61,15 @@ def build_server(workspace):
         return call("get-session", session_id)
 
     @server.tool(annotations=read)
-    def setup_list_options(session_id: str, compact: bool = False) -> dict:
-        """Use compact for recommended settings and counts; full catalog only for custom choices."""
-        return call("list-options", session_id, compact=compact)
+    def setup_list_options(
+        session_id: str, compact: bool = True, protocols: list[str] | None = None
+    ) -> dict:
+        """Read requirements schema and installed scope; full options map models to services/dependencies."""
+        return call("list-options", session_id, compact=compact, protocols=protocols)
 
     @server.tool(annotations=draft)
     def setup_update_selection(session_id: str, selection: dict) -> dict:
-        """Patch draft choices. Never include credentials. Changes invalidate prior plans."""
+        """Record needs and setup decisions in selection.requirements; patch draft choices, never credentials."""
         return call("update-selection", session_id, selection=selection)
 
     @server.tool(annotations=draft)

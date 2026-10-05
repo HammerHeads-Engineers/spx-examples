@@ -20,7 +20,28 @@ def main():
     # Format-only fixture: configuration generation is not server qualification.
     key = "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
     session = engine.create(
-        root / "generated", key, initial={"protocols": ["http"], "start": False}
+        root / "generated",
+        key,
+        initial={
+            "protocols": ["http"],
+            "start": False,
+            "requirements": {
+                "description": "Generate a local HTTP testing environment",
+                "catalog_scope": "selected",
+                "protocols": ["http"],
+                "required_services": [],
+                "external_services": {},
+                "remove_services": [],
+                "unresolved": [],
+                "decisions": {
+                    "install_spx_ui": True,
+                    "start": False,
+                    "service_bind_addresses": {},
+                    "port_mappings": {},
+                    "replace_existing": False,
+                },
+            },
+        },
     )
     workspace = prepare_workspace(
         root / "Workspace with spaces Łódź", engine, session["session_id"]

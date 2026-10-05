@@ -333,6 +333,7 @@ def prepare_workspace(
     with file_lock(engine.root / "sessions.lock"):
         session = engine._read(session_id)
         session["source_root"] = str(workspace)
+        session["requirements_required"] = True
         session.update(plan=None, status="DRAFT", stage="configuration", job=None)
         engine._write(session)
     if bootstrap:
@@ -371,35 +372,71 @@ code, credentials or generated files, and do not run Docker replacement directly
    is already stored privately. Never ask for it in chat. The public license field
    gives planning limits: Community (CO) allows at most five instances; the server
    still validates entitlement. Do not read or infer the key yourself.
-2. Default to Server, UI and the model catalog with zero instances, no instance
-   autostart, localhost and normal ports. Use recommended_selection for a new
-   unconfigured draft; preserve explicit user choices, including no-start/no-UI.
-   Additional protocol services are optional: select them for the user's stated
-   use case, or set service_ids=null to resolve services for their chosen scope.
-   Ask only unanswered setup decisions in one short group. Do not propose demo
-   instances, profiles or autostart as defaults, even for paid licenses. Request
-   the full options catalog only for custom selections. Create/run simulations
-   later in runtime MCP, on a separate user request.
-3. Update the draft once and call setup_plan. Port conflicts return a complete
+2. Discover requirements BEFORE choosing the catalog or proposing installation.
+   If the initial message does not describe the application, ask:
+   "What would you like to use SPX for? Describe the devices, protocols and
+   applications you want to connect." Reuse information already supplied.
+   Never select the full catalog unless the user explicitly asks for it. Select
+   appropriate models/packs after identifying the use case. A base-only Server/UI
+   installation is also an explicit choice, not a guess about unknown needs.
+   Group missing details into one short follow-up: relevant protocols/devices,
+   local test services versus existing external services, UI, start now versus
+   generate only, local versus LAN service access, and standard versus custom
+   addresses/ports. Propose sensible defaults and explain them together; do not
+   ask again about decisions already supplied. Preserve no-start/no-UI choices.
+   Always default to zero instances and no instance autostart, even for paid
+   licenses. Instances and simulations are created later on a separate request.
+3. Use setup_list_options(compact=false, protocols=[...]) when matching needs to
+   exact model IDs; omit the protocol filter only for a broader catalog choice.
+   Model entries expose services; service entries expose runtime and depends_on.
+   Record the use case in selection.requirements using requirements_schema:
+   description, catalog_scope (selected/full_catalog/base), protocols actually
+   needed now, required_services, external_services, remove_services, unresolved,
+   and decisions containing the proposed/reviewed install_spx_ui, start,
+   service_bind_addresses, port_mappings and replace_existing values.
+   The decisions record documents configuration, NOT permission to execute.
+   external_services must include a credential-free endpoint with explicit port
+   and provisioning instructions for future instance parameters. Never request
+   service passwords in conversation. External connectivity is not yet verified.
+   A registered model is not an active protocol: install the infrastructure needed
+   for the user's intended operation, while keeping instances at zero. For KNX
+   testing this includes knx_gateway; MQTT needs a local broker or an explicitly
+   chosen external broker. Use service_ids=null to resolve required dependencies,
+   or an explicit complete list when preserving existing services.
+   On update use installed_selection to preserve the installed catalog and services
+   unless the user changes scope. Do not silently remove existing gateways;
+   record agreed removals in remove_services and show them in the approval plan.
+4. Update the draft and call setup_plan only after needs and details are known.
+   Resolve REQUIREMENTS_INCOMPLETE, SETUP_DECISION_REQUIRED and missing-service
+   errors with the user; do not bypass the gate or retry unchanged drafts.
+   Port conflicts return a complete
    suggested_port_mappings patch: propose that patch, never handwrite a range.
    You may set replace_existing=true to prepare a reviewable replacement proposal
    before approval; this only prepares a plan and authorizes no execution. Respect
    any explicit refusal. Include replacement and changed ports in final approval,
    without an extra question merely to prepare the plan. If Docker is unavailable,
    help start it and re-plan; required OS permissions remain user actions.
-4. Present a short summary: components/catalog, zero instances, local/LAN access,
-   changed ports, whether an existing stack is replaced, and whether it will start.
+5. Present a short summary linking the user's needs to selected models, protocols
+   and services, with external-provider provisioning, zero instances, UI,
+   local/LAN service access, ports, removed services/models, whether an existing
+   stack is replaced, and whether it will start.
    Keep full per-port/model details available on request. Obtain one approval of
    this concrete ready plan in chat, then call setup_apply with its plan_id/revision.
    Never infer approval from opening the workspace or the initial setup request.
    Obtain new approval only when the reviewed configuration or installation
    conditions actually change. Never stop a service to silence changing logs.
-5. Call setup_get_status(compact=true), then reuse its cursor as after_cursor with
+6. Call setup_get_status(compact=true), then reuse its cursor as after_cursor with
    wait_seconds=30 and compact=true. Wait for phase changes or timeout; do not
    busy-poll or repeatedly fetch the full session/catalog. Report meaningful phase
    changes only, not unchanged status or each registered model. Keep all progress
    and diagnostics in this conversation; do not return to terminal questions.
-6. Report success only for SUCCEEDED, with the UI link and runtime workspace.
+7. Report success only for SUCCEEDED, with the UI link and runtime workspace.
+   Report service verification separately from device/protocol communication.
+   A running gateway alone does not prove device communication. For no-start,
+   report configuration generated; do not claim services are running. External
+   providers require the recorded provisioning when creating instances and a
+   subsequent communication check on user request. Do not create demo instances
+   merely to report installation success.
    FAILED requires reviewing diagnostics and a new plan; RECOVERY_REQUIRED must
    not be retried blindly. A repeated apply of the same plan returns the same job.
    Explain MCP warnings separately. Reconnect to resume after disconnect.
@@ -418,6 +455,9 @@ change global client configuration or request product keys in CLI arguments.
 
 Open this directory as a trusted local workspace in Codex, Claude Code, or
 OpenCode v2 and say: **Complete SPX setup and installation**.
+Describe what you need SPX for (devices, protocols and integrations). The agent
+will clarify missing details and propose an environment for those requirements.
+The complete catalog is optional; no simulation instances are created by default.
 Restart/reconnect the project's MCP if your client does not reload its configuration.
 All further decisions and final approval happen in the conversation. Setup's
 terminal is only a progress monitor; R returns to the ordinary wizard before apply.

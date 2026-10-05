@@ -12,11 +12,34 @@ from installer.setup_workspace import prepare_workspace, read_descriptor
 KEY = "AAAAA-AAAAA-AAAAA-AAAAA-AAAAA-AAAAA"
 
 
+def use_case(protocols=(), scope="base"):
+    return {
+        "description": "Explicit configuration-generation test",
+        "catalog_scope": scope,
+        "protocols": list(protocols),
+        "required_services": [],
+        "external_services": {},
+        "remove_services": [],
+        "unresolved": [],
+        "decisions": {
+            "install_spx_ui": True,
+            "start": False,
+            "service_bind_addresses": {},
+            "port_mappings": {},
+            "replace_existing": False,
+        },
+    }
+
+
 @pytest.fixture
 def workspace(tmp_path):
     root = tmp_path / "Workspace with spaces Łódź"
     engine = SetupEngine(tmp_path / "private")
-    session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
+    session = engine.create(
+        tmp_path / "generated",
+        KEY,
+        initial={"start": False, "requirements": use_case()},
+    )
     prepare_workspace(
         root,
         engine,
@@ -128,6 +151,7 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
     from mcp.client.stdio import StdioServerParameters, stdio_client
 
     root, engine, session = workspace
+    engine.update(session["session_id"], {"requirements": None})
     profile = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
         "mcpServers"
     ]["spx_setup"]
@@ -151,11 +175,21 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
                 )
                 assert json.loads(options.content[0].text)["ok"]
                 assert KEY not in options.content[0].text
+                blocked = await client.call_tool(
+                    "setup_plan", {"session_id": session["session_id"]}
+                )
+                blocked_plan = json.loads(blocked.content[0].text)["result"]
+                assert not blocked_plan["ready"]
+                assert blocked_plan["errors"][0]["code"] == "REQUIREMENTS_INCOMPLETE"
                 result = await client.call_tool(
                     "setup_update_selection",
                     {
                         "session_id": session["session_id"],
-                        "selection": {"protocols": ["http"], "start": False},
+                        "selection": {
+                            "protocols": ["http"],
+                            "start": False,
+                            "requirements": use_case(["http"], "selected"),
+                        },
                     },
                 )
                 assert json.loads(result.content[0].text)["ok"]
