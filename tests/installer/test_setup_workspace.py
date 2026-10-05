@@ -180,11 +180,20 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
         async with stdio_client(parameters) as (reader, writer):
             async with ClientSession(reader, writer) as client:
                 await client.initialize()
-                for _ in range(60):
+                cursor = None
+                for _ in range(6):
                     result = await client.call_tool(
-                        "setup_get_status", {"session_id": session["session_id"]}
+                        "setup_get_status",
+                        {
+                            "session_id": session["session_id"],
+                            "after_cursor": cursor,
+                            "wait_seconds": 5,
+                            "compact": True,
+                        },
                     )
                     current = json.loads(result.content[0].text)["result"]
+                    assert "selection" not in current and "plan" not in current
+                    cursor = current["cursor"]
                     if current["status"] in {
                         "SUCCEEDED",
                         "FAILED",
@@ -192,7 +201,6 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
                     }:
                         assert current["status"] == "SUCCEEDED", current
                         return
-                    await asyncio.sleep(0.25)
                 pytest.fail("Detached Setup job did not finish")
 
     asyncio.run(reconnect())

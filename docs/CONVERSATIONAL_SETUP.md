@@ -11,10 +11,19 @@ Setup workspace/MCP implementation is present in the distribution.
 
 Agent mode collects the product key locally or reuses the saved installation key.
 It prepares a workspace before testing Docker or the SPX API. Open that directory
-in a trusted local agent and say **Dokończ konfigurację i instalację SPX**. Further
+in a trusted local agent and say **Complete SPX setup and installation**. Further
 questions, choices, approval, progress and diagnostics happen in the conversation.
 The terminal monitors progress; R returns to the ordinary wizard before execution.
 Closing the monitor or disconnecting MCP does not cancel or restart a running job.
+
+Agent defaults are Server, UI and the model catalog, localhost, normal ports,
+and **zero instances with no instance autostart**. Optional protocol services
+are chosen for the user's stated use case. The compact options response supplies
+recommended selections without enumerating every model/profile. Existing explicit
+choices (including no-start/no-UI) take precedence. Ask missing decisions together,
+show a short plan, and obtain one approval covering replacement and port changes.
+Simulation setup belongs to the runtime workspace after successful installation.
+Generated handoff text is English; the conversation can use the user's language.
 
 Defaults:
 
@@ -59,11 +68,11 @@ alone does not grant local process access. No public installer endpoint is added
 | MCP | CLI action | Behavior |
 | --- | --- | --- |
 | `setup_get_session` | `get-session` | Public selection, revision, stage, plan and diagnostics |
-| `setup_list_options` | `list-options` | Packages, profiles, models, protocols, services and local addresses |
+| `setup_list_options` | `list-options` | Full catalog, or `compact:true` for recommended selections/counts |
 | `setup_update_selection` | `update-selection` | Validated patch; invalidates earlier plans |
 | `setup_plan` | `plan` | Generate private staging files, inspect stack/ports, return complete plan |
 | `setup_apply` | `apply` | Apply the approved plan ID/revision as an independent job |
-| `setup_get_status` | `status` | Durable progress, diagnostics, result and separate MCP warning |
+| `setup_get_status` | `status` | Durable progress; optional compact response and bounded wait for changes |
 
 Direct form: `python -m installer setup --state-root <private-state> <action>
 --session-id <id> --json`. The generated `setup-cli.ps1` / `setup-cli.sh` supply
@@ -71,6 +80,21 @@ state location and session ID. Updates use `--selection-file <JSON>` (or `-` for
 stdin); apply requires `--plan-id <id> --revision <number>`. Results use
 `{"ok":true,"result":...}` or `{"ok":false,"error":...}` and nonzero CLI exit.
 No CLI credential argument or MCP session-creation tool is exposed.
+
+Sessions and plans include a public `license` summary: plan name, instance limit,
+and `server_verified:false`. Local checksum-valid fields provide a planning budget;
+the CO prefix gives a conservative Community cap of five. Invalid/unknown keys do
+not acquire authorization from this hint. The server validates validity/expiry.
+An over-budget instance selection fails before generation or Docker replacement.
+
+Use `setup_get_status(compact:true)` once, then reuse `cursor` as `after_cursor`
+with `wait_seconds:30` and `compact:true`. CLI equivalents are `status --compact
+--after-cursor <cursor> --wait-seconds 30 --json` and `list-options --compact`.
+Waiting happens outside session locks; MCP handles it asynchronously. The cursor
+tracks lifecycle/phase changes, not every log line. A timeout returns `changed:false`
+and current state. A terminal result returns immediately. Compact status omits the
+catalog/selection and limits diagnostics to the last 30 lines; get-session retains
+the full diagnostics for failure investigation. Report changed phases only.
 
 Selection fields: `packages`, `profiles`, `protocols`, `install_models`,
 `install_instances`, `install_spx_ui`, `model_ids`, `service_ids`, `instances`,
@@ -86,6 +110,19 @@ in conversation before calling apply. The engine checks identity, revision,
 staged files, active configuration, source payload and detected stack/ports again
 before queuing and before modifying files. Changed conditions require a new plan
 and new approval. It does not interpret conversational consent itself.
+
+Preparing a draft with `replace_existing:true` is not approval to execute. An agent
+may prepare that proposal without a separate preliminary confirmation, but must
+explicitly include replacement in the final reviewed plan and respect refusals.
+Port conflicts include an applicable `suggested_port_mappings` patch, with the
+complete contiguous Modbus range where needed. Do not handwrite individual range
+entries or stop unrelated services to make a proposal valid.
+
+The active-configuration fingerprint excludes Home Assistant logs, recorder DB,
+`.storage` and Matter runtime data. Their normal writes do not stale a plan.
+Compose, `.env`, model/library payload, Home Assistant configuration YAML and other
+installation configuration remain guarded, as do the staged payload and detected
+stack/required ports. Changes to those still reject execution before modification.
 
 The same staging engine is used by interactive and legacy generation. Those
 flows keep their terminal prompts; agent execution uses no terminal `input()`.

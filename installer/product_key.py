@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import binascii
 import os
 from pathlib import Path
 import re
 import sys
-
 
 _KEY_PATTERN = re.compile(r"(?:[A-Z2-7]{30}|(?:[A-Z2-7]{5}-){5}[A-Z2-7]{5})")
 FORMAT_GUIDANCE = (
@@ -23,6 +23,37 @@ def validate_product_key_format(value: str) -> str:
     if not _KEY_PATTERN.fullmatch(value):
         raise ValueError(FORMAT_GUIDANCE)
     return value
+
+
+def product_key_summary(value: str) -> dict:
+    """Public planning hints, never authentication or personal key fields.
+
+    The shipped key layout is shared with spx_server.limits. A checksum-valid
+    key carries its instance budget after the two-character plan identifier.
+    Community's CO prefix also gives a conservative five-instance planning cap.
+    The running server remains responsible for license validity and expiry.
+    """
+    result = {"plan": "Unknown", "instance_limit": None, "server_verified": False}
+    try:
+        compact = validate_product_key_format(value).replace("-", "")
+    except ValueError:
+        return result
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
+    bits = "".join(f"{alphabet.index(c):05b}" for c in compact)
+    checksum_valid = binascii.crc_hqx(
+        int(bits[:118] + "00", 2).to_bytes(15, "big"), 0xFFFF
+    ) == int(bits[118:134], 2)
+    community = compact.startswith("CO")
+    if checksum_valid:
+        limit = int(bits[10:18], 2)
+        result.update(
+            plan="Community" if community else compact[:2],
+            instance_limit=min(limit, 5) if community else limit,
+            source="embedded_fields",
+        )
+    elif community:
+        result.update(plan="Community", instance_limit=5, source="community_prefix")
+    return result
 
 
 def runtime_product_key(env_file: Path) -> str:

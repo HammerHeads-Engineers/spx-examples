@@ -366,24 +366,43 @@ This installer-managed workspace configures SPX; it is not a development checkou
 Read INSTALLATION.md and use the local spx_setup MCP tools. Do not edit installer
 code, credentials or generated files, and do not run Docker replacement directly.
 
-1. Call setup_get_session and setup_list_options. The product key is already
-   stored privately; never ask the user to paste it in chat or read credential files.
-2. Ask all configuration questions in this conversation: packages or protocols,
-   profiles, models, default/custom instances, instance auto-start, UI, service
-   selection, local/LAN addresses, ports, and whether to start the stack now.
-3. Call setup_update_selection and setup_plan. Explain notices, unsupported
-   choices, conflicts, existing SPX replacement, and proposed port mappings.
-   If Docker is unavailable, help start Docker Desktop/Engine using normal local
-   CLI operations and obtain a new plan. Required OS permissions remain user actions.
-4. Present the complete ready plan and wait for explicit user approval in chat.
-   Never infer approval from opening the workspace or the initial request to configure.
-   Call setup_apply with that exact plan_id/revision only after approval.
-5. Poll setup_get_status every few seconds during execution and report changes
-   here. Do not return the user to terminal prompts. Changed conditions require
-   a new plan and approval. A repeated apply is safe only with the same plan.
-6. Report success only for SUCCEEDED. FAILED requires reviewing the diagnostics
-   and a new plan; RECOVERY_REQUIRED must not be retried blindly. Explain any MCP
-   warning separately from stack readiness. Reconnect to resume after disconnect.
+1. Read setup_get_session and setup_list_options(compact=true). Use these tools,
+   not source-code scans, Docker inventories or credential files. The product key
+   is already stored privately. Never ask for it in chat. The public license field
+   gives planning limits: Community (CO) allows at most five instances; the server
+   still validates entitlement. Do not read or infer the key yourself.
+2. Default to Server, UI and the model catalog with zero instances, no instance
+   autostart, localhost and normal ports. Use recommended_selection for a new
+   unconfigured draft; preserve explicit user choices, including no-start/no-UI.
+   Additional protocol services are optional: select them for the user's stated
+   use case, or set service_ids=null to resolve services for their chosen scope.
+   Ask only unanswered setup decisions in one short group. Do not propose demo
+   instances, profiles or autostart as defaults, even for paid licenses. Request
+   the full options catalog only for custom selections. Create/run simulations
+   later in runtime MCP, on a separate user request.
+3. Update the draft once and call setup_plan. Port conflicts return a complete
+   suggested_port_mappings patch: propose that patch, never handwrite a range.
+   You may set replace_existing=true to prepare a reviewable replacement proposal
+   before approval; this only prepares a plan and authorizes no execution. Respect
+   any explicit refusal. Include replacement and changed ports in final approval,
+   without an extra question merely to prepare the plan. If Docker is unavailable,
+   help start it and re-plan; required OS permissions remain user actions.
+4. Present a short summary: components/catalog, zero instances, local/LAN access,
+   changed ports, whether an existing stack is replaced, and whether it will start.
+   Keep full per-port/model details available on request. Obtain one approval of
+   this concrete ready plan in chat, then call setup_apply with its plan_id/revision.
+   Never infer approval from opening the workspace or the initial setup request.
+   Obtain new approval only when the reviewed configuration or installation
+   conditions actually change. Never stop a service to silence changing logs.
+5. Call setup_get_status(compact=true), then reuse its cursor as after_cursor with
+   wait_seconds=30 and compact=true. Wait for phase changes or timeout; do not
+   busy-poll or repeatedly fetch the full session/catalog. Report meaningful phase
+   changes only, not unchanged status or each registered model. Keep all progress
+   and diagnostics in this conversation; do not return to terminal questions.
+6. Report success only for SUCCEEDED, with the UI link and runtime workspace.
+   FAILED requires reviewing diagnostics and a new plan; RECOVERY_REQUIRED must
+   not be retried blindly. A repeated apply of the same plan returns the same job.
+   Explain MCP warnings separately. Reconnect to resume after disconnect.
 
 Use the JSON CLI equivalents only if the host cannot connect local MCP. Do not
 change global client configuration or request product keys in CLI arguments.
@@ -398,7 +417,7 @@ change global client configuration or request product keys in CLI arguments.
         f"""# Finish SPX installation with your own agent
 
 Open this directory as a trusted local workspace in Codex, Claude Code, or
-OpenCode v2 and say: **Dokończ konfigurację i instalację SPX**.
+OpenCode v2 and say: **Complete SPX setup and installation**.
 Restart/reconnect the project's MCP if your client does not reload its configuration.
 All further decisions and final approval happen in the conversation. Setup's
 terminal is only a progress monitor; R returns to the ordinary wizard before apply.
@@ -476,7 +495,7 @@ def launch_handoff(args, loader):
     )
     prepare_workspace(workspace, engine, session["session_id"])
     print(f"\n[spx-setup] Open this directory in your local agent: {workspace}")
-    print("[spx-setup] Say: Dokończ konfigurację i instalację SPX")
+    print("[spx-setup] Say: Complete SPX setup and installation")
     print(
         "[spx-setup] All configuration and approval now happen in the conversation. R returns to the ordinary wizard before installation."
     )
