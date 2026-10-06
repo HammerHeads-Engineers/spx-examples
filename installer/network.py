@@ -10,7 +10,6 @@ import platform
 import plistlib
 import re
 import shutil
-import socket
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -121,21 +120,8 @@ def _parse_windows_ipconfig(output: str) -> List[IPv4Address]:
     return candidates
 
 
-def _socket_candidates() -> List[IPv4Address]:
-    candidates: List[IPv4Address] = []
-    try:
-        hostnames = {socket.gethostname(), socket.getfqdn()}
-        for hostname in hostnames:
-            for entry in socket.getaddrinfo(hostname, None, socket.AF_INET):
-                address = entry[4][0]
-                candidates.append(IPv4Address("hostname", address))
-    except OSError:
-        pass
-    return candidates
-
-
 def discover_ipv4_addresses() -> List[IPv4Address]:
-    """Return stable, private IPv4 candidates suitable for LAN binding."""
+    """Return private interface IPv4 candidates without waiting on DNS."""
 
     system = platform.system().lower()
     candidates: List[IPv4Address] = []
@@ -146,7 +132,6 @@ def discover_ipv4_addresses() -> List[IPv4Address]:
             _parse_ip_output(_run_command(["ip", "-o", "-4", "addr", "show"]))
         )
         candidates.extend(_parse_ifconfig_output(_run_command(["ifconfig"])))
-    candidates.extend(_socket_candidates())
     return _normalise_candidates(candidates)
 
 

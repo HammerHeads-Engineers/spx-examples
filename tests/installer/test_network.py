@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import socket
+
+import pytest
 
 from installer import network
 
@@ -49,6 +52,26 @@ def test_parse_platform_outputs() -> None:
     )
     assert network._parse_windows_ipconfig(windows) == [
         network.IPv4Address("Ethernet adapter Wi-Fi", "172.16.0.20")
+    ]
+
+
+def test_discovery_does_not_wait_for_hostname_dns(monkeypatch) -> None:
+    monkeypatch.setattr(network.platform, "system", lambda: "Darwin")
+
+    def run(command):
+        if command[0] == "ifconfig":
+            return "en0: flags=8863<UP>\n\tinet 192.168.1.24 netmask 0xffffff00"
+        return ""
+
+    monkeypatch.setattr(network, "_run_command", run)
+
+    def unexpected_dns(*args, **kwargs):
+        pytest.fail("Interface discovery must not perform hostname DNS lookups")
+
+    monkeypatch.setattr(socket, "getfqdn", unexpected_dns)
+    monkeypatch.setattr(socket, "getaddrinfo", unexpected_dns)
+    assert network.discover_ipv4_addresses() == [
+        network.IPv4Address("en0", "192.168.1.24")
     ]
 
 
