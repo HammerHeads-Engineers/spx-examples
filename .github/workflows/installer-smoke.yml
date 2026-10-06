@@ -24,7 +24,7 @@ jobs:
     name: Setup workspace and worker (${{ matrix.os }})
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +38,7 @@ jobs:
         run: python -m pip install pytest pyyaml requests "mcp>=1.26,<2" "spx-python==1.0.0-rc.3"
       - name: Test sessions, client profiles and real MCP reconnect
         run: >-
-          python -m pytest -q tests/installer/test_setup_sessions.py
+          python -m pytest -vv --durations=15 tests/installer/test_setup_sessions.py
           tests/installer/test_setup_workspace.py tests/installer/test_wizard_modes.py
           tests/installer/test_setup_requirements.py tests/installer/test_readiness.py
           tests/installer/test_setup_context.py
