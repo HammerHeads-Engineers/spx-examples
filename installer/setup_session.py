@@ -43,6 +43,7 @@ from .setup_requirements import (
     assess_requirements,
     external_summary,
     required_services,
+    service_closure,
     validate_requirements,
 )
 
@@ -235,7 +236,7 @@ def configuration_digest(root: Path) -> str:
 
 
 def resolve_selection(
-    value: dict, key: str, index
+    value: dict, key: str, index, installed=None
 ) -> tuple[WizardSelection, list[str]]:
     """Resolve and validate a secret-free draft against the shipped catalog."""
     try:
@@ -270,15 +271,20 @@ def resolve_selection(
         ):
             raise SetupError(f"Invalid {field}; use setup_list_options")
     models = value["model_ids"]
+    requirements = value.get("requirements") or {}
+    installed = installed or {}
     if models is None:
         models = (
             sorted(index.models)
-            if (value.get("requirements") or {}).get("catalog_scope") == "full_catalog"
-            else resolve_model_ids(
-                value["packages"], value["profiles"], value["protocols"], index
+            if requirements.get("catalog_scope") == "full_catalog"
+            else (
+                list(installed.get("model_ids", []))
+                if requirements.get("catalog_scope") == "preserve"
+                else resolve_model_ids(
+                    value["packages"], value["profiles"], value["protocols"], index
+                )
             )
         )
-        requirements = value.get("requirements") or {}
         filters = value["protocols"] or requirements.get("protocols", [])
         if requirements.get("catalog_scope") == "selected" and filters:
             scope = (
@@ -293,19 +299,6 @@ def resolve_selection(
             )
     if not value["install_models"]:
         models = []
-    services = value["service_ids"]
-    if services is None:
-        services = (
-            required_services(value["requirements"], models, index)
-            if value.get("requirements")
-            else (
-                resolve_protocol_service_ids(value["protocols"], index)
-                if value["protocols"] and not value["packages"]
-                else resolve_service_ids(
-                    models, value["packages"], value["profiles"], index
-                )
-            )
-        )
     instances = value["instances"]
     if instances is None:
         instances = (
@@ -315,6 +308,34 @@ def resolve_selection(
         )
     if not isinstance(instances, list):
         raise SetupError("instances must be a list")
+    if any(
+        not isinstance(entry, dict) or entry.get("model_id") not in models
+        for entry in instances
+    ):
+        raise SetupError("Every instance must reference a selected model")
+    services = value["service_ids"]
+    if services is None:
+        services = (
+            required_services(value["requirements"], models, index, instances)
+            if value.get("requirements")
+            else (
+                resolve_protocol_service_ids(value["protocols"], index)
+                if value["protocols"] and not value["packages"]
+                else resolve_service_ids(
+                    models, value["packages"], value["profiles"], index
+                )
+            )
+        )
+        if requirements.get("catalog_scope") == "preserve":
+            services = service_closure(
+                set(services)
+                | (
+                    set(installed.get("service_ids", []))
+                    - set(requirements.get("remove_services", []))
+                ),
+                index,
+                requirements.get("external_services", {}),
+            )
     keys = set()
     for entry in instances:
         if (
@@ -556,6 +577,91 @@ class SetupEngine:
                 }
         return {**current, "cursor": cursor, "changed": changed}
 
+    def context(self, session_id):
+        """One finite, credential-free startup response; never probes Docker/API."""
+        from .setup_runtime import binding_path
+
+        session = self.get(session_id)
+        options = self.options(session_id, compact=True)
+        installation = {
+            "source": "existing_bundle" if options["installed_selection"] else "none",
+            "server_checked": False,
+            "runtime_available": False,
+            "runtime_status": "SPX_NOT_READY",
+        }
+        path = binding_path(self, session["output"])
+        if path.exists():
+            try:
+                binding = json.loads(path.read_text(encoding="utf-8"))
+                installed = self._read(binding["session_id"])
+                if (
+                    installed["output"] != session["output"]
+                    or type(binding["started"]) is not bool
+                ):
+                    raise ValueError("Invalid installation binding")
+                installation.update(
+                    source="managed_binding",
+                    session_id=binding["session_id"],
+                    status=installed["status"],
+                    started=binding["started"],
+                    runtime_available=binding["started"],
+                    runtime_status=(
+                        "READY_TO_CHECK" if binding["started"] else "SPX_NOT_STARTED"
+                    ),
+                )
+            except (OSError, ValueError, KeyError, TypeError, SetupError):
+                installation["runtime_status"] = "INVALID_INSTALLATION_BINDING"
+        active = self.root / "active-installation.json"
+        if active.exists():
+            try:
+                owner = json.loads(active.read_text(encoding="utf-8"))
+                running = self.get(owner["session_id"])
+                if running["output"] == session["output"] and running["status"] in {
+                    "APPLYING",
+                    "RECOVERY_REQUIRED",
+                }:
+                    installation.update(
+                        runtime_available=False, runtime_status="SPX_NOT_READY"
+                    )
+            except (OSError, ValueError, KeyError, TypeError, SetupError):
+                installation.update(
+                    runtime_available=False, runtime_status="INVALID_INSTALLATION_STATE"
+                )
+        requirements = session["selection"].get("requirements") or {}
+        missing = []
+        for field in ("description", "catalog_scope"):
+            if not requirements.get(field):
+                missing.append(field)
+        from .setup_requirements import DECISIONS
+
+        for field in DECISIONS:
+            if (
+                requirements.get("decisions", {}).get(field)
+                != session["selection"][field]
+            ):
+                missing.append(field)
+        missing.extend(requirements.get("unresolved", []))
+        return {
+            "context_version": 1,
+            "session": {
+                k: session.get(k)
+                for k in ("session_id", "revision", "status", "stage", "workspace")
+            },
+            "installation": installation,
+            "selection": session["selection"],
+            "license": session["license"],
+            "requirements_required": options["requirements_required"],
+            "requirements_schema": options["requirements_schema"],
+            "installed_selection": options["installed_selection"],
+            "recommended_selection": options["recommended_selection"],
+            "missing_decisions": missing,
+            "tools": {
+                "setup": True,
+                "runtime": installation["runtime_available"],
+                "server_checked": False,
+            },
+        }
+
     def options(self, session_id, *, compact=False, protocols=None):
         session = self._read(session_id)
         index = self._index(session)
@@ -710,7 +816,10 @@ class SetupEngine:
             ):
                 raise SetupError("Do not pass product keys in Setup tool arguments")
             selection = {**session["selection"], **patch}
-            resolve_selection(selection, key, self._index(session))
+            index = self._index(session)
+            resolve_selection(
+                selection, key, index, self._installed_selection(session, index)
+            )
             session.update(
                 selection=selection,
                 revision=session["revision"] + 1,
@@ -733,8 +842,12 @@ class SetupEngine:
         directory = (
             self._directory(session["session_id"]) / f"stage-{session['revision']}"
         )
+        index = self._index(session)
         selection, warnings = resolve_selection(
-            session["selection"], self._key(session), self._index(session)
+            session["selection"],
+            self._key(session),
+            index,
+            self._installed_selection(session, index),
         )
         license = product_key_summary(self._key(session))
         limit = license["instance_limit"]
@@ -744,7 +857,7 @@ class SetupEngine:
                 "LICENSE_INSTANCE_LIMIT",
                 {"requested": len(selection.instances), "limit": limit},
             )
-        DeploymentGenerator(self._index(session)).generate(selection, directory)
+        DeploymentGenerator(index).generate(selection, directory)
         if session["selection"].get("requirements"):
             external = session["selection"]["requirements"].get("external_services", {})
             compose_path = directory / "docker-compose.generated.yml"
@@ -973,7 +1086,7 @@ class SetupEngine:
             return []  # Ordinary generate and wizard retain their contract.
         index = self._index(session)
         selection, _ = resolve_selection(
-            session["selection"], self._key(session), index
+            session["selection"], self._key(session), index, installed
         )
         return assess_requirements(session["selection"], selection, index, installed)
 
@@ -997,7 +1110,10 @@ class SetupEngine:
                 "Setup requirements changed; review a new plan", "STALE_PLAN"
             )
         selection, _ = resolve_selection(
-            session["selection"], self._key(session), self._index(session)
+            session["selection"],
+            self._key(session),
+            self._index(session),
+            self._installed_selection(session, self._index(session)),
         )
         preflight = self._preflight(directory, session["selection"]["start"])
         if (

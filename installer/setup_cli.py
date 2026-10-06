@@ -13,8 +13,10 @@ def add_parser(subparsers):
         help="Plan and execute local Setup sessions (no product-key arguments).",
     )
     parser.add_argument("--state-root", type=Path, default=None)
+    parser.add_argument("--workspace-root", type=Path, default=None)
     actions = parser.add_subparsers(dest="setup_action", required=True)
     for name in (
+        "get-context",
         "get-session",
         "list-options",
         "update-selection",
@@ -23,7 +25,10 @@ def add_parser(subparsers):
         "status",
     ):
         action = actions.add_parser(name)
-        action.add_argument("--session-id", required=True)
+        action.add_argument(
+            "--session-id",
+            help="Required without --workspace-root; explicit stale IDs are rejected",
+        )
         action.add_argument(
             "--json",
             action="store_true",
@@ -57,6 +62,8 @@ def invoke(engine, action, session_id, **arguments):
     try:
         if action == "get-session":
             value = engine.get(session_id)
+        elif action == "get-context":
+            value = engine.context(session_id)
         elif action == "status":
             value = engine.status(session_id, **arguments)
         elif action == "list-options":
@@ -89,7 +96,26 @@ def invoke(engine, action, session_id, **arguments):
 
 def run(args):
     try:
-        engine = SetupEngine(args.state_root, require_conversation=True)
+        workspace = None
+        if args.workspace_root:
+            from .setup_workspace import current_descriptor
+
+            workspace, descriptor = current_descriptor(args.workspace_root)
+            if args.session_id and args.session_id != descriptor["session_id"]:
+                raise SetupError(
+                    "This session is no longer current. Read get-context and review the current plan.",
+                    "SESSION_MISMATCH",
+                    {"current_session_id": descriptor["session_id"]},
+                )
+            session_id = descriptor["session_id"]
+            engine = SetupEngine(
+                Path(descriptor["state_root"]), require_conversation=True
+            )
+        else:
+            if not args.session_id:
+                raise SetupError("Supply --workspace-root or --session-id")
+            session_id = args.session_id
+            engine = SetupEngine(args.state_root, require_conversation=True)
         arguments = {}
         if args.setup_action == "update-selection":
             content = (
@@ -108,7 +134,18 @@ def run(args):
             )
         if args.setup_action == "list-options":
             arguments.update(compact=args.compact, protocols=args.protocols)
-        result = invoke(engine, args.setup_action, args.session_id, **arguments)
+        result = invoke(engine, args.setup_action, session_id, **arguments)
+        if args.setup_action == "get-context" and workspace and result["ok"]:
+            result["result"]["workspace"] = {
+                "path": str(workspace),
+                "version": descriptor.get("workspace_version", 0),
+                "redirected": args.workspace_root.resolve() != workspace,
+            }
+    except SetupError as exc:
+        result = {
+            "ok": False,
+            "error": {"code": exc.code, "message": str(exc), "details": exc.details},
+        }
     except (OSError, ValueError):
         result = {
             "ok": False,

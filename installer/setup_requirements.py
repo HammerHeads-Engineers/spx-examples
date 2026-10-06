@@ -13,7 +13,7 @@ DECISIONS = (
     "port_mappings",
     "replace_existing",
 )
-SCOPES = ["selected", "full_catalog", "base"]
+SCOPES = ["selected", "full_catalog", "base", "preserve"]
 SCHEMA = {
     "description": "User's intended application (no credentials)",
     "catalog_scope": SCOPES,
@@ -37,7 +37,9 @@ def validate_requirements(value, index):
     ):
         raise ValueError("requirements.description must be a short, secret-free string")
     if "catalog_scope" in value and value["catalog_scope"] not in SCOPES:
-        raise ValueError("Choose selected, full_catalog or base catalog scope")
+        raise ValueError(
+            "Choose selected, full_catalog, base or preserve catalog scope"
+        )
     protocols = {p for m in index.models.values() for p in m.protocols} | {
         s.protocol for s in index.services.values()
     }
@@ -148,17 +150,17 @@ def service_closure(seeds, index, external=()):
     return sorted(result)
 
 
-def required_services(requirements, model_ids, index):
+def required_services(requirements, model_ids, index, instances=()):
     if not requirements:
         return []
     protocols = set(requirements.get("protocols", []))
-    scope = requirements.get("catalog_scope")
+    instantiated = {entry["model_id"] for entry in instances}
     seeds = set(requirements.get("required_services", []))
     for mid in model_ids:
         model = index.models[mid]
-        # Full catalogs are libraries. Infrastructure is provisioned only for
-        # requested protocols, rather than every registered model's transport.
-        if scope == "full_catalog" and not protocols.intersection(model.protocols):
+        # Registered models are a library in every scope. Actual protocol needs
+        # and explicit instances determine the infrastructure, not its size.
+        if mid not in instantiated and not protocols.intersection(model.protocols):
             continue
         seeds.update(model.services)
     return service_closure(seeds, index, requirements.get("external_services", {}))
@@ -215,6 +217,14 @@ def assess_requirements(value, selection, index, installed):
             questions=req["unresolved"],
         )
     model_ids = selection.model_ids
+    if req["catalog_scope"] == "preserve" and (
+        "model_ids" not in installed
+        or not set(installed["model_ids"]).issubset(model_ids)
+    ):
+        error(
+            "CATALOG_SCOPE_MISMATCH",
+            "Preserve requires an installed catalog and cannot remove its models; choose a new scope for removals.",
+        )
     if req["catalog_scope"] == "base" and model_ids:
         error(
             "CATALOG_SCOPE_MISMATCH",
@@ -268,7 +278,7 @@ def assess_requirements(value, selection, index, installed):
                 "Choose either a local or external provider.",
                 service_id=sid,
             )
-    needed = required_services(req, model_ids, index)
+    needed = required_services(req, model_ids, index, selection.instances)
     # Explicitly selected local services also require their transitive peers.
     needed = service_closure(set(needed) | set(selection.service_ids), index, external)
     for sid in sorted(set(needed) - set(selection.service_ids)):

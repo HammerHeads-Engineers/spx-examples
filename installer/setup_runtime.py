@@ -48,21 +48,31 @@ class SetupRuntime:
     @property
     def catalog(self):
         from spx_mcp.backend.catalog import RepoCatalog
+        from .setup_workspace import current_descriptor
 
-        return RepoCatalog(self.workspace)
+        workspace, _ = current_descriptor(self.workspace)
+        return RepoCatalog(workspace)
 
     def _binding(self):
-        session = self.engine._read(self.session_id)
-        active = self.engine.root / "active-installation.json"
+        return self._binding_context()[:2]
+
+    def _binding_context(self):
+        from .setup_workspace import current_descriptor
+
+        workspace, descriptor = current_descriptor(self.workspace)
+        engine = SetupEngine(Path(descriptor["state_root"]))
+        session_id = descriptor["session_id"]
+        session = engine._read(session_id)
+        active = engine.root / "active-installation.json"
         if active.exists():
             owner = json.loads(active.read_text(encoding="utf-8"))
-            job_session = self.engine._read(owner["session_id"])
+            job_session = engine._read(owner["session_id"])
             if (
                 job_session["output"] == session["output"]
                 and job_session["status"] in {"APPLYING", "RECOVERY_REQUIRED"}
                 and not (
                     self.verify_pending
-                    and owner["session_id"] == self.session_id
+                    and owner["session_id"] == session_id
                     and job_session["status"] == "APPLYING"
                 )
             ):
@@ -72,35 +82,35 @@ class SetupRuntime:
                 )
         try:
             binding = json.loads(
-                binding_path(self.engine, session["output"]).read_text(encoding="utf-8")
+                binding_path(engine, session["output"]).read_text(encoding="utf-8")
             )
         except FileNotFoundError:
             raise RuntimeAvailabilityError(
                 "Complete SPX installation before using runtime tools.", "SPX_NOT_READY"
             ) from None
-        installed = self.engine._read(binding["session_id"])
+        installed = engine._read(binding["session_id"])
         if installed["output"] != session["output"]:
             raise RuntimeAvailabilityError(
                 "Installation binding does not match this workspace", "SPX_NOT_READY"
             )
-        return binding, installed
+        return binding, installed, engine, workspace
 
     @property
     def config(self):
-        return self._config(*self._binding())
+        return self._config(*self._binding_context())
 
-    def _config(self, binding, installed):
+    def _config(self, binding, installed, engine=None, workspace=None):
         from spx_mcp.config import SpxMcpConfig
         from .product_key import validate_product_key_format
 
-        key = self.engine._key(installed)
+        key = (engine or self.engine)._key(installed)
         try:
             validate_product_key_format(key)
             status = "valid"
         except ValueError:
             status = "invalid"
         return SpxMcpConfig(
-            repo_root=self.workspace,
+            repo_root=workspace or self.workspace,
             spx_base_url=binding["api"],
             product_key=key,
             product_key_status=status,
@@ -112,7 +122,7 @@ class SetupRuntime:
         )
 
     def create_client(self):
-        binding, installed = self._binding()
+        binding, installed, engine, workspace = self._binding_context()
         if not binding["started"]:
             raise RuntimeAvailabilityError(
                 "SPX tools are installed; the stack was not started. Start SPX before using runtime tools.",
@@ -120,7 +130,7 @@ class SetupRuntime:
             )
         from spx_mcp.backend.client import create_spx_client
 
-        return create_spx_client(self._config(binding, installed))
+        return create_spx_client(self._config(binding, installed, engine, workspace))
 
     def require_write(self):
         # Runtime writes are requested separately from installation approval.

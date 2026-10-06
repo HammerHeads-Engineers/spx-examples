@@ -74,6 +74,7 @@ def test_recommended_draft_does_not_choose_entire_catalog(agent):
         "selected",
         "full_catalog",
         "base",
+        "preserve",
     ]
 
 
@@ -417,3 +418,93 @@ def test_conversational_cli_requires_needs_after_ordinary_wizard(tmp_path, capsy
     assert result["result"]["errors"][0]["code"] == "REQUIREMENTS_INCOMPLETE"
     assert engine.get(sid)["requirements_required"]
     assert not Path(session["output"]).exists()
+
+
+def test_preserve_installed_catalog_adds_only_active_mqtt_service(agent):
+    engine, sid = agent
+    index = engine._index(engine._read(sid))
+    models = list(index.models)
+    output = Path(engine.get(sid)["output"])
+    output.mkdir()
+    (output / "bundle.json").write_text(
+        json.dumps(
+            {
+                "models": [{"id": mid} for mid in models],
+                "services": ["knx_gateway"],
+                "ui_enabled": True,
+            }
+        )
+    )
+    configure(
+        agent,
+        "mqtt",
+        model_ids=None,
+        requirements=requirements("mqtt", catalog_scope="preserve"),
+    )
+    plan = engine.plan(sid)
+    assert plan["ready"], plan["errors"]
+    from installer.selection import apply_platform_compatibility
+
+    supported = apply_platform_compatibility(
+        model_ids=models, service_ids=[], instances=[], start_instances=[], index=index
+    ).model_ids
+    assert set(plan["selection"]["model_ids"]) == set(supported)
+    assert set(plan["selection"]["service_ids"]) == {"knx_gateway", "mqtt_broker"}
+    assert plan["changes"]["removed_services"] == []
+    assert plan["selection"]["instances"] == []
+
+
+def test_dormant_selected_models_do_not_require_unrequested_services(agent):
+    engine, sid = agent
+    configure(
+        agent, "mqtt", model_ids=["Env.EnvSensor.Mqtt", "Building.SmartPlug.Matter"]
+    )
+    plan = engine.plan(sid)
+    assert plan["ready"], plan["errors"]
+    assert plan["selection"]["service_ids"] == ["mqtt_broker"]
+
+
+def test_explicit_instances_require_infrastructure_even_for_dormant_protocol(agent):
+    engine, sid = agent
+    configure(
+        agent,
+        "mqtt",
+        model_ids=["Env.EnvSensor.Mqtt", "Building.SmartPlug.Matter"],
+        service_ids=["mqtt_broker"],
+        instances=[
+            {"model_id": "Building.SmartPlug.Matter", "instance_key": "explicit_matter"}
+        ],
+    )
+    plan = engine.plan(sid)
+    assert not plan["ready"]
+    assert any(e.get("service_id") == "matter_server" for e in plan["errors"])
+
+
+def test_preserve_requires_existing_catalog_and_blocks_silent_removal(agent):
+    engine, sid = agent
+    configure(
+        agent, "mqtt", requirements=requirements("mqtt", catalog_scope="preserve")
+    )
+    assert not engine.plan(sid)["ready"]
+    output = Path(engine.get(sid)["output"])
+    output.mkdir()
+    (output / "bundle.json").write_text(
+        json.dumps(
+            {
+                "models": [
+                    {"id": "Env.EnvSensor.Mqtt"},
+                    {"id": "Building.RoomController.Knx"},
+                ],
+                "services": [],
+            }
+        )
+    )
+    configure(
+        agent,
+        "mqtt",
+        model_ids=["Env.EnvSensor.Mqtt"],
+        requirements=requirements("mqtt", catalog_scope="preserve"),
+    )
+    assert any(
+        e["code"] == "CATALOG_SCOPE_MISMATCH" for e in engine.plan(sid)["errors"]
+    )

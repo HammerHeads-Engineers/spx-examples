@@ -49,12 +49,55 @@ def read_descriptor(workspace):
         (Path(workspace) / "setup-session.json").read_text(encoding="utf-8")
     )
     if (
-        value.get("purpose") != "setup"
-        or not value.get("session_id")
-        or not value.get("state_root")
+        not isinstance(value, dict)
+        or value.get("purpose") != "setup"
+        or not isinstance(value.get("session_id"), str)
+        or not value["session_id"]
+        or not isinstance(value.get("state_root"), str)
+        or not value["state_root"]
     ):
         raise SetupError("Invalid Setup workspace descriptor")
     return value
+
+
+def current_descriptor(workspace):
+    """Follow only the private pointer for this installation, never host env."""
+    from .setup_runtime import binding_path
+
+    root = Path(workspace).resolve()
+    descriptor = read_descriptor(root)
+    engine = SetupEngine(Path(descriptor["state_root"]))
+    session = engine._read(descriptor["session_id"])
+    pointer = binding_path(engine, session["output"]).with_name("setup-workspace.json")
+    if not pointer.exists():
+        return root, descriptor
+    current = json.loads(pointer.read_text(encoding="utf-8"))
+    if (
+        not isinstance(current, dict)
+        or not isinstance(current.get("workspace"), str)
+        or not current["workspace"]
+        or not isinstance(current.get("session_id"), str)
+        or not current["session_id"]
+    ):
+        raise SetupError(
+            "The current Setup workspace is unavailable. Run SPX Setup to repair it.",
+            "STALE_WORKSPACE",
+        )
+    canonical = Path(current["workspace"]).resolve()
+    if canonical == root:
+        return root, descriptor
+    latest = read_descriptor(canonical)
+    if (
+        Path(latest["state_root"]).resolve() != engine.root.resolve()
+        or latest["session_id"] != current["session_id"]
+        or Path(engine._read(latest["session_id"])["output"]).resolve()
+        != Path(session["output"]).resolve()
+    ):
+        raise SetupError(
+            "The current Setup workspace is unavailable. Run SPX Setup to repair it.",
+            "STALE_WORKSPACE",
+        )
+    return canonical, latest
 
 
 def _jsonc(content):
@@ -352,6 +395,7 @@ def prepare_workspace(
         "session_id": session_id,
         "state_root": str(engine.root),
         "python": str(interpreter),
+        "workspace_version": 1,
     }
     atomic_json(workspace / "setup-session.json", descriptor)
     atomic_json(marker, {"purpose": "setup", "session_id": session_id})
@@ -398,6 +442,14 @@ def prepare_workspace(
             raise SetupError(
                 "Setup workspace verification failed; run SPX Setup again before handing it to an agent."
             )
+    # Publish only a completely prepared workspace. Older project-local
+    # connections for this installation can discover the current handoff.
+    from .setup_runtime import binding_path
+
+    atomic_json(
+        binding_path(engine, str(output)).with_name("setup-workspace.json"),
+        {"workspace": str(workspace), "session_id": session_id},
+    )
     return workspace
 
 
@@ -410,7 +462,12 @@ provides setup_* and runtime server_* tools. Do not use an inherited/global SPX
 connection for this installation. Do not edit installer
 code, credentials or generated files, and do not run Docker replacement directly.
 
-1. Read setup_get_session and setup_list_options(compact=true). Use these tools,
+1. Read setup_get_context once. It returns the CURRENT draft, separately recorded
+   installation, license, installed selection, defaults and missing decisions.
+   A previous installation's SUCCEEDED does not complete a new DRAFT. Runtime
+   availability means tools can be tried, not that API/protocol health was checked.
+   Use setup_get_session only for detailed diagnostics and setup_list_options only
+   to look up models/services not already known from the context. Use these tools,
    not source-code scans, Docker inventories or credential files. The product key
    is already stored privately. Never ask for it in chat. The public license field
    gives planning limits: Community (CO) allows at most five instances; the server
@@ -433,7 +490,7 @@ code, credentials or generated files, and do not run Docker replacement directly
    exact model IDs; omit the protocol filter only for a broader catalog choice.
    Model entries expose services; service entries expose runtime and depends_on.
    Record the use case in selection.requirements using requirements_schema:
-   description, catalog_scope (selected/full_catalog/base), protocols actually
+   description, catalog_scope (selected/full_catalog/base/preserve), protocols actually
    needed now, required_services, external_services, remove_services, unresolved,
    and decisions containing the proposed/reviewed install_spx_ui, start,
    service_bind_addresses, port_mappings and replace_existing values.
@@ -444,10 +501,15 @@ code, credentials or generated files, and do not run Docker replacement directly
    A registered model is not an active protocol: install the infrastructure needed
    for the user's intended operation, while keeping instances at zero. For KNX
    testing this includes knx_gateway; MQTT needs a local broker or an explicitly
-   chosen external broker. Use service_ids=null to resolve required dependencies,
+   chosen external broker. Dormant library models do not require their services;
+   required protocols and explicitly requested instances determine infrastructure.
+   Use service_ids=null to resolve required dependencies,
    or an explicit complete list when preserving existing services.
-   On update use installed_selection to preserve the installed catalog and services
-   unless the user changes scope. Do not silently remove existing gateways;
+   On update use catalog_scope=preserve with model_ids=null and service_ids=null
+   to keep the installed catalog and services while adding required infrastructure.
+   To add a model absent from that catalog, provide existing plus new model IDs.
+   Do not ask the user to narrow a retained library merely to add a broker.
+   Change the scope only when the user requests a different library. Do not silently remove existing gateways;
    record agreed removals in remove_services and show them in the approval plan.
 4. Update the draft and call setup_plan only after needs and details are known.
    Resolve REQUIREMENTS_INCOMPLETE, SETUP_DECISION_REQUIRED and missing-service
@@ -525,7 +587,7 @@ For no-start, tools are prepared but live calls wait until SPX is started.
 Other local agents can launch `{interpreter}` with arguments
 `installer/setup_mcp.py stdio --workspace-root <this directory>` using local stdio.
 Without MCP run the local setup-cli launcher with these actions:
-`get-session`, `list-options`, `update-selection --selection-file <JSON patch>`,
+`get-context`, `get-session`, `list-options`, `update-selection --selection-file <JSON patch>`,
 `plan`, `apply --plan-id <reviewed id> --revision <reviewed revision>`, `status`.
 The launcher supplies the private-state location and current session identifier.
 
@@ -534,13 +596,13 @@ a directory does not give them access to local stdio or Docker.
 """,
     )
     # PowerShell's argument array and POSIX quoting keep paths and user arguments intact.
-    args = ["-m", "installer", "setup", "--state-root", str(state_root)]
+    args = ["-m", "installer", "setup", "--workspace-root", str(workspace)]
     ps_args = ", ".join("'" + part.replace("'", "''") + "'" for part in args)
-    ps = f"Set-Location -LiteralPath $PSScriptRoot\n$setupArgs = @({ps_args}) + @($args[0]) + @('--session-id', '{session_id}') + @($args | Select-Object -Skip 1)\n& '{str(interpreter).replace(chr(39), chr(39)*2)}' @setupArgs\nexit $LASTEXITCODE\n"
+    ps = f"Set-Location -LiteralPath $PSScriptRoot\n$setupArgs = @({ps_args}) + @($args)\n& '{str(interpreter).replace(chr(39), chr(39)*2)}' @setupArgs\nexit $LASTEXITCODE\n"
     _atomic_text(workspace / "setup-cli.ps1", ps)
     import shlex
 
-    sh = f'#!/usr/bin/env sh\ncd "$(dirname "$0")" || exit 1\naction="$1"; shift\nexec {shlex.quote(str(interpreter))} -m installer setup --state-root {shlex.quote(str(state_root))} "$action" --session-id {session_id} "$@"\n'
+    sh = f'#!/usr/bin/env sh\ncd "$(dirname "$0")" || exit 1\nexec {shlex.quote(str(interpreter))} -m installer setup --workspace-root {shlex.quote(str(workspace))} "$@"\n'
     _atomic_text(workspace / "setup-cli.sh", sh)
     runtime_script = workspace / "installer/spx_cli.py"
     ps = f"& '{str(interpreter).replace(chr(39), chr(39)*2)}' '{str(runtime_script).replace(chr(39), chr(39)*2)}' @args --workspace-root $PSScriptRoot\nexit $LASTEXITCODE\n"
