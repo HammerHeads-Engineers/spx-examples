@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -421,3 +422,37 @@ def test_closing_monitor_does_not_cancel_queued_job(workspace, monkeypatch):
     assert engine.get(session["session_id"])["status"] == "APPLYING"
     engine.run_job(session["session_id"], job["job_id"])
     assert engine.get(session["session_id"])["status"] == "SUCCEEDED"
+
+
+@pytest.mark.parametrize("status", ["APPLYING", "RECOVERY_REQUIRED"])
+def test_handoff_preserves_job_in_legacy_setup_workspace(
+    tmp_path, monkeypatch, capsys, status
+):
+    from installer.setup_workspace import launch_handoff
+
+    old = tmp_path / "old setup-workspace"
+    canonical = tmp_path / "workspace"
+    engine = SetupEngine(tmp_path / "private")
+    session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
+    prepare_workspace(old, engine, session["session_id"], bootstrap=False)
+    state = engine._read(session["session_id"])
+    state["status"] = status
+    engine._write(state)
+    monkeypatch.setattr(
+        "installer.setup_workspace.default_workspace", lambda: canonical
+    )
+    monkeypatch.setattr("installer.setup_workspace.legacy_setup_workspace", lambda: old)
+    observed = []
+    monkeypatch.setattr(
+        "installer.setup_workspace.monitor",
+        lambda selected_engine, session_id: observed.append(
+            (selected_engine.root, session_id)
+        )
+        or 0,
+    )
+
+    assert launch_handoff(SimpleNamespace(output=tmp_path / "generated"), None) == 0
+    assert observed == [(engine.root, session["session_id"])]
+    assert not canonical.exists()
+    assert engine.get(session["session_id"])["status"] == status
+    assert str(old) in capsys.readouterr().out

@@ -34,6 +34,18 @@ def default_workspace():
     return resolve_default_workspace_dir()
 
 
+def legacy_setup_workspace():
+    """The separate agent workspace used before Setup joined the MCP workspace."""
+    if os.name == "nt":
+        return (
+            Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+            / "SPX/setup-workspace"
+        )
+    if sys.platform == "darwin":
+        return Path.home() / "Documents/spx-setup-workspace"
+    return Path.home() / "spx-setup-workspace"
+
+
 def default_output():
     if os.name == "nt":
         return (
@@ -638,8 +650,25 @@ def launch_handoff(args, loader):
     output = (
         Path(getattr(args, "output", None) or default_output()).expanduser().absolute()
     )
+    explicit_workspace = getattr(args, "setup_workspace", None)
+    workspace = Path(explicit_workspace or default_workspace())
+    if not explicit_workspace:
+        old_workspace = legacy_setup_workspace()
+        if (
+            old_workspace.resolve() != workspace.resolve()
+            and (old_workspace / "setup-session.json").is_file()
+        ):
+            descriptor = read_descriptor(old_workspace)
+            old_engine = SetupEngine(Path(descriptor["state_root"]))
+            old_session = old_engine.get(descriptor["session_id"])
+            if old_session["status"] in {"APPLYING", "RECOVERY_REQUIRED"}:
+                print(
+                    f"[spx-setup] Reconnect your agent to {old_workspace}; "
+                    f"existing job: {old_session['status']}. "
+                    f"Open {workspace} after this job finishes."
+                )
+                return monitor(old_engine, descriptor["session_id"])
     engine = SetupEngine()
-    workspace = Path(getattr(args, "setup_workspace", None) or default_workspace())
     if (workspace / "setup-session.json").is_file():
         descriptor = read_descriptor(workspace)
         previous = SetupEngine(Path(descriptor["state_root"])).get(
