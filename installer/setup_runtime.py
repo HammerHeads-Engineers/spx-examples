@@ -22,14 +22,46 @@ def binding_path(engine, output):
     return engine.root / "installations" / digest / "runtime.json"
 
 
+def pending_binding_path(engine, output):
+    return binding_path(engine, output).with_name("runtime-pending.json")
+
+
 def publish_runtime(engine, session, *, started):
-    atomic_json(
-        binding_path(engine, session["output"]),
-        {
-            "session_id": session["session_id"],
-            "api": _endpoints(Path(session["output"]))["api"],
-            "started": bool(started),
-        },
+    binding = {
+        "session_id": session["session_id"],
+        "api": _endpoints(Path(session["output"]))["api"],
+        "started": bool(started),
+    }
+    if started:
+        atomic_json(binding_path(engine, session["output"]), binding)
+        pending_binding_path(engine, session["output"]).unlink(missing_ok=True)
+    else:
+        # A generated-but-not-started update must not replace the connection
+        # to a still-running previous installation.
+        atomic_json(pending_binding_path(engine, session["output"]), binding)
+
+
+def candidate_config(engine, session, workspace, *, api=None):
+    """Resolve a candidate without exposing its key in args or publishing it."""
+    from spx_mcp.config import SpxMcpConfig
+    from .product_key import validate_product_key_format
+
+    key = engine._key(session)
+    try:
+        validate_product_key_format(key)
+        status = "valid"
+    except ValueError:
+        status = "invalid"
+    return SpxMcpConfig(
+        repo_root=Path(workspace),
+        spx_base_url=api or _endpoints(Path(session["output"]))["api"],
+        product_key=key,
+        product_key_status=status,
+        product_key_source="private installation state",
+        allow_write=True,
+        pretty_errors=False,
+        workspace_kind="managed",
+        default_work_mode="runtime_mcp",
     )
 
 
@@ -85,6 +117,11 @@ class SetupRuntime:
                 binding_path(engine, session["output"]).read_text(encoding="utf-8")
             )
         except FileNotFoundError:
+            if pending_binding_path(engine, session["output"]).exists():
+                raise RuntimeAvailabilityError(
+                    "SPX tools are installed; start SPX before using runtime tools.",
+                    "SPX_NOT_STARTED",
+                ) from None
             raise RuntimeAvailabilityError(
                 "Complete SPX installation before using runtime tools.", "SPX_NOT_READY"
             ) from None
@@ -99,26 +136,32 @@ class SetupRuntime:
     def config(self):
         return self._config(*self._binding_context())
 
-    def _config(self, binding, installed, engine=None, workspace=None):
-        from spx_mcp.config import SpxMcpConfig
-        from .product_key import validate_product_key_format
+    def pending_config(self):
+        """Allow local doctor checks for a fresh install that was not started."""
+        from .setup_workspace import current_descriptor
 
-        key = (engine or self.engine)._key(installed)
-        try:
-            validate_product_key_format(key)
-            status = "valid"
-        except ValueError:
-            status = "invalid"
-        return SpxMcpConfig(
-            repo_root=workspace or self.workspace,
-            spx_base_url=binding["api"],
-            product_key=key,
-            product_key_status=status,
-            product_key_source="private installation state",
-            allow_write=True,
-            pretty_errors=False,
-            workspace_kind="managed",
-            default_work_mode="runtime_mcp",
+        workspace, descriptor = current_descriptor(self.workspace)
+        engine = SetupEngine(Path(descriptor["state_root"]))
+        session = engine._read(descriptor["session_id"])
+        path = pending_binding_path(engine, session["output"])
+        if not path.is_file():
+            raise RuntimeAvailabilityError(
+                "Complete SPX installation before using runtime tools.", "SPX_NOT_READY"
+            )
+        pending = json.loads(path.read_text(encoding="utf-8"))
+        installed = engine._read(pending["session_id"])
+        if Path(installed["output"]).resolve() != Path(session["output"]).resolve():
+            raise RuntimeAvailabilityError(
+                "Pending installation does not match this workspace", "SPX_NOT_READY"
+            )
+        return candidate_config(engine, installed, workspace, api=pending["api"])
+
+    def _config(self, binding, installed, engine=None, workspace=None):
+        return candidate_config(
+            engine or self.engine,
+            installed,
+            workspace or self.workspace,
+            api=binding["api"],
         )
 
     def create_client(self):
@@ -165,16 +208,21 @@ def prepare_tools(engine, session, *, started, bootstrap=True):
     from .setup_workspace import prepare_workspace, read_descriptor
     from .setup_session import clean_environment
 
-    publish_runtime(engine, session, started=started)
     workspace = Path(session.get("workspace") or resolve_default_workspace_dir())
     # Agent handoff prepared the full toolset before deployment. Do not copy
     # running code or rebuild its interpreter underneath the connected client.
     descriptor = workspace / "setup-session.json"
-    already_prepared = (
-        session.get("workspace")
-        and descriptor.is_file()
-        and read_descriptor(workspace)["session_id"] == session["session_id"]
+    prepared_pointer = binding_path(engine, session["output"]).with_name(
+        "setup-workspace.json"
     )
+    already_prepared = False
+    if session.get("workspace") and descriptor.is_file() and prepared_pointer.is_file():
+        prepared = json.loads(prepared_pointer.read_text(encoding="utf-8"))
+        already_prepared = (
+            read_descriptor(workspace)["session_id"] == session["session_id"]
+            and prepared.get("session_id") == session["session_id"]
+            and Path(prepared.get("workspace", "")).resolve() == workspace.resolve()
+        )
     if not already_prepared:
         prepare_workspace(
             workspace,
@@ -190,7 +238,8 @@ def prepare_tools(engine, session, *, started, bootstrap=True):
         "doctor",
         "--workspace-root",
         str(workspace),
-        "--during-setup",
+        "--candidate-session-id",
+        session["session_id"],
     ]
     if started:
         command.append("--check-server")
@@ -212,6 +261,7 @@ def prepare_tools(engine, session, *, started, bootstrap=True):
     atomic_json(
         Path(session["output"]) / ".spx-tools.json", {"workspace": str(workspace)}
     )
+    publish_runtime(engine, session, started=started)
     return {
         "ok": True,
         "workspace": str(workspace),
@@ -226,7 +276,9 @@ def mark_runtime_started(seed_env, workspace):
 
     runtime = SetupRuntime(workspace, verify_pending=True)
     session = runtime.engine._read(runtime.session_id)
-    path = binding_path(runtime.engine, session["output"])
+    active = binding_path(runtime.engine, session["output"])
+    pending = pending_binding_path(runtime.engine, session["output"])
+    path = pending if pending.exists() else active
     if not path.exists():
         return False  # First install publishes its binding in the common final step.
     binding = json.loads(path.read_text(encoding="utf-8"))
@@ -239,5 +291,7 @@ def mark_runtime_started(seed_env, workspace):
             "Installation credentials changed; run SPX Setup to reconfigure tools"
         )
     binding["started"] = True
-    atomic_json(path, binding)
+    atomic_json(active, binding)
+    if path == pending:
+        pending.unlink(missing_ok=True)
     return True

@@ -12,7 +12,8 @@ def execute_selection(
     catalog=None,
     profiles=None,
     start_callback=None,
-    workspace=None
+    workspace=None,
+    prepare_mcp_before_install=False,
 ):
     resolved = asdict(selection)
     resolved.pop("license_key")
@@ -38,6 +39,22 @@ def execute_selection(
         private = engine._read(session["session_id"])
         private["workspace"] = str(workspace)
         engine._write(private)
+    if prepare_mcp_before_install:
+        from .setup_workspace import default_workspace, prepare_workspace
+
+        try:
+            prepare_workspace(
+                workspace or default_workspace(),
+                engine,
+                session["session_id"],
+                preserve_session=True,
+            )
+        except Exception:
+            # The ordinary wizard can still install the stack. Tool repair is
+            # reported independently after deployment by prepare_tools.
+            print(
+                "[spx-installer] MCP preparation failed; installation will continue and retry tool setup after deployment."
+            )
     plan = engine.plan(session["session_id"])
     job = engine.apply(
         session["session_id"], plan["plan_id"], plan["revision"], launch=False

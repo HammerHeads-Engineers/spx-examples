@@ -16,7 +16,7 @@ from installer.setup_session import SetupEngine, SetupError
 from installer.setup_workspace import read_descriptor, current_descriptor
 
 
-def build_server(workspace):
+def build_server(workspace, *, toolset="setup"):
     from mcp.server.fastmcp import FastMCP
     from mcp.types import ToolAnnotations
 
@@ -24,10 +24,23 @@ def build_server(workspace):
     engine = SetupEngine(Path(descriptor["state_root"]), require_conversation=True)
     session_id = descriptor["session_id"]
     engine.get(session_id)
+    if toolset not in {"setup", "runtime"}:
+        raise ValueError("Unknown SPX MCP toolset")
     server = FastMCP(
-        "SPX",
-        instructions="Install and work with SPX in this same workspace/connection. Start with setup_get_context once: distinguish the current draft from a previous committed installation. Descriptor changes are resolved per call; old explicit session IDs cannot mutate the new draft. Runtime tools resolve committed configuration automatically; no reconnect is needed after installation. Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Preserve the installed library with catalog_scope=preserve, model_ids=null, service_ids=null; dormant catalog models do not require infrastructure. Needed protocols and explicitly requested instances determine services. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan.",
+        "SPX Setup" if toolset == "setup" else "SPX Runtime",
+        instructions=(
+            "Install SPX in this workspace, then use its already-registered spx runtime MCP without reconnecting. Start with setup_get_context once: distinguish the current draft from a previous committed installation. Descriptor changes are resolved per call; old explicit session IDs cannot mutate the new draft. Discover the user's application and missing setup details before selecting models/services. Record selection.requirements using requirements_schema. Never default to the full catalog. Preserve the installed library with catalog_scope=preserve, model_ids=null, service_ids=null; dormant catalog models do not require infrastructure. Needed protocols and explicitly requested instances determine services. Keep zero instances unless explicitly requested. setup_plan validates needs, decisions, dependencies and service removals. Never request or disclose the product key. setup_apply requires explicit approval of the current ready plan."
+            if toolset == "setup"
+            else "Work with the installed SPX runtime. Configuration is resolved "
+            "from private committed state for each call, so installation and "
+            "credential changes do not require reconnecting MCP."
+        ),
     )
+    if toolset == "runtime":
+        from installer.setup_runtime import register_runtime_tools
+
+        register_runtime_tools(server, workspace)
+        return server
     read = ToolAnnotations(
         readOnlyHint=True,
         destructiveHint=False,
@@ -129,11 +142,6 @@ def build_server(workspace):
             compact=compact,
         )
 
-    # Publish the stable runtime toolset before installation: the connected
-    # client need not rediscover servers/tools when deployment completes.
-    from installer.setup_runtime import register_runtime_tools
-
-    register_runtime_tools(server, workspace)
     return server
 
 
@@ -141,16 +149,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["stdio", "doctor"])
     parser.add_argument("--workspace-root", type=Path, required=True)
+    parser.add_argument("--toolset", choices=["setup", "runtime"], default="setup")
     args = parser.parse_args(argv)
     try:
-        server = build_server(args.workspace_root)
+        server = build_server(args.workspace_root, toolset=args.toolset)
         if args.command == "doctor":
             names = [tool.name for tool in asyncio.run(server.list_tools())]
             print(
                 json.dumps(
                     {
                         "ok": True,
-                        "purpose": "setup",
+                        "purpose": args.toolset,
                         "server_checked": False,
                         "tools": names,
                     }

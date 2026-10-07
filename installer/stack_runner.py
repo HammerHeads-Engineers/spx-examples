@@ -522,7 +522,10 @@ def _start(script_dir: Path, *, assume_yes: bool) -> int:
                 from installer.mcp_workspace import synchronize_managed_workspace
             except ImportError:
                 from mcp_workspace import synchronize_managed_workspace
-            if synchronize_managed_workspace(env_file):
+            # SetupEngine verifies the candidate and publishes its private
+            # binding after this transaction. A standalone Start promotes a
+            # previously generated no-start binding here.
+            if not os.environ.get('SPX_SETUP_JOURNAL') and synchronize_managed_workspace(env_file):
                 print('[spx-start] SPX tools configuration refreshed. Continue in your SPX workspace.')
         except Exception:
             # The stack is already committed and healthy. MCP setup failure

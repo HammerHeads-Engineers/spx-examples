@@ -63,19 +63,24 @@ poetry install --with dev
 ## Bootstrap MCP client configs
 
 Packaged SPX Setup automatically prepares a shared workspace for installation
-and live work, in all wizard modes. Its project-local `spx` stdio server publishes
-`setup_*`, catalog and runtime tools before deployment. Runtime calls read the
+and live work, in all wizard modes. It registers `spx_setup` for installation
+and `spx` for catalog and runtime work before deployment. Both use the same
+workspace and private installation state. Runtime calls read the
 committed installation's private binding on each operation, so installation and
 key/URL updates do not require reconnecting an already connected agent. A failed
 installation does not publish new runtime settings; active/recovery transactions
-block live operations. Explicit no-start installs prepare tools but report
-`SPX_NOT_STARTED` until the supported Start helper commits successfully.
+block live operations. An update without Start retains the previous active
+connection and stores the new configuration as pending. A fresh no-start install
+reports `SPX_NOT_STARTED` until the supported Start helper commits successfully.
 
 The workspace also contains `spx.ps1` / `spx.sh` for JSON CLI diagnostics and
 runtime tool calls. `doctor --check-server` verifies authenticated access, and
 `call <tool> --arguments-file <JSON file>` uses the same implementation as MCP.
 Tool readiness failures are separate from stack success. Use SPX MCP Setup for
 repair, or the repository bootstrap below for development checkout workflows.
+When diagnosing a different checkout, run the workspace CLI's
+`doctor --project-root <checkout>` to detect project-local Codex MCP entries
+still targeting an older workspace.
 
 To generate a local Codex MCP config for this repository without committing
 machine-specific paths, use one of the bootstrap scripts below. They create

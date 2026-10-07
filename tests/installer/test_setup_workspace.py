@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -68,7 +69,13 @@ def test_profiles_and_instructions_do_not_contain_key(workspace):
     assert any(
         value.endswith("setup_mcp.py") for value in claude["mcpServers"]["spx"]["args"]
     )
+    assert set(claude["mcpServers"]) >= {"spx", "spx_setup"}
+    assert "setup" in claude["mcpServers"]["spx_setup"]["args"]
+    assert "runtime" in claude["mcpServers"]["spx"]["args"]
     opencode = json.loads((root / "opencode.jsonc").read_text(encoding="utf-8"))
+    codex = (root / ".codex/config.toml").read_text(encoding="utf-8")
+    assert "[mcp_servers.spx_setup]" in codex and "[mcp_servers.spx]" in codex
+    assert set(opencode["mcp"]["servers"]) >= {"spx_setup", "spx"}
     assert opencode["mcp"]["servers"]["spx"]["type"] == "local"
     assert "mcp.servers" not in opencode
 
@@ -107,18 +114,21 @@ def test_mcp_exposes_setup_and_runtime_tools_without_api(workspace):
     from installer.setup_mcp import build_server
 
     root, _, _ = workspace
-    server = build_server(root)
-    names = {tool.name for tool in asyncio.run(server.list_tools())}
-    assert names >= {
+    setup = {tool.name for tool in asyncio.run(build_server(root).list_tools())}
+    runtime = {
+        tool.name
+        for tool in asyncio.run(build_server(root, toolset="runtime").list_tools())
+    }
+    assert setup >= {
         "setup_get_session",
         "setup_list_options",
         "setup_update_selection",
         "setup_plan",
         "setup_apply",
         "setup_get_status",
-        "health",
-        "server_list_instances",
     }
+    assert runtime >= {"health", "server_list_instances"}
+    assert "health" not in setup and "setup_apply" not in runtime
 
 
 def test_runtime_workspace_is_never_overwritten(tmp_path):
@@ -160,7 +170,7 @@ def test_real_stdio_handoff_survives_reconnect_and_generates_configuration(
     engine._write(private)
     profile = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
         "mcpServers"
-    ]["spx"]
+    ]["spx_setup"]
     parameters = StdioServerParameters(
         command=profile["command"],
         args=profile["args"],
@@ -298,7 +308,7 @@ def test_bootstrap_uses_utf8_and_can_retry_failed_download(tmp_path, monkeypatch
         prepare_workspace(root, engine, session["session_id"])
     assert (root / ".spx-setup-workspace.json").is_file()
     prepare_workspace(root, engine, session["session_id"])
-    assert len(calls) == 3  # failed bootstrap, retry, doctor
+    assert len(calls) == 4  # failed bootstrap, retry, both MCP doctors
 
 
 def test_unsupported_python_reports_agent_fallback(tmp_path, monkeypatch):
@@ -412,3 +422,37 @@ def test_closing_monitor_does_not_cancel_queued_job(workspace, monkeypatch):
     assert engine.get(session["session_id"])["status"] == "APPLYING"
     engine.run_job(session["session_id"], job["job_id"])
     assert engine.get(session["session_id"])["status"] == "SUCCEEDED"
+
+
+@pytest.mark.parametrize("status", ["APPLYING", "RECOVERY_REQUIRED"])
+def test_handoff_preserves_job_in_legacy_setup_workspace(
+    tmp_path, monkeypatch, capsys, status
+):
+    from installer.setup_workspace import launch_handoff
+
+    old = tmp_path / "old setup-workspace"
+    canonical = tmp_path / "workspace"
+    engine = SetupEngine(tmp_path / "private")
+    session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
+    prepare_workspace(old, engine, session["session_id"], bootstrap=False)
+    state = engine._read(session["session_id"])
+    state["status"] = status
+    engine._write(state)
+    monkeypatch.setattr(
+        "installer.setup_workspace.default_workspace", lambda: canonical
+    )
+    monkeypatch.setattr("installer.setup_workspace.legacy_setup_workspace", lambda: old)
+    observed = []
+    monkeypatch.setattr(
+        "installer.setup_workspace.monitor",
+        lambda selected_engine, session_id: observed.append(
+            (selected_engine.root, session_id)
+        )
+        or 0,
+    )
+
+    assert launch_handoff(SimpleNamespace(output=tmp_path / "generated"), None) == 0
+    assert observed == [(engine.root, session["session_id"])]
+    assert not canonical.exists()
+    assert engine.get(session["session_id"])["status"] == status
+    assert str(old) in capsys.readouterr().out

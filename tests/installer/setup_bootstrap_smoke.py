@@ -57,21 +57,27 @@ def main():
     ):
         assert key not in (workspace / name).read_text(encoding="utf-8")
     descriptor = read_descriptor(workspace)
-    doctor = subprocess.run(
-        [
-            descriptor["python"],
-            str(workspace / "installer/setup_mcp.py"),
-            "doctor",
-            "--workspace-root",
-            str(workspace),
-        ],
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-        check=True,
-    )
-    assert json.loads(doctor.stdout)["ok"]
+    profiles = json.loads((workspace / ".mcp.json").read_text(encoding="utf-8"))
+    assert set(profiles["mcpServers"]) >= {"spx_setup", "spx"}
+    for toolset in ("setup", "runtime"):
+        doctor = subprocess.run(
+            [
+                descriptor["python"],
+                str(workspace / "installer/setup_mcp.py"),
+                "doctor",
+                "--workspace-root",
+                str(workspace),
+                "--toolset",
+                toolset,
+            ],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+            check=True,
+        )
+        report = json.loads(doctor.stdout)
+        assert report["ok"] and report["purpose"] == toolset
     launcher = (
         [
             "powershell.exe",

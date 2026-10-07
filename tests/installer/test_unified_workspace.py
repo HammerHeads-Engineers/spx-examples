@@ -24,21 +24,26 @@ def workspace(tmp_path):
 
 
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="MCP SDK requires Python 3.10+")
-def test_setup_connection_already_exposes_runtime_tools(workspace):
+def test_both_connections_expose_their_tools_before_install(workspace):
     from installer.setup_mcp import build_server
 
     root, _, _ = workspace
-    server = build_server(root)
-    names = {tool.name for tool in asyncio.run(server.list_tools())}
+    setup = {tool.name for tool in asyncio.run(build_server(root).list_tools())}
+    runtime = {
+        tool.name
+        for tool in asyncio.run(build_server(root, toolset="runtime").list_tools())
+    }
+    assert "setup_plan" in setup
+    assert "health" not in setup
+    assert "setup_plan" not in runtime
     assert {
-        "setup_plan",
         "health",
         "repo_find_models",
         "server_list_models",
         "server_ensure_instance",
         "server_start_instance",
         "server_upsert_connection",
-    } <= names
+    } <= runtime
 
 
 def test_all_flows_prepare_tools_after_success_without_changing_result(
@@ -63,6 +68,48 @@ def test_all_flows_prepare_tools_after_success_without_changing_result(
     assert state["status"] == "SUCCEEDED"
     assert state["tools"]["ok"]
     assert calls == [False]
+
+
+def test_ordinary_wizard_prepares_mcp_before_deployment(tmp_path, monkeypatch):
+    from installer.setup_local import execute_selection
+    from installer.wizard import WizardSelection
+
+    engine = SetupEngine(tmp_path / "private")
+    monkeypatch.setattr("installer.setup_local.SetupEngine", lambda: engine)
+    events = []
+
+    def prepare(workspace, current_engine, session_id, **kwargs):
+        assert current_engine is engine
+        assert not (tmp_path / "generated" / "bundle.json").exists()
+        events.append("mcp-prepared")
+
+    monkeypatch.setattr("installer.setup_workspace.prepare_workspace", prepare)
+    monkeypatch.setattr(
+        engine,
+        "_prepare_tools",
+        lambda *args, **kwargs: {"ok": True, "workspace": str(tmp_path / "workspace")},
+    )
+    selection = WizardSelection(
+        packages=[],
+        profiles=[],
+        protocols=[],
+        install_examples=False,
+        install_spx_ui=True,
+        offline_bundle=False,
+        license_key=KEY,
+        model_ids=[],
+        service_ids=[],
+        instances=[],
+        start_instances=[],
+    )
+    result = execute_selection(
+        selection,
+        tmp_path / "generated",
+        workspace=tmp_path / "workspace",
+        prepare_mcp_before_install=True,
+    )
+    assert events == ["mcp-prepared"]
+    assert result["status"] == "SUCCEEDED"
 
 
 def test_tool_failure_is_separate_from_successful_installation(tmp_path, monkeypatch):
@@ -145,6 +192,85 @@ def test_no_start_tools_are_installed_but_runtime_is_not_started(workspace):
         SetupRuntime(root).create_client()
     assert error.value.code == "SPX_NOT_STARTED"
     assert (root / "spx.ps1").is_file() and (root / "spx.sh").is_file()
+
+
+def test_no_start_update_keeps_active_binding_until_manual_start(
+    workspace, tmp_path, monkeypatch
+):
+    from installer.setup_runtime import (
+        SetupRuntime,
+        binding_path,
+        pending_binding_path,
+        mark_runtime_started,
+        publish_runtime,
+    )
+
+    root, engine, original = workspace
+    active = binding_path(engine, original["output"])
+    atomic_json(
+        active,
+        {
+            "session_id": original["session_id"],
+            "api": "http://127.0.0.1:8000",
+            "started": True,
+        },
+    )
+    replacement = engine.create(
+        Path(original["output"]), "B" * 30, initial={"start": False}
+    )
+    monkeypatch.setattr(
+        "installer.setup_runtime._endpoints",
+        lambda _: {"api": "http://127.0.0.1:18000"},
+    )
+    publish_runtime(engine, replacement, started=False)
+    pending = pending_binding_path(engine, original["output"])
+    assert pending.is_file()
+    assert SetupRuntime(root).config.product_key == KEY
+    assert SetupRuntime(root).config.spx_base_url == "http://127.0.0.1:8000"
+
+    descriptor = json.loads((root / "setup-session.json").read_text(encoding="utf-8"))
+    descriptor["session_id"] = replacement["session_id"]
+    atomic_json(root / "setup-session.json", descriptor)
+    seed = Path(original["output"]) / ".env"
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    seed.write_text("SPX_PRODUCT_KEY=" + "B" * 30, encoding="utf-8")
+    assert mark_runtime_started(seed, root)
+    assert not pending.exists()
+    assert SetupRuntime(root).config.product_key == "B" * 30
+    assert SetupRuntime(root).config.spx_base_url == "http://127.0.0.1:18000"
+
+
+def test_failed_candidate_doctor_never_replaces_active_binding(workspace, monkeypatch):
+    from installer.setup_runtime import binding_path, prepare_tools
+    from installer.setup_session import SetupError
+    import subprocess
+
+    root, engine, original = workspace
+    active = binding_path(engine, original["output"])
+    binding = {
+        "session_id": original["session_id"],
+        "api": "http://127.0.0.1:8000",
+        "started": True,
+    }
+    atomic_json(active, binding)
+    replacement = engine.create(
+        Path(original["output"]), "B" * 30, initial={"start": True}
+    )
+    prepare_workspace(root, engine, replacement["session_id"], bootstrap=False)
+    monkeypatch.setattr(
+        "installer.setup_runtime.subprocess.run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 1, '{"ok": false}', ""
+        ),
+    )
+    with pytest.raises(SetupError, match="could not verify"):
+        prepare_tools(
+            engine,
+            engine._read(replacement["session_id"]),
+            started=True,
+            bootstrap=False,
+        )
+    assert json.loads(active.read_text(encoding="utf-8")) == binding
 
 
 def test_runtime_blocked_during_replacement_and_recovery(workspace):
@@ -273,7 +399,11 @@ def test_same_stdio_connection_works_after_install_and_key_rotation(
 def test_common_preparation_creates_workspace_without_resetting_job(
     tmp_path, monkeypatch
 ):
-    from installer.setup_runtime import prepare_tools
+    from installer.setup_runtime import (
+        prepare_tools,
+        binding_path,
+        pending_binding_path,
+    )
 
     engine = SetupEngine(tmp_path / "private")
     session = engine.create(tmp_path / "generated", KEY, initial={"start": False})
@@ -298,6 +428,8 @@ def test_common_preparation_creates_workspace_without_resetting_job(
     assert final["job"]["job_id"] == job["job_id"]
     assert final["tools"]["ok"] is True
     assert final["tools"]["server_checked"] is False
+    assert pending_binding_path(engine, session["output"]).is_file()
+    assert not binding_path(engine, session["output"]).exists()
     for path in root.rglob("*"):
         if path.is_file():
             assert KEY.encode() not in path.read_bytes()
@@ -370,13 +502,12 @@ def test_repair_preserves_job_and_removes_old_setup_profiles(workspace):
         root, engine, session["session_id"], bootstrap=False, preserve_session=True
     )
     assert engine.get(session["session_id"])["job"]["job_id"] == "finished"
-    assert "spx_setup" not in (root / ".codex/config.toml").read_text()
+    assert "[mcp_servers.spx_setup]" in (root / ".codex/config.toml").read_text()
+    assert 'SETTING = "old"' not in (root / ".codex/config.toml").read_text()
     assert "[mcp_servers.other]" in (root / ".codex/config.toml").read_text()
     assert (
         "spx_setup"
-        not in json.loads((root / ".mcp.json").read_text(encoding="utf-8"))[
-            "mcpServers"
-        ]
+        in json.loads((root / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]
     )
     current["status"] = "RECOVERY_REQUIRED"
     engine._write(current)
@@ -441,3 +572,44 @@ def test_runtime_cli_no_start_and_inventory(workspace, capsys):
     if sys.version_info >= (3, 10):
         assert main(["call", "health", "--workspace-root", str(root)]) == 1
         assert json.loads(capsys.readouterr().out)["error"]["code"] == "SPX_NOT_STARTED"
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="MCP runtime requires Python 3.10+; native Setup jobs cover the doctor",
+)
+def test_fresh_pending_install_passes_local_doctor_but_blocks_live_calls(
+    workspace, capsys
+):
+    from installer.spx_cli import main
+    from installer.setup_runtime import pending_binding_path
+
+    root, engine, session = workspace
+    atomic_json(
+        pending_binding_path(engine, session["output"]),
+        {
+            "session_id": session["session_id"],
+            "api": "http://127.0.0.1:8000",
+            "started": False,
+        },
+    )
+    assert main(["doctor", "--workspace-root", str(root)]) == 0
+    assert json.loads(capsys.readouterr().out)["ok"]
+    assert main(["call", "health", "--workspace-root", str(root)]) == 1
+    assert json.loads(capsys.readouterr().out)["error"]["code"] == "SPX_NOT_STARTED"
+
+
+def test_doctor_identifies_stale_project_local_codex_mcp(workspace, tmp_path):
+    from installer.spx_cli import project_mcp_check
+
+    root, _, _ = workspace
+    project = tmp_path / "another checkout"
+    (project / ".codex").mkdir(parents=True)
+    (project / ".codex/config.toml").write_text(
+        '[mcp_servers.spx]\ncommand = "python"\nargs = ["-m", "spx_mcp", "stdio", "--repo-root", "old-checkout"]\n',
+        encoding="utf-8",
+    )
+    stale = project_mcp_check(project, root)
+    assert not stale["ok"] and "spx" in stale["message"]
+    current = project_mcp_check(root, root)
+    assert current["ok"]
