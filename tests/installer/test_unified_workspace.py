@@ -574,6 +574,10 @@ def test_runtime_cli_no_start_and_inventory(workspace, capsys):
         assert json.loads(capsys.readouterr().out)["error"]["code"] == "SPX_NOT_STARTED"
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="MCP runtime requires Python 3.10+; native Setup jobs cover the doctor",
+)
 def test_fresh_pending_install_passes_local_doctor_but_blocks_live_calls(
     workspace, capsys
 ):
