@@ -392,9 +392,9 @@ def synchronize_managed_workspace(seed_env: Path, *, workspace_dir: Optional[Pat
     marker = json.loads(marker_path.read_text(encoding='utf-8'))
     if marker.get('workspace_kind', marker.get('workspace_mode')) != WORKSPACE_KIND_MANAGED:
         return False
-    source = Path(marker['source_root'])
-    validate_source_root(source)
-    sync_payload(source, workspace)
+    # A running MCP process may import these files after the stack commits.
+    # Payload updates belong to installer preflight or an explicit MCP repair,
+    # never to the post-start hook.
     seeded = read_seeded_workspace_env(primary_seed_env_path=seed_env, fallback_seed_env_path=None)
     values = build_workspace_env(existing=read_dotenv(workspace / '.env'), seeded=seeded)
     write_dotenv(workspace / '.env', values)

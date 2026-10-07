@@ -22,6 +22,12 @@ def main(argv=None):
     parser.add_argument("--arguments-file", type=Path)
     parser.add_argument("--check-server", action="store_true")
     parser.add_argument("--during-setup", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--candidate-session-id", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--project-root",
+        type=Path,
+        help="Also check whether another project's Codex MCP entries target this SPX workspace.",
+    )
     parser.add_argument(
         "--json", action="store_true", help="JSON is also the default output"
     )
@@ -34,7 +40,34 @@ def main(argv=None):
             runtime = SetupRuntime(
                 args.workspace_root, verify_pending=args.during_setup
             )
-            if args.check_server:
+            if args.candidate_session_id:
+                from installer.setup_runtime import candidate_config
+
+                candidate = runtime.engine._read(args.candidate_session_id)
+                current = runtime.engine._read(runtime.session_id)
+                if (
+                    Path(candidate["output"]).resolve()
+                    != Path(current["output"]).resolve()
+                ):
+                    raise ValueError("Candidate installation does not match workspace")
+                config = candidate_config(
+                    runtime.engine, candidate, args.workspace_root
+                )
+            else:
+                try:
+                    config = runtime.config
+                except Exception as error:
+                    from spx_mcp.errors import RuntimeAvailabilityError
+
+                    if (
+                        not args.check_server
+                        and isinstance(error, RuntimeAvailabilityError)
+                        and error.code == "SPX_NOT_STARTED"
+                    ):
+                        config = runtime.pending_config()
+                    else:
+                        raise
+            if args.check_server and not args.candidate_session_id:
                 binding, _ = runtime._binding()
                 if not binding["started"]:
                     from spx_mcp.errors import RuntimeAvailabilityError
@@ -43,11 +76,17 @@ def main(argv=None):
                         "SPX tools are installed; the stack was not started.",
                         "SPX_NOT_STARTED",
                     )
-            result = doctor_report(runtime.config, check_server=args.check_server)
+            result = doctor_report(config, check_server=args.check_server)
+            if args.project_root:
+                result["project_mcp"] = project_mcp_check(
+                    args.project_root, args.workspace_root
+                )
+                if not result["project_mcp"]["ok"]:
+                    result["ok"] = False
         else:
             from installer.setup_mcp import build_server
 
-            server = build_server(args.workspace_root)
+            server = build_server(args.workspace_root, toolset="runtime")
             if args.command == "list-tools":
                 result = {
                     "ok": True,
@@ -98,6 +137,54 @@ def main(argv=None):
             )
         )
         return 1
+
+
+def project_mcp_check(project_root: Path, workspace_root: Path) -> dict:
+    """Report stale project-local Codex entries without printing their contents."""
+    path = project_root / ".codex" / "config.toml"
+    if not path.is_file():
+        return {
+            "ok": True,
+            "checked": True,
+            "message": "No project-local Codex MCP configuration.",
+        }
+    try:
+        try:
+            import tomllib as toml_reader
+        except ImportError:  # Python 3.10
+            import tomli as toml_reader
+        with path.open("rb") as handle:
+            servers = toml_reader.load(handle).get("mcp_servers", {})
+    except (OSError, ValueError, ImportError):
+        return {
+            "ok": False,
+            "checked": True,
+            "message": "Project-local Codex MCP configuration is unreadable.",
+        }
+    expected = workspace_root.resolve()
+    stale = []
+    for name in ("spx_setup", "spx"):
+        entry = servers.get(name)
+        if not isinstance(entry, dict):
+            continue
+        args = entry.get("args", [])
+        if not isinstance(args, list) or not any(
+            isinstance(item, str) and Path(item).resolve() == expected for item in args
+        ):
+            stale.append(name)
+    if stale:
+        return {
+            "ok": False,
+            "checked": True,
+            "message": "Project-local Codex MCP entry points outside the installed SPX workspace: "
+            + ", ".join(stale)
+            + ". Open the installed workspace or repair this project's MCP configuration.",
+        }
+    return {
+        "ok": True,
+        "checked": True,
+        "message": "Project-local SPX MCP entries are current.",
+    }
 
 
 if __name__ == "__main__":

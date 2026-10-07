@@ -279,7 +279,7 @@ def test_real_stdio_context_follows_rotated_descriptor(workspace):
     from mcp.client.stdio import StdioServerParameters, stdio_client
 
     root, engine, first = workspace
-    profile = json.loads((root / ".mcp.json").read_text())["mcpServers"]["spx"]
+    profile = json.loads((root / ".mcp.json").read_text())["mcpServers"]["spx_setup"]
     parameters = StdioServerParameters(command=profile["command"], args=profile["args"])
 
     async def verify():

@@ -476,6 +476,7 @@ def run(args: argparse.Namespace) -> int:
             catalog=getattr(args, "catalog", None),
             profiles=getattr(args, "profiles", None),
             workspace=getattr(args, "setup_workspace", None),
+            prepare_mcp_before_install=not noninteractive,
             start_callback=(
                 (
                     lambda directory, journal: _launch_stack(

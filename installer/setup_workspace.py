@@ -24,7 +24,8 @@ from tools.codex_mcp_bootstrap import (
     upsert_named_mcp_server,
 )
 
-SERVER_NAME = "spx"
+SERVER_NAME = "spx_setup"
+RUNTIME_SERVER_NAME = "spx"
 
 
 def default_workspace():
@@ -349,7 +350,7 @@ def prepare_workspace(
         if not interpreter.is_file():
             raise SetupError("Setup bootstrap did not return a valid interpreter")
     script = workspace / "installer/setup_mcp.py"
-    args = [str(script), "stdio", "--workspace-root", str(workspace)]
+    common_args = [str(script), "stdio", "--workspace-root", str(workspace)]
     codex_path = workspace / ".codex/config.toml"
     existing = codex_path.read_text(encoding="utf-8") if codex_path.exists() else ""
     if marker.is_file():
@@ -362,33 +363,43 @@ def prepare_workspace(
         )
         claude.setdefault("mcpServers", {}).pop("spx_setup", None)
         opencode.setdefault("mcp", {}).setdefault("servers", {}).pop("spx_setup", None)
-    invocation = ServerInvocation(
-        str(interpreter),
-        args,
-        str(workspace),
-        startup_timeout_sec=45,
-        tool_timeout_sec=120,
-    )
+    invocations = {
+        name: ServerInvocation(
+            str(interpreter),
+            [*common_args, "--toolset", toolset],
+            str(workspace),
+            startup_timeout_sec=45,
+            tool_timeout_sec=120,
+        )
+        for name, toolset in (
+            (SERVER_NAME, "setup"),
+            (RUNTIME_SERVER_NAME, "runtime"),
+        )
+    }
+    for name, invocation in invocations.items():
+        existing = upsert_named_mcp_server(
+            existing, name, render_mcp_server_block(name, invocation)
+        )
     _atomic_text(
         codex_path,
-        upsert_named_mcp_server(
-            existing, SERVER_NAME, render_mcp_server_block(SERVER_NAME, invocation)
-        ),
+        existing,
     )
-    claude.setdefault("mcpServers", {})[SERVER_NAME] = {
-        "type": "stdio",
-        "command": str(interpreter),
-        "args": args,
-        "env": {},
-    }
+    for name, invocation in invocations.items():
+        claude.setdefault("mcpServers", {})[name] = {
+            "type": "stdio",
+            "command": str(interpreter),
+            "args": invocation.args,
+            "env": {},
+        }
     atomic_json(claude_path, claude)
     opencode.setdefault("$schema", "https://opencode.ai/config.json")
-    opencode.setdefault("mcp", {}).setdefault("servers", {})[SERVER_NAME] = {
-        "type": "local",
-        "command": [str(interpreter), *args],
-        "cwd": str(workspace),
-        "codemode": False,
-    }
+    for name, invocation in invocations.items():
+        opencode.setdefault("mcp", {}).setdefault("servers", {})[name] = {
+            "type": "local",
+            "command": [str(interpreter), *invocation.args],
+            "cwd": str(workspace),
+            "codemode": False,
+        }
     atomic_json(opencode_path, opencode)
     descriptor = {
         "purpose": "setup",
@@ -422,26 +433,29 @@ def prepare_workspace(
             session.update(plan=None, status="DRAFT", stage="configuration", job=None)
         engine._write(session)
     if bootstrap:
-        verified = subprocess.run(
-            [
-                str(interpreter),
-                str(script),
-                "doctor",
-                "--workspace-root",
-                str(workspace),
-            ],
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=clean_environment(),
-            check=False,
-        )
-        if verified.returncode:
-            raise SetupError(
-                "Setup workspace verification failed; run SPX Setup again before handing it to an agent."
+        for toolset in ("setup", "runtime"):
+            verified = subprocess.run(
+                [
+                    str(interpreter),
+                    str(script),
+                    "doctor",
+                    "--workspace-root",
+                    str(workspace),
+                    "--toolset",
+                    toolset,
+                ],
+                cwd=workspace,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=clean_environment(),
+                check=False,
             )
+            if verified.returncode:
+                raise SetupError(
+                    f"{toolset.title()} MCP could not start; run SPX Setup again to repair the workspace."
+                )
     # Publish only a completely prepared workspace. Older project-local
     # connections for this installation can discover the current handoff.
     from .setup_runtime import binding_path
@@ -457,9 +471,10 @@ def _write_instructions(workspace, interpreter, state_root, session_id):
     instructions = """# SPX conversational Setup
 
 This installer-managed workspace configures SPX; it is not a development checkout.
-Read INSTALLATION.md and use the project-local spx MCP tools. This same connection
-provides setup_* and runtime server_* tools. Do not use an inherited/global SPX
-connection for this installation. Do not edit installer
+Read INSTALLATION.md and use the project-local spx_setup MCP for installation.
+The project-local spx MCP is available from the start for runtime work after
+installation. Do not use an inherited/global SPX connection for this installation.
+Do not edit installer
 code, credentials or generated files, and do not run Docker replacement directly.
 
 1. Read setup_get_context once. It returns the CURRENT draft, separately recorded
@@ -536,9 +551,9 @@ code, credentials or generated files, and do not run Docker replacement directly
    changes only, not unchanged status or each registered model. Keep all progress
    and diagnostics in this conversation; do not return to terminal questions.
 7. Report stack success only for SUCCEEDED. Check tools.ok separately: when true,
-   MCP and CLI are ready in THIS workspace. Never ask the user to switch workspace,
-   reconnect MCP, or run MCP Setup after successful tool preparation. On the next
-   user request, use this same MCP's repo_* and server_* tools to work with SPX.
+   both MCP servers and CLI are ready in THIS workspace. Never ask the user to switch
+   workspace, reconnect MCP, or run MCP Setup after successful tool preparation.
+   On the next user request, use the spx MCP's repo_* and server_* tools to work with SPX.
    Verify runtime access with health/server_list_models/server_list_instances.
    Installation approval does not authorize creating demo instances. Protocol
    requests must check required services; zero-instance installation does not
@@ -578,14 +593,15 @@ All further decisions and final approval happen in the conversation. Setup's
 terminal is only a progress monitor; R returns to the ordinary wizard before apply.
 
 Your SPX key is outside this workspace. Do not paste keys into the conversation.
-The project's spx MCP works before Docker or SPX API is running and also provides
-runtime tools. After successful installation, continue working in this SAME
-workspace and conversation. No second MCP Setup or reconnect is needed. Runtime
-operations resolve the committed installation's private configuration per call.
+The project's spx_setup MCP works before Docker or SPX API is running. The spx
+runtime MCP is registered from the start. After installation, continue in this
+SAME workspace and conversation. No second MCP Setup or reconnect is needed.
+Runtime calls resolve the committed installation's private configuration afresh.
 For no-start, tools are prepared but live calls wait until SPX is started.
 
 Other local agents can launch `{interpreter}` with arguments
-`installer/setup_mcp.py stdio --workspace-root <this directory>` using local stdio.
+`installer/setup_mcp.py stdio --workspace-root <this directory> --toolset setup`
+or `--toolset runtime` using local stdio.
 Without MCP run the local setup-cli launcher with these actions:
 `get-context`, `get-session`, `list-options`, `update-selection --selection-file <JSON patch>`,
 `plan`, `apply --plan-id <reviewed id> --revision <reviewed revision>`, `status`.

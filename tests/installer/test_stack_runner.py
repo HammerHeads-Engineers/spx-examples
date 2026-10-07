@@ -127,8 +127,9 @@ def test_failure_captures_diagnostics_before_rollback_and_retains_recovery_files
 
 
 @pytest.mark.parametrize("mcp_fails", [False, True])
+@pytest.mark.parametrize("setup_transaction", [False, True])
 def test_managed_sync_happens_only_after_commit_and_does_not_roll_back_healthy_stack(
-    tmp_path, monkeypatch, capsys, mcp_fails
+    tmp_path, monkeypatch, capsys, mcp_fails, setup_transaction
 ):
     for name in ("stack_manager.py", "docker-compose.generated.yml", ".env",
                  "docker-compose.transaction.yml", "network.py", "modbus_port_configurator.py",
@@ -136,6 +137,7 @@ def test_managed_sync_happens_only_after_commit_and_does_not_roll_back_healthy_s
         (tmp_path / name).write_text("__TRANSACTION_TOKEN__", encoding="utf-8")
     (tmp_path / "bundle.json").write_text(json.dumps({"installation_id": "install"}))
     commands = []
+    sync_calls = []
 
     def run(argv, **kwargs):
         args = [str(arg) for arg in argv]
@@ -151,6 +153,7 @@ def test_managed_sync_happens_only_after_commit_and_does_not_roll_back_healthy_s
         return subprocess.CompletedProcess(argv, 0, stdout, b"")
 
     def sync(seed):
+        sync_calls.append(seed)
         assert seed == tmp_path / ".env"
         assert any(Path(args[1]).name == "stack_manager.py" and args[2] == "commit" for args in commands)
         if mcp_fails:
@@ -162,10 +165,17 @@ def test_managed_sync_happens_only_after_commit_and_does_not_roll_back_healthy_s
     monkeypatch.setattr(sr.uuid, "uuid4", lambda: SimpleNamespace(hex="current"))
     monkeypatch.setattr(mw, "synchronize_managed_workspace", sync)
     monkeypatch.delenv("SPX_BASE_URL", raising=False)
+    if setup_transaction:
+        monkeypatch.setenv("SPX_SETUP_JOURNAL", str(tmp_path / "journal.json"))
+    else:
+        monkeypatch.delenv("SPX_SETUP_JOURNAL", raising=False)
     assert sr._start(tmp_path, assume_yes=True) == 0
     assert not any(Path(args[1]).name == "stack_manager.py" and args[2] == "rollback" for args in commands)
     output = capsys.readouterr()
-    if mcp_fails:
+    if setup_transaction:
+        assert not sync_calls, "SetupEngine publishes its binding after verification"
+        assert "configuration refreshed" not in output.out
+    elif mcp_fails:
         assert "stack is healthy" in output.err
         assert "SPX MCP Setup" in output.err
     else:
