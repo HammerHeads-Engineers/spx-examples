@@ -114,6 +114,9 @@ print_python_runtime_hint() {
 
 # shellcheck source=/dev/null
 . "${REPO_DIR}/installer/docker_preflight.sh"
+# Resolve an installed CLI without prompting before choosing a wizard mode.
+# The generated start script performs the full check when a stack is started.
+spx_resolve_docker_cli || true
 
 SYSTEM_PYTHON_BIN="$(resolve_system_python)"
 need_cmd "$SYSTEM_PYTHON_BIN"

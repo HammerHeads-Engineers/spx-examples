@@ -288,7 +288,7 @@ subnet; firewalls and inter-subnet routing remain the user's responsibility.
 Non-interactive generation always uses local-only binds.
 
 The generated stack always uses Compose project `spx` and installer labels. The
-server/UI contract is SPX Server `v1.0.0-rc.72` with SPX UI `v1.0.0-rc.74`;
+server/UI contract is SPX Server `v1.0.0-rc.72` with SPX UI `v1.0.0-rc.75`;
 unsupported version pairs are rejected during generation. Community defaults
 auto-start at most five instances. A profile is additive to its selected pack,
 not a replacement for the pack.
@@ -348,7 +348,15 @@ press Enter to recheck or `Q` to quit. A failure is reported with its stage and
 restores the previous stack when possible; it never removes volumes/images or
 unrelated containers. Legacy `spx-rollback-*` containers from
 RC65 are detected as SPX snapshots and are not left behind after a successful
-rerun. `spx-stop` stops only containers carrying the generated installation ID.
+rerun. `spx-stop` stops all services carrying the generated installation ID,
+including KNX and other optional helpers, while excluding rollback snapshots
+and unrelated installations. Docker stop errors are reported as failures.
+
+Generated macOS/Linux Start and Stop scripts carry the same Docker preflight
+helper as Setup. They search Docker Desktop's bundled CLI and the per-user
+Docker bin directory before checking Engine and Compose, so the native macOS
+flow does not require adding Docker to the shell PATH manually. macOS Cleanup
+retains generated files if Stop fails, allowing recovery before data is removed.
 
 If startup fails, Setup saves the API readiness result, Docker state and recent
 server/UI logs to `logs/start-<transaction>.json` in the generated folder before

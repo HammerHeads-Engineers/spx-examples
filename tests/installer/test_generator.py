@@ -12,6 +12,7 @@ import sys
 import uuid
 
 import yaml
+import pytest
 
 from installer import manifest
 from installer.generator import (
@@ -318,7 +319,7 @@ def test_generator_creates_compose(tmp_path: Path) -> None:
     bundle = json.loads((output_dir / "bundle.json").read_text(encoding="utf-8"))
     assert "license_key" not in bundle
     assert bundle["server_version"] == "v1.0.0-rc.72"
-    assert bundle["ui_version"] == "v1.0.0-rc.74"
+    assert bundle["ui_version"] == "v1.0.0-rc.75"
     assert bundle["compose_project"] == "spx"
     assert {1883, 502, 3671, 6720, 8000}.issubset(set(bundle["required_ports"]))
     service_mappings = {
@@ -515,8 +516,10 @@ def test_generator_repairs_stale_directory_at_file_asset_path(tmp_path: Path) ->
     assert "knx_gateway" in transaction_knx["networks"]["default"]["aliases"]
 
 
+@pytest.mark.parametrize("docker_in_path", [True, False])
 def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     tmp_path: Path,
+    docker_in_path: bool,
 ) -> None:
     output_dir = tmp_path / "Library" / "Application Support" / "SPX" / "generated"
     generator = DeploymentGenerator(build_index())
@@ -569,7 +572,9 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     )
     fake_bin = tmp_path / "fake-bin"
     fake_bin.mkdir()
-    (fake_bin / "docker").write_text(
+    docker_dir = fake_bin if docker_in_path else tmp_path / "home" / ".docker" / "bin"
+    docker_dir.mkdir(parents=True, exist_ok=True)
+    (docker_dir / "docker").write_text(
         "#!/bin/sh\n"
         'case "$*" in\n'
         "  *\"ps --services --status running\"*) printf '%s\\n' transaction-test-spx-server ;;\n"
@@ -577,7 +582,7 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
         "exit 0\n",
         encoding="utf-8",
     )
-    (fake_bin / "docker").chmod(0o755)
+    (docker_dir / "docker").chmod(0o755)
     bash = shutil.which("bash")
     if os.name == "nt":
         bash = next(
@@ -616,6 +621,7 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     environment = {
         **os.environ,
         "PATH": f"{fake_bin}:/usr/bin:/bin",
+        "HOME": str(tmp_path / "home"),
         "FAKE_RUNTIME_PYTHON": str(runtime_python),
         "FAKE_RUNTIME_LOG": str(log_path),
         "SPX_SYSTEM_PYTHON_BIN": str(system_python),

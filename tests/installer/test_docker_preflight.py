@@ -53,6 +53,11 @@ spx_docker_platform() {{ printf '%s\\n' "$PLATFORM"; }}
 spx_resolve_docker_cli() {{ (( CLI_PRESENT == 1 )) || {marker_test}; }}
 spx_start_docker_desktop() {{ start_calls=$((start_calls + 1)); return "$START_STATUS"; }}
 sleep() {{ sleep_calls=$((sleep_calls + 1)); :; }}
+# Keep a host-installed legacy Compose executable out of this mock scenario.
+command() {{
+  if [[ "$1" == "-v" && "${{2:-}}" == "docker-compose" ]]; then return 1; fi
+  builtin command "$@"
+}}
 docker() {{
   case "${{1:-}}" in
     info)
