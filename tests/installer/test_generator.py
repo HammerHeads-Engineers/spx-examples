@@ -618,12 +618,25 @@ def test_generated_start_handles_empty_args_and_runtime_paths_with_spaces(
     )
     system_python.chmod(0o755)
     log_path = tmp_path / "runtime.log"
+    bash_env = tmp_path / "isolated-docker-path.sh"
+    bash_env.write_text(
+        "command() {\n"
+        '  if [[ "$1" == "-v" && "${2:-}" == "docker" ]]; then\n'
+        '    [[ "$(builtin command -v docker)" == "$FAKE_DOCKER_BIN" ]] || return 1\n'
+        "  fi\n"
+        '  builtin command "$@"\n'
+        "}\n",
+        encoding="utf-8",
+    )
     environment = {
         **os.environ,
         "PATH": f"{fake_bin}:/usr/bin:/bin",
         "HOME": str(tmp_path / "home"),
         "FAKE_RUNTIME_PYTHON": str(runtime_python),
         "FAKE_RUNTIME_LOG": str(log_path),
+        # A runner may have /usr/bin/docker. Discovery must only accept our fake.
+        "BASH_ENV": str(bash_env),
+        "FAKE_DOCKER_BIN": str(docker_dir / "docker"),
         "SPX_SYSTEM_PYTHON_BIN": str(system_python),
         "PYTHON_BIN": str(
             tmp_path / "Library" / "Application Support" / "installer-python"
