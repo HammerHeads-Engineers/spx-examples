@@ -15,6 +15,7 @@ from installer.stack_manager import (
     ContainerInfo,
     ExistingStack,
     PreflightResult,
+    PreflightError,
     StackManager,
     UserDeclined,
 )
@@ -529,6 +530,72 @@ def test_stop_stack_stops_stable_names_but_not_snapshots(
     manager.stop_stack()
 
     assert [call[1:3] for call in calls if call[1] == "stop"] == [["stop", "stable-id"]]
+
+
+def test_stop_includes_optional_services_and_protects_other_installations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = []
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        installation_id="current",
+        runner=lambda argv, **kwargs: calls.append(list(argv)) or completed(list(argv)),
+    )
+    containers = [
+        ContainerInfo(
+            id=name,
+            name=name,
+            image="third-party:latest",
+            labels={LABEL_INSTALLATION_ID: installation},
+            state=state,
+        )
+        for name, installation, state in [
+            ("knxd-server", "current", "running"),
+            ("homeassistant-server", "current", "running"),
+            ("spx-transaction-current-extra", "current", "running"),
+            ("stopped-service", "current", "exited"),
+            ("unrelated-db", "other", "running"),
+            ("no-label", "", "running"),
+            ("spx-snapshot-old", "current", "running"),
+            ("spx-rollback-old", "current", "running"),
+        ]
+    ]
+    monkeypatch.setattr(manager, "list_containers", lambda: containers)
+    manager.stop_stack()
+    assert calls == [
+        ["docker", "stop", name]
+        for name in [
+            "knxd-server",
+            "homeassistant-server",
+            "spx-transaction-current-extra",
+        ]
+    ]
+
+
+def test_stop_requires_installation_id(tmp_path: Path) -> None:
+    manager = StackManager(tmp_path / "compose.yml")
+    with pytest.raises(PreflightError, match="installation ID"):
+        manager.stop_stack()
+
+
+def test_stop_reports_docker_failure(tmp_path: Path, monkeypatch) -> None:
+    from installer.stack_manager import CommandError
+
+    manager = StackManager(
+        tmp_path / "compose.yml",
+        installation_id="current",
+        runner=lambda argv, **kwargs: completed(list(argv), "stop failed", 1),
+    )
+    container = ContainerInfo(
+        id="knx",
+        name="knxd-server",
+        image="knxd",
+        labels={LABEL_INSTALLATION_ID: "current"},
+        state="running",
+    )
+    monkeypatch.setattr(manager, "list_containers", lambda: [container])
+    with pytest.raises(CommandError):
+        manager.stop_stack()
 
 
 def test_legacy_rollback_named_container_is_detected_only_for_known_spx_image(

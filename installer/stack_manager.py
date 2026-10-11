@@ -1128,18 +1128,19 @@ class StackManager:
         print(f"[spx-preflight] Diagnostics saved to {path}")
 
     def stop_stack(self) -> None:
+        if not self.installation_id:
+            raise PreflightError("Stopping a stack requires its installation ID.")
         current = [
             container
             for container in self.list_containers()
             if container.installation_id == self.installation_id
-            and (
-                container.name in EXPECTED_IMAGES
-                or container.name.startswith("spx-transaction-")
-            )
+            # Optional services retain the same ownership label after commit.
+            # Backups can carry it too, but must stay available for rollback.
+            and not container.name.startswith(SNAPSHOT_PREFIXES)
         ]
         for container in current:
             if container.running:
-                self._run(["docker", "stop", container.id], check=False)
+                self.docker(["stop", container.id])
 
     def stop_transaction(self) -> None:
         """Backward-compatible alias for stopping the current stack."""

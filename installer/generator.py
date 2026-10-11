@@ -521,6 +521,10 @@ class DeploymentGenerator:
         )
         shutil.copy2(Path(__file__).with_name("network.py"), output_dir / "network.py")
         shutil.copy2(
+            Path(__file__).with_name("docker_preflight.sh"),
+            output_dir / "docker_preflight.sh",
+        )
+        shutil.copy2(
             Path(__file__).with_name("modbus_port_configurator.py"),
             output_dir / "modbus_port_configurator.py",
         )
@@ -685,10 +689,15 @@ need_cmd() {
   fi
 }
 
-need_cmd docker
 need_cmd "$SYSTEM_PYTHON_BIN"
 STAGE="product-key"
 "$SYSTEM_PYTHON_BIN" "$SCRIPT_DIR/product_key.py" --env-file "$SCRIPT_DIR/.env"
+# Resolve Docker Desktop even when the interactive wizard skipped the early
+# preflight or Docker was installed after Setup opened.
+. "$SCRIPT_DIR/docker_preflight.sh"
+STAGE="docker"
+check_docker
+need_cmd docker
 STAGE="runtime"
 if [ ! -f "$SCRIPT_DIR/runtime_bootstrap.py" ]; then
   echo "[spx-start] stage=runtime: missing runtime bootstrap helper" >&2
@@ -845,6 +854,8 @@ exit $LASTEXITCODE
         self._write_ps_script(output_dir / "spx-start.ps1", powershell)
 
         stop_sh = r"""SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$SCRIPT_DIR/docker_preflight.sh"
+check_docker
 MACOS_PYTHON_HELPER="${SCRIPT_DIR}/macos_python_runtime.sh"
 if [ "$(uname -s)" = "Darwin" ] && [ -f "${MACOS_PYTHON_HELPER}" ]; then
   # shellcheck source=/dev/null
