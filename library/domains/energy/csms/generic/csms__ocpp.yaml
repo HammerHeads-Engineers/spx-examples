@@ -5,8 +5,11 @@
 name: csms__ocpp
 description: |
   Simulated OCPP 1.6 central system (CSMS) responding to a single charge point.
-  Implements BootNotification + Heartbeat responses per the spx-server integration
-  tests and records StatusNotification/MeterValues telemetry for dashboards.
+  Implements registration, heartbeat, authorization, and transaction responses.
+  Generates UTC response timestamps and distinct transaction IDs for this CSMS
+  instance; records StatusNotification/MeterValues telemetry for dashboards.
+  This is a permissive single-charge-point simulator, without billing or an
+  authorization database. Transaction IDs restart when the instance is recreated.
 
 meta_parameters:
   ocpp_server_host:
@@ -26,9 +29,29 @@ meta_parameters:
     default: "spx-csms"
 
 attributes:
+  k__authorization_status:
+    type: str
+    default: "Accepted"
+  last_id_tag:
+    type: str
+    default: ""
+  last_transaction_timestamp:
+    type: str
+    default: ""
+  last_meter_start_wh:
+    type: int
+    default: 0
+    unit: Wh
+  last_meter_stop_wh:
+    type: int
+    default: 0
+    unit: Wh
+  last_stop_reason:
+    type: str
+    default: "Local"
   csms_current_time:
     type: str
-    default: "2025-01-01T00:00:00Z"
+    default: ""
   heartbeat_interval_s:
     type: int
     default: 30
@@ -127,7 +150,9 @@ communication:
           action: BootNotification
           payload:
             status: "#attr(registration_status)"
-            currentTime: "#attr(csms_current_time)"
+            currentTime:
+              attribute: "#attr(csms_current_time)"
+              metadata: {generator: utc_now}
             heartbeatInterval: "#attr(heartbeat_interval_s)"
         heartbeat_request:
           direction: inbound
@@ -139,7 +164,55 @@ communication:
           frame_type: call_result
           action: Heartbeat
           payload:
-            currentTime: "#attr(csms_current_time)"
+            currentTime:
+              attribute: "#attr(csms_current_time)"
+              metadata: {generator: utc_now}
+        authorize_request:
+          direction: inbound
+          frame_type: call
+          action: Authorize
+          payload:
+            idTag: "#attr(last_id_tag)"
+        authorize_response:
+          direction: outbound
+          frame_type: call_result
+          action: Authorize
+          payload:
+            idTagInfo.status: "#attr(k__authorization_status)"
+        start_transaction_request:
+          direction: inbound
+          frame_type: call
+          action: StartTransaction
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            idTag: "#attr(last_id_tag)"
+            meterStart: "#attr(last_meter_start_wh)"
+            timestamp: "#attr(last_transaction_timestamp)"
+        start_transaction_response:
+          direction: outbound
+          frame_type: call_result
+          action: StartTransaction
+          payload:
+            transactionId:
+              attribute: "#attr(last_transaction_id)"
+              metadata: {generator: transaction_id}
+            idTagInfo.status: "#attr(k__authorization_status)"
+        stop_transaction_request:
+          direction: inbound
+          frame_type: call
+          action: StopTransaction
+          payload:
+            transactionId: "#attr(last_transaction_id)"
+            idTag: "#attr(last_id_tag)"
+            meterStop: "#attr(last_meter_stop_wh)"
+            timestamp: "#attr(last_transaction_timestamp)"
+            reason: "#attr(last_stop_reason)"
+        stop_transaction_response:
+          direction: outbound
+          frame_type: call_result
+          action: StopTransaction
+          payload:
+            idTagInfo.status: "#attr(k__authorization_status)"
         status_notification_request:
           direction: inbound
           frame_type: call
@@ -178,7 +251,6 @@ scenarios:
     overrides:
       $in(registration_status): "Accepted"
       $in(heartbeat_interval_s): 30
-      $in(csms_current_time): "2025-01-01T00:00:00Z"
   reject_evse:
     enabled: false
     display_name: "Reject EVSE Registration"
@@ -194,4 +266,3 @@ scenarios:
     duration: 20.0
     overrides:
       $in(heartbeat_interval_s): 10
-      $in(csms_current_time): "2025-01-01T00:00:00Z"

@@ -4,6 +4,14 @@ OPC UA/Modbus/MQTT/HTTP-oriented kit for line automation, process control and
 factory monitoring. The present iteration links the models we already maintain;
 additional Redfish device twins can land alongside.
 
+Legacy `modbus_tcp` twins (thermal/PID controllers, VFD, pressure transmitter,
+I/O module) expose `modbus_host` and `modbus_port` provisioning parameters.
+The default container port remains 502 for compatibility with the shared gateway.
+For a dedicated instance endpoint, choose a container port from 5020–5120 and
+connect the client to its published host port listed in `bundle.json` (for
+example, container 5020 may be published as host 15020). Unit IDs remain
+automatically allocated by the legacy runtime.
+
 MQTT models use the bundled `mosquitto-server:1883` by default. Set
 `mqtt_broker_host`, `mqtt_broker_port`, and `mqtt_topic_prefix` when provisioning
 an external broker or multiple instances. Demo scenarios are opt-in: start them

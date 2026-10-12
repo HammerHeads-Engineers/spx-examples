@@ -5,6 +5,16 @@ description: |
   Simple pressure transmitter with linear response, exposed via Modbus. Useful
   for testing analog input scaling and alarm handling.
 
+meta_parameters:
+  modbus_host:
+    type: str
+    default: "0.0.0.0"
+  modbus_port:
+    type: int
+    default: 502
+    min: 1
+    max: 65535
+
 attributes:
   pressure_bar:
     type: float
@@ -74,6 +84,8 @@ actions:
 
 communication:
   - modbus_tcp:
+      host: "$param(modbus_host)"
+      port: "$param(modbus_port)"
       poll_interval: 0.2
       mapping:
         pressure_bar:      { address: [0,1], group: h_r, type: float }

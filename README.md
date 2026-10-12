@@ -28,6 +28,18 @@ When creating or updating model YAMLs, keep these repo-level rules in mind:
 - For user-facing scenarios, include `display_name`.
 - Before opening a PR, run `poetry run python tools/validate_models.py` and the relevant pack or unit tests.
 
+### KNX clients across Docker Desktop hosts
+
+External KNX/IP tunnel clients connecting to the bundled knxd gateway must
+enable NAT/route-back mode (`ConnectionConfig(..., route_back=True)` in XKNX,
+or the corresponding NAT option in ETS). Docker Desktop can otherwise advertise
+the container's private `172.x` data endpoint after a successful CONNECT, which
+the client cannot reach from the LAN. Use the host's published UDP 3671 endpoint.
+SPX KNX models already enable route-back by default. This requirement applies
+to both Windows and macOS; it does not require host networking.
+See [knxd configuration](https://github.com/knxd/knxd/blob/main/doc/inifile.rst)
+and [ETS connection manager](https://support.knx.org/hc/en-us/articles/4402353231762-Connection-Manager-Detailed).
+
 ## Local MCP tool
 
 This repository includes a local MCP tool for code-oriented LLM workflows against

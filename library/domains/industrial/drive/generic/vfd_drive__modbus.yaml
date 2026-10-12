@@ -6,6 +6,16 @@ description: |
   via Modbus registers. Suitable for testing drive commissioning tools and
   simple PLC integrations.
 
+meta_parameters:
+  modbus_host:
+    type: str
+    default: "0.0.0.0"
+  modbus_port:
+    type: int
+    default: 502
+    min: 1
+    max: 65535
+
 attributes:
   enable:
     type: int
@@ -116,6 +126,8 @@ actions:
 
 communication:
   - modbus_tcp:
+      host: "$param(modbus_host)"
+      port: "$param(modbus_port)"
       poll_interval: 0.1
       mapping:
         enable:             { address: [0,0],  group: c_o, type: uint_16 }
