@@ -57,6 +57,26 @@ def _bundle() -> dict:
     }
 
 
+def test_commit_repairs_stale_transaction_ports_without_new_port_choice(tmp_path):
+    compose_file, bundle_file, env_file, transaction_file = _write_bundle_files(tmp_path)
+    compose = _compose()
+    compose["services"]["spx-server"]["ports"][0] = "192.168.0.195:1502:502"
+    compose_file.write_text(yaml.safe_dump(compose))
+    bundle = _bundle()
+    bundle["modbus_port_mappings"]["gateway_host_port"] = 1502
+    bundle_file.write_text(json.dumps(bundle))
+    staged_file = tmp_path / "pending.json"
+    stage_configuration(compose_file=compose_file, bundle_file=bundle_file,
+                        env_file=env_file, staged_file=staged_file,
+                        manager=FakeManager({}), output=lambda _message: None)
+    assert not json.loads(staged_file.read_text())["changed"]
+    _commit_stage(compose_file=compose_file, transaction_template=transaction_file,
+                  bundle_file=bundle_file, staged_file=staged_file)
+    transaction = yaml.safe_load(transaction_file.read_text())
+    assert next(iter(transaction["services"].values()))["ports"] == compose["services"]["spx-server"]["ports"]
+    assert json.loads(bundle_file.read_text())["required_ports"][0] == 1502
+
+
 def _service_compose(*, transaction: bool = False) -> dict:
     service_name = (
         "transaction-token-spx-server" if transaction else "spx-server"

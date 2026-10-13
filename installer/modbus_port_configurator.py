@@ -796,9 +796,6 @@ def _commit_stage(
 ) -> dict:
     staged = _read_json(staged_file)
     bundle = _read_json(bundle_file)
-    if not staged.get("changed"):
-        return bundle
-
     modbus_selected = bool(staged.get("modbus_selected"))
     settings = PortSettings()
     if modbus_selected:
@@ -827,6 +824,19 @@ def _commit_stage(
         }
     compose = _with_service_mapping_hosts(compose, bundle, service_hosts)
     transaction = _with_service_mapping_hosts(transaction, bundle, service_hosts)
+    # The base Compose file is the source of truth, including edits made
+    # outside the port chooser. A previously generated transaction template
+    # must never retain an old host port or bind address.
+    base_services = compose.get("services", {})
+    for transaction_name, service in transaction.get("services", {}).items():
+        matches = [name for name in base_services
+                   if transaction_name == name or transaction_name.endswith("-" + name)]
+        if matches:
+            base = base_services[max(matches, key=len)]
+            if "ports" in base:
+                service["ports"] = list(base["ports"])
+            else:
+                service.pop("ports", None)
     for record in _service_mapping_records(bundle):
         key = str(record["key"])
         if key in service_hosts:

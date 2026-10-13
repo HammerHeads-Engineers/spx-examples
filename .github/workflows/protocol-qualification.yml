@@ -41,6 +41,8 @@ jobs:
                 tests/core/runtime/test_pause_scenarios.py \
                 tests/packs/energy_pack/test_ocpp_model_regressions.py \
                 tests/packs/energy_pack/test_ocpp_pair_regression.py \
+                tests/packs/energy_pack/test_ocpp_transactions_regression.py \
+                tests/packs/industrial_iiot_pack/test_legacy_modbus_endpoints.py \
                 tests/packs/smart_building_pack/test_lwm2m_model_regression.py \
                 --junitxml=/results/protocol.xml -o junit_family=xunit1
             '

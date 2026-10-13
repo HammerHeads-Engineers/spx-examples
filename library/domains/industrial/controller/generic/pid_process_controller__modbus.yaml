@@ -5,6 +5,16 @@ description: |
   Generic PID process controller for a single-loop process variable exposed
   via Modbus. Represents typical industrial temperature, pressure, or level loops.
 
+meta_parameters:
+  modbus_host:
+    type: str
+    default: "0.0.0.0"
+  modbus_port:
+    type: int
+    default: 502
+    min: 1
+    max: 65535
+
 attributes:
   pv:
     type: float
@@ -135,6 +145,8 @@ actions:
 
 communication:
   - modbus_tcp:
+      host: "$param(modbus_host)"
+      port: "$param(modbus_port)"
       poll_interval: 0.25
       mapping:
         pv:              { address: [0,1], group: h_r, type: float }

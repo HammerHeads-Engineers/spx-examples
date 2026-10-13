@@ -44,11 +44,13 @@ def test_pause_qualification_requires_the_entire_selected_manifest() -> None:
     assert "models" not in cleanup["run"]
 
 
-def test_pause_scenarios_are_required_in_protocol_runtime() -> None:
+def test_pause_transactions_and_modbus_ports_are_required_in_protocol_runtime() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/protocol-qualification.yml").read_text())
     runs = "\n".join(step.get("run", "") for step in workflow["jobs"]["shipped-model-protocols"]["steps"])
     assert "python -m tools.required_pytest" in runs
     assert "test_pause_scenarios.py" in runs
+    assert "test_ocpp_transactions_regression.py" in runs
+    assert "test_legacy_modbus_endpoints.py" in runs
 
 
 def test_licensed_stack_artifacts_exclude_unredacted_generated_configuration() -> None:

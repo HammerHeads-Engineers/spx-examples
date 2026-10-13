@@ -303,6 +303,27 @@ For mappings expressed as dicts:
 - The mapping key is the primary name.
 - If the entry supports a `name` field, set it explicitly (defaulting to the mapping key).
 
+### OCPP response fields
+
+OCPP payload field names may use a dotted path, for example
+`idTagInfo.status: "#attr(k__authorization_status)"`, to populate a nested
+response object. Generated response fields require SPX Server `v1.0.0-rc.73` or later:
+
+```yaml
+currentTime:
+  attribute: "#attr(csms_current_time)"
+  metadata: {generator: utc_now}
+transactionId:
+  attribute: "#attr(last_transaction_id)"
+  metadata: {generator: transaction_id}
+```
+
+`utc_now` generates UTC at response construction. `transaction_id` allocates
+a distinct positive integer for each response, scoped to one protocol instance.
+The counter survives transport stop/start and restarts on instance recreation.
+Generated values are also written to the mapped attributes for diagnostics.
+Use generators only on the intended outbound response fields.
+
 ## Scenarios
 `scenarios` is a mapping from scenario name to configuration.
 Common fields:

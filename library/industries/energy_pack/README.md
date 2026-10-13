@@ -4,6 +4,17 @@ Foundation for energy-native DER / e-mobility scenarios. Includes OCPP 1.6 charg
 point + CSMS twins, Modbus EVSEs, and power-meter telemetry for charging and
 power-flow demos.
 
+The CSMS also handles Authorize, StartTransaction and StopTransaction, with
+`k__authorization_status` controlling the returned tag status. Each start gets
+a distinct transaction ID within the protocol instance; IDs restart on instance
+recreation. Boot and heartbeat responses use the current UTC time. This is a
+single-charge-point simulator without billing or an authorization database.
+These responses require SPX Server `v1.0.0-rc.73` or later.
+
+The legacy three-phase Modbus meter retains container port 502 by default.
+Override `modbus_host` and `modbus_port` when using a dedicated instance port;
+the client must use the corresponding published host port from `bundle.json`.
+
 The MQTT energy meter uses the bundled `mosquitto-server:1883` by default;
 `mqtt_broker_host`, `mqtt_broker_port`, and `mqtt_topic_prefix` remain overridable.
 Energy is integrated from elapsed simulation seconds, independently of polling

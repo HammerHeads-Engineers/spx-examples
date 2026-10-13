@@ -8,6 +8,16 @@ description: |
   temperature-loop demos. The model exposes temperature, setpoint, power, and
   overload-related state without changing the legacy public attribute names.
 
+meta_parameters:
+  modbus_host:
+    type: str
+    default: "0.0.0.0"
+  modbus_port:
+    type: int
+    default: 502
+    min: 1
+    max: 65535
+
 attributes:
   temperature:
     type: float
@@ -116,6 +126,8 @@ actions:
 
 communication:
   - modbus_tcp:
+      host: "$param(modbus_host)"
+      port: "$param(modbus_port)"
       poll_interval: 0.25
       mapping:
         temperature:        { address: [0,1], group: h_r, type: float }
