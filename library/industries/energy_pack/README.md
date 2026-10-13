@@ -9,7 +9,7 @@ The CSMS also handles Authorize, StartTransaction and StopTransaction, with
 a distinct transaction ID within the protocol instance; IDs restart on instance
 recreation. Boot and heartbeat responses use the current UTC time. This is a
 single-charge-point simulator without billing or an authorization database.
-These responses require the server protocol fixes following RC72.
+These responses require SPX Server `v1.0.0-rc.73` or later.
 
 The legacy three-phase Modbus meter retains container port 502 by default.
 Override `modbus_host` and `modbus_port` when using a dedicated instance port;

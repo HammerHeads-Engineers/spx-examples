@@ -307,8 +307,7 @@ For mappings expressed as dicts:
 
 OCPP payload field names may use a dotted path, for example
 `idTagInfo.status: "#attr(k__authorization_status)"`, to populate a nested
-response object. Generated response fields require the server protocol fixes
-following RC72:
+response object. Generated response fields require SPX Server `v1.0.0-rc.73` or later:
 
 ```yaml
 currentTime:
