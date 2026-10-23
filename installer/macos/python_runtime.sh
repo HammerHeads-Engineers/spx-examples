@@ -29,6 +29,7 @@ spx_resolve_macos_python() {
   fi
 
   candidates+=(
+    "/Library/SPX/Python.framework/Versions/${SPX_MACOS_PYTHON_FRAMEWORK_VERSION}/bin/${SPX_MACOS_PYTHON_BIN_NAME}"
     "/Library/Frameworks/Python.framework/Versions/${SPX_MACOS_PYTHON_FRAMEWORK_VERSION}/bin/${SPX_MACOS_PYTHON_BIN_NAME}"
   )
 

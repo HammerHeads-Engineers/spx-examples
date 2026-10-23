@@ -512,13 +512,16 @@ scripts/build_macos_pkg.sh \
 ```
 
 The native macOS package includes the official universal2 CPython runtime
-(`3.12.10`) as a separate installer component. It is installed at
-`/Library/Frameworks/Python.framework` and is selected by the SPX launchers
+(`3.13.17`) as a separate installer component. It is installed at
+`/Library/SPX/Python.framework` and is selected by the SPX launchers
 before any Python found on `PATH`. This keeps the `.pkg` independent of
 Homebrew, Xcode Command Line Tools, or a user-managed Python installation.
-The runtime component is checksum-verified during the build; the current
-official download is approximately 44 MB and the installed framework uses
-approximately 106 MB before the SPX virtual environment and its packages.
+The private framework and its separate package receipt leave any global
+`/Library/Frameworks/Python.framework` installation and packages untouched.
+The runtime component is checksum-verified during the build. Standard-library
+bytecode for all optimization levels is generated before signing, so installation
+and runtime imports preserve the framework seal. Building requires a matching
+Python 3.13 interpreter; use `SPX_BUILD_PYTHON` to select it explicitly.
 Portable `.tgz`, `.run`, and source-checkout flows retain their existing
 system-Python fallback.
 
@@ -527,9 +530,9 @@ locally, pass both the package path and its expected checksum:
 
 ```bash
 scripts/build_macos_pkg.sh \
-  --python-version 3.12.10 \
-  --python-package /absolute/path/python-3.12.10-macos11.pkg \
-  --python-sha256 8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4
+  --python-version 3.13.17 \
+  --python-package /absolute/path/python-3.13.17-macos11.pkg \
+  --python-sha256 3053592af66128269efab37fe7851a4894920b27c442aeec99ce4d34d17c07e3
 ```
 
 For GitHub Actions, configure the `macos-signing` environment with

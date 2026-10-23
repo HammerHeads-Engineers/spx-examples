@@ -88,9 +88,9 @@ def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:
     assert "installer-macos-${VERSION}.pkg" in job
     assert "-allowUntrusted" in job
     assert "SPX_SKIP_AUTO_SETUP=1" in job
-    assert "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13" in job
+    assert "/Library/SPX/Python.framework/Versions/3.13/bin/python3.13" in job
     assert 'file "${python_bin}" | grep -q "universal binary"' in job
-    assert "pkgutil --pkg-info com.hammerheadsengineers.spx.python" in job
+    assert "pkgutil --pkg-info com.hammerheadsengineers.spx.python.private" in job
     assert "SPX Tools/SPX Setup.app/Contents/Resources/spx-installer" in job
     assert "Bootstrap MCP workspace with the bundled macOS Python" in job
     assert "Install a Docker probe" not in job

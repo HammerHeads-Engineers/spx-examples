@@ -470,6 +470,9 @@ jobs:
           sudo mkdir -p "$(dirname "${marker}")"
           sudo touch "${marker}"
           sudo chown root:wheel "${support_dir}" "${support_dir}/legacy-data" "${marker}"
+          legacy_python_marker="/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/spx-ci-existing.txt"
+          sudo mkdir -p "$(dirname "${legacy_python_marker}")"
+          printf 'preexisting-package\n' | sudo tee "${legacy_python_marker}" >/dev/null
           sudo env SPX_SKIP_AUTO_SETUP=1 /usr/sbin/installer \
             -pkg "${DIST_DIR}/spx-installer-macos-${VERSION}.pkg" \
             -target / \
@@ -478,16 +481,17 @@ jobs:
           test "$(stat -f '%Su' "${marker}")" = "root"
           test ! -e "$HOME/Library/LaunchAgents/com.simplephysx.spx.setup-once.plist"
           test ! -e "$HOME/Library/LaunchAgents/com.simplephysx.spx.setup-once.sh"
+          test "$(cat "${legacy_python_marker}")" = preexisting-package
 
       - name: Verify bundled Python and run the installed setup payload
         shell: bash
         run: |
           set -euo pipefail
-          python_bin="/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13"
+          python_bin="/Library/SPX/Python.framework/Versions/3.13/bin/python3.13"
           test -x "${python_bin}"
           "${python_bin}" --version
           file "${python_bin}" | grep -q "universal binary"
-          pkgutil --pkg-info com.hammerheadsengineers.spx.python
+          pkgutil --pkg-info com.hammerheadsengineers.spx.python.private
 
           payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
           test -x "${payload}/spx-install.sh"
@@ -506,7 +510,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python_bin="/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13"
+          python_bin="/Library/SPX/Python.framework/Versions/3.13/bin/python3.13"
           payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
           mcp_workspace="${RUNNER_TEMP}/spx-macos-mcp-workspace"
           test -f "${payload}/.spx-macos-bundled-python"
@@ -539,6 +543,18 @@ jobs:
             --repo-root "${mcp_workspace}" \
             --allow-write \
             2>&1 | tee "${RUNNER_TEMP}/spx-macos-mcp-stdio.log"
+
+      - name: Verify installed framework seal after Setup and MCP runtime use
+        shell: bash
+        run: |
+          set -euo pipefail
+          framework="/Library/SPX/Python.framework"
+          python_bin="${framework}/Versions/3.13/bin/python3.13"
+          for optimization in -I -O -OO; do
+            "${python_bin}" "${optimization}" -I -c \
+              'import asyncio, compileall, ensurepip, ssl, tkinter, venv'
+          done
+          codesign --verify --deep --strict --verbose=2 "${framework}"
 
       - name: Validate generated macOS bundle
         shell: bash

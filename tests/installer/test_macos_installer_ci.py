@@ -54,8 +54,9 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     assert "pkgutil --expand-full" in script
     assert "Python_Framework.pkg/Payload" in script
     assert "com.hammerheadsengineers.spx.python" in script
-    assert "Library/Frameworks/Python.framework" in script
-    assert '--install-location "/Library/Frameworks/Python.framework"' in script
+    assert "Library/SPX/Python.framework" in script
+    assert '--install-location "${python_install_root}"' in script
+    assert 'python_install_root="/Library/SPX/Python.framework"' in script
     assert "codesign --verify --deep --strict" in script
     assert "python_version" in script
     assert (
