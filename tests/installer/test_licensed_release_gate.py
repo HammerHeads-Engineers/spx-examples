@@ -28,6 +28,26 @@ def test_release_requires_licensed_stack_qualification() -> None:
     assert qualification["secrets"]["SPX_TEST_PRODUCT_KEY"] == "${{ secrets.SPX_TEST_PRODUCT_KEY }}"
 
 
+def test_selected_images_are_verified_after_generation_and_before_start() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/installer-stack-qualification.yml").read_text())
+    steps = workflow["jobs"]["full-stack-smoke"]["steps"]
+    generate = next(index for index, step in enumerate(steps) if step["name"] == "Generate a Docker-backed bundle through the installer")
+    verify = next(index for index, step in enumerate(steps) if step["name"] == "Verify selected Python images before starting the generated stack")
+    start = next(index for index, step in enumerate(steps) if step["name"] == "Start the generated SPX stack")
+    assert generate < verify < start
+    assert '--compose "${OUTPUT_DIR}/docker-compose.generated.yml"' in steps[verify]["run"]
+    assert steps[verify].get("continue-on-error", False) is False
+
+
+def test_catalog_audit_still_checks_optional_providers_strictly() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/catalog-image-security.yml").read_text())
+    job = workflow["jobs"]["catalog-image-audit"]
+    check = next(step for step in job["steps"] if step.get("name") == "Verify all catalog Python providers without repairing images")
+    assert check["run"] == "python -m tools.verify_python_images"
+    assert check.get("continue-on-error", False) is False
+    assert job.get("continue-on-error", False) is False
+
+
 def test_pause_qualification_requires_the_entire_selected_manifest() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/installer-stack-qualification.yml").read_text())
     steps = workflow["jobs"]["full-stack-smoke"]["steps"]

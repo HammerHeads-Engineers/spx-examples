@@ -48,9 +48,6 @@ jobs:
           VIRTUAL_ENV="$PWD/.venv" .spx-ci/bin/poetry install --with=dev --no-root --no-interaction --no-ansi
           .venv/bin/python installer/runtime_bootstrap.py --check
 
-      - name: Verify shipped Python images before repairing test environments
-        run: poetry run python -m tools.verify_python_images
-
       - name: Build the portable installer used by the integration test
         shell: bash
         run: |
@@ -79,6 +76,11 @@ jobs:
             --product-key "${SPX_PRODUCT_KEY}" \
             --no-start \
             2>&1 | tee "${RUNNER_TEMP}/spx-full-generate.log"
+
+      - name: Verify selected Python images before starting the generated stack
+        run: >-
+          poetry run python -m tools.verify_python_images
+          --compose "${OUTPUT_DIR}/docker-compose.generated.yml"
 
       - name: Start the generated SPX stack
         shell: bash

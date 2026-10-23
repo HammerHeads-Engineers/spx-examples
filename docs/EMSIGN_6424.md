@@ -39,8 +39,12 @@ for 3.13 because the old locks lack Windows wheels for that interpreter.
   NumPy/SciPy wheels on Python 3.13 while retaining the older interpreter choices.
 - `tools/secure_ci_python.py`, workflows: secure separate Poetry and dependency
   environments before use, refresh Linux system certificates, validate after sync.
-- `tools/verify_python_images.py`: release qualification checks the original
-  SPX Server, Home Assistant and Matter images before any test-time repairs.
+- `tools/verify_python_images.py`: release qualification checks every original
+  Python image selected in the generated Compose bundle before starting it.
+  Selecting Home Assistant or Matter includes those providers in the same strict
+  gate; the industrial starter does not deploy them. The manual **Catalog Python
+  image security audit** workflow checks the complete catalog, including optional
+  upstream images, independently of the industrial starter qualification.
 - Windows/macOS packaging, runtime resolution and smoke workflows: Python
   3.13.17; verified SHA-256 for both official native payloads; updated Windows
   prerequisite marker so an installed 3.12 prerequisite cannot skip the new one.

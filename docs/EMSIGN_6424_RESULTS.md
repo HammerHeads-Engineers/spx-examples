@@ -5,6 +5,24 @@ na gałęziach `fix/emsign-bootstrap`. Poniższe wyniki pochodzą z lokalnej wal
 przed wysłaniem PR-ów. Nie opublikowano wydania ani nie wdrożono produkcji.
 Pierwotny checkout spx-examples z lokalnymi zmianami użytkownika pozostawiono bez zmian.
 
+## Uzupełnienie po review i publikacji RC74
+
+- Server #76 i poprawka uwierzytelniania wydania #77 są zmergowane do `develop`.
+  Opublikowano `v1.0.0-rc.74` dla linux/amd64 i linux/arm64; digest indeksu:
+  `sha256:9003cdcf2e88465238c815ad9278971ad5b6a184a2b47104bf076ec2f88989a5`.
+- Natywne testy instalatora Windows 2022/2025, macOS ARM64/Intel oraz Linux
+  przeszły po poprawieniu wykrywania Pythona 3.13 i rozdzieleniu interpretera
+  budującego od instalowanego runtime na Windows.
+- Obraz Matter nadal nie przeszedł kwalifikacji magazynu CA. Nie naprawiono
+  zewnętrznych obrazów Home Assistant/Matter ani nie uznano zadania 6424 za zamknięte.
+- Obowiązkowa kwalifikacja instalatora sprawdza wszystkie obrazy Pythona
+  obecne w wygenerowanym Compose, przed uruchomieniem stosu. Przemysłowy starter
+  nie zawiera Home Assistanta ani Matter. Jeśli wybrany stos je zawiera, podlegają
+  temu samemu blokującemu testowi bezpieczeństwa.
+- Pełny audyt katalogu pozostaje dostępny w ręcznym workflow
+  `Catalog Python image security audit` i przez `python -m tools.verify_python_images`.
+  Poniższe wyniki i blokady opisują wcześniejszy etap lokalnej walidacji.
+
 ## Zakres i źródła
 
 - spx-examples: worktree na bazie develop `4d9a8f8` (RC108).

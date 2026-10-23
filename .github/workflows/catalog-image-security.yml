@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: MIT
+name: Catalog Python image security audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-image-audit:
+    name: Audit SPX and optional upstream Python images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13.17"
+      - name: Refresh system certificates
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+      - name: Prepare secured audit tools
+        run: |
+          python installer/runtime_bootstrap.py --secure-only
+          python -m pip install pyyaml
+      - name: Verify all catalog Python providers without repairing images
+        run: python -m tools.verify_python_images
+      - name: Explain audit scope
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          This audit covers SPX Server and the optional Home Assistant/Matter images.
+          A failed provider is not security-qualified. Required installer CI checks
+          every Python image selected for its generated bundle before stack startup.
+          Optional providers absent from that bundle are covered by this manual audit.
+          EOF
