@@ -538,9 +538,11 @@ def test_bootstrap_runtime_installs_workspace_editably(tmp_path: Path, monkeypat
         "install",
         "--disable-pip-version-check",
         "--no-input",
+        "certifi>=2026.10.19",
         "-e",
         str(workspace),
     ]
+    assert calls[2] == [str(expected_python), str(runtime_helper), "--check"]
 
 
 def test_bootstrap_codex_enables_write_tools(tmp_path: Path, monkeypatch) -> None:

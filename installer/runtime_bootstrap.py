@@ -7,11 +7,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 from typing import Any
+
+
+PIP_BOOTSTRAP = (
+    "pip @ https://files.pythonhosted.org/packages/3f/06/"
+    "3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/"
+    "pip-26.2.2-py3-none-any.whl#sha256="
+    "fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+)
+SECURITY_MINIMUMS = {"pip": "26.2.2", "certifi": "2026.10.19", "uv": "0.13.4"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -20,8 +30,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--venv-dir",
-        required=True,
         help="Directory where the virtual environment should live.",
+    )
+    parser.add_argument(
+        "--secure-only",
+        action="store_true",
+        help="Secure this interpreter without creating a venv.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Verify this interpreter without changing it.",
     )
     parser.add_argument(
         "--package",
@@ -81,26 +100,99 @@ def has_module(python_bin: Path, module_name: str) -> bool:
     return True
 
 
-def ensure_pip_available(python_bin: Path) -> None:
-    if has_module(python_bin, "pip"):
-        return
-
-    print(
-        f"[runtime] Bootstrapping pip in {python_bin.parent.parent}",
-        file=sys.stderr,
+def environment_versions(python_bin: Path) -> dict[str, Any]:
+    result = subprocess.run(
+        [
+            str(python_bin),
+            "-c",
+            "import json, sys; from importlib import metadata; "
+            "names = ('pip', 'certifi', 'uv'); "
+            "installed = {d.metadata['Name'].lower(): d.version for d in metadata.distributions() "
+            "if d.metadata.get('Name', '').lower() in names}; "
+            "print(json.dumps(dict(installed, python=list(sys.version_info[:3]))))",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    try:
-        run_command([str(python_bin), "-m", "ensurepip", "--upgrade"])
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(
-            "Python virtual environment does not include pip and ensurepip failed. "
-            "Install the distro Python venv/pip support packages and retry."
-        ) from exc
+    return json.loads(result.stdout)
 
-    if not has_module(python_bin, "pip"):
+
+def safe_version(version: str | None, minimum: str) -> bool:
+    # Prereleases and unknown vendor versions must not pass the security gate.
+    if version is None or not re.fullmatch(r"\d+(?:\.\d+)*", version):
+        return False
+    parts = tuple(int(part) for part in version.split("."))
+    floor = tuple(int(part) for part in minimum.split("."))
+    width = max(len(parts), len(floor))
+    return parts + (0,) * (width - len(parts)) >= floor + (0,) * (width - len(floor))
+
+
+def ensure_pip_available(python_bin: Path) -> None:
+    versions = environment_versions(python_bin)
+    if tuple(versions["python"][:2]) < (3, 10):
         raise RuntimeError(
-            "Python virtual environment was created, but pip is still unavailable after ensurepip."
+            "Secure SPX package installation requires Python 3.10+. "
+            "Migrate this environment; the advisory bootstrap does not support Python 3.9."
         )
+    if safe_version(versions.get("pip"), SECURITY_MINIMUMS["pip"]):
+        return
+    if not has_module(python_bin, "pip"):
+        # ensurepip is offline and only seeds the installer; it is not remediation.
+        run_command([str(python_bin), "-m", "ensurepip", "--upgrade"])
+    run_command(
+        [
+            str(python_bin),
+            "-m",
+            "pip",
+            "--disable-pip-version-check",
+            "install",
+            "--no-index",
+            "--no-deps",
+            PIP_BOOTSTRAP,
+        ]
+    )
+    if not safe_version(
+        environment_versions(python_bin).get("pip"), SECURITY_MINIMUMS["pip"]
+    ):
+        raise RuntimeError("Pinned pip bootstrap did not produce a safe pip version.")
+
+
+def ensure_secure_environment(python_bin: Path) -> None:
+    ensure_pip_available(python_bin)
+    versions = environment_versions(python_bin)
+    requirements = [
+        f"{name}>={minimum}"
+        for name, minimum in SECURITY_MINIMUMS.items()
+        if name != "pip"
+        and (name == "certifi" or name in versions)
+        and not safe_version(versions.get(name), minimum)
+    ]
+    if requirements:
+        run_command(
+            [
+                str(python_bin),
+                "-m",
+                "pip",
+                "--disable-pip-version-check",
+                "install",
+                "--upgrade",
+                *requirements,
+            ]
+        )
+    verify_environment(python_bin)
+
+
+def verify_environment(python_bin: Path) -> dict[str, Any]:
+    versions = environment_versions(python_bin)
+    for name, minimum in SECURITY_MINIMUMS.items():
+        if name == "uv" and name not in versions:
+            continue
+        if not safe_version(versions.get(name), minimum):
+            raise RuntimeError(
+                f"Unsafe {name} in {python_bin}: {versions.get(name)!r}; require >= {minimum}"
+            )
+    return versions
 
 
 def is_healthy_virtualenv(venv_dir: Path) -> bool:
@@ -168,10 +260,11 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
         )
         run_command([sys.executable, "-m", "venv", str(venv_dir)])
         python_bin = venv_python_path(venv_dir)
+    # Security is independent of the package/cache stamp, including empty runtimes.
+    ensure_secure_environment(python_bin)
     current_state = read_stamp(stamp_path)
     if current_state != desired_state:
         if packages:
-            ensure_pip_available(python_bin)
             print(
                 f"[runtime] Installing Python packages into {venv_dir}",
                 file=sys.stderr,
@@ -183,9 +276,11 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
                     "pip",
                     "install",
                     "--disable-pip-version-check",
+                    "certifi>=2026.10.19",
                     *packages,
                 ]
             )
+        ensure_secure_environment(python_bin)
         write_stamp(stamp_path, desired_state)
 
     return python_bin
@@ -193,6 +288,14 @@ def ensure_runtime(venv_dir: Path, packages: list[str]) -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.check:
+        print(json.dumps(verify_environment(Path(sys.executable)), sort_keys=True))
+        return 0
+    if args.secure_only:
+        ensure_secure_environment(Path(sys.executable))
+        return 0
+    if not args.venv_dir:
+        raise SystemExit("--venv-dir, --secure-only or --check is required")
     packages = normalize_packages(args.package)
     python_bin = ensure_runtime(Path(args.venv_dir).expanduser().resolve(), packages)
     print(str(python_bin))

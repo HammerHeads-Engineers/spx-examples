@@ -27,7 +27,7 @@ Options:
   --sign IDENTITY               Sign the .pkg with this Developer ID Installer identity
   --keychain PATH               Optional keychain for pkg signing / notarytool profile lookup
   --notarytool-profile PROFILE  Submit the signed .pkg with this notarytool keychain profile
-  --python-version VERSION      Official universal2 Python version to bundle (default: 3.12.10)
+  --python-version VERSION      Official universal2 Python version to bundle (default: 3.13.17)
   --python-package PATH         Use a local official Python macOS .pkg instead of downloading it
   --python-sha256 SHA256        Expected SHA-256 for the Python package
   -h, --help                    Show this help
@@ -386,9 +386,9 @@ APP_SIGN_IDENTITY=""
 SIGN_IDENTITY=""
 KEYCHAIN_PATH=""
 NOTARYTOOL_PROFILE=""
-PYTHON_VERSION="3.12.10"
+PYTHON_VERSION="3.13.17"
 PYTHON_PACKAGE_INPUT=""
-PYTHON_PACKAGE_SHA256="8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4"
+PYTHON_PACKAGE_SHA256="3053592af66128269efab37fe7851a4894920b27c442aeec99ce4d34d17c07e3"
 PRODUCT_TITLE="SPX Tools"
 
 while [[ $# -gt 0 ]]; do

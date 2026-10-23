@@ -887,10 +887,13 @@ def bootstrap_runtime(repo_root: Path, workspace_dir: Path, python_bin: str) -> 
             "install",
             "--disable-pip-version-check",
             "--no-input",
+            "certifi>=2026.10.19",
             "-e",
             str(workspace_dir),
         ]
     )
+    # Editable requirements/build backends may have changed the environment.
+    run_command([str(venv_python), str(runtime_helper), "--check"])
     return venv_python
 
 

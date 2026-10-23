@@ -5,6 +5,9 @@ See the accompanying LICENSE file for terms.
 -->
 
 # spx-examples
+
+Before installing Python packages or upgrading an existing SPX installation,
+follow [the security bootstrap and migration procedure](docs/EMSIGN_6424.md).
 Runnable examples and best practices for the SPX ecosystem (SDK + Server). Covers components, models, actions, polling, PythonFile bindings, snapshots, and API v3 flows. Each example is self-contained with concise docs and tests to help you learn, prototype, and verify behavior.
 
 ## LLM-first development
@@ -300,7 +303,7 @@ subnet; firewalls and inter-subnet routing remain the user's responsibility.
 Non-interactive generation always uses local-only binds.
 
 The generated stack always uses Compose project `spx` and installer labels. The
-server/UI contract is SPX Server `v1.0.0-rc.73` with SPX UI `v1.0.0-rc.75`;
+server/UI contract is SPX Server `v1.0.0-rc.74` with SPX UI `v1.0.0-rc.75`;
 unsupported version pairs are rejected during generation. Community defaults
 auto-start at most five instances. A profile is additive to its selected pack,
 not a replacement for the pack.

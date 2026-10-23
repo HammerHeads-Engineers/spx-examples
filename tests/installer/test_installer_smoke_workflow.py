@@ -76,7 +76,7 @@ def test_windows_smoke_installs_bundle_and_runs_installed_launcher() -> None:
     assert "Remove-Item Env:PYTHON_BIN" in job
     assert '".venv\\Scripts\\python.exe"' in job
     assert "tools\\verify_mcp_stdio.py" in job
-    assert "BundledPython312Installed" in job
+    assert "BundledPython313Installed" in job
     assert "pythonLocation" in job
     assert "instead of the bundled runtime" in job
 
@@ -88,7 +88,7 @@ def test_macos_smoke_installs_package_and_checks_bundled_python() -> None:
     assert "installer-macos-${VERSION}.pkg" in job
     assert "-allowUntrusted" in job
     assert "SPX_SKIP_AUTO_SETUP=1" in job
-    assert "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12" in job
+    assert "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13" in job
     assert 'file "${python_bin}" | grep -q "universal binary"' in job
     assert "pkgutil --pkg-info com.hammerheadsengineers.spx.python" in job
     assert "SPX Tools/SPX Setup.app/Contents/Resources/spx-installer" in job

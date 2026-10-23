@@ -37,7 +37,7 @@ def test_windows_installer_job_provisions_native_build_dependencies() -> None:
     job = _job("build-windows-installer", "build-macos-installer")
 
     assert "actions/setup-python@v7" in job
-    assert 'python-version: "3.12.10"' in job
+    assert 'python-version: "3.13.17"' in job
     assert "actions/setup-dotnet@v6" in job
     assert 'dotnet-version: "8.0.x"' in job
     assert 'dotnet tool install --global wix --version "6.*"' in job
@@ -78,7 +78,7 @@ def test_windows_bundle_signs_burn_engine_and_bundle_before_publishing() -> None
     assert "wix burn extract $bundlePath" in job
     assert "wix burn detach $bundlePath" not in job
     assert 'Filter "spx-windows-*.msi"' in job
-    assert 'Filter "python-3.12.10-amd64.exe"' in job
+    assert 'Filter "python-3.13.17-amd64.exe"' in job
     assert job.count(r".\packaging\windows\Verify-AuthenticodeSignature.ps1") == 2
 
     verifier = (REPO_ROOT / "packaging" / "windows" / "Verify-AuthenticodeSignature.ps1").read_text(
@@ -116,9 +116,9 @@ def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
     assert "SOFTWARE\\Python\\PythonCore\\" in launcher
     assert "RegistryHive.CurrentUser" in launcher
     assert "RegistryHive.LocalMachine" in launcher
-    assert "requiredVersion: (3, 12)" in launcher
+    assert "requiredVersion: (3, 13)" in launcher
     assert "new PythonCandidate" not in launcher
-    assert "The bundled Python 3.12 runtime was not found" in launcher
+    assert "The bundled Python 3.13 runtime was not found" in launcher
 
 
 def test_windows_launcher_supports_success_pause_without_changing_legacy_error_pause() -> None:
@@ -149,11 +149,11 @@ def test_windows_bundle_uses_an_spx_owned_python_marker() -> None:
     bundle = BUNDLE_WXS_PATH.read_text(encoding="utf-8")
     product = PRODUCT_WXS_PATH.read_text(encoding="utf-8")
 
-    assert 'Value="BundledPython312Installed"' in bundle
-    assert 'Variable="SpxBundledPython312Installed"' in bundle
-    assert 'DetectCondition="SpxBundledPython312Installed = 1"' in bundle
+    assert 'Value="BundledPython313Installed"' in bundle
+    assert 'Variable="SpxBundledPython313Installed"' in bundle
+    assert 'DetectCondition="SpxBundledPython313Installed = 1"' in bundle
     assert "Python312InstallPathPerMachine OR Python312InstallPathPerUser" not in bundle
-    assert 'Name="BundledPython312Installed"' in product
+    assert 'Name="BundledPython313Installed"' in product
 
 
 def test_windows_bundle_offers_setup_launch_on_success() -> None:

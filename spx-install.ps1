@@ -172,6 +172,14 @@ try {
     if (Test-DockerPreflightRequired -Arguments ([string[]]$installerArgs)) {
         $DockerCompose = Check-Docker
     }
+    # Always secure the installer venv, including reuse with all modules present.
+    $runtimeRoot = if ($Env:SPX_RUNTIME_HOME) { $Env:SPX_RUNTIME_HOME } else { Join-Path $Env:LOCALAPPDATA "SPX/runtime" }
+    $runtimeHelper = Join-Path $RepoDir "installer/runtime_bootstrap.py"
+    $runtimePython = & $InstallerPythonBin $runtimeHelper --venv-dir (Join-Path $runtimeRoot "installer") --package pyyaml --package colorama
+    if ($LASTEXITCODE -ne 0 -or -not $runtimePython) {
+        throw "[spx-install] Secure Python runtime bootstrap failed"
+    }
+    $InstallerPythonBin = ([string]$runtimePython).Trim()
     Check-PythonModules
 
     Set-Location -Path $RepoDir

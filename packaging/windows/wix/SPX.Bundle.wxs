@@ -12,11 +12,11 @@
     UpgradeCode="229427D2-B3F9-4DFD-9DEF-9BF45CBE80B8"
     Compressed="yes">
     <util:RegistrySearch
-      Id="SpxBundledPython312InstalledSearch"
+      Id="SpxBundledPython313InstalledSearch"
       Root="HKCU"
       Key="Software\HammerHeads Engineers\SPX"
-      Value="BundledPython312Installed"
-      Variable="SpxBundledPython312Installed"
+      Value="BundledPython313Installed"
+      Variable="SpxBundledPython313Installed"
       Result="value"
       Bitness="always64" />
     <util:RegistrySearch
@@ -47,11 +47,11 @@
 
     <Chain>
       <ExePackage
-        Id="Python312Prerequisite"
+        Id="Python313Prerequisite"
         DisplayName="$(var.PythonPackageDisplayName)"
         SourceFile="$(var.PythonInstallerPath)"
         InstallArguments="/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=1 InstallLauncherAllUsers=0 Include_test=0"
-        DetectCondition="SpxBundledPython312Installed = 1"
+        DetectCondition="SpxBundledPython313Installed = 1"
         Compressed="yes"
         Cache="keep"
         PerMachine="no"

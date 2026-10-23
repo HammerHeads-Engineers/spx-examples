@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [3.9.19, 3.10.14, 3.11.9, 3.12.10]
+        python-version: [3.10.14, 3.11.9, 3.13.17]
 
     steps:
       - name: Checkout repository
@@ -25,17 +25,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Poetry
-        run: pipx install poetry
-
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-          cache: poetry
+
+      - name: Refresh Linux certificate store
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+
+      - name: Install Poetry
+        run: python tools/secure_ci_python.py
 
       - name: Install dependencies
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Verify dependency environment security
+        run: poetry run python installer/runtime_bootstrap.py --check
 
       - name: Fetch develop baseline
         run: git fetch origin develop
@@ -81,20 +87,26 @@ jobs:
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/checkout@v7
 
-      - name: Install Poetry
-        if: ${{ steps.gate.outputs.enabled == 'true' }}
-        run: pipx install poetry
-
-      - name: Set up Python 3.12.10
+      - name: Set up Python 3.13.17
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         uses: actions/setup-python@v7
         with:
-          python-version: 3.12.10
-          cache: poetry
+          python-version: 3.13.17
+
+      - name: Refresh Linux certificate store
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+
+      - name: Install Poetry
+        if: ${{ steps.gate.outputs.enabled == 'true' }}
+        run: python tools/secure_ci_python.py
 
       - name: Install dependencies
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Verify dependency environment security
+        run: poetry run python installer/runtime_bootstrap.py --check
 
       - name: Generate embedded bundle (non-interactive)
         if: ${{ steps.gate.outputs.enabled == 'true' }}
