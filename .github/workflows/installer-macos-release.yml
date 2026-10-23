@@ -118,10 +118,10 @@ jobs:
           APP_SIGN_IDENTITY: ${{ vars.MACOS_APP_SIGN_IDENTITY }}
           INSTALLER_SIGN_IDENTITY: ${{ vars.MACOS_INSTALLER_SIGN_IDENTITY }}
           NOTARY_PROFILE: ${{ vars.MACOS_NOTARY_PROFILE }}
+          REQUESTED_VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           set -euo pipefail
-          version="${{ inputs.version || github.ref_name }}"
-          version="${version#v}"
+          version="${REQUESTED_VERSION#v}"
           telemetry_environment="staging"
           if [[ "${version}" != *-* ]]; then
             telemetry_environment="production"
@@ -148,7 +148,7 @@ jobs:
       - name: Upload package and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: spx-installer-macos-${{ github.ref_name }}
+          name: spx-installer-macos-${{ github.run_id }}
           path: |
             ${{ env.MACOS_PACKAGE }}
             ${{ env.MACOS_PACKAGE }}.sha256
