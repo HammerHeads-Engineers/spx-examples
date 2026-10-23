@@ -116,7 +116,7 @@ def test_windows_launcher_requires_the_bundled_python_runtime() -> None:
     assert "SOFTWARE\\Python\\PythonCore\\" in launcher
     assert "RegistryHive.CurrentUser" in launcher
     assert "RegistryHive.LocalMachine" in launcher
-    assert "requiredVersion: (3, 12)" in launcher
+    assert "requiredVersion: (3, 13)" in launcher
     assert "new PythonCandidate" not in launcher
     assert "The bundled Python 3.13 runtime was not found" in launcher
 

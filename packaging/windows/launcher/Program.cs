@@ -285,7 +285,7 @@ internal static class Program
                 var resolved = TryResolvePythonExecutable(
                     candidate,
                     Array.Empty<string>(),
-                    requiredVersion: (3, 12)
+                    requiredVersion: (3, 13)
                 );
                 if (resolved is not null)
                 {
