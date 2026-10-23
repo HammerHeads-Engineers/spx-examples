@@ -197,10 +197,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.13
+      # Keep the build interpreter distinct from the bundled 3.13 runtime so
+      # installing the prerequisite cannot reuse the build runner's Python.
+      - name: Set up build Python 3.12
         uses: actions/setup-python@v7
         with:
-          python-version: "3.13.17"
+          python-version: "3.12"
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v6
