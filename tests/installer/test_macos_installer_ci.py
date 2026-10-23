@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci-cd.yml"
@@ -57,7 +58,10 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     assert '--install-location "/Library/Frameworks/Python.framework"' in script
     assert "codesign --verify --deep --strict" in script
     assert "python_version" in script
-    assert "--exclude '._*'" in script
+    assert (
+        'ditto --rsrc --extattr --noqtn "${framework_payload}" "${PYTHON_FRAMEWORK_ROOT}"'
+        in script
+    )
     assert '"${python_scripts_dir}/postinstall"' in script
     assert '--scripts "${python_scripts_dir}"' in script
     assert 'python_pkgbuild_args+=(--sign "${SIGN_IDENTITY}")' in script
@@ -71,9 +75,12 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
         'local python_library="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/Python"'
         in script
     )
-    assert 'codesign "${python_codesign_args[@]}" "${python_library}"' in script
-    assert 'codesign --force --sign - "${python_library}"' in script
-    assert 'codesign --verify --strict --verbose=2 "${python_library}"' in script
+    assert 'codesign "${python_codesign_args[@]}" "${PYTHON_FRAMEWORK_ROOT}"' in script
+    assert 'codesign --force --sign - "${PYTHON_FRAMEWORK_ROOT}"' in script
+    assert (
+        'codesign --verify --deep --strict --verbose=2 "${PYTHON_FRAMEWORK_ROOT}"'
+        in script
+    )
     assert 'pkgutil --check-signature "${COMPONENT_PKG_PATH}"' in script
     assert 'pkgutil --check-signature "${PYTHON_COMPONENT_PKG_PATH}"' in script
 
@@ -179,6 +186,26 @@ def test_macos_installer_job_prepares_ephemeral_signing_keychain() -> None:
     assert "xcrun notarytool store-credentials" in job
     assert '--key-id "${MACOS_NOTARY_KEY_ID}"' in job
     assert '--issuer "${MACOS_NOTARY_ISSUER_ID}"' in job
+
+
+def test_manual_gate_uses_the_release_job_notarization_credentials() -> None:
+    production = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    manual = yaml.safe_load(
+        (REPO_ROOT / ".github/workflows/installer-macos-release.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    release_steps = production["jobs"]["build-macos-installer"]["steps"]
+    manual_steps = manual["jobs"]["build-and-verify"]["steps"]
+
+    def prepare(steps):
+        return next(
+            step
+            for step in steps
+            if step.get("name") == "Prepare macOS signing and notarization"
+        )
+
+    assert prepare(manual_steps) == prepare(release_steps)
 
 
 def test_macos_installer_job_validates_and_publishes_package() -> None:

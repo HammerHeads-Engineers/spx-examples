@@ -440,6 +440,10 @@ jobs:
         shell: bash
         run: python -m pytest -q tests/installer/test_docker_preflight.py
 
+      - name: Test nested framework signatures through package round trip
+        shell: bash
+        run: python -m pytest -q tests/installer/test_macos_framework_signatures.py
+
       - name: Build unsigned macOS installer package
         shell: bash
         run: |
