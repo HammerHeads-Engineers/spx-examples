@@ -170,7 +170,10 @@ prepare_python_component() {
   fi
 
   mkdir -p "${PYTHON_FRAMEWORK_ROOT}"
-  rsync -a --delete --exclude '._*' "${framework_payload}/" "${PYTHON_FRAMEWORK_ROOT}/"
+  # Tcl/Tk include signed scripts and static archives whose signatures live in
+  # extended attributes. rsync -a discards them and breaks the nested framework
+  # seals even though a shallow check of the Python library still succeeds.
+  ditto --rsrc --extattr --noqtn "${framework_payload}" "${PYTHON_FRAMEWORK_ROOT}"
 
   # The official package includes development-only LLVM object files in the
   # framework config directory. They are not needed by the runtime and Apple
@@ -189,11 +192,9 @@ prepare_python_component() {
     exit 1
   fi
 
-  # Removing python.o changes the sealed resource list of the framework's
-  # shared library. Re-sign that library after the cleanup; otherwise the
-  # vendor signature remains cryptographically valid only for the original
-  # file set and notarization rejects both universal2 slices. The launcher
-  # apps and the package keep their existing signing flow below.
+  # Removing python.o changes the parent framework's resource seal. Sign the
+  # framework bundle after cleanup, preserving the unchanged vendor signatures
+  # of its nested Tcl/Tk frameworks and Python.app.
   local python_library="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/Python"
   if [[ ! -f "${python_library}" ]]; then
     echo "Bundled Python framework library is missing: ${python_library}" >&2
@@ -209,13 +210,13 @@ prepare_python_component() {
     if [[ -n "${KEYCHAIN_PATH}" ]]; then
       python_codesign_args+=(--keychain "${KEYCHAIN_PATH}")
     fi
-    codesign "${python_codesign_args[@]}" "${python_library}"
+    codesign "${python_codesign_args[@]}" "${PYTHON_FRAMEWORK_ROOT}"
   else
     # An unsigned local package may still contain the vendor signature, but
     # it cannot remain valid after removing the sealed development object.
-    codesign --force --sign - "${python_library}"
+    codesign --force --sign - "${PYTHON_FRAMEWORK_ROOT}"
   fi
-  codesign --verify --strict --verbose=2 "${python_library}"
+  codesign --verify --deep --strict --verbose=2 "${PYTHON_FRAMEWORK_ROOT}"
 
   local python_bin="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/bin/python${PYTHON_FRAMEWORK_VERSION}"
   if [[ ! -x "${python_bin}" ]]; then
@@ -356,6 +357,14 @@ EOF
 
   pkgbuild "${python_pkgbuild_args[@]}" "${PYTHON_COMPONENT_PKG_PATH}"
 
+  # Check the archived payload too: signatures on non-Mach-O nested code must
+  # survive both the staging copy and the pkgbuild/pkgutil round trip.
+  local inspection_path="${STAGING_ROOT}/python-component-inspection"
+  rm -rf "${inspection_path}"
+  pkgutil --expand-full "${PYTHON_COMPONENT_PKG_PATH}" "${inspection_path}"
+  codesign --verify --deep --strict --verbose=2 \
+    "${inspection_path}/Payload/Versions/${PYTHON_FRAMEWORK_VERSION}/Python"
+
   if [[ -n "${SIGN_IDENTITY}" ]]; then
     echo "Python component signature:"
     pkgutil --check-signature "${PYTHON_COMPONENT_PKG_PATH}"
@@ -492,7 +501,7 @@ PYTHON_PACKAGE_URL="https://www.python.org/ftp/python/${PYTHON_VERSION}/python-$
 PYTHON_COMPONENT_ID="com.hammerheadsengineers.spx.python"
 APP_OUTPUT_DIR="${STAGING_DIR}/root/${TOOLS_DIR_NAME}"
 APP_INSTALL_ROOT="${APP_ROOT}/${TOOLS_DIR_NAME}"
-PYTHON_FRAMEWORK_ROOT="${STAGING_ROOT}/python-framework-root"
+PYTHON_FRAMEWORK_ROOT="${STAGING_ROOT}/python-framework-root/Python.framework"
 PKG_SCRIPTS_DIR="${STAGING_ROOT}/pkg-scripts"
 MACOS_RESOURCES_DIR="${REPO_ROOT}/packaging/macos/resources"
 # shellcheck source=scripts/macos_notarization.sh
@@ -528,7 +537,7 @@ fi
 require_command pkgbuild
 require_command productbuild
 require_command pkgutil
-require_command rsync
+require_command ditto
 require_command shasum
 require_command file
 require_command codesign
