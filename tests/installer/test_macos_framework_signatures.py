@@ -12,7 +12,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.skipif(
-    sys.platform != "darwin", reason="Requires macOS signing tools"
+    sys.platform != "darwin" or sys.version_info[:2] != (3, 13),
+    reason="Requires macOS signing tools and the bundled Python 3.13 bytecode compiler",
 )
 
 
@@ -97,6 +98,10 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
     object_file = version / "lib" / "python3.13" / "config-3.13-darwin" / "python.o"
     object_file.parent.mkdir(parents=True)
     object_file.write_bytes(b"development-only object\n")
+    module = version / "lib" / "python3.13" / "signature_probe.py"
+    module.write_text(
+        '"""A runtime import must not change the framework seal."""\nvalue = 42\n'
+    )
     run("codesign", "--force", "--sign", "-", str(python))
     run("codesign", "--verify", "--deep", "--strict", str(python))
 
@@ -141,12 +146,35 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
         "TOOLS_DIR_NAME": "SPX Tools",
         "PYTHON_COMPONENT_ID": "com.example.spx.repacked-python",
         "PYTHON_COMPONENT_PKG_PATH": str(output),
+        "SPX_BUILD_PYTHON": sys.executable,
     }
     run("bash", str(harness), env=env)
 
     payload = staging / "python-component-inspection" / "Payload" / "Versions" / "3.13"
     assert output.is_file()
     assert not list(payload.rglob("*.o"))
+    run("codesign", "--verify", "--deep", "--strict", str(payload / "Python"))
+    caches = list(
+        (payload / "lib/python3.13/__pycache__").glob("signature_probe.*.pyc")
+    )
+    assert len(caches) == 3
+    before = {path.relative_to(payload): path.read_bytes() for path in caches}
+    # Import the packaged module at all supported optimization levels. Use a
+    # real matching interpreter; the Mach-O fixture above is intentionally tiny.
+    for flags in ([], ["-O"], ["-OO"]):
+        run(
+            sys.executable,
+            *flags,
+            "-I",
+            "-c",
+            "import sys; sys.path.insert(0, sys.argv[1]); import signature_probe; assert signature_probe.value == 42",
+            str(payload / "lib/python3.13"),
+        )
+    after = list((payload / "lib/python3.13/__pycache__").glob("signature_probe.*.pyc"))
+    assert before == {path.relative_to(payload): path.read_bytes() for path in after}
+    postinstall = (staging / "python-scripts/postinstall").read_text()
+    assert "compileall" not in postinstall
+    run("bash", str(staging / "python-scripts/postinstall"), env={**env, "CI": "1"})
     run("codesign", "--verify", "--deep", "--strict", str(payload / "Python"))
     for name in ("Tcl", "Tk"):
         nested = payload / "Frameworks" / f"{name}.framework"

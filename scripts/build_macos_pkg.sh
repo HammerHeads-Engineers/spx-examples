@@ -31,6 +31,9 @@ Options:
   --python-package PATH         Use a local official Python macOS .pkg instead of downloading it
   --python-sha256 SHA256        Expected SHA-256 for the Python package
   -h, --help                    Show this help
+
+Environment:
+  SPX_BUILD_PYTHON              Build interpreter matching the bundled Python minor version
 EOF
 }
 
@@ -192,6 +195,32 @@ prepare_python_component() {
     exit 1
   fi
 
+  # Cache files are sealed resources too. Generate every optimization level
+  # before signing, using the bundled minor version and final installed paths.
+  # Postinstall must never add bytecode to the signed framework.
+  local bytecode_python="${SPX_BUILD_PYTHON:-python3}"
+  local python_stdlib="${PYTHON_FRAMEWORK_ROOT}/Versions/${PYTHON_FRAMEWORK_VERSION}/lib/python${PYTHON_FRAMEWORK_VERSION}"
+  "${bytecode_python}" -I - "${python_stdlib}" "${PYTHON_FRAMEWORK_VERSION}" <<'PY'
+import compileall
+import py_compile
+import re
+import sys
+
+stdlib, version = sys.argv[1:]
+if sys.version_info[:2] != tuple(map(int, version.split('.'))):
+    raise SystemExit(f"Building Python {version} bytecode requires Python {version}; set SPX_BUILD_PYTHON to its executable")
+if not compileall.compile_dir(
+    stdlib,
+    ddir=f"/Library/Frameworks/Python.framework/Versions/{version}/lib/python{version}",
+    force=True,
+    quiet=1,
+    rx=re.compile(r"bad_coding|badsyntax|site-packages|test/test_lib2to3/data"),
+    optimize=(0, 1, 2),
+    invalidation_mode=py_compile.PycInvalidationMode.CHECKED_HASH,
+):
+    raise SystemExit("Bundled Python bytecode compilation failed")
+PY
+
   # Removing python.o changes the parent framework's resource seal. Sign the
   # framework bundle after cleanup, preserving the unchanged vendor signatures
   # of its nested Tcl/Tk frameworks and Python.app.
@@ -236,16 +265,6 @@ prepare_python_component() {
   cat > "${python_scripts_dir}/postinstall" <<EOF
 #!/bin/bash
 set -euo pipefail
-
-framework_root="/Library/Frameworks/Python.framework/Versions/${PYTHON_FRAMEWORK_VERSION}"
-python_bin="\${framework_root}/bin/python${PYTHON_FRAMEWORK_VERSION}"
-compileall="\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}/compileall.py"
-
-if [ -x "\${python_bin}" ] && [ -f "\${compileall}" ]; then
-  "\${python_bin}" -E -s -Wi "\${compileall}" -q -j0 \\
-    -f -x 'bad_coding|badsyntax|site-packages|test/test_lib2to3/data' \\
-    "\${framework_root}/lib/python${PYTHON_FRAMEWORK_VERSION}"
-fi
 
 console_user="\$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null || true)"
 if [[ -z "\${console_user}" || "\${console_user}" == "root" || "\${console_user}" == "loginwindow" ]]; then

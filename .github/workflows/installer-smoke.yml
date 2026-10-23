@@ -540,6 +540,18 @@ jobs:
             --allow-write \
             2>&1 | tee "${RUNNER_TEMP}/spx-macos-mcp-stdio.log"
 
+      - name: Verify installed framework seal after Setup and MCP runtime use
+        shell: bash
+        run: |
+          set -euo pipefail
+          framework="/Library/Frameworks/Python.framework"
+          python_bin="${framework}/Versions/3.13/bin/python3.13"
+          for optimization in 0 1 2; do
+            PYTHONOPTIMIZE="${optimization}" "${python_bin}" -I -c \
+              'import asyncio, compileall, ensurepip, ssl, tkinter, venv'
+          done
+          codesign --verify --deep --strict --verbose=2 "${framework}"
+
       - name: Validate generated macOS bundle
         shell: bash
         run: |
