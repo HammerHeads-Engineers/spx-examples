@@ -12,7 +12,7 @@ internal static class Program
     private const string WorkspaceDirectoryName = "workspace";
     private const string PauseOnErrorArgument = "--pause-on-error";
     private const string PauseOnExitArgument = "--pause-on-exit";
-    private const string BundledPythonVersion = "3.12";
+    private const string BundledPythonVersion = "3.13";
     private const string BundledPythonInstallPathKey =
         @"SOFTWARE\Python\PythonCore\" + BundledPythonVersion + @"\InstallPath";
 
@@ -252,7 +252,7 @@ internal static class Program
         }
 
         throw new InvalidOperationException(
-            "The bundled Python 3.12 runtime was not found. "
+            "The bundled Python 3.13 runtime was not found. "
             + "Repair or reinstall SPX Tools, then retry. "
             + "For a development override, set PYTHON_BIN to a Python 3.10+ executable."
         );

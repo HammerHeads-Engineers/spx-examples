@@ -225,3 +225,6 @@ library/assets/homeassistant/config/deps/
 library/assets/homeassistant/config/tts/
 library/assets/homeassistant/config/secrets.yaml
 library/assets/matter/data/
+
+# Isolated secure CI tooling (not an application dependency)
+.spx-ci/

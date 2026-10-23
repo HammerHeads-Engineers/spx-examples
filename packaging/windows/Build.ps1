@@ -10,7 +10,8 @@ param(
     [string]$Manufacturer = "HammerHeads Engineers Sp. z o.o.",
     [string]$ProductName = "SPX Tools",
     [string]$BundleName = "SPX Tools",
-    [string]$PythonVersion = "3.12.10",
+    [string]$PythonVersion = "3.13.17",
+    [string]$PythonInstallerSha256 = "5da012101ba2e17113a9a1cd901e9ce1441086f2b7ecb5de06ec94163899a190",
     [string]$PythonInstallerPath = "",
     [string]$PythonInstallerUrl = "",
     [string]$PythonPackageDisplayName = "",
@@ -243,6 +244,7 @@ function Resolve-PythonInstallerArtifact {
 
     if ($PythonInstallerPath) {
         $resolvedPath = Resolve-RequiredFile -Path $PythonInstallerPath -Label "Python installer"
+        Assert-PythonInstallerHash -Path $resolvedPath
         Assert-AuthenticodeSigner -Path $resolvedPath -ExpectedSubject $PythonInstallerSigner
         return $resolvedPath
     }
@@ -267,6 +269,7 @@ function Resolve-PythonInstallerArtifact {
     }
 
     try {
+        Assert-PythonInstallerHash -Path $downloadPath
         Assert-AuthenticodeSigner -Path $downloadPath -ExpectedSubject $PythonInstallerSigner
     }
     catch {
@@ -277,6 +280,21 @@ function Resolve-PythonInstallerArtifact {
     }
 
     return (Resolve-Path $downloadPath).Path
+}
+
+function Assert-PythonInstallerHash {
+    param([string]$Path)
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $actualHash = [System.BitConverter]::ToString($hasher.ComputeHash($stream)).Replace("-", "")
+    } finally {
+        $stream.Dispose()
+        $hasher.Dispose()
+    }
+    if ($actualHash -ine $PythonInstallerSha256) {
+        throw "Python installer SHA-256 mismatch. Supply the verified hash for any custom Python payload."
+    }
 }
 
 function Invoke-SignTool {

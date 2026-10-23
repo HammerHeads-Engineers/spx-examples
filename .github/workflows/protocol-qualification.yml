@@ -35,7 +35,8 @@ jobs:
             -w /examples -e PYTHONPATH=/app:/examples \
             -e SPX_MODEL_RUNTIME_TESTS=1 -e LWM2M_TEST_HOST=leshan-qa \
             --entrypoint sh simplephysx/spx-server:${{ steps.server.outputs.tag }} -c '
-              pip install pytest && python -m tools.required_pytest -q \
+              apt-get update && apt-get install -y ca-certificates && update-ca-certificates &&
+              python /examples/installer/runtime_bootstrap.py --secure-only && python -m pip install pytest && python -m tools.required_pytest -q \
                 tests/core/runtime/test_catalog_physics.py \
                 tests/core/runtime/test_catalog_energy.py \
                 tests/core/runtime/test_pause_scenarios.py \

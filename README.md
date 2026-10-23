@@ -5,6 +5,9 @@ See the accompanying LICENSE file for terms.
 -->
 
 # spx-examples
+
+Before installing Python packages or upgrading an existing SPX installation,
+follow [the security bootstrap and migration procedure](docs/EMSIGN_6424.md).
 Runnable examples and best practices for the SPX ecosystem (SDK + Server). Covers components, models, actions, polling, PythonFile bindings, snapshots, and API v3 flows. Each example is self-contained with concise docs and tests to help you learn, prototype, and verify behavior.
 
 ## LLM-first development

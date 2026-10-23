@@ -34,13 +34,13 @@ def test_macos_installer_job_builds_signed_native_package() -> None:
     job = _macos_job()
 
     assert "actions/setup-python@v7" in job
-    assert 'python-version: "3.12.10"' in job
+    assert 'python-version: "3.13.17"' in job
     assert '--app-sign "${MACOS_APP_SIGN_IDENTITY}"' in job
     assert '--sign "${MACOS_INSTALLER_SIGN_IDENTITY}"' in job
     assert '--keychain "${MACOS_SIGNING_KEYCHAIN}"' in job
     assert '--notarytool-profile "${MACOS_NOTARY_PROFILE}"' in job
     assert "path=dist/spx-installer-macos-${version}.pkg" in job
-    assert '--python-version "3.12.10"' in job
+    assert '--python-version "3.13.17"' in job
 
 
 def test_macos_package_bundles_verified_universal_python_runtime() -> None:
@@ -49,7 +49,7 @@ def test_macos_package_bundles_verified_universal_python_runtime() -> None:
     assert 'if [[ "${OUTPUT_DIR}" = /* ]]; then' in script
     assert 'DEST_DIR="${OUTPUT_DIR}"' in script
     assert "python-${PYTHON_VERSION}-macos11.pkg" in script
-    assert "8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4" in script
+    assert "3053592af66128269efab37fe7851a4894920b27c442aeec99ce4d34d17c07e3" in script
     assert "pkgutil --expand-full" in script
     assert "Python_Framework.pkg/Payload" in script
     assert "com.hammerheadsengineers.spx.python" in script

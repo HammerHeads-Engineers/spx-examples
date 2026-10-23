@@ -18,12 +18,12 @@ The current scaffold does the following:
 
 - stages the same repo payload that ships in the portable installer package,
 - publishes a self-contained `SpxLauncher.exe`,
-- downloads or reuses a cached official Python 3.12 offline installer and verifies its Authenticode signature,
+- downloads or reuses a cached official Python 3.13 offline installer and verifies its Authenticode signature,
 - generates a WiX fragment for the staged files,
 - builds an MSI that installs the payload under `%LocalAppData%\SPX\app`,
 - builds a Burn bundle EXE that chains the Python prerequisite and the MSI.
 
-The current scaffold still does not install Docker. `SpxLauncher.exe` uses the existing PowerShell wizard for `setup` and Python helpers for MCP setup and generated-stack start/stop. It resolves the Python 3.12 interpreter installed by the Burn prerequisite from the Python registry keys and passes that exact executable to these flows; it does not fall back to an unrelated Python on `PATH`. An explicit `PYTHON_BIN` remains available as a development/test override.
+The current scaffold still does not install Docker. `SpxLauncher.exe` uses the existing PowerShell wizard for `setup` and Python helpers for MCP setup and generated-stack start/stop. It resolves the Python 3.13 interpreter installed by the Burn prerequisite from the Python registry keys and passes that exact executable to these flows; it does not fall back to an unrelated Python on `PATH`. An explicit `PYTHON_BIN` remains available as a development/test override.
 
 When setup cannot reach Docker Desktop, it attempts to start it and waits up to
 60 seconds for the daemon. If it remains unavailable, interactive setup offers
@@ -45,7 +45,7 @@ Installer-managed SPX content now lives under one user-writable root:
 
 Installer builds normalize repository semver into Windows-friendly numeric versions. The MSI uses `major.minor.patch`; the Burn bundle carries `major.minor.patch.revision` when the repo version ends with a numeric prerelease suffix such as `-rc.24`.
 
-The Burn bundle defaults to Python `3.12.10`, which is the last Python 3.12 release that still ships the classic Windows offline installer. You can override the cached installer path or URL if you need a different payload.
+The Burn bundle defaults to Python `3.13.17`, which includes the security-fixed pip 26.2.2 in the classic Windows offline installer. You can override the cached installer path or URL if you need a different payload.
 
 Quick install via `winget`:
 
@@ -66,7 +66,7 @@ Useful options:
 powershell -ExecutionPolicy Bypass -File .\packaging\windows\Build.ps1 `
   -Configuration Release `
   -RuntimeIdentifier win-x64 `
-  -PythonInstallerPath C:\cache\python-3.12.10-amd64.exe `
+  -PythonInstallerPath C:\cache\python-3.13.17-amd64.exe `
   -SignThumbprint YOUR_CERT_THUMBPRINT
 ```
 
@@ -80,7 +80,7 @@ The Python prerequisite is cached under `build/windows/cache/` by default and is
 ## GitHub Actions release build
 
 After Semantic Release creates a version tag, the release workflow checks out
-that tag on `windows-2025` and builds the installer with Python 3.12, .NET 8,
+that tag on `windows-2025` and builds the installer with Python 3.13, .NET 8,
 Poetry, WiX v6, and the required WiX Bootstrapper Applications and Util
 extensions. It signs the Burn engine, reattaches it to the bundle, then signs
 the complete `spx-installer-<version>.exe` with Azure Artifact Signing profile

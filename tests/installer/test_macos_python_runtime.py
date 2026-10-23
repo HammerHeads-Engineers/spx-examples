@@ -12,7 +12,7 @@ def test_mac_shell_launchers_source_and_prefer_packaged_python() -> None:
     install_script = (REPO_ROOT / "spx-install.sh").read_text(encoding="utf-8")
     mcp_script = (REPO_ROOT / "spx-mcp-setup.sh").read_text(encoding="utf-8")
 
-    assert 'SPX_MACOS_PYTHON_VERSION="${SPX_MACOS_PYTHON_VERSION:-3.12.10}"' in helper
+    assert 'SPX_MACOS_PYTHON_VERSION="${SPX_MACOS_PYTHON_VERSION:-3.13.17}"' in helper
     assert "/Library/Frameworks/Python.framework/Versions/" in helper
     assert (
         '"/Library/Frameworks/Python.framework/Versions/Current/bin/"python3.*'

@@ -33,9 +33,17 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: '3.12.10'
+          python-version: '3.13.17'
+      - name: Refresh Linux certificate store
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+
+      - name: Secure Python before installing packages
+        run: python installer/runtime_bootstrap.py --secure-only
       - name: Install normal Setup test dependencies
         run: python -m pip install pytest pyyaml requests "mcp>=1.26,<2" "spx-python==1.0.0-rc.3"
+      - name: Exercise clean and cached vulnerable Python runtimes
+        run: python tests/installer/security_bootstrap_smoke.py
       - name: Test sessions, client profiles and real MCP reconnect
         run: >-
           python -m pytest -vv --durations=15 tests/installer/test_setup_sessions.py
@@ -189,23 +197,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12.10"
+          python-version: "3.13.17"
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "8.0.x"
 
+      - name: Refresh Linux certificate store
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+
       - name: Install Poetry
         shell: pwsh
-        run: python -m pip install --upgrade pip poetry
+        run: python tools/secure_ci_python.py
 
       - name: Install repository dependencies
         shell: pwsh
         run: poetry install --with=dev --no-root --no-interaction --no-ansi
+
+      - name: Verify dependency environment security
+        run: poetry run python installer/runtime_bootstrap.py --check
 
       - name: Test Docker Desktop startup and retry flow
         shell: pwsh
@@ -277,22 +292,22 @@ jobs:
             throw "MCP workspace Python was not created at $venvPython."
           }
           $version = & $venvPython -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
-          if ($version -notmatch '^3\.12\.') {
-            throw "MCP workspace is not based on bundled Python 3.12: $version"
+          if ($version -notmatch '^3\.13\.') {
+            throw "MCP workspace is not based on bundled Python 3.13: $version"
           }
           $spxKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\HammerHeads Engineers\SPX")
           if ($null -eq $spxKey) {
             throw "SPX installation marker was not found."
           }
           try {
-            $bundledPythonMarker = $spxKey.GetValue("BundledPython312Installed")
+            $bundledPythonMarker = $spxKey.GetValue("BundledPython313Installed")
           } finally {
             $spxKey.Dispose()
           }
           if ([string]$bundledPythonMarker -ne "1") {
             throw "SPX bundled Python installation marker was not found."
           }
-          $registryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("SOFTWARE\Python\PythonCore\3.12\InstallPath")
+          $registryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("SOFTWARE\Python\PythonCore\3.13\InstallPath")
           if ($null -eq $registryKey) {
             throw "Bundled Python registry key was not found."
           }
@@ -306,6 +321,10 @@ jobs:
           }
           $marker = Get-Content (Join-Path $workspace ".spx-mcp-workspace.json") -Raw | ConvertFrom-Json
           $registryPython = [IO.Path]::GetFullPath((Join-Path ([string]$registryInstallPath) "python.exe"))
+          & $registryPython -c "import ensurepip; assert tuple(map(int, ensurepip.version().split('.'))) >= (26, 2, 2)"
+          if ($LASTEXITCODE -ne 0) { throw "Bundled ensurepip is unsafe" }
+          & $venvPython (Join-Path $workspace "installer/runtime_bootstrap.py") --check
+          if ($LASTEXITCODE -ne 0) { throw "Installed MCP environment is unsafe" }
           $bootstrapPython = [IO.Path]::GetFullPath([string]$marker.bootstrap_python)
           if ($bootstrapPython -ine $registryPython) {
             throw "MCP did not use the bundled Python from the registry: $bootstrapPython"
@@ -399,10 +418,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up Python 3.12
+      - name: Set up Python 3.13
         uses: actions/setup-python@v7
         with:
-          python-version: "3.12.10"
+          python-version: "3.13.17"
+
+      - name: Refresh Linux certificate store
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ca-certificates && sudo update-ca-certificates
+
+      - name: Secure Python before installing packages
+        run: python installer/runtime_bootstrap.py --secure-only
 
       - name: Install pytest for installer behavior tests
         shell: bash
@@ -451,7 +477,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python_bin="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+          python_bin="/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13"
           test -x "${python_bin}"
           "${python_bin}" --version
           file "${python_bin}" | grep -q "universal binary"
@@ -474,7 +500,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python_bin="/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12"
+          python_bin="/Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13"
           payload="/Applications/SPX Tools/SPX Setup.app/Contents/Resources/spx-installer"
           mcp_workspace="${RUNNER_TEMP}/spx-macos-mcp-workspace"
           test -f "${payload}/.spx-macos-bundled-python"
@@ -490,7 +516,9 @@ jobs:
             2>&1 | tee "${RUNNER_TEMP}/spx-macos-mcp.log"
           venv_python="${mcp_workspace}/.venv/bin/python"
           test -x "${venv_python}"
-          test "$("${venv_python}" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = "3.12.10"
+          "${python_bin}" -c 'import ensurepip; assert tuple(map(int, ensurepip.version().split("."))) >= (26, 2, 2)'
+          "${venv_python}" "${mcp_workspace}/installer/runtime_bootstrap.py" --check
+          test "$("${venv_python}" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')" = "3.13.17"
           /usr/bin/python3 - "${mcp_workspace}/.spx-mcp-workspace.json" "${python_bin}" "${venv_python}" <<'PY'
           import json
           import sys
