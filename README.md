@@ -513,9 +513,11 @@ scripts/build_macos_pkg.sh \
 
 The native macOS package includes the official universal2 CPython runtime
 (`3.13.17`) as a separate installer component. It is installed at
-`/Library/Frameworks/Python.framework` and is selected by the SPX launchers
+`/Library/SPX/Python.framework` and is selected by the SPX launchers
 before any Python found on `PATH`. This keeps the `.pkg` independent of
 Homebrew, Xcode Command Line Tools, or a user-managed Python installation.
+The private framework and its separate package receipt leave any global
+`/Library/Frameworks/Python.framework` installation and packages untouched.
 The runtime component is checksum-verified during the build. Standard-library
 bytecode for all optimization levels is generated before signing, so installation
 and runtime imports preserve the framework seal. Building requires a matching

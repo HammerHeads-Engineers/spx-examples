@@ -27,9 +27,9 @@ check on a clean macOS host with Docker Desktop and a staging Community key.
    modules at all three optimization levels and verify the installed seal:
 
    ```bash
-   framework=/Library/Frameworks/Python.framework
-   for optimization in 0 1 2; do
-     PYTHONOPTIMIZE="$optimization" "$framework/Versions/3.13/bin/python3.13" -I -c \
+   framework=/Library/SPX/Python.framework
+   for optimization in -I -O -OO; do
+     "$framework/Versions/3.13/bin/python3.13" "$optimization" -I -c \
        'import asyncio, compileall, ensurepip, ssl, tkinter, venv'
    done
    codesign --verify --deep --strict --verbose=2 "$framework"

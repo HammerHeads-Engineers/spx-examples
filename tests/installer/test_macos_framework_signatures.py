@@ -56,12 +56,22 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
         "-arch",
         "x86_64",
         "-dynamiclib",
+        "-install_name",
+        "/Library/Frameworks/Python.framework/Versions/3.13/Python",
         str(source),
         "-o",
         str(library),
     )
     run(
-        "clang", "-arch", "arm64", "-arch", "x86_64", str(source), "-o", str(executable)
+        "clang",
+        "-arch",
+        "arm64",
+        "-arch",
+        "x86_64",
+        str(source),
+        "-Wl,-rpath,/Library/Frameworks/Python.framework/Versions/3.13",
+        "-o",
+        str(executable),
     )
 
     python = tmp_path / "source" / "Python.framework"
@@ -70,11 +80,15 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
         nested = version / "Frameworks" / f"{name}.framework"
         nested_version = framework(nested, "8.6", library)
         script = nested_version / f"{name.lower()}Config.sh"
-        script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        script.write_text(
+            "#!/bin/sh\nprefix=/Library/Frameworks/Python.framework\nexit 0\n",
+            encoding="utf-8",
+        )
         script.chmod(0o755)
         run("codesign", "--force", "--sign", "-", str(script))
         # These non-Mach-O signatures are exactly what rsync -a used to drop.
         assert "com.apple.cs.CodeDirectory" in run("xattr", str(script)).stdout
+
         run("codesign", "--force", "--sign", "-", str(nested))
 
     bin_dir = version / "bin"
@@ -134,6 +148,7 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
     env = {
         **os.environ,
         "STAGING_ROOT": str(staging),
+        "REPO_ROOT": str(ROOT),
         "PYTHON_VERSION": "3.13.17",
         "PYTHON_FRAMEWORK_VERSION": "3.13",
         "PYTHON_FRAMEWORK_ROOT": str(staging / "Python.framework"),
@@ -173,6 +188,14 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
     after = list((payload / "lib/python3.13/__pycache__").glob("signature_probe.*.pyc"))
     assert before == {path.relative_to(payload): path.read_bytes() for path in after}
     postinstall = (staging / "python-scripts/postinstall").read_text()
+    assert (
+        "/Library/SPX/Python.framework"
+        in run("otool", "-D", str(payload / "Python")).stdout
+    )
+    assert (
+        "/Library/Frameworks/Python.framework"
+        not in run("otool", "-l", str(payload / "bin/python3.13")).stdout
+    )
     assert "compileall" not in postinstall
     run("bash", str(staging / "python-scripts/postinstall"), env={**env, "CI": "1"})
     run("codesign", "--verify", "--deep", "--strict", str(payload / "Python"))
@@ -181,3 +204,4 @@ def test_nested_signatures_survive_python_component_repackaging(tmp_path):
         run("codesign", "--verify", "--deep", "--strict", str(nested))
         script = nested / "Versions" / "8.6" / f"{name.lower()}Config.sh"
         assert "com.apple.cs.CodeDirectory" in run("xattr", str(script)).stdout
+        assert "prefix=/Library/SPX/Python.framework" in script.read_text()
