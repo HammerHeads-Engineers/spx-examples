@@ -93,6 +93,7 @@ The Python executable is `.venv/bin/python` on macOS/Linux or
 `.venv/Scripts/python.exe` on Windows. Omit `--allow-write` for read-only work.
 The product installer owns automated Python/MCP setup and client configuration;
 no installer scripts or legacy compatibility helpers live in this repository.
+The product installer configures clients in read/write mode by default.
 `CLAUDE.md` points agents to the shared `AGENTS.md` instructions.
 
 ## Runtime-first MCP workflow
