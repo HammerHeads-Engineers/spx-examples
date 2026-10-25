@@ -1,0 +1,42 @@
+name: Propose offline documentation update
+on:
+  schedule:
+    - cron: '43 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: sync-docs-context
+  cancel-in-progress: false
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/sync_docs_context.py --update
+      - uses: peter-evans/create-pull-request@v7
+        id: pr
+        with:
+          branch: codex/sync-docs-context
+          base: develop
+          title: 'docs(context): refresh canonical offline references'
+          commit-message: 'docs(context): refresh canonical offline references'
+          body: 'Exports the complete canonical model and MCP references from the exact public Docs revision recorded in docs-source.json. Review and merge manually; promote develop to main normally. No installer or runtime changes.'
+          add-paths: |
+            docs-source.json
+            docs/MODEL_LANGUAGE.md
+            docs/MCP.md
+      - name: Explicitly run read-only validation for the bot branch
+        if: steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docs-context.yml --ref codex/sync-docs-context

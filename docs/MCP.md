@@ -1,4 +1,9 @@
-# Local MCP Tool
+<!-- Generated from HammerHeads-Engineers/spx-docs@18763a4ef81235769c219a5454a36e8295868559:getting-started/mcp-reference.md; do not edit. -->
+
+> Canonical reference: [https://docs.simplephysx.com/getting-started/mcp-reference](https://docs.simplephysx.com/getting-started/mcp-reference)
+> Source commit: `18763a4ef81235769c219a5454a36e8295868559`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+
+# SPX MCP reference
 
 `spx-examples` includes a local MCP tool intended for code-oriented LLM workflows.
 It is a repo tool, not an example project: the MCP server understands the local
@@ -14,6 +19,10 @@ The current MCP server is designed for local `stdio` workflows:
 - inspect runtime logs, communication trees, and protocol bindings
 - optionally perform write operations such as model registration, instance lifecycle
   control, and attribute writes
+
+The canonical reference is maintained in `spx-docs`; public Examples keeps a
+generated offline copy at `docs/MCP.md`. Installation and client provisioning
+belong to the private installer, while runtime MCP modules live in public Examples.
 
 ## Work modes
 
@@ -56,7 +65,7 @@ the host Python and require Python 3.10 or newer for MCP.
 Example setup on Windows:
 
 ```powershell
-poetry env use C:\Python314\python.exe
+poetry env use C:\Python312\python.exe
 poetry install --with dev
 ```
 
@@ -143,10 +152,8 @@ Use this flow when the active work mode is `repo_dev`:
 `repo_dev` remains the default for ordinary manual clones, even if MCP is
 available and a local `spx-server` is running.
 
-Optional flags:
-
-- `--read-only` to omit `--allow-write`
-- `--server-name custom_name` to use a different MCP server id
+For read-only operation, omit `--allow-write`. Client registration names are
+configured in the MCP client, rather than through a runtime `--server-name` flag.
 
 Use the checkout’s `.venv` Python interpreter or `poetry run python -m spx_mcp ...`.
 
@@ -187,8 +194,7 @@ in the report or command arguments. New installer-managed workspaces use
 `spx.ps1 doctor --check-server --json` (Windows) or the equivalent `spx.sh`
 command. They resolve credentials from private committed installation state on
 every operation; inherited host variables are ignored and no reconnect is
-required after installation. Older managed workspaces still prioritize their
-local `.env` over inherited values until upgraded. If tool preparation fails
+required after installation. If tool preparation fails
 while the stack is healthy, run **SPX MCP Setup** to repair it. Rollback retains
 the previous runtime binding.
 
@@ -200,15 +206,9 @@ poetry run spx-mcp stdio --allow-write
 poetry run python -m spx_mcp stdio
 ```
 
-Run the live end-to-end smoke test against a local `spx-server`:
-
-```powershell
-C:\Python314\python.exe tools\mcp_live_smoke.py
-```
-
-This script launches `spx_mcp` over `stdio`, connects with an MCP client,
-validates a catalog model, registers it on the running server, creates an
-instance, inspects diagnostics, and exercises basic lifecycle operations.
+For live validation, use host-managed MCP tools and the runtime workflow above.
+Integration tests require an explicitly prepared server and product key. Check
+which helper scripts exist in your checkout before invoking them.
 
 ## Tool groups
 
