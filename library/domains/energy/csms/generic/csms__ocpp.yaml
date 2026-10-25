@@ -1,0 +1,268 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: csms__ocpp
+description: |
+  Simulated OCPP 1.6 central system (CSMS) responding to a single charge point.
+  Implements registration, heartbeat, authorization, and transaction responses.
+  Generates UTC response timestamps and distinct transaction IDs for this CSMS
+  instance; records StatusNotification/MeterValues telemetry for dashboards.
+  This is a permissive single-charge-point simulator, without billing or an
+  authorization database. Transaction IDs restart when the instance is recreated.
+
+meta_parameters:
+  ocpp_server_host:
+    type: str
+    default: "0.0.0.0"
+  ocpp_server_port:
+    type: int
+    default: 9000
+  ocpp_server_path:
+    type: str
+    default: "/ocpp"
+  ocpp_subprotocol:
+    type: str
+    default: "ocpp1.6"
+  ocpp_charge_point_id:
+    type: str
+    default: "spx-csms"
+
+attributes:
+  k__authorization_status:
+    type: str
+    default: "Accepted"
+  last_id_tag:
+    type: str
+    default: ""
+  last_transaction_timestamp:
+    type: str
+    default: ""
+  last_meter_start_wh:
+    type: int
+    default: 0
+    unit: Wh
+  last_meter_stop_wh:
+    type: int
+    default: 0
+    unit: Wh
+  last_stop_reason:
+    type: str
+    default: "Local"
+  csms_current_time:
+    type: str
+    default: ""
+  heartbeat_interval_s:
+    type: int
+    default: 30
+    unit: s
+  registration_status:
+    type: str
+    default: "Accepted"
+
+  last_boot_vendor:
+    type: str
+    default: ""
+  last_boot_model:
+    type: str
+    default: ""
+  last_boot_serial:
+    type: str
+    default: ""
+
+  last_connector_id:
+    type: int
+    default: 1
+  last_connector_status:
+    type: str
+    default: "Available"
+  last_error_code:
+    type: str
+    default: "NoError"
+  last_status_info:
+    type: str
+    default: ""
+  last_vendor_id:
+    type: str
+    default: ""
+  last_transaction_id:
+    type: int
+    default: 0
+
+  last_meter_values:
+    type: list
+    default: []
+  last_energy_wh:
+    type: float
+    default: 0.0
+    unit: Wh
+  last_power_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  status_text:
+    type: str
+    default: "CSMS idle"
+
+actions:
+  - function: $in(last_energy_wh)
+    name: derive_energy_from_meter_values
+    description: Read the energy measurand in Wh, retaining the last valid sample.
+    imports: {meter_reading: "extensions.ocpp_meter_values.meter_reading"}
+    call: meter_reading($in(last_meter_values), "Energy.Active.Import.Register", $in(last_energy_wh))
+  - function: $in(last_power_w)
+    name: derive_power_from_meter_values
+    description: Read the power measurand in W, retaining the last valid sample.
+    imports: {meter_reading: "extensions.ocpp_meter_values.meter_reading"}
+    call: meter_reading($in(last_meter_values), "Power.Active.Import", $in(last_power_w))
+
+  - function: $in(status_text)
+    name: render_status_text
+    description: Summarise latest CP state for dashboards.
+    call: (
+          "Accepted CP boot from " + ($in(last_boot_serial) or "unknown")
+          + " / status=" + $in(last_connector_status)
+          + " / error=" + $in(last_error_code)
+        )
+
+communication:
+  - ocpp:
+      role: central_system
+      charge_point_id: "$param(ocpp_charge_point_id)"
+      server:
+        host: "$param(ocpp_server_host)"
+        port: "$param(ocpp_server_port)"
+        path: "$param(ocpp_server_path)"
+        subprotocol: "$param(ocpp_subprotocol)"
+      bindings:
+        boot_request:
+          direction: inbound
+          frame_type: call
+          action: BootNotification
+          payload:
+            chargePointVendor: "#attr(last_boot_vendor)"
+            chargePointModel: "#attr(last_boot_model)"
+            chargePointSerialNumber: "#attr(last_boot_serial)"
+        boot_response:
+          direction: outbound
+          frame_type: call_result
+          action: BootNotification
+          payload:
+            status: "#attr(registration_status)"
+            currentTime:
+              attribute: "#attr(csms_current_time)"
+              metadata: {generator: utc_now}
+            heartbeatInterval: "#attr(heartbeat_interval_s)"
+        heartbeat_request:
+          direction: inbound
+          frame_type: call
+          action: Heartbeat
+          payload: {}
+        heartbeat_response:
+          direction: outbound
+          frame_type: call_result
+          action: Heartbeat
+          payload:
+            currentTime:
+              attribute: "#attr(csms_current_time)"
+              metadata: {generator: utc_now}
+        authorize_request:
+          direction: inbound
+          frame_type: call
+          action: Authorize
+          payload:
+            idTag: "#attr(last_id_tag)"
+        authorize_response:
+          direction: outbound
+          frame_type: call_result
+          action: Authorize
+          payload:
+            idTagInfo.status: "#attr(k__authorization_status)"
+        start_transaction_request:
+          direction: inbound
+          frame_type: call
+          action: StartTransaction
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            idTag: "#attr(last_id_tag)"
+            meterStart: "#attr(last_meter_start_wh)"
+            timestamp: "#attr(last_transaction_timestamp)"
+        start_transaction_response:
+          direction: outbound
+          frame_type: call_result
+          action: StartTransaction
+          payload:
+            transactionId:
+              attribute: "#attr(last_transaction_id)"
+              metadata: {generator: transaction_id}
+            idTagInfo.status: "#attr(k__authorization_status)"
+        stop_transaction_request:
+          direction: inbound
+          frame_type: call
+          action: StopTransaction
+          payload:
+            transactionId: "#attr(last_transaction_id)"
+            idTag: "#attr(last_id_tag)"
+            meterStop: "#attr(last_meter_stop_wh)"
+            timestamp: "#attr(last_transaction_timestamp)"
+            reason: "#attr(last_stop_reason)"
+        stop_transaction_response:
+          direction: outbound
+          frame_type: call_result
+          action: StopTransaction
+          payload:
+            idTagInfo.status: "#attr(k__authorization_status)"
+        status_notification_request:
+          direction: inbound
+          frame_type: call
+          action: StatusNotification
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            status: "#attr(last_connector_status)"
+            errorCode: "#attr(last_error_code)"
+            info: "#attr(last_status_info)"
+            vendorId: "#attr(last_vendor_id)"
+        status_notification_response:
+          direction: outbound
+          frame_type: call_result
+          action: StatusNotification
+          payload: {}
+        meter_values_request:
+          direction: inbound
+          frame_type: call
+          action: MeterValues
+          payload:
+            connectorId: "#attr(last_connector_id)"
+            transactionId: "#attr(last_transaction_id)"
+            meterValue: "#attr(last_meter_values)"
+        meter_values_response:
+          direction: outbound
+          frame_type: call_result
+          action: MeterValues
+          payload: {}
+
+scenarios:
+  accept_evse:
+    enabled: false
+    display_name: "Accept EVSE Registration"
+    description: Accept the charge-point boot request with the nominal heartbeat interval.
+    duration: 15.0
+    overrides:
+      $in(registration_status): "Accepted"
+      $in(heartbeat_interval_s): 30
+  reject_evse:
+    enabled: false
+    display_name: "Reject EVSE Registration"
+    description: Reject the boot request to exercise charge-point onboarding failure handling.
+    duration: 10.0
+    overrides:
+      $in(registration_status): "Rejected"
+      $in(heartbeat_interval_s): 0
+  fast_heartbeat:
+    enabled: false
+    display_name: "Fast Heartbeat"
+    description: Shorten the heartbeat interval for a more chatty demo session.
+    duration: 20.0
+    overrides:
+      $in(heartbeat_interval_s): 10

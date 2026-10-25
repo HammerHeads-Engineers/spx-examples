@@ -1,0 +1,137 @@
+# SPDX-License-Identifier: MIT
+name: siglent_spd1000x__scpi
+description: |
+  Siglent SPD1000X series single-channel programmable DC power supply driven by
+  SCPI (ASCII/TCP). Exposes voltage/current setpoints, output state, and basic
+  measurements for lab automation workflows.
+
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  idn:
+    type: str
+    default: "SIGLENT,SPD1000X,SPD1000X0000000,1.01"
+
+  k__selected_output:
+    type: str
+    default: "CH1"
+
+  k__ch1_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch1_current_limit_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch1_output_state:
+    type: int
+    default: 0
+
+  ch1_voltage_readback_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch1_current_readback_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch1_power_readback_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  system_status:
+    type: int
+    default: 0
+  system_version:
+    type: str
+    default: "1.00"
+  error_status:
+    type: str
+    default: '0,"No error"'
+
+actions:
+  - function: $in(ch1_voltage_readback_v)
+    name: update_ch1_voltage
+    description: Mirror channel 1 set voltage when the output is enabled.
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_current_readback_a)
+    name: update_ch1_current
+    description: Mirror channel 1 current limit as measured current when enabled.
+    call: ($in(k__ch1_current_limit_a) if $in(k__ch1_output_state) == 1 else 0.0)
+  - function: $in(ch1_power_readback_w)
+    name: update_ch1_power
+    description: Compute instantaneous output power from the measured voltage and current.
+    call: ($in(ch1_voltage_readback_v) * $in(ch1_current_readback_a))
+  - function: $in(system_status)
+    name: update_system_status
+    description: Publish a simple system status bit reflecting output enable state.
+    call: (1 if $in(k__ch1_output_state) == 1 else 0)
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        ":SYSTem:ERRor?":
+          name: query_system_error
+          response: "#out(error_status)"
+        ":SYSTem:VERSion?":
+          name: query_system_version
+          response: "#out(system_version)"
+        ":SYSTem:STATus?":
+          name: query_system_status
+          response: "#out(system_status)"
+
+        ":INSTrument CH1":
+          name: select_channel_1
+          "#attr(k__selected_output)": "CH1"
+          response: "OK"
+        ":INSTrument?":
+          name: query_selected_channel
+          response: "#out(k__selected_output)"
+
+        "CH1:VOLTage {voltage}":
+          name: set_channel_1_voltage
+          response: null
+          "#attr(k__ch1_voltage_set_v)": "voltage"
+        "CH1:VOLTage?":
+          name: query_channel_1_voltage
+          response: "#out(k__ch1_voltage_set_v)"
+
+        "CH1:CURRent {current}":
+          name: set_channel_1_current_limit
+          response: null
+          "#attr(k__ch1_current_limit_a)": "current"
+        "CH1:CURRent?":
+          name: query_channel_1_current_limit
+          response: "#out(k__ch1_current_limit_a)"
+
+        ":OUTPut CH1,ON":
+          name: enable_channel_1_output
+          response: null
+          "#attr(k__ch1_output_state)": 1
+        ":OUTPut CH1,OFF":
+          name: disable_channel_1_output
+          response: null
+          "#attr(k__ch1_output_state)": 0
+
+        ":MEASure:VOLTage? CH1":
+          name: query_channel_1_voltage_readback
+          response: "#out(ch1_voltage_readback_v)"
+        ":MEASure:CURRent? CH1":
+          name: query_channel_1_current_readback
+          response: "#out(ch1_current_readback_a)"
+        ":MEASure:POWEr? CH1":
+          name: query_channel_1_power_readback
+          response: "#out(ch1_power_readback_w)"

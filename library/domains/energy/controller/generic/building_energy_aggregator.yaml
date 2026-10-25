@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: MIT
+
+name: building_energy_aggregator
+description: |
+  Building-level dynamic load aggregator for Smart Building Pack. It sums
+  instantaneous electrical demand from HVAC, lighting, blind motors, and other
+  optional building subsystems, then exposes a single dynamic load that can be
+  fed into the main building meter and ESS.
+
+attributes:
+  k__hvac_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  k__lighting_load_w:
+    type: float
+    default: 0.0
+    unit: W
+  k__blind_motor_load_w:
+    type: float
+    default: 0.0
+    unit: W
+  k__other_dynamic_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+
+  lighting_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  blind_motor_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  total_dynamic_load_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  total_dynamic_load_w:
+    type: float
+    default: 0.0
+    unit: W
+  active_subsystem_count:
+    type: int
+    default: 0
+
+actions:
+  - function: $in(lighting_load_kw)
+    name: compute_lighting_load_kw
+    description: Convert instantaneous lighting load from watts to kilowatts.
+    call: max(0.0, $in(k__lighting_load_w)) / 1000.0
+
+  - function: $in(blind_motor_load_kw)
+    name: compute_blind_motor_load_kw
+    description: Convert aggregate blind motor load from watts to kilowatts.
+    call: max(0.0, $in(k__blind_motor_load_w)) / 1000.0
+
+  - function: $in(total_dynamic_load_kw)
+    name: compute_total_dynamic_load_kw
+    description: Sum dynamic building loads coming from active subsystems.
+    call: max(0.0, $in(k__hvac_load_kw)) + max(0.0, $in(lighting_load_kw)) + max(0.0, $in(blind_motor_load_kw)) + max(0.0, $in(k__other_dynamic_load_kw))
+
+  - function: $in(total_dynamic_load_w)
+    name: compute_total_dynamic_load_w
+    description: Expose aggregate dynamic building load in watts.
+    call: $in(total_dynamic_load_kw) * 1000.0
+
+  - function: $in(active_subsystem_count)
+    name: compute_active_subsystem_count
+    description: Count currently active subsystems contributing to dynamic building load.
+    call: (1 if $in(k__hvac_load_kw) > 0.01 else 0) + (1 if $in(k__lighting_load_w) > 1.0 else 0) + (1 if $in(k__blind_motor_load_w) > 1.0 else 0) + (1 if $in(k__other_dynamic_load_kw) > 0.01 else 0)
+
+scenarios:
+  evening_occupied:
+    display_name: Evening Occupied
+    description: HVAC, lighting, and occasional blind motion contribute to building load.
+    duration: 30.0
+    overrides:
+      $in(k__hvac_load_kw): 1.8
+      $in(k__lighting_load_w): 240.0
+      $in(k__blind_motor_load_w): 150.0
+
+  sunny_midday:
+    display_name: Sunny Midday
+    description: Small HVAC load with no lighting and no moving blinds.
+    duration: 30.0
+    overrides:
+      $in(k__hvac_load_kw): 0.4
+      $in(k__lighting_load_w): 0.0
+      $in(k__blind_motor_load_w): 0.0

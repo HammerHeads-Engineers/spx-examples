@@ -1,0 +1,339 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
+# See the accompanying LICENSE file for terms.
+
+name: environment_sensor__lwm2m
+description: >
+  LwM2M-driven environmental sensor that registers against a Leshan server and
+  exposes temperature, humidity, comfort, and HVAC control resources over CoAP.
+
+meta_parameters:
+  lwm2m_local_port:
+    type: int
+    default: 0
+  lwm2m_endpoint:
+    type: str
+    default: "generic-lwm2m-env-001"
+  lwm2m_server_host:
+    type: str
+    default: leshan-server
+  lwm2m_server_port:
+    type: int
+    default: 5683
+  # Legacy parameter retained for existing instance configurations; device identity uses lwm2m_endpoint.
+  lwm2m_server_endpoint:
+    type: str
+    default: leshan
+
+attributes:
+  # Temperature state [degC]
+  k__temperature_c:
+    type: float
+    default: 22.5
+    unit: degC
+  ambient_c:
+    type: float
+    default: 20.5
+    unit: degC
+  k__target_c:
+    type: float
+    default: 22.0
+    unit: degC
+  temperature_min_c:
+    type: float
+    default: 21.0
+    unit: degC
+  temperature_max_c:
+    type: float
+    default: 24.5
+    unit: degC
+
+  # Humidity and comfort telemetry
+  k__humidity_percent:
+    type: float
+    default: 45.0
+    unit: percent
+  humidity_target:
+    type: float
+    default: 47.0
+    unit: percent
+  humidity_min_percent:
+    type: float
+    default: 40.0
+    unit: percent
+  humidity_max_percent:
+    type: float
+    default: 55.0
+    unit: percent
+  k__comfort_index:
+    type: float
+    default: 92.0
+    unit: score
+
+  # HVAC state and occupancy
+  k__hvac_mode:
+    type: str
+    default: "auto"
+  k__fan_speed_percent:
+    type: float
+    default: 32.0
+    unit: percent
+  k__fan_speed_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_speed_adjusted_target:
+    type: float
+    default: 35.0
+    unit: percent
+  fan_slew_rate:
+    type: float
+    default: 4.0
+  k__occupancy_count:
+    type: float
+    default: 3.0
+    unit: count
+  k__occupancy_target:
+    type: float
+    default: 3.0
+    unit: count
+
+  # Status helpers
+  k__status_text:
+    type: str
+    default: "IDLE"
+  current_timestamp:
+    type: str
+    default: "2025-01-01T12:00:00Z"
+  lwm2m_connected:
+    type: int
+    default: 0
+  lwm2m_request_counter:
+    type: int
+    default: 0
+
+  _lwm2m_manufacturer:
+    type: str
+    default: "Hammerheads Engineers"
+  _lwm2m_model_number:
+    type: str
+    default: "generic-lwm2m-env"
+  _lwm2m_time_s:
+    type: int
+    default: 1735732800
+    unit: s
+
+actions:
+  - function: $in(lwm2m_connected)
+    name: read_registration_diagnostic
+    call: int($attr(communication.lwm2m.registered))
+  - function: $in(lwm2m_request_counter)
+    name: read_resource_operation_counter
+    call: int($attr(communication.lwm2m.request_counter))
+  - function: $in(_lwm2m_time_s)
+    name: encode_lwm2m_timestamp
+    imports: {datetime: datetime}
+    call: int(datetime.datetime.fromisoformat($in(current_timestamp).replace("Z", "+00:00")).timestamp())
+  - function: $in(k__temperature_c)
+    name: update_temperature
+    description: Glide the temperature toward the setpoint with ambient influence.
+    heating_gain: 0.12
+    cooling_gain: 0.09
+    ambient_gain: 0.04
+    occupancy_gain: 0.018
+    call: (
+          $in(k__temperature_c)
+          + ambient_gain * ($in(ambient_c) - $in(k__temperature_c))
+          + occupancy_gain * max(0.0, $in(k__occupancy_count) - 1.0)
+          + heating_gain * max(0.0, $in(k__target_c) - $in(k__temperature_c))
+          - cooling_gain * max(0.0, $in(k__temperature_c) - $in(k__target_c))
+        )
+
+  - function: $in(temperature_min_c)
+    name: capture_min_temperature
+    description: Track the minimum observed temperature for the current session.
+    call: min($in(temperature_min_c), $in(k__temperature_c))
+
+  - function: $in(temperature_max_c)
+    name: capture_max_temperature
+    description: Track the maximum observed temperature for the current session.
+    call: max($in(temperature_max_c), $in(k__temperature_c))
+
+  - function: $in(k__humidity_percent)
+    name: update_humidity
+    description: Blend humidity toward the target with occupant contribution.
+    recovery_gain: 0.06
+    occupant_gain: 0.025
+    call: max(
+          15.0,
+          min(
+            95.0,
+            $in(k__humidity_percent)
+            + recovery_gain * ($in(humidity_target) - $in(k__humidity_percent))
+            + occupant_gain * max(0.0, $in(k__occupancy_count) - 1.0)
+          )
+        )
+
+  - function: $in(k__comfort_index)
+    name: compute_comfort_index
+    description: Collapse deviations into a 0-100 score (100 = best comfort).
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0
+            - 10.0 * abs($in(k__target_c) - $in(k__temperature_c))
+            - 2.5 * abs($in(humidity_target) - $in(k__humidity_percent))
+          )
+        )
+
+  - function: $in(fan_speed_adjusted_target)
+    name: compute_fan_speed_adjusted_target
+    description: Increase fan demand when temperature exceeds the setpoint.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            $in(k__fan_speed_target)
+            + max(-25.0, min(25.0, 2.5 * ($in(k__temperature_c) - $in(k__target_c))))
+          )
+        )
+
+  - function: $in(k__fan_speed_percent)
+    name: slew_fan_speed
+    description: Rate-limit fan speed adjustments derived from remote commands.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            (
+              $in(fan_speed_adjusted_target)
+              if abs($in(fan_speed_adjusted_target) - $in(k__fan_speed_percent)) <= $in(fan_slew_rate)
+              else (
+                $in(k__fan_speed_percent)
+                + (
+                    $in(fan_slew_rate)
+                    if $in(fan_speed_adjusted_target) > $in(k__fan_speed_percent)
+                    else -$in(fan_slew_rate)
+                  )
+              )
+            )
+          )
+        )
+
+  - function: $in(k__status_text)
+    name: update_status
+    description: Provide a textual status reflecting target tracking and connectivity.
+    call: (
+          "DISCONNECTED" if $in(lwm2m_connected) == 0
+          else (
+            "HEATING" if $in(k__target_c) - $in(k__temperature_c) > 0.6
+            else ("COOLING" if $in(k__temperature_c) - $in(k__target_c) > 0.6 else "IDLE")
+          )
+        )
+
+communication:
+- lwm2m:
+    description: Register and serve resources from the same local CoAP endpoint.
+    port: $param(lwm2m_local_port)
+    server:
+      host: $param(lwm2m_server_host)
+      port: $param(lwm2m_server_port)
+      endpoint: $param(lwm2m_endpoint)
+      lifetime: 120
+    bindings:
+    - name: query_manufacturer
+      path: 3/0/0
+      operation: read
+      read_attribute: '#attr(_lwm2m_manufacturer)'
+      content_format: text/plain
+    - name: query_model_number
+      path: 3/0/1
+      operation: read
+      read_attribute: '#attr(_lwm2m_model_number)'
+      content_format: text/plain
+    - name: query_current_time
+      path: 3/0/13
+      operation: read
+      read_attribute: '#attr(_lwm2m_time_s)'
+      content_format: text/plain
+    - name: query_temperature_c
+      path: 3303/0/5700
+      operation: read
+      read_attribute: '#attr(k__temperature_c)'
+      content_format: text/plain
+    - name: query_temperature_min
+      path: 3303/0/5601
+      operation: read
+      read_attribute: '#attr(temperature_min_c)'
+      content_format: text/plain
+    - name: query_temperature_max
+      path: 3303/0/5602
+      operation: read
+      read_attribute: '#attr(temperature_max_c)'
+      content_format: text/plain
+    - name: query_humidity_percent
+      path: 3304/0/5700
+      operation: read
+      read_attribute: '#attr(k__humidity_percent)'
+      content_format: text/plain
+    - name: query_humidity_min
+      path: 3304/0/5601
+      operation: read
+      read_attribute: '#attr(humidity_min_percent)'
+      content_format: text/plain
+    - name: query_humidity_max
+      path: 3304/0/5602
+      operation: read
+      read_attribute: '#attr(humidity_max_percent)'
+      content_format: text/plain
+    - name: query_temperature_setpoint
+      path: 3308/0/5900
+      operation: read
+      read_attribute: '#attr(k__target_c)'
+      content_format: text/plain
+    - name: set_temperature_setpoint
+      path: 3308/0/5900
+      operation: write
+      write_attribute: '#attr(k__target_c)'
+      content_format: text/plain
+    - name: query_hvac_mode
+      path: 3308/0/5903
+      operation: read
+      read_attribute: '#attr(k__hvac_mode)'
+      content_format: text/plain
+    - name: set_hvac_mode
+      path: 3308/0/5903
+      operation: write
+      write_attribute: '#attr(k__hvac_mode)'
+      content_format: text/plain
+    - name: query_fan_speed_command
+      path: 3340/0/5851
+      operation: read
+      read_attribute: '#attr(k__fan_speed_target)'
+      content_format: text/plain
+    - name: set_fan_speed_command
+      path: 3340/0/5851
+      operation: write
+      write_attribute: '#attr(k__fan_speed_target)'
+      content_format: text/plain
+    - name: query_fan_speed_percent
+      path: 3340/0/5900
+      operation: read
+      read_attribute: '#attr(k__fan_speed_percent)'
+      content_format: text/plain
+    - name: query_lwm2m_connected
+      path: 3342/0/5500
+      operation: read
+      read_attribute: '#attr(lwm2m_connected)'
+      content_format: text/plain
+
+scenarios:
+  lwm2m_reconnect:
+    name: LwM2M Reconnect
+    display_name: "LwM2M Reconnect"
+    description: Temporarily stops the LwM2M client to exercise reconnect handling.
+    duration: 3.0
+    call:
+      path: communication.lwm2m.stop
+      stop_path: communication.lwm2m.start

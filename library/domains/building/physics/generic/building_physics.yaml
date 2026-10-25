@@ -1,0 +1,367 @@
+# SPDX-License-Identifier: MIT
+
+name: building_physics
+description: |
+  Central Smart Building Pack physics model. It represents the simplified
+  building envelope, occupancy, daylight, solar gain, HVAC demand, lighting
+  demand, and utility-demand factors that connect weather, KNX blind feedback,
+  HVAC, energy, and utility-meter simulations through SPX Connections.
+
+attributes:
+  k__outdoor_temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+  k__brightness_lux:
+    type: float
+    default: 20000.0
+    unit: lux
+  k__occupancy_count:
+    type: int
+    default: 2
+  k__blind_position_pct:
+    type: float
+    default: 35.0
+    unit: "%"
+  k__hvac_setpoint_c:
+    type: float
+    default: 21.0
+    unit: degC
+  k__thermal_mass_kwh_c:
+    type: float
+    default: 9.0
+    unit: kWh/degC
+  k__heat_loss_w_per_c:
+    type: float
+    default: 180.0
+    unit: W/degC
+  k__solar_gain_max_w:
+    type: float
+    default: 3200.0
+    unit: W
+  k__internal_base_gain_w:
+    type: float
+    default: 450.0
+    unit: W
+  k__occupant_heat_gain_w:
+    type: float
+    default: 90.0
+    unit: W/person
+  k__hvac_capacity_w:
+    type: float
+    default: 5200.0
+    unit: W
+  k__hvac_response_w_per_c:
+    type: float
+    default: 1600.0
+    unit: W/degC
+  k__hvac_heating_cop:
+    type: float
+    default: 2.7
+  k__hvac_cooling_cop:
+    type: float
+    default: 3.2
+  k__daylight_reference_lux:
+    type: float
+    default: 60000.0
+    unit: lux
+  k__lighting_full_daylight_lux:
+    type: float
+    default: 18000.0
+    unit: lux
+  k__water_heat_threshold_c:
+    type: float
+    default: 24.0
+    unit: degC
+  k__water_heat_gain_l_min_per_c:
+    type: float
+    default: 0.55
+    unit: L/min/degC
+  k__water_occupancy_gain_l_min:
+    type: float
+    default: 0.45
+    unit: L/min/person
+  k__max_weather_water_boost_l_min:
+    type: float
+    default: 8.0
+    unit: L/min
+
+  indoor_temperature_c:
+    type: float
+    default: 21.0
+    unit: degC
+  daylight_factor_pct:
+    type: float
+    default: 30.0
+    unit: "%"
+  solar_heat_gain_w:
+    type: float
+    default: 600.0
+    unit: W
+  occupancy_heat_gain_w:
+    type: float
+    default: 180.0
+    unit: W
+  thermal_loss_w:
+    type: float
+    default: 180.0
+    unit: W
+  passive_heat_balance_w:
+    type: float
+    default: 1050.0
+    unit: W
+  hvac_heat_demand_w:
+    type: float
+    default: 0.0
+    unit: W
+  hvac_cooling_demand_w:
+    type: float
+    default: 0.0
+    unit: W
+  hvac_electric_power_kw:
+    type: float
+    default: 0.0
+    unit: kW
+  hvac_electric_power_w:
+    type: float
+    default: 0.0
+    unit: W
+  lighting_demand_pct:
+    type: float
+    default: 70.0
+    unit: "%"
+  solar_shading_need_pct:
+    type: float
+    default: 25.0
+    unit: "%"
+  ventilation_demand_pct:
+    type: float
+    default: 35.0
+    unit: "%"
+  water_demand_boost_l_min:
+    type: float
+    default: 0.9
+    unit: L/min
+  gas_demand_m3_h:
+    type: float
+    default: 0.22
+    unit: m3/h
+  comfort_score_pct:
+    type: float
+    default: 95.0
+    unit: "%"
+  cycle_time_s:
+    type: float
+    default: 30.0
+    unit: s
+
+timer:
+  time_step: 1.0
+
+actions:
+  - function: $in(daylight_factor_pct)
+    name: compute_daylight_factor
+    description: Estimate useful daylight after blinds attenuate outdoor brightness.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            ($in(k__brightness_lux) / max(1.0, $in(k__daylight_reference_lux)))
+            * (100.0 - max(0.0, min(100.0, $in(k__blind_position_pct))))
+          )
+        )
+
+  - function: $in(solar_heat_gain_w)
+    name: compute_solar_heat_gain
+    description: Convert daylight and blind position into approximate solar heat gain.
+    call: max(
+          0.0,
+          $in(k__solar_gain_max_w)
+          * min(1.0, max(0.0, $in(k__brightness_lux)) / max(1.0, $in(k__daylight_reference_lux)))
+          * (100.0 - max(0.0, min(100.0, $in(k__blind_position_pct)))) / 100.0
+        )
+
+  - function: $in(occupancy_heat_gain_w)
+    name: compute_occupancy_heat_gain
+    description: Approximate internal heat gains from occupants.
+    call: max(0.0, $in(k__occupancy_count)) * max(0.0, $in(k__occupant_heat_gain_w))
+
+  - function: $in(thermal_loss_w)
+    name: compute_envelope_heat_loss
+    description: Signed envelope heat loss; negative value means outdoor heat gain.
+    call: ($in(indoor_temperature_c) - $in(k__outdoor_temperature_c)) * max(0.0, $in(k__heat_loss_w_per_c))
+
+  - function: $in(passive_heat_balance_w)
+    name: compute_passive_heat_balance
+    description: Heat balance before active HVAC response.
+    call: $in(solar_heat_gain_w) + $in(occupancy_heat_gain_w) + $in(k__internal_base_gain_w) - $in(thermal_loss_w)
+
+  - function: $in(hvac_heat_demand_w)
+    name: compute_heating_demand
+    description: Heating demand needed to move indoor temperature toward setpoint.
+    call: min(
+          max(0.0, $in(k__hvac_capacity_w)),
+          max(0.0, $in(k__hvac_setpoint_c) - $in(indoor_temperature_c))
+          * max(0.0, $in(k__hvac_response_w_per_c))
+        )
+
+  - function: $in(hvac_cooling_demand_w)
+    name: compute_cooling_demand
+    description: Cooling demand needed to move indoor temperature toward setpoint.
+    call: min(
+          max(0.0, $in(k__hvac_capacity_w)),
+          max(0.0, $in(indoor_temperature_c) - $in(k__hvac_setpoint_c))
+          * max(0.0, $in(k__hvac_response_w_per_c))
+        )
+
+  - function: $in(hvac_electric_power_kw)
+    name: compute_hvac_electric_power
+    description: Approximate HVAC electrical load from thermal demand and COP.
+    call: (
+          max(0.0, $in(hvac_heat_demand_w)) / max(0.1, $in(k__hvac_heating_cop))
+          + max(0.0, $in(hvac_cooling_demand_w)) / max(0.1, $in(k__hvac_cooling_cop))
+        ) / 1000.0
+
+  - function: $in(hvac_electric_power_w)
+    name: compute_hvac_electric_power_w
+    description: Expose HVAC electrical load in watts for ESS models.
+    call: $in(hvac_electric_power_kw) * 1000.0
+
+  - function: $in(indoor_temperature_c)
+    name: integrate_indoor_temperature
+    description: Advance indoor temperature using envelope balance and active HVAC response.
+    call: max(
+          -20.0,
+          min(
+            55.0,
+            $in(indoor_temperature_c)
+            + (
+              $in(passive_heat_balance_w)
+              + $in(hvac_heat_demand_w)
+              - $in(hvac_cooling_demand_w)
+            )
+            * $in(cycle_time_s)
+            / (max(0.1, $in(k__thermal_mass_kwh_c)) * 3600000.0)
+          )
+        )
+
+  - function: $in(lighting_demand_pct)
+    name: compute_lighting_demand
+    description: Estimate outdoor lighting demand from available daylight.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0
+            - (
+              max(0.0, $in(k__brightness_lux))
+              / max(1.0, $in(k__lighting_full_daylight_lux))
+              * 100.0
+            )
+          )
+        )
+
+  - function: $in(solar_shading_need_pct)
+    name: compute_solar_shading_need
+    description: |
+      Estimate how strongly the building would benefit from solar shading based
+      on sun exposure and overheating tendency. This is a physics-side signal,
+      not a direct blind command.
+    call: (
+          max(
+            0.0,
+            min(
+              100.0,
+              max(0.0, $in(k__brightness_lux) - 12000.0) / 68000.0 * 60.0
+              + max(0.0, $in(k__outdoor_temperature_c) - 22.0) * 2.5
+              + max(0.0, $in(indoor_temperature_c) - $in(k__hvac_setpoint_c)) * 12.0
+            )
+          )
+        )
+
+  - function: $in(ventilation_demand_pct)
+    name: compute_ventilation_demand
+    description: Estimate ventilation demand from occupancy.
+    call: max(20.0, min(100.0, 20.0 + max(0.0, $in(k__occupancy_count)) * 12.0))
+
+  - function: $in(water_demand_boost_l_min)
+    name: compute_water_demand_boost
+    description: Combine occupancy and hot sunny weather into water demand boost.
+    call: min(
+          max(0.0, $in(k__max_weather_water_boost_l_min)),
+          max(0.0, $in(k__occupancy_count)) * max(0.0, $in(k__water_occupancy_gain_l_min))
+          + (
+            1
+            if $in(k__brightness_lux) >= 10000.0
+            else 0
+          )
+          * max(0.0, $in(k__outdoor_temperature_c) - $in(k__water_heat_threshold_c))
+          * max(0.0, $in(k__water_heat_gain_l_min_per_c))
+        )
+
+  - function: $in(gas_demand_m3_h)
+    name: compute_gas_demand
+    description: Estimate domestic gas demand from occupancy, hot-water use, and backup winter heating.
+    call: min(
+          2.5,
+          0.05
+          + max(0.0, $in(k__occupancy_count)) * 0.03
+          + max(0.0, $in(water_demand_boost_l_min)) * 0.018
+          + max(0.0, $in(hvac_heat_demand_w)) / 1000.0 * 0.11
+        )
+
+  - function: $in(comfort_score_pct)
+    name: compute_comfort_score
+    description: Simple comfort score based on distance from HVAC setpoint.
+    call: max(
+          0.0,
+          min(
+            100.0,
+            100.0 - abs($in(indoor_temperature_c) - $in(k__hvac_setpoint_c)) * 12.0
+          )
+        )
+
+scenarios:
+  winter_occupied:
+    display_name: Winter Occupied
+    description: Cold occupied day with low solar gain and heating demand.
+    duration: 30.0
+    overrides:
+      $in(k__outdoor_temperature_c): -6.0
+      $in(k__brightness_lux): 15000.0
+      $in(k__occupancy_count): 3
+      $in(k__blind_position_pct): 20.0
+      $in(k__hvac_setpoint_c): 21.5
+
+  summer_sunny:
+    display_name: Summer Sunny
+    description: Hot sunny day with blinds partly closed, cooling and water demand.
+    duration: 30.0
+    overrides:
+      $in(k__outdoor_temperature_c): 32.0
+      $in(k__brightness_lux): 85000.0
+      $in(k__occupancy_count): 2
+      $in(k__blind_position_pct): 65.0
+      $in(k__hvac_setpoint_c): 22.0
+
+  night_unoccupied:
+    display_name: Night Unoccupied
+    description: Empty building at night with no lighting or water demand.
+    duration: 30.0
+    overrides:
+      $in(k__outdoor_temperature_c): 12.0
+      $in(k__brightness_lux): 0.0
+      $in(k__occupancy_count): 0
+      $in(k__blind_position_pct): 90.0
+      $in(k__hvac_setpoint_c): 19.0
+
+  weekend_day:
+    display_name: Weekend Day
+    description: Occupied mild day with moderate daylight and utility demand.
+    duration: 30.0
+    overrides:
+      $in(k__outdoor_temperature_c): 20.0
+      $in(k__brightness_lux): 35000.0
+      $in(k__occupancy_count): 4
+      $in(k__blind_position_pct): 35.0
+      $in(k__hvac_setpoint_c): 21.0

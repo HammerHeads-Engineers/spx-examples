@@ -1,0 +1,27 @@
+name: Models and MCP
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry==2.2.1
+          poetry install --with dev --no-interaction
+      - name: Validate models and catalog
+        run: poetry run python tools/validate_models.py
+      - name: Run unit tests
+        run: poetry run pytest -q tests/core/unit tests/mcp/unit tests/packs/*/unit

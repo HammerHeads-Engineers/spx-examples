@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Advanced thermal controller without protocol bindings.
+# Uses FunctionAction imports/params to reduce duplication and improve physics fidelity.
+attributes:
+  # core state
+  setpoint: 0.1
+  spx_sdk_version: ""
+conditions:
+  - if: not $attr(spx_sdk_version)
+    actions:
+      - function: $in(spx_sdk_version)
+        imports: {spx_sdk: spx_sdk}
+        call: (print(f"[spx_sdk_version] v={spx_sdk.__version__}"), spx_sdk.__version__)[1]
+  - if: $attr(setpoint) < 2.5
+    actions:
+      - function: $in(setpoint)
+        call: (print(f"[print_time_test][phase1]"), $in(setpoint))[1]
+  - if: $attr(setpoint) >= 2.5
+    actions:
+      - function: $in(setpoint)
+        call: (print(f"[print_time_test][phase2]"), $in(setpoint))[1]

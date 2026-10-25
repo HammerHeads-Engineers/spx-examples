@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: MIT
+
+name: temperature_sensor__ble_gatt
+description: >
+  Minimal BLE GATT temperature sensor exposing a measured temperature together
+  with a writable setpoint characteristic for mobile-app or firmware tests.
+
+meta_parameters:
+  ble_adapter_base_url:
+    type: str
+    default: http://host.docker.internal:8085
+  ble_device_name:
+    type: str
+    default: "SpX Temperature Sensor"
+
+attributes:
+  temperature:
+    type: float
+    default: 22.5
+    unit: degC
+  setpoint:
+    type: float
+    default: 24.0
+    unit: degC
+
+communication:
+  - ble:
+      adapter:
+        baseUrl: "$param(ble_adapter_base_url)"
+      device:
+        name: "$param(ble_device_name)"
+      codecs:
+        celsius:
+          format: utf8
+      bindings:
+        temperature:
+          attribute: $out(temperature)
+          codecRef: celsius
+        setpoint:
+          attribute: $in(setpoint)
+          codecRef: celsius
+          stateKey: setpointC
+      services:
+        - uuid: "181a"
+          name: Environmental Sensing
+          characteristics:
+            - uuid: "2a6e"
+              name: Temperature
+              binding: temperature
+              properties: [read, notify]
+              notify:
+                triggers: [state]
+            - uuid: "f0c09111-8b3a-4e69-bdd0-9f0f613d1a90"
+              name: Setpoint
+              binding: setpoint
+              properties: [read, write, notify]
+              notify:
+                triggers: [state]
+              onWrite:
+                - action: parse
+                  type: float
+                  target: state
+                  key: setpointC
+                - action: log
+                  template: "[BLE] Setpoint -> {{value}}"

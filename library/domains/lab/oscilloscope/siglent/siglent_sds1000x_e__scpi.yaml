@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: MIT
+name: siglent_sds1000x_e__scpi
+description: |
+  Virtual Siglent SDS1000X-E series oscilloscope exposing a subset of the
+  SCPI (ASCII/TCP) command set for channel setup and measurement queries.
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  k__channel_1_scale_v:
+    type: float
+    default: 1.0
+    unit: V
+  k__channel_1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__timebase_scale_s:
+    type: float
+    default: 0.001
+    unit: s
+  k__trigger_level_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_vpp_v:
+    type: float
+    default: 2.0
+    unit: V
+  channel1_vrms_v:
+    type: float
+    default: 0.7071
+    unit: V
+  channel1_vavg_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_freq_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  channel1_period_s:
+    type: float
+    default: 0.001
+    unit: s
+  idn:
+    type: str
+    default: "SIGLENT,SDS1000X-E,SDS1XE0000000,1.0"
+
+actions:
+  - function: $in(channel1_period_s)
+    name: update_period
+    description: Recompute period from the current channel 1 frequency.
+    params:
+      min_freq_hz: 0.1
+    call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
+  - function: $in(channel1_vrms_v)
+    name: update_vrms
+    description: Approximate RMS voltage from the configured channel 1 Vpp amplitude.
+    params:
+      scale: 0.353553
+    call: $in(channel1_vpp_v) * scale
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        "C1:VDIV?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
+        "C1:VDIV {scale}":
+          name: set_channel_1_scale
+          "#attr(k__channel_1_scale_v)": "scale"
+          response: "OK"
+        "C1:OFST?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
+        "C1:OFST {offset}":
+          name: set_channel_1_offset
+          "#attr(k__channel_1_offset_v)": "offset"
+          response: "OK"
+        "TDIV?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
+        "TDIV {scale}":
+          name: set_timebase_scale
+          "#attr(k__timebase_scale_s)": "scale"
+          response: "OK"
+        "TRLV?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
+        "TRLV {level}":
+          name: set_trigger_level
+          "#attr(k__trigger_level_v)": "level"
+          response: "OK"
+        "C1:PAVA? PKPK":
+          name: query_channel_1_vpp
+          response: "#out(channel1_vpp_v)"
+        "C1:PAVA? RMS":
+          name: query_channel_1_vrms
+          response: "#out(channel1_vrms_v)"
+        "C1:PAVA? MEAN":
+          name: query_channel_1_vavg
+          response: "#out(channel1_vavg_v)"
+        "C1:PAVA? FREQ":
+          name: query_channel_1_frequency
+          response: "#out(channel1_freq_hz)"
+        "C1:PAVA? PER":
+          name: query_channel_1_period
+          response: "#out(channel1_period_s)"
+
+scenarios:
+  amplitude_sweep:
+    display_name: "Amplitude Sweep"
+    description: "Slowly ramp channel 1 amplitude for lab demos."
+    period: 0.2
+    actions:
+      - function: $in(channel1_vpp_v)
+        params:
+          min_vpp: 0.5
+          max_vpp: 5.0
+          step_vpp: 0.1
+        call: |
+          (lambda v, min_vpp, max_vpp, step_vpp:
+            min_vpp if v >= max_vpp else v + step_vpp
+          )($in(channel1_vpp_v), min_vpp, max_vpp, step_vpp)
+      - function: $in(channel1_vrms_v)
+        params:
+          scale: 0.353553
+        call: $in(channel1_vpp_v) * scale

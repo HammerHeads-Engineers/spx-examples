@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: MIT
+name: siglent_ssa3000x__scpi
+description: |
+  Virtual Siglent SSA3000X series spectrum analyzer exposing a subset of the
+  SCPI (ASCII/TCP) command set for center frequency, span, reference level,
+  and marker readback queries.
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  idn:
+    type: str
+    default: "SIGLENT,SSA3000X,SSA3X0000000,1.0"
+
+  k__center_frequency_hz:
+    type: float
+    default: 1000000000.0
+    unit: Hz
+  k__span_hz:
+    type: float
+    default: 10000000.0
+    unit: Hz
+  k__reference_level_dbm:
+    type: float
+    default: -20.0
+    unit: dBm
+  k__marker_1_enabled:
+    type: int
+    default: 1
+
+  marker_1_level_dbm:
+    type: float
+    default: -50.0
+    unit: dBm
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+
+        ":SENSe:FREQuency:CENTer?":
+          name: query_center_frequency
+          response: "#out(k__center_frequency_hz)"
+        ":SENSe:FREQuency:CENTer {frequency}":
+          name: set_center_frequency
+          "#attr(k__center_frequency_hz)": "frequency"
+          response: "OK"
+
+        ":SENSe:FREQuency:SPAN?":
+          name: query_span
+          response: "#out(k__span_hz)"
+        ":SENSe:FREQuency:SPAN {span}":
+          name: set_span
+          "#attr(k__span_hz)": "span"
+          response: "OK"
+
+        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel?":
+          name: query_reference_level
+          response: "#out(k__reference_level_dbm)"
+        ":DISPlay:WINDow:TRACe:Y:SCALe:RLEVel {level}":
+          name: set_reference_level
+          "#attr(k__reference_level_dbm)": "level"
+          response: "OK"
+
+        ":CALCulate:MARKer1:STATe?":
+          name: query_marker_1_enabled
+          response: "#out(k__marker_1_enabled)"
+        ":CALCulate:MARKer1:STATe {state}":
+          name: set_marker_1_enabled
+          "#attr(k__marker_1_enabled)": "state"
+          response: "OK"
+
+        ":CALCulate:MARKer1:Y?":
+          name: query_marker_1_level
+          response: "#out(marker_1_level_dbm)"

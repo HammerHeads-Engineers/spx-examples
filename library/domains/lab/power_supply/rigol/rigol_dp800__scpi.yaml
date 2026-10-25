@@ -1,0 +1,284 @@
+# SPDX-License-Identifier: MIT
+name: rigol_dp800__scpi
+description: |
+  Virtual Rigol DP800-series programmable linear power supply exposing a
+  subset of SCPI commands for channel voltage/current setpoints, output
+  enable, and measurement readback over TCP.
+
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  idn:
+    type: str
+    default: "RIGOL,DP800,DP8D000000000,00.01.17"
+
+  k__ch1_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch1_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch1_output_state:
+    type: str
+    default: "OFF"
+  ch1_output_mode:
+    type: str
+    default: "CV"
+  ch1_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch1_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch1_power_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  k__ch2_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch2_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch2_output_state:
+    type: str
+    default: "OFF"
+  ch2_output_mode:
+    type: str
+    default: "CV"
+  ch2_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch2_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch2_power_w:
+    type: float
+    default: 0.0
+    unit: W
+
+  k__ch3_voltage_set_v:
+    type: float
+    default: 5.0
+    unit: V
+  k__ch3_current_set_a:
+    type: float
+    default: 1.0
+    unit: A
+  k__ch3_output_state:
+    type: str
+    default: "OFF"
+  ch3_output_mode:
+    type: str
+    default: "CV"
+  ch3_voltage_v:
+    type: float
+    default: 0.0
+    unit: V
+  ch3_current_a:
+    type: float
+    default: 0.0
+    unit: A
+  ch3_power_w:
+    type: float
+    default: 0.0
+    unit: W
+
+actions:
+  - function: $in(ch1_voltage_v)
+    name: update_ch1_voltage
+    description: Mirror channel 1 set voltage when the output is enabled.
+    call: ($in(k__ch1_voltage_set_v) if $in(k__ch1_output_state) == "ON" else 0.0)
+  - function: $in(ch1_current_a)
+    name: update_ch1_current
+    description: Mirror channel 1 current setpoint when the output is enabled.
+    call: ($in(k__ch1_current_set_a) if $in(k__ch1_output_state) == "ON" else 0.0)
+  - function: $in(ch1_power_w)
+    name: update_ch1_power
+    description: Compute channel 1 output power from configured voltage and current.
+    call: ($in(k__ch1_voltage_set_v) * $in(k__ch1_current_set_a) if $in(k__ch1_output_state) == "ON" else 0.0)
+
+  - function: $in(ch2_voltage_v)
+    name: update_ch2_voltage
+    description: Mirror channel 2 set voltage when the output is enabled.
+    call: ($in(k__ch2_voltage_set_v) if $in(k__ch2_output_state) == "ON" else 0.0)
+  - function: $in(ch2_current_a)
+    name: update_ch2_current
+    description: Mirror channel 2 current setpoint when the output is enabled.
+    call: ($in(k__ch2_current_set_a) if $in(k__ch2_output_state) == "ON" else 0.0)
+  - function: $in(ch2_power_w)
+    name: update_ch2_power
+    description: Compute channel 2 output power from configured voltage and current.
+    call: ($in(k__ch2_voltage_set_v) * $in(k__ch2_current_set_a) if $in(k__ch2_output_state) == "ON" else 0.0)
+
+  - function: $in(ch3_voltage_v)
+    name: update_ch3_voltage
+    description: Mirror channel 3 set voltage when the output is enabled.
+    call: ($in(k__ch3_voltage_set_v) if $in(k__ch3_output_state) == "ON" else 0.0)
+  - function: $in(ch3_current_a)
+    name: update_ch3_current
+    description: Mirror channel 3 current setpoint when the output is enabled.
+    call: ($in(k__ch3_current_set_a) if $in(k__ch3_output_state) == "ON" else 0.0)
+  - function: $in(ch3_power_w)
+    name: update_ch3_power
+    description: Compute channel 3 output power from configured voltage and current.
+    call: ($in(k__ch3_voltage_set_v) * $in(k__ch3_current_set_a) if $in(k__ch3_output_state) == "ON" else 0.0)
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+
+        ":MEAS? CH1":
+          name: query_channel_1_voltage
+          response: "#out(ch1_voltage_v)"
+        ":MEAS? CH2":
+          name: query_channel_2_voltage
+          response: "#out(ch2_voltage_v)"
+        ":MEAS? CH3":
+          name: query_channel_3_voltage
+          response: "#out(ch3_voltage_v)"
+        ":MEAS:VOLT? CH1":
+          name: query_channel_1_voltage_explicit
+          response: "#out(ch1_voltage_v)"
+        ":MEAS:VOLT? CH2":
+          name: query_channel_2_voltage_explicit
+          response: "#out(ch2_voltage_v)"
+        ":MEAS:VOLT? CH3":
+          name: query_channel_3_voltage_explicit
+          response: "#out(ch3_voltage_v)"
+        ":MEAS:CURR? CH1":
+          name: query_channel_1_current
+          response: "#out(ch1_current_a)"
+        ":MEAS:CURR? CH2":
+          name: query_channel_2_current
+          response: "#out(ch2_current_a)"
+        ":MEAS:CURR? CH3":
+          name: query_channel_3_current
+          response: "#out(ch3_current_a)"
+        ":MEAS:POWE? CH1":
+          name: query_channel_1_power
+          response: "#out(ch1_power_w)"
+        ":MEAS:POWE? CH2":
+          name: query_channel_2_power
+          response: "#out(ch2_power_w)"
+        ":MEAS:POWE? CH3":
+          name: query_channel_3_power
+          response: "#out(ch3_power_w)"
+
+        ":SOURce1:VOLTage {voltage}":
+          name: set_channel_1_voltage
+          response: null
+          "#attr(k__ch1_voltage_set_v)": "voltage"
+        ":SOURce1:VOLTage?":
+          name: query_channel_1_voltage_setpoint
+          response: "#out(k__ch1_voltage_set_v)"
+        ":SOURce1:CURRent {current}":
+          name: set_channel_1_current
+          response: null
+          "#attr(k__ch1_current_set_a)": "current"
+        ":SOURce1:CURRent?":
+          name: query_channel_1_current_setpoint
+          response: "#out(k__ch1_current_set_a)"
+
+        ":SOURce2:VOLTage {voltage}":
+          name: set_channel_2_voltage
+          response: null
+          "#attr(k__ch2_voltage_set_v)": "voltage"
+        ":SOURce2:VOLTage?":
+          name: query_channel_2_voltage_setpoint
+          response: "#out(k__ch2_voltage_set_v)"
+        ":SOURce2:CURRent {current}":
+          name: set_channel_2_current
+          response: null
+          "#attr(k__ch2_current_set_a)": "current"
+        ":SOURce2:CURRent?":
+          name: query_channel_2_current_setpoint
+          response: "#out(k__ch2_current_set_a)"
+
+        ":SOURce3:VOLTage {voltage}":
+          name: set_channel_3_voltage
+          response: null
+          "#attr(k__ch3_voltage_set_v)": "voltage"
+        ":SOURce3:VOLTage?":
+          name: query_channel_3_voltage_setpoint
+          response: "#out(k__ch3_voltage_set_v)"
+        ":SOURce3:CURRent {current}":
+          name: set_channel_3_current
+          response: null
+          "#attr(k__ch3_current_set_a)": "current"
+        ":SOURce3:CURRent?":
+          name: query_channel_3_current_setpoint
+          response: "#out(k__ch3_current_set_a)"
+
+        ":OUTP? CH1":
+          name: query_channel_1_output
+          response: "#out(k__ch1_output_state)"
+        ":OUTP? CH2":
+          name: query_channel_2_output
+          response: "#out(k__ch2_output_state)"
+        ":OUTP? CH3":
+          name: query_channel_3_output
+          response: "#out(k__ch3_output_state)"
+        ":OUTP CH1,ON":
+          name: enable_channel_1_output
+          response: null
+          "#attr(k__ch1_output_state)": "ON"
+        ":OUTP CH1,OFF":
+          name: disable_channel_1_output
+          response: null
+          "#attr(k__ch1_output_state)": "OFF"
+        ":OUTP CH2,ON":
+          name: enable_channel_2_output
+          response: null
+          "#attr(k__ch2_output_state)": "ON"
+        ":OUTP CH2,OFF":
+          name: disable_channel_2_output
+          response: null
+          "#attr(k__ch2_output_state)": "OFF"
+        ":OUTP CH3,ON":
+          name: enable_channel_3_output
+          response: null
+          "#attr(k__ch3_output_state)": "ON"
+        ":OUTP CH3,OFF":
+          name: disable_channel_3_output
+          response: null
+          "#attr(k__ch3_output_state)": "OFF"
+
+        ":OUTP:MODE? CH1":
+          name: query_channel_1_output_mode
+          response: "#out(ch1_output_mode)"
+        ":OUTP:MODE? CH2":
+          name: query_channel_2_output_mode
+          response: "#out(ch2_output_mode)"
+        ":OUTP:MODE? CH3":
+          name: query_channel_3_output_mode
+          response: "#out(ch3_output_mode)"
+        ":OUTP:CVCC? CH1":
+          name: query_channel_1_cvcc_mode
+          response: "#out(ch1_output_mode)"
+        ":OUTP:CVCC? CH2":
+          name: query_channel_2_cvcc_mode
+          response: "#out(ch2_output_mode)"
+        ":OUTP:CVCC? CH3":
+          name: query_channel_3_cvcc_mode
+          response: "#out(ch3_output_mode)"

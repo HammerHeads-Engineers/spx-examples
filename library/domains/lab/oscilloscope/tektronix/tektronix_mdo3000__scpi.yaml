@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: MIT
+name: tektronix_mdo3000__scpi
+description: |
+  Tektronix MDO3000 Series mixed domain oscilloscope model driven by SCPI
+  (ASCII/TCP). Supports channel setup, basic measurement queries, and
+  immediate measurement type selection.
+
+meta_parameters:
+  ascii_port:
+    type: int
+    default: 0
+
+attributes:
+  k__channel_1_scale_v:
+    type: float
+    default: 1.0
+    unit: V
+  k__channel_1_offset_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__timebase_scale_s:
+    type: float
+    default: 0.001
+    unit: s
+  k__trigger_level_v:
+    type: float
+    default: 0.0
+    unit: V
+  k__measurement_type:
+    type: str
+    default: VPP
+  k__measurement_source:
+    type: str
+    default: CH1
+  channel1_vpp_v:
+    type: float
+    default: 2.0
+    unit: V
+  channel1_vrms_v:
+    type: float
+    default: 0.7071
+    unit: V
+  channel1_vavg_v:
+    type: float
+    default: 0.0
+    unit: V
+  channel1_freq_hz:
+    type: float
+    default: 1000.0
+    unit: Hz
+  channel1_period_s:
+    type: float
+    default: 0.001
+    unit: s
+  measurement_value:
+    type: float
+    default: 2.0
+  idn:
+    type: str
+    default: "TEKTRONIX,MDO3000,0000000,1.0"
+  last_error:
+    type: str
+    default: "0,No error"
+
+actions:
+  - function: $in(channel1_period_s)
+    name: update_period
+    description: Recompute period from the current channel 1 frequency.
+    params:
+      min_freq_hz: 0.1
+    call: 1.0 / max($in(channel1_freq_hz), min_freq_hz)
+  - function: $in(channel1_vrms_v)
+    name: update_vrms
+    description: Approximate RMS voltage from the configured channel 1 Vpp amplitude.
+    params:
+      scale: 0.353553
+    call: $in(channel1_vpp_v) * scale
+  - function: $in(measurement_value)
+    name: update_measurement_value
+    description: Select the active measurement value according to the configured measurement type.
+    call: |
+      (
+        $in(channel1_vpp_v) if $in(k__measurement_type) == "VPP" else
+        $in(channel1_vrms_v) if $in(k__measurement_type) == "VRMS" else
+        $in(channel1_vavg_v) if $in(k__measurement_type) == "MEAN" else
+        $in(channel1_freq_hz) if $in(k__measurement_type) == "FREQ" else
+        $in(channel1_period_s) if $in(k__measurement_type) == "PER" else
+        $in(channel1_vpp_v)
+      )
+
+communication:
+  - ascii:
+      # Port can be overridden via ascii_port; 0 keeps runtime auto-assignment.
+      port: "$param(ascii_port)"
+      terminator: "\n"
+      response_delay: 0.01
+      response_jitter: 0.0
+      mappings:
+        "*IDN?":
+          name: query_idn
+          response: "#out(idn)"
+        ":SYSTem:ERRor?":
+          name: query_system_error
+          response: "#out(last_error)"
+        ":CHANnel1:SCAle?":
+          name: query_channel_1_scale
+          response: "#out(k__channel_1_scale_v)"
+        ":CHANnel1:SCAle {scale}":
+          name: set_channel_1_scale
+          "#attr(k__channel_1_scale_v)": "scale"
+          response: "OK"
+        ":CHANnel1:OFFSet?":
+          name: query_channel_1_offset
+          response: "#out(k__channel_1_offset_v)"
+        ":CHANnel1:OFFSet {offset}":
+          name: set_channel_1_offset
+          "#attr(k__channel_1_offset_v)": "offset"
+          response: "OK"
+        ":HORizontal:MAIn:SCAle?":
+          name: query_timebase_scale
+          response: "#out(k__timebase_scale_s)"
+        ":HORizontal:MAIn:SCAle {scale}":
+          name: set_timebase_scale
+          "#attr(k__timebase_scale_s)": "scale"
+          response: "OK"
+        ":TRIGger:A:LEVel?":
+          name: query_trigger_level
+          response: "#out(k__trigger_level_v)"
+        ":TRIGger:A:LEVel {level}":
+          name: set_trigger_level
+          "#attr(k__trigger_level_v)": "level"
+          response: "OK"
+        ":MEASUrement:IMMed:TYPe?":
+          name: query_measurement_type
+          response: "#out(k__measurement_type)"
+        ":MEASUrement:IMMed:TYPe {mtype}":
+          name: set_measurement_type
+          "#attr(k__measurement_type)": "mtype"
+          response: "OK"
+        ":MEASUrement:IMMed:SOUrce?":
+          name: query_measurement_source
+          response: "#out(k__measurement_source)"
+        ":MEASUrement:IMMed:SOUrce {source}":
+          name: set_measurement_source
+          "#attr(k__measurement_source)": "source"
+          response: "OK"
+        ":MEASUrement:IMMed:VALue?":
+          name: query_measurement_value
+          response: "#out(measurement_value)"
+
+scenarios:
+  calibration_tone:
+    display_name: "Calibration Tone"
+    description: "Stable 1 kHz, 2 Vpp signal for lab calibration."
+    overrides:
+      $out(channel1_vpp_v): 2.0
+      $out(channel1_vavg_v): 0.0
+      $out(channel1_freq_hz): 1000.0
+  transient_spike:
+    display_name: "Transient Spike"
+    description: "Short 5 Vpp excursion to validate limit triggers."
+    duration: 1.0
+    overrides:
+      $out(channel1_vpp_v): 5.0
