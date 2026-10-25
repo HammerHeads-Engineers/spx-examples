@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "repository": "HammerHeads-Engineers/spx-docs",
-  "commit": "18763a4ef81235769c219a5454a36e8295868559",
-  "content_sha256": "94c059d11842002f209ed4854cb496834b6ffe09856d1f15f4372dbe18de0633",
+  "commit": "987ab48a6e00d93f0d6f0c02325c24c6e2750504",
+  "content_sha256": "f0429ddcee1f54918272ebf870c1ffb0b86811fbcd1a95616b8a5abd55650420",
   "exports": {
     "simulation-and-modeling/model-definition-reference.md": {
       "path": "docs/MODEL_LANGUAGE.md",
