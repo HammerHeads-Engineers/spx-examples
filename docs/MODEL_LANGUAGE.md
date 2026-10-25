@@ -1,7 +1,69 @@
-# MODEL_LANGUAGE
+<!-- Generated from HammerHeads-Engineers/spx-docs@18763a4ef81235769c219a5454a36e8295868559:simulation-and-modeling/model-definition-reference.md; do not edit. -->
 
-This document defines the lightweight YAML modeling language used in this repo.
-It is descriptive, not a strict schema; update it if new constructs are introduced.
+> Canonical reference: [https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference](https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference)
+> Source commit: `18763a4ef81235769c219a5454a36e8295868559`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+
+# Model definition reference (YAML and JSON)
+
+This is the canonical SPX model-definition reference. It describes the released
+server RC76 / SDK RC21 baseline recorded in `sources.json`. Public examples and
+repository conventions live in [spx-examples](https://github.com/HammerHeads-Engineers/spx-examples).
+Its `docs/MODEL_LANGUAGE.md` is a generated offline copy of this page.
+
+YAML and JSON express the same model mapping when passed through the API/import
+path. JSON requires quoted keys and strings and has no YAML comments, anchors or
+aliases. The public model library and catalogs use YAML; JSON support at the API
+boundary does not change that repository convention.
+
+## Minimal PT100-style model
+
+YAML:
+
+```yaml
+name: pt100_demo
+description: Minimal deterministic temperature sensor
+attributes:
+  k__temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+  temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+actions:
+  - function: $in(temperature_c)
+    name: update_temperature
+    call: $in(k__temperature_c)
+```
+
+Equivalent JSON (API/import):
+
+```json
+{
+  "name": "pt100_demo",
+  "description": "Minimal deterministic temperature sensor",
+  "attributes": {
+    "k__temperature_c": {"type": "float", "default": 20.0, "unit": "degC"},
+    "temperature_c": {"type": "float", "default": 20.0, "unit": "degC"}
+  },
+  "actions": [{"function": "$in(temperature_c)", "name": "update_temperature", "call": "$in(k__temperature_c)"}]
+}
+```
+
+This models temperature telemetry, not the electrical resistance curve of a
+physical PT100. Both serializations must parse to identical mappings. Catalog
+validation is structural; registration and a running instance additionally test
+runtime semantics. Protocol interoperability needs a separate explicit test.
+
+## State naming
+
+Use `lower_snake_case`. Use `k__*` for persistent control inputs and targets,
+`cmd__*` for command/trigger inputs, plain names for telemetry and diagnostics,
+and leading `_` for internal helpers. Prefixes express intent; they do not
+implement access control. Keep dimensional suffixes and `unit` aligned, for
+example `temperature_c` with `degC` or `energy_total_kwh` with `kWh`.
+
 
 ## Top-level structure
 - `name`: optional string identifier (recommended for new/updated models).
@@ -44,10 +106,10 @@ Conventions:
   Avoid `k__` on derived or telemetry-only attributes.
 
 ## Expressions
-- `$in(attr)` reads a value from the model state.
-- `$out(attr)` writes a value to the model state.
+- `$in(attr)` / `$internal(attr)` select the internal value wrapper for reads or writes.
+- `$out(attr)` / `$ext(attr)` select the external value wrapper for reads or writes.
 - `$attr(path)` reads runtime metadata (e.g., `$attr(timer.time)`).
-- `$ext(attr)` exposes raw values for protocol bindings.
+- The action target or connection endpoint determines whether a wrapper is read or written; `in`/`out` alone are not read/write commands.
 - `#attr(name)` references an attribute in protocol mappings.
 - `$(...)` can reference runtime config values (commonly used in `params`), e.g. `$(~.timer.default_step)`.
 
@@ -75,7 +137,7 @@ These action types are provided by spx-server/spx-core and used across the model
 - `interpolate`: interpolate a series of (time, value) points.
 - `pid`: PID controller output based on `input` and `setpoint`.
 
-If you introduce a new action type, document it here and add a usage example.
+New action types require runtime implementation and tests before they are documented as supported.
 
 Common action fields (optional unless noted):
 - Action key (e.g., `function`, `noise`, `call`, `ramp`): identifies the action type and target (required).
@@ -269,14 +331,26 @@ python_file:
 ```
 
 ## Communication
+
+Deployment values belong in `meta_parameters`, bound with `$param(...)`, rather
+than hardcoded endpoints. Keep simulation tuning in attributes. For the MQTT
+fragment below, declare:
+
+```yaml
+meta_parameters:
+  mqtt_broker_host: {type: str, default: localhost}
+  mqtt_broker_port: {type: int, default: 1883}
+```
+
 `communication` is a list of protocol blocks. Each block is a mapping keyed by the protocol name:
 ```yaml
 communication:
   - mqtt:
-      broker: mosquitto-server
-      port: 1883
+      broker: $param(mqtt_broker_host)
+      port: $param(mqtt_broker_port)
       bindings:
-        - attribute: $ext(temperature_c)
+        - name: publish_temperature
+          attribute: $ext(temperature_c)
           topic: telemetry/temperature_c
           direction: publish
 ```
@@ -294,7 +368,7 @@ Known protocol types in spx-core include:
 When a protocol uses `bindings` (or another list of mapping entries that supports a `name` field):
 - Include an explicit `name` on every binding entry.
 - Keep `name` stable and unique within the container.
-- Prefer `name` equal to the attribute name (e.g., `temperature` for `$ext(temperature)`).
+- Prefer stable verb-led names such as `publish_temperature`, `set_target` or `query_status`.
 - If a binding spans multiple attributes or the protocol address is the primary identity,
   use a protocol-point name (e.g., `knx_ga_1_1_10`, `modbus_hr_40001`).
 - Add direction suffix only when needed to disambiguate: `_in`, `_out`, `_rw`.
@@ -343,7 +417,7 @@ Example:
 ```yaml
 scenarios:
   warmup:
-    enabled: true
+    enabled: false
     duration: 10.0
     overrides:
       $in(setpoint_c): 30.0
