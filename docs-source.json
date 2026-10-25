@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
   "repository": "HammerHeads-Engineers/spx-docs",
-  "commit": "987ab48a6e00d93f0d6f0c02325c24c6e2750504",
-  "content_sha256": "f0429ddcee1f54918272ebf870c1ffb0b86811fbcd1a95616b8a5abd55650420",
+  "commit": "6ec09e4cad0b6cd958865bbd79b1b1b2833aa01c",
+  "content_sha256": "613f097fb4c8f3f4f98c1e01edde3c7d5b0af05c1091ad88c5db701ebb484dbc",
   "exports": {
     "simulation-and-modeling/model-definition-reference.md": {
       "path": "docs/MODEL_LANGUAGE.md",
-      "canonical_url": "https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference"
+      "canonical_url": "https://docs.simplephysx.com/reference/model-definition-reference"
     },
     "getting-started/mcp-reference.md": {
       "path": "docs/MCP.md",
-      "canonical_url": "https://docs.simplephysx.com/getting-started/mcp-reference"
+      "canonical_url": "https://docs.simplephysx.com/reference/mcp-reference"
     }
   }
 }

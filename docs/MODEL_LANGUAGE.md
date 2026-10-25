@@ -1,7 +1,7 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@987ab48a6e00d93f0d6f0c02325c24c6e2750504:simulation-and-modeling/model-definition-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@6ec09e4cad0b6cd958865bbd79b1b1b2833aa01c:simulation-and-modeling/model-definition-reference.md; do not edit. -->
 
-> Canonical reference: [https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference](https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference)
-> Source commit: `987ab48a6e00d93f0d6f0c02325c24c6e2750504`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Canonical reference: [https://docs.simplephysx.com/reference/model-definition-reference](https://docs.simplephysx.com/reference/model-definition-reference)
+> Source commit: `6ec09e4cad0b6cd958865bbd79b1b1b2833aa01c`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
 
 # Model definition reference (YAML and JSON)
 
@@ -77,11 +77,31 @@ example `temperature_c` with `degC` or `energy_total_kwh` with `kWh`.
 - `python_file` / `import`: optional Python class bindings.
 - `timer`: optional time base for time-aware actions.
 - `polling`: optional background runner for parent components.
-- System components (advanced): `connections`, `modules`, `meta_parameters`, `init_parameters`,
-  `instances`/`units`, `templates`/`models`, `snapshots`, `logs`.
+- `meta_parameters`: per-instance/deployment inputs, including communication host, port and IDs.
+- `init_parameters`: parameters consumed when constructing the model.
+- System configuration (advanced): `connections`, `modules`, `instances`/`units`,
+  `templates`/`models`, `snapshots`, `logs`.
 
-System components are typically used in system-level configs; avoid them in per-model YAML
-unless the model explicitly needs them.
+### Deployment and communication parameters
+
+`meta_parameters` belongs in an ordinary device model when its deployment values
+vary between instances. Bind configurable adapter fields through `$param(...)`.
+For example, this is a model fragment, not a complete definition:
+
+```yaml
+meta_parameters:
+  modbus_port:
+    type: int
+    default: 502
+communication:
+  - modbus_slave:
+      port: $param(modbus_port)
+```
+
+Provide the complete adapter host/unit/bindings from the chosen protocol reference.
+Use attributes for simulation controls and telemetry, meta parameters for wiring.
+System-only containers usually belong in system configuration rather than every
+device definition. See the full Communication section for a complete example.
 
 ## Attributes
 `attributes` is a mapping from attribute name to either:
@@ -514,5 +534,5 @@ fields: parsing and catalog validation are not proof of runtime or protocol succ
 internal write clears an external override; persistent faults must be reapplied
 at the intended point in execution. Snapshots restore structure/defaults, not
 live readings or elapsed time. Manual clock control does not seed randomness.
-For identifiers see the [glossary](https://docs.simplephysx.com/appendices/glossary-of-terms#model-identifiers);
-for verified stepping use the [client tutorial](https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/using-spx-python).
+For identifiers see the [glossary](https://docs.simplephysx.com/reference/glossary-of-terms#model-identifiers);
+for verified stepping use the [client tutorial](https://docs.simplephysx.com/readme/using-spx-python).
