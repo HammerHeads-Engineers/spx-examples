@@ -1,7 +1,7 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@18763a4ef81235769c219a5454a36e8295868559:getting-started/mcp-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@987ab48a6e00d93f0d6f0c02325c24c6e2750504:getting-started/mcp-reference.md; do not edit. -->
 
 > Canonical reference: [https://docs.simplephysx.com/getting-started/mcp-reference](https://docs.simplephysx.com/getting-started/mcp-reference)
-> Source commit: `18763a4ef81235769c219a5454a36e8295868559`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Source commit: `987ab48a6e00d93f0d6f0c02325c24c6e2750504`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
 
 # SPX MCP reference
 
@@ -375,3 +375,15 @@ server_run_connection(connection_name="...")
   - scenario `overrides` behave like a temporary overlay and revert on `stop()`
   - scenario `actions` such as `function` or `set` materialize state changes and
     the resulting values remain after `stop()`
+
+## Agent entry point and documentation provenance
+
+Before choosing a task, read [Agent Start Here](https://docs.simplephysx.com/llm-first-model-authoring/agent-start-here).
+It distinguishes live runtime work, durable public Examples contributions and
+product documentation. The installed context follows the installer's exact pin;
+a newer public checkout does not replace that context or upgrade server modules.
+Use the version set in [Release Notes](https://docs.simplephysx.com/operations-and-support/release-notes).
+
+For managed workspaces inspect the active private connection binding before
+editing fallback `.env` values. Report runtime, SDK, API and protocol verification
+separately. Do not turn a live request into repository hardening by default.
