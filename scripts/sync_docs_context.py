@@ -11,8 +11,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'HammerHeads-Engineers/spx-docs'
 PAGES = {
-    'simulation-and-modeling/model-definition-reference.md': ('docs/MODEL_LANGUAGE.md', 'https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference'),
-    'getting-started/mcp-reference.md': ('docs/MCP.md', 'https://docs.simplephysx.com/getting-started/mcp-reference'),
+    'simulation-and-modeling/model-definition-reference.md': ('docs/MODEL_LANGUAGE.md', 'https://docs.simplephysx.com/reference/model-definition-reference'),
+    'getting-started/mcp-reference.md': ('docs/MCP.md', 'https://docs.simplephysx.com/reference/mcp-reference'),
 }
 
 

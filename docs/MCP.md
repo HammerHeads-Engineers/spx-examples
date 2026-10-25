@@ -1,13 +1,16 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@987ab48a6e00d93f0d6f0c02325c24c6e2750504:getting-started/mcp-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@d16c58d985b36850174181fb5e990059fb08b7bc:getting-started/mcp-reference.md; do not edit. -->
 
-> Canonical reference: [https://docs.simplephysx.com/getting-started/mcp-reference](https://docs.simplephysx.com/getting-started/mcp-reference)
-> Source commit: `987ab48a6e00d93f0d6f0c02325c24c6e2750504`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Canonical reference: [https://docs.simplephysx.com/reference/mcp-reference](https://docs.simplephysx.com/reference/mcp-reference)
+> Source commit: `d16c58d985b36850174181fb5e990059fb08b7bc`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
 
-# SPX MCP reference
+# MCP tools and runtime rules
 
 `spx-examples` includes a local MCP tool intended for code-oriented LLM workflows.
 It is a repo tool, not an example project: the MCP server understands the local
 catalog, profiles, packs, model validation rules, and a running SPX server.
+
+For the shortest task path, read [Agent Start Here](https://docs.simplephysx.com/llm-first-model-authoring/agent-start-here).
+This full reference is also exported offline to public Examples.
 
 ## Scope
 
