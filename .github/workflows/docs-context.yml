@@ -1,0 +1,22 @@
+name: Offline documentation checks
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install PyYAML==6.0.3 pytest==8.4.2
+      - run: python scripts/sync_docs_context.py --check
+      - run: python scripts/render_readme_catalog.py --check
+      - run: pytest -q tests/docs/unit

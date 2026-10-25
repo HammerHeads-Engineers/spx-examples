@@ -1,5 +1,10 @@
 # LLM_SPEC
 
+This is the repository contribution playbook. Product language semantics are
+maintained at https://docs.simplephysx.com; `docs/MODEL_LANGUAGE.md` is the
+generated offline reference. Propose semantic corrections in `spx-docs` first.
+
+
 Single source of truth for LLM and agent contributions.
 
 ## MUST
@@ -49,9 +54,8 @@ Use this path for agent-driven model work whose goal is local runtime validation
   1. `python tools/validate_models.py`
   2. register model on the local SPX server
   3. recreate/start the instance
-  4. verify protocol read of key telemetry
-  5. verify protocol write of the main control input
-  6. verify any implemented mode/command path
+  4. stop when the instance reaches `RUNNING`, unless protocol proof or deeper diagnostics was requested
+  5. verify protocol read/write or mode/command paths only when explicitly requested or failure-driven
 - Do not assume runtime tree shape blindly during live checks. If the object layout is unclear, inspect the live instance document or validate through protocol reads/writes instead of relying on guessed paths.
 
 ## Runtime connection intent
@@ -131,7 +135,7 @@ Do not treat this as a mandatory flow for unrelated repository tasks.
 - if one-click sample provisioning is expected for the pack, add `default_instances` (and `start_instances` when needed) in `library/catalog/industries.yaml`.
 - Keep changes additive and backward-compatible.
 
-5) Runtime smoke gate (required)
+5) Runtime smoke gate (required for persistent release-grade model contributions)
 - Add a minimal integration smoke test for each new model.
 - Smoke test must load/register the model via `spx_python`, create/reset/start an instance, and assert it reaches `running`.
 - For protocol models, verify at least one protocol-level read/write probe on the exposed endpoint (for Modbus: resolve endpoint and read key registers).
