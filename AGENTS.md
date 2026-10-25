@@ -45,6 +45,7 @@ at https://docs.simplephysx.com. `docs/MODEL_LANGUAGE.md` and `docs/MCP.md` are
 generated complete offline snapshots pinned by `docs-source.json`; propose
 semantic corrections upstream rather than hand-editing these exports. This
 file, `docs/LLM_SPEC.md` and task templates remain local operating rules.
+Use the portal’s Guides for tasks and Reference for syntax/API lookup.
 For the source hierarchy, work-mode stopping criteria and SDK/client/runtime
 distinctions, read [Agent Start Here](https://docs.simplephysx.com/llm-first-model-authoring/agent-start-here).
 

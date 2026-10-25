@@ -9,11 +9,12 @@ agent working instructions. The full product documentation lives at
 | I want to… | Start here |
 | --- | --- |
 | Work with an agent: choose live runtime or a durable contribution | [Agent Start Here](https://docs.simplephysx.com/llm-first-model-authoring/agent-start-here) |
-| Install SPX or configure an MCP client | [Installation Guide](https://docs.simplephysx.com/getting-started/installation-guide) |
-| Understand model definitions in YAML or JSON | [Model documentation](https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference), or [offline snapshot](docs/MODEL_LANGUAGE.md) |
+| Install SPX | [Installation Guide](https://docs.simplephysx.com/readme/installation-guide) |
+| Understand model definitions in YAML or JSON | [Model documentation](https://docs.simplephysx.com/reference/model-definition-reference), or [offline snapshot](docs/MODEL_LANGUAGE.md) |
 | Find an existing model or industry pack | [Device Catalog](https://docs.simplephysx.com/usage-scenarios-and-examples/device-catalog), then `library/` below |
-| Run my first simulation | [First simulation tutorial](https://docs.simplephysx.com/getting-started/build-your-first-simulation) |
-| Work with a live server through an agent | [MCP guide](https://docs.simplephysx.com/getting-started/connect-llm-with-spx-mcp), or [offline snapshot](docs/MCP.md) |
+| Run my first simulation in the UI | [First device in the UI](https://docs.simplephysx.com/readme/getting-started) |
+| Write a model in YAML or JSON | [Create your first model](https://docs.simplephysx.com/spx-development-guide/build-your-first-simulation) |
+| Work with a live server through an agent | [MCP guide](https://docs.simplephysx.com/llm-first-model-authoring/connect-llm-with-spx-mcp), or [offline snapshot](docs/MCP.md) |
 | Contribute a model | [AGENTS.md](AGENTS.md), [modeling playbook](docs/LLM_SPEC.md), [task template](docs/LLM_TASK_TEMPLATE.md) |
 
 ## Library overview
@@ -79,7 +80,7 @@ actions:
 This is a temperature model, not a physical PT100 resistance calculation.
 The [complete offline reference](docs/MODEL_LANGUAGE.md) provides equivalent
 JSON and explains units, actions, scenarios, timers and parameterized
-communication. The [portal model documentation](https://docs.simplephysx.com/spx-development-guide/simulation-and-modeling/model-definition-reference)
+communication. The [portal model documentation](https://docs.simplephysx.com/reference/model-definition-reference)
 is the stable online entry point. Library contributions use YAML and require a
 catalog entry; JSON is supported at the API/import boundary.
 
