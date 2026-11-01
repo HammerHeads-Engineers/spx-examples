@@ -18,7 +18,7 @@ on:
 permissions:
   contents: read
 
-# A qualification endpoint is disposable and shared by trusted release runs.
+# Serialize publication; every runtime job creates its own disposable Docker stack.
 concurrency:
   group: model-catalog-publication
   cancel-in-progress: false
@@ -69,7 +69,8 @@ jobs:
       - name: Export committed model content
         env:
           CATALOG_VERSION: ${{ steps.metadata.outputs.version }}
-        run: poetry run python -m tools.catalog build --version "$CATALOG_VERSION" --output dist/catalog --require-clean
+          CATALOG_CHANNEL: ${{ steps.metadata.outputs.channel }}
+        run: poetry run python -m tools.catalog build --version "$CATALOG_VERSION" --channel "$CATALOG_CHANNEL" --output dist/catalog --require-clean
       - uses: actions/upload-artifact@v7
         with:
           name: catalog-candidate
@@ -78,48 +79,16 @@ jobs:
 
   qualify:
     needs: candidate
-    if: needs.candidate.outputs.channel == 'stable'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: catalog-qualification
-    strategy:
-      fail-fast: false
-      matrix:
-        server: ${{ fromJSON(needs.candidate.outputs.targets) }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.12'
-      - run: python -m pip install poetry==2.2.1
-      - run: poetry install --with dev --no-interaction
-      - uses: actions/download-artifact@v8
-        with:
-          name: catalog-candidate
-          path: dist/catalog
-      - name: Qualify every compatible model on the actual target server
-        env:
-          SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
-          SPX_CATALOG_QUALIFICATION_URLS: ${{ vars.SPX_CATALOG_QUALIFICATION_URLS }}
-          SERVER_TARGET: ${{ matrix.server }}
-        run: >-
-          poetry run python -m tools.catalog qualify dist/catalog
-          --target "$SERVER_TARGET" --allow-runtime-writes
-          --output "dist/qualification-$SERVER_TARGET.json"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: qualification-${{ matrix.server }}
-          path: dist/qualification-*.json
-          if-no-files-found: error
+    uses: ./.github/workflows/runtime-qualification.yml
+    with:
+      catalog_artifact: catalog-candidate
+      channel: ${{ needs.candidate.outputs.channel }}
 
   publish:
     needs: [candidate, qualify]
     if: >-
       always() && needs.candidate.result == 'success' &&
-      (needs.candidate.outputs.channel == 'preview' || needs.qualify.result == 'success')
+      needs.qualify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: catalog-${{ needs.candidate.outputs.channel }}
@@ -141,7 +110,7 @@ jobs:
       - uses: actions/download-artifact@v8
         if: needs.candidate.outputs.channel == 'stable'
         with:
-          pattern: qualification-*
+          pattern: runtime-*-*
           merge-multiple: true
           path: dist/catalog
       - name: Reverify artifacts and enforce the stable qualification gate

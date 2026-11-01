@@ -1,5 +1,9 @@
 # Embedded & Lab Pack
 
+BLE examples remain in the source library and preview catalogs while separate
+BLE QA is prepared. The current stable catalog omits those two models and their
+default instances; MQTT, LwM2M, SCPI and Modbus examples remain available.
+
 Bundle of BLE/LwM2M/MQTT edge nodes and SCPI/modbus instruments for CI pipelines
 and firmware validation labs.
 

@@ -45,6 +45,10 @@ offline model archive. Preview and qualified stable releases follow the
 [catalog release flow](docs/CATALOG_RELEASES.md). Existing installer builds still
 use their pinned public context until their catalog consumer is updated;
 updating this checkout does not update installed services or running instances.
+Stable catalogs can contain fewer models than the source library when examples
+are preview-only. BLE is currently deferred; CI tests all models published in the
+stable artifact against declared server targets and probes latest official/RC
+servers separately.
 
 ## Repository map
 

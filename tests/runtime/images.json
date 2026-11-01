@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "server_repository": "simplephysx/spx-server",
+  "deferred_protocols": ["ble"],
+  "services": {
+    "mqtt": "eclipse-mosquitto@sha256:b4b46a35b99c198070cf2d2724909c7a2aa583236316a3e1680353164a843040",
+    "knx": "michelmu/knxd-docker@sha256:6622f6b4ecb2a2ec4ab233fef5323fcbc5452477c5ce7d2274277cddac6f9256",
+    "lwm2m": "corfr/leshan@sha256:e38d90898577d6eda50de45c8c9b446a29d1cb0bf658aa613dbb5e8a68ba137c",
+    "matter": "ghcr.io/home-assistant-libs/python-matter-server@sha256:170aa093ce91c76cde4cc390918307590f0f5558fcec93f913af3cb019e6562a"
+  }
+}

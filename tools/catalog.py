@@ -31,6 +31,7 @@ def main() -> int:
     build.add_argument("--version", required=True)
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--require-clean", action="store_true")
+    build.add_argument("--channel", choices=["preview", "stable"], default="preview")
     verify = commands.add_parser(
         "verify", help="Verify schema, resources and archive hashes"
     )
@@ -72,6 +73,17 @@ def main() -> int:
     qualify.add_argument("--output", type=Path, required=True)
     qualify.add_argument("--allow-runtime-writes", action="store_true")
     qualify.add_argument(
+        "--exclude-protocol",
+        action="append",
+        default=[],
+        help="Explicit diagnostic exclusion, recorded in the report",
+    )
+    qualify.add_argument(
+        "--probe-all",
+        action="store_true",
+        help="Probe even undeclared server compatibility; never qualifies stable",
+    )
+    qualify.add_argument(
         "--model",
         action="append",
         default=[],
@@ -89,12 +101,17 @@ def main() -> int:
         root = args.root.resolve()
         if args.command == "build":
             document = export_catalog(
-                root, args.output, args.version, require_clean=args.require_clean
+                root,
+                args.output,
+                args.version,
+                require_clean=args.require_clean,
+                channel=args.channel,
             )
             result = {
                 "status": "PASSED",
                 "catalog": str(args.output / "catalog.json"),
                 "models": len(document["models"]),
+                "channel": args.channel,
                 "source": document["source"],
             }
         elif args.command == "verify":
@@ -158,6 +175,8 @@ def main() -> int:
                 allow_writes=args.allow_runtime_writes,
                 model_ids=args.model,
                 expected_server=args.target,
+                excluded_protocols=args.exclude_protocol,
+                probe_all=args.probe_all,
             )
             args.output.parent.mkdir(parents=True, exist_ok=True)
             args.output.write_bytes(json_bytes(result))
