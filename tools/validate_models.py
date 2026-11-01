@@ -111,6 +111,21 @@ def validate_model_file(path: Path, data: object, result: ValidationResult) -> N
             result.add(f"{path}: 'communication' must be a list or mapping")
 
     scenarios = data.get("scenarios")
+    blocks = communication if isinstance(communication, list) else [communication]
+    for block in blocks:
+        matter = block.get("matter") if isinstance(block, dict) else None
+        if not isinstance(matter, dict):
+            continue
+        bindings = matter.get("bindings", [])
+        if not isinstance(bindings, list):
+            result.add(f"{path}: Matter bindings must be a list")
+            continue
+        for binding in bindings:
+            if isinstance(binding, dict) and isinstance(binding.get("command"), bool):
+                result.add(
+                    f"{path}: Matter binding {binding.get('name', '<unnamed>')}: "
+                    'quote command names such as "On"/"Off"; YAML parsed a boolean'
+                )
     if scenarios is None:
         return
     if not isinstance(scenarios, dict):

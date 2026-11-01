@@ -6,6 +6,20 @@ description: |
   python-matter-server API surface used by Home Assistant; values are scaled to
   the 0.01 degC resolution Matter expects.
 
+meta_parameters:
+  matter_server_ws_url:
+    type: str
+    default: "ws://matter-server:5580/ws"
+  matter_fabric_id:
+    type: str
+    default: "0x1"
+  matter_node_id:
+    type: str
+    default: "0x1234"
+  matter_endpoint:
+    type: int
+    default: 1
+
 attributes:
   room_temperature_c:
     type: float
@@ -116,36 +130,36 @@ actions:
 communication:
   - matter:
       controller:
-        fabric_id: "0x1"
-        ws_url: "ws://matter-server:5580/ws"
+        fabric_id: "$param(matter_fabric_id)"
+        ws_url: "$param(matter_server_ws_url)"
       default_payload_codec: tlv
       bindings:
         - name: temperature_report
           direction: outbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: TemperatureMeasurement
           attribute: MeasuredValue
           read_attribute: "#attr(measured_value_raw)"
         - name: heating_setpoint
           direction: bidirectional
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: Thermostat
           attribute: OccupiedHeatingSetpoint
           read_attribute: "#attr(heating_setpoint_raw)"
           write_attribute: "#attr(room_command_raw)"
         - name: system_mode
           direction: outbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: Thermostat
           attribute: SystemMode
           read_attribute: "#attr(hvac_mode_code)"
         - name: hvac_active
           direction: outbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: OnOff
           attribute: OnOff
           read_attribute: "#attr(hvac_active)"
