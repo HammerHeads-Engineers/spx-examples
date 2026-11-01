@@ -26,6 +26,7 @@ MODEL_METADATA = {
     "resources",
     "status",
     "replaced_by",
+    "channels",
 }
 
 
@@ -279,8 +280,12 @@ def model_files(root: Path, entry: dict, definition: dict, metadata: dict) -> li
     return sorted({entry["path"], *resources})
 
 
-def build_document(root: Path, version: str, *, require_clean=False) -> dict:
+def build_document(
+    root: Path, version: str, *, require_clean=False, channel="preview"
+) -> dict:
     root = root.resolve()
+    if channel not in {"preview", "stable"}:
+        raise CatalogError("Catalog channel must be preview or stable")
     if not VERSION_RE.fullmatch(version):
         raise CatalogError(
             "Catalog version must contain only letters, digits, dots, underscores and hyphens"
@@ -310,6 +315,18 @@ def build_document(root: Path, version: str, *, require_clean=False) -> dict:
             raise CatalogError(
                 f"{entry['id']}: unknown distribution metadata; supported: {sorted(MODEL_METADATA)}"
             )
+        channels = metadata.get("channels", ["preview", "stable"])
+        if (
+            not isinstance(channels, list)
+            or not channels
+            or any(value not in {"preview", "stable"} for value in channels)
+            or len(set(channels)) != len(channels)
+        ):
+            raise CatalogError(
+                f"{entry['id']}: distribution.channels must be a unique nonempty list of preview/stable"
+            )
+        if channel not in channels:
+            continue
         spec = metadata.get("server_compatibility", config["server_compatibility"])
         if not any(
             server_matches(spec, target) for target in config["qualification_targets"]
@@ -361,17 +378,32 @@ def build_document(root: Path, version: str, *, require_clean=False) -> dict:
         read_yaml(root / "library/catalog/industries.yaml")["industries"],
         key=lambda item: item["id"],
     ):
+        members = [m for m in models if pack["id"] in m["packages"]]
+        member_ids = {m["id"] for m in members}
+        instances = [
+            entry
+            for entry in pack.get("default_instances", [])
+            if entry["model"] in member_ids
+        ]
+        instance_ids = {entry["instance"] for entry in instances}
+        available_protocols = {protocol for m in members for protocol in m["protocols"]}
         packs.append(
             {
                 "id": pack["id"],
                 "name": pack["name"],
                 "description": pack["description"].strip(),
-                "default_protocols": sorted(set(pack["protocols"])),
+                "default_protocols": sorted(
+                    set(pack["protocols"]) & available_protocols
+                ),
                 "recommended_model_ids": [
                     m["id"] for m in models if pack["id"] in m["packages"]
                 ],
-                "default_instances": pack.get("default_instances", []),
-                "start_instances": pack.get("start_instances", []),
+                "default_instances": instances,
+                "start_instances": [
+                    key
+                    for key in pack.get("start_instances", [])
+                    if key in instance_ids
+                ],
             }
         )
     content = source_files(root, sorted(files), committed=not dirty)
@@ -402,9 +434,11 @@ def build_document(root: Path, version: str, *, require_clean=False) -> dict:
 
 
 def export_catalog(
-    root: Path, output: Path, version: str, *, require_clean=False
+    root: Path, output: Path, version: str, *, require_clean=False, channel="preview"
 ) -> dict:
-    document = build_document(root, version, require_clean=require_clean)
+    document = build_document(
+        root, version, require_clean=require_clean, channel=channel
+    )
     encoded = json_bytes(document)
     output.mkdir(parents=True, exist_ok=True)
     target = output / "catalog.json"

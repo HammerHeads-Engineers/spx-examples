@@ -37,7 +37,10 @@ def check(root: Path, *, tests=True, base_ref=None) -> dict:
             record("public-model-compatibility", [str(exc)])
     try:
         with tempfile.TemporaryDirectory(prefix="spx-catalog-check-") as directory:
-            export_catalog(root, Path(directory), "local-check")
+            for channel in ("preview", "stable"):
+                export_catalog(
+                    root, Path(directory) / channel, "local-check", channel=channel
+                )
         record("distribution-contract-and-artifacts", [])
     except (CatalogError, OSError, ValueError, TypeError, KeyError) as exc:
         record("distribution-contract-and-artifacts", [str(exc)])

@@ -20,6 +20,9 @@ Read [CATALOG_CONTRACT.md](docs/CATALOG_CONTRACT.md) before changing compatibili
 resources or deprecation metadata. Runtime compatibility claims require evidence;
 the defaults in `library/catalog/distribution.yaml` are declared qualification
 targets, not proof. Preserve IDs, paths and public attributes in a maintained line.
+Use `distribution.channels: [preview]` for deferred examples. BLE models are
+currently preview-only pending separate BLE QA. Stable release CI must test every
+model in its artifact; never turn a skipped/excluded model into a passing result.
 
 ## Repository map
 - Models: `library/domains/<domain_group>/<device_class>/<vendor|generic>/*.yaml`

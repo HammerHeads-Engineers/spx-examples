@@ -108,7 +108,8 @@ industries:
   - id: embedded_lab_pack
     name: Embedded & Lab Pack
     description: >-
-      BLE, MQTT/LwM2M and SCPI devices for firmware CI and hardware-in-the-loop labs.
+      MQTT/LwM2M and SCPI devices for firmware CI and hardware-in-the-loop labs.
+      BLE examples are available in preview while their separate QA is prepared.
     protocols: [ble, mqtt, lwm2m, coap, scpi, modbus]
     services: [btvirt_adapter, mqtt_broker, lwm2m_server, scpi_tcp_stack, modbus_tcp_gateway]
     profiles:

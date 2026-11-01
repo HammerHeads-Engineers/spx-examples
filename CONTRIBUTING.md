@@ -65,6 +65,9 @@ Keep IDs, existing public attributes and paths stable. Deprecate an existing
 model with a replacement reference instead of removing it from a maintained
 line. See [the distribution contract](docs/CATALOG_CONTRACT.md) for compatibility
 overrides and [release operations](docs/CATALOG_RELEASES.md) for promotion rules.
+Models deferred from a stable release stay in the library with
+`distribution.channels: [preview]`. BLE examples currently follow this policy
+until native/virtual BLE runtime QA is added; retain that policy for new BLE twins.
 
 Generated `library/industries/*/MODELS.yaml`, README counts and distribution
 artifacts are derived from source catalogs. After manual membership edits run:
@@ -106,6 +109,10 @@ Static validation does not establish runtime compatibility. Runtime tests need
 an explicitly prepared test server and a locally supplied `SPX_PRODUCT_KEY`;
 public fork PR checks need neither a license key nor access to internal services.
 Never put credentials in YAML, examples, PR text, screenshots or test reports.
+Trusted release CI starts disposable servers itself and tests the latest official
+and RC server images alongside every declared compatibility target. Required
+targets gate publication; advisory probes expose compatibility limits without
+automatically widening declarations. Fork PRs do not receive the product secret.
 
 ## 5. Open the PR
 
