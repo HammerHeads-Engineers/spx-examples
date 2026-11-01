@@ -80,6 +80,8 @@ jobs:
   qualify:
     needs: candidate
     uses: ./.github/workflows/runtime-qualification.yml
+    secrets:
+      SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
     with:
       catalog_artifact: catalog-candidate
       channel: ${{ needs.candidate.outputs.channel }}

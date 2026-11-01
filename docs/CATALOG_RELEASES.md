@@ -29,6 +29,9 @@ Configure the secret `SPX_PRODUCT_KEY` in the GitHub environment
 passed through the environment, never through workflow arguments or committed
 files. Public fork/PR checks remain credential-free. There is no permanently
 running qualification server or CI endpoint URL to maintain.
+The publication workflow explicitly forwards the named secret to the reusable
+workflow; its `workflow_call` declaration requires it. The environment-scoped
+value takes precedence and remains restricted to the permitted branches.
 
 `Model runtime compatibility` runs before preview/stable publication and by
 manual dispatch without publication. It discovers the latest official

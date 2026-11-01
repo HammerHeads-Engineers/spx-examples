@@ -2,6 +2,9 @@ name: Model runtime compatibility
 
 on:
   workflow_call:
+    secrets:
+      SPX_PRODUCT_KEY:
+        required: true
     inputs:
       catalog_artifact:
         required: true
