@@ -15,7 +15,8 @@ agent working instructions. The full product documentation lives at
 | Run my first simulation in the UI | [First device in the UI](https://docs.simplephysx.com/readme/getting-started) |
 | Write a model in YAML or JSON | [Create your first model](https://docs.simplephysx.com/spx-development-guide/build-your-first-simulation) |
 | Work with a live server through an agent | [MCP guide](https://docs.simplephysx.com/llm-first-model-authoring/connect-llm-with-spx-mcp), or [offline snapshot](docs/MCP.md) |
-| Contribute a model | [AGENTS.md](AGENTS.md), [modeling playbook](docs/LLM_SPEC.md), [task template](docs/LLM_TASK_TEMPLATE.md) |
+| Contribute a model, as a person or agent | [Contribution quickstart](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), [task template](docs/LLM_TASK_TEMPLATE.md) |
+| Build or consume a versioned model catalog | [Catalog contract](docs/CATALOG_CONTRACT.md), [release flow](docs/CATALOG_RELEASES.md) |
 
 ## Library overview
 
@@ -38,9 +39,12 @@ Protocol tags: `bacnet`, `ble`, `coap`, `http`, `knx`, `lwm2m`, `matter`, `modbu
 These are reference simulations, not manufacturer-certified digital twins.
 <!-- catalog-overview:end -->
 
-The library can advance independently of packaged releases. An installed
-bundle uses the public context revision pinned by its private installer build;
-updating this checkout does not update installed services or their versions.
+The library advances independently of product installers. Public `catalog-*`
+releases contain versioned discovery metadata, model/resource hashes and an
+offline model archive. Preview and qualified stable releases follow the
+[catalog release flow](docs/CATALOG_RELEASES.md). Existing installer builds still
+use their pinned public context until their catalog consumer is updated;
+updating this checkout does not update installed services or running instances.
 
 ## Repository map
 
@@ -52,6 +56,7 @@ updating this checkout does not update installed services or their versions.
 | `examples/` and `extensions/` | Runnable scripts/notebooks and model helpers |
 | `spx_mcp/` | Runtime MCP and catalog tools |
 | `tests/` and `tools/` | Validation and contribution tooling |
+| `schemas/` and `templates/` | Distribution contract, model starter and behavior-test template |
 | `docs/` | Agent playbook plus generated offline product references |
 
 ## Minimal model: PT100-style temperature telemetry
@@ -90,16 +95,22 @@ Use Python 3.12 (the CI baseline) and Poetry. MCP requires Python 3.10+.
 
 ```sh
 poetry install --with dev
-poetry run python tools/validate_models.py
-poetry run python scripts/render_readme_catalog.py --check
-poetry run pytest tests/core/unit tests/mcp/unit tests/packs/*/unit
+poetry run python -m tools.check
 ```
 
-The validator checks cataloged library models. To contribute the sample, place it
-in the appropriate library directory and add its catalog entry as described in
-`AGENTS.md`. Runtime validation additionally requires registering the model and
-starting an instance on an already running SPX Server. Protocol proof is a
-separate test when requested or needed to diagnose a failure.
+This is the same credential-free command used by public CI on Windows and Linux.
+Use `--json --report dist/contribution-checks.json` for agents and `--no-tests`
+only for fast structural iteration. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+the scaffold command, behavioral twins, generated-file refresh, testing and PR
+review. A model/catalog draft and its derived indexes can be created together:
+
+```sh
+poetry run python -m tools.catalog scaffold --id Community.Pt100 --name community_pt100 --description "Temperature demo" --pack embedded_lab_pack
+```
+
+Static validation does not establish runtime compatibility. Stable catalog
+publication requires reports from actual target servers, bound to the exact
+catalog hash. Model-specific protocol proof remains part of transport changes.
 
 For live work, set `SPX_BASE_URL` and `SPX_PRODUCT_KEY` locally; keep keys private.
 Integration tests require the corresponding stack and services. Start the
@@ -115,7 +126,8 @@ editing these exports. A daily/manual workflow opens a review PR against
 promotion. `AGENTS.md`, `LLM_SPEC.md` and task templates remain local working rules.
 
 Product/MCP installation, Python preparation, client configuration, native
-packaging, signing and release publication belong to private `spx-installer`.
+packaging, signing and product release publication belong to private `spx-installer`.
+Public model-only catalog publication belongs here and includes no installer code.
 Get product packages through [SPX Downloads](https://staging.simplephysx.com/downloads).
 `downloads.simplephysx.com` delivers authorized files. This public repository
 has fresh history and contains no installer code, installer releases, product

@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: MIT
+# Retained at its legacy path for diagnostics, outside the downloadable library.
+unpublished_models:
+- path: library/domains/industrial/controller/generic/thermal_controller_simple.yaml
+  reason: Legacy SDK print-timing diagnostic; not a device model for installation.
 models:
 - id: Env.EnvSensor.Mqtt
   name: MQTT Environment Sensor
@@ -378,6 +382,9 @@ models:
   profiles:
   - scpi_lab
 - id: Process.ThermalController.Advanced
+  distribution:
+    resources:
+    - extensions/thermal_model.py
   name: Thermal Controller (Advanced)
   path: library/domains/industrial/controller/generic/thermal_controller_advanced.yaml
   domain: industrial
@@ -1340,6 +1347,9 @@ models:
   profiles:
   - ev_csms_demo
 - id: Energy.CSMS.Ocpp
+  distribution:
+    resources:
+    - extensions/ocpp_meter_values.py
   name: CSMS Control Simulator (OCPP 1.6)
   path: library/domains/energy/csms/generic/csms__ocpp.yaml
   domain: energy

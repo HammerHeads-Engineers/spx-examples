@@ -7,12 +7,21 @@ permissions:
   contents: read
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    name: Contribution checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: '1'
+      SPX_CATALOG_BASE_REF: ${{ github.event.pull_request.base.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -21,7 +30,15 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install poetry==2.2.1
           poetry install --with dev --no-interaction
-      - name: Validate models and catalog
-        run: poetry run python tools/validate_models.py
-      - name: Run unit tests
-        run: poetry run pytest -q tests/core/unit tests/mcp/unit tests/packs/*/unit
+      - name: Run the same credential-free checks as contributors and agents
+        run: poetry run python -m tools.check --report dist/contribution-checks.json
+      - name: Build a reviewable catalog artifact
+        run: poetry run python -m tools.catalog build --version ci.${{ github.run_id }} --output dist/catalog --require-clean
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: contribution-${{ matrix.os }}
+          path: |
+            dist/contribution-checks.json
+            dist/catalog/catalog.json
+            dist/catalog/model-files.zip

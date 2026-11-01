@@ -605,6 +605,43 @@ def validate_models(root: Path) -> ValidationResult:
         for model in models
         if isinstance(model.get("path"), str) and model.get("path")
     }
+    catalog = load_yaml(root / "library/catalog/models.yaml", result)
+    unpublished = (
+        catalog.get("unpublished_models", []) if isinstance(catalog, dict) else []
+    )
+    unpublished_paths = set()
+    if not isinstance(unpublished, list):
+        result.add("library/catalog/models.yaml: unpublished_models must be a list")
+        unpublished = []
+    for entry in unpublished:
+        if not isinstance(entry, dict) or set(entry) != {"path", "reason"}:
+            result.add(
+                "library/catalog/models.yaml: unpublished entries require path and reason"
+            )
+            continue
+        path, reason = entry["path"], entry["reason"]
+        if not isinstance(path, str) or not MODEL_PATH_RE.fullmatch(path):
+            result.add(
+                "library/catalog/models.yaml: unpublished model needs a canonical model path"
+            )
+            continue
+        if not isinstance(reason, str) or not reason.strip():
+            result.add(f"{path}: explain why the model is unpublished")
+        if (
+            not (root / path).is_file()
+            or path in model_paths
+            or path in unpublished_paths
+        ):
+            result.add(
+                f"{path}: unpublished model must exist and be listed exactly once, outside published models"
+            )
+        unpublished_paths.add(path)
+    for path in sorted(model_root.rglob("*.yaml")):
+        relative = path.relative_to(root).as_posix()
+        if relative not in model_paths | unpublished_paths:
+            result.add(
+                f"{relative}: model is missing from library/catalog/models.yaml; add its public catalog entry"
+            )
     validate_profiles(root, profiles, model_paths, industry_map, result)
     validate_pack_indexes(root, models, industry_map, result)
     return result

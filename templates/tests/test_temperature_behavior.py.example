@@ -1,0 +1,43 @@
+"""Adapt this runtime test for the generated temperature starter model.
+
+Copy to tests/core/runtime/test_your_model.py, set MODEL_PATH, and run only on
+a disposable test environment with SPX_PRODUCT_KEY and SPX_BASE_URL provided.
+"""
+import os
+import uuid
+from pathlib import Path
+
+import pytest
+import yaml
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("SPX_MODEL_RUNTIME_TESTS") != "1",
+    reason="Explicit runtime test environment required",
+)
+MODEL_PATH = Path("library/domains/environment/sensor/generic/community_pt100.yaml")
+
+
+def test_control_input_changes_temperature_telemetry():
+    import spx_python
+    key = os.environ.get("SPX_PRODUCT_KEY")
+    if not key:
+        pytest.skip("SPX_PRODUCT_KEY required")
+    client = spx_python.init(address=os.environ.get("SPX_BASE_URL", "http://localhost:8000"), product_key=key)
+    model_key = "contribution_test_" + uuid.uuid4().hex
+    instance_key = model_key + "_instance"
+    models, instances = client["models"], client["instances"]
+    try:
+        models[model_key] = yaml.safe_load(MODEL_PATH.read_text(encoding="utf-8"))
+        instances[instance_key] = model_key
+        instance = instances[instance_key]
+        instance.reset()
+        instance.start()
+        instance["attributes"]["k__temperature_c"].internal_value = 37.5
+        instance.run()
+        assert instance["attributes"]["temperature_c"].internal_value == pytest.approx(37.5)
+    finally:
+        if instance_key in instances.keys():
+            instances[instance_key].stop()
+            del instances[instance_key]
+        if model_key in models.keys():
+            del models[model_key]
