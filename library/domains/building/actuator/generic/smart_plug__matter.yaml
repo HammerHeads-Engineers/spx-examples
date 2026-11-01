@@ -7,6 +7,20 @@ description: |
   Matter OnOff smart plug / relay that talks to python-matter-server (used by Home Assistant).
   Uses command counters to emit On/Off commands and subscribes to the OnOff attribute for feedback.
 
+meta_parameters:
+  matter_server_ws_url:
+    type: str
+    default: "ws://matter-server:5580/ws"
+  matter_fabric_id:
+    type: str
+    default: "0x1"
+  matter_node_id:
+    type: str
+    default: "0x1234"
+  matter_endpoint:
+    type: int
+    default: 1
+
 attributes:
   switch_state:
     type: int
@@ -137,15 +151,15 @@ actions:
 communication:
   - matter:
       controller:
-        fabric_id: "0x1"
-        ws_url: "ws://matter-server:5580/ws"
+        fabric_id: "$param(matter_fabric_id)"
+        ws_url: "$param(matter_server_ws_url)"
       default_payload_codec: tlv
       bindings:
-        # Replace node_id/endpoint with the commissioned device values (see scripts/matter_client.py list-nodes).
+        # Provision node/endpoint parameters with the commissioned device values.
         - name: plug_state_feedback
           direction: inbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: OnOff
           attribute: OnOff
           subscription:
@@ -154,18 +168,18 @@ communication:
 
         - name: plug_command_on
           direction: outbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: OnOff
-          command: On
+          command: "On"
           read_attribute: "#attr(command_on_counter)"
 
         - name: plug_command_off
           direction: outbound
-          node_id: "0x1234"
-          endpoint: 1
+          node_id: "$param(matter_node_id)"
+          endpoint: "$param(matter_endpoint)"
           cluster: OnOff
-          command: Off
+          command: "Off"
           read_attribute: "#attr(command_off_counter)"
 
 scenarios:

@@ -106,6 +106,13 @@ the reconnect scenario performs Stop/Start of that same component.
 - OPC UA lighting panel: `opc.tcp://localhost:4844/spx/lighting-panel`
 - Matter server WebSocket: `ws://localhost:5580/ws`
 
+The Matter smart-plug and thermostat models use `matter_server_ws_url`,
+`matter_fabric_id`, `matter_node_id` and `matter_endpoint` meta parameters.
+Provision the node/endpoint with a device commissioned on that Matter fabric;
+the default node `0x1234` is an example identifier. The default WebSocket address
+inside a prepared stack is `ws://matter-server:5580/ws`. Keep Matter command
+names such as `"On"` and `"Off"` quoted in YAML so they remain protocol names.
+
 ## Tests
 
 - Unit and catalog checks: `tests/packs/smart_building_pack/unit`

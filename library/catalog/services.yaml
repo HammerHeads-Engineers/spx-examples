@@ -156,10 +156,10 @@ services:
       provider: spx-server
       notes: "Expose only if models requiring HTTP endpoints are enabled."
   - id: btvirt_adapter
-    name: btvirt Adapter
+    name: SPX BLE Adapter
     protocol: ble
     network_exposure: local_only
-    description: btvirt-backed fake BLE adapter that exposes BLE GATT devices over HTTP.
+    description: Native BLE adapter exposing configurable GATT devices through a local HTTP API.
     ports:
       - transport: tcp
         host: 8085
@@ -175,7 +175,7 @@ services:
         macos: ["bash", "installer/scripts/setup_btvirt_macos.sh"]
         linux: ["bash", "installer/scripts/setup_btvirt_linux.sh"]
       notes: >
-        The adapter spawns a local btvirt daemon; ensure the service is running before starting BLE models.
+        Start a supported macOS/Linux Bluetooth backend before BLE models. Current native installation policy is owned by spx-installer.
   - id: scpi_tcp_stack
     name: SCPI TCP Stack
     protocol: scpi
