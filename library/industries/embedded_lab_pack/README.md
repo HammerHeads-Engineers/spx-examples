@@ -4,6 +4,23 @@ BLE examples remain in the source library and preview catalogs while separate
 BLE QA is prepared. The current stable catalog omits those two models and their
 default instances; MQTT, LwM2M, SCPI and Modbus examples remain available.
 
+## Start here
+
+| Item | What to use |
+| --- | --- |
+| First SPX result | [Temperature tutorial](../../../examples/README.md#first-success-temperature-telemetry) |
+| SCPI selection | [Lab profile](../../../profiles/embedded_lab_pack/scpi_lab.yaml), with live listener ports discovered per instance |
+| MQTT/LwM2M/preview BLE selection | [mHealth profile](../../../profiles/embedded_lab_pack/mhealth_ci.yaml); inspect requirements before use |
+| Live workflow | [MCP/runtime guide](../../../docs/RUNTIME_WORKFLOW.md) |
+| Existing BLE script | [Preview example and requirements](../../../examples/packs/embedded_lab_pack/README.md) |
+
+Use a compatible SPX test server with capacity for the chosen devices. SCPI/Modbus
+models expose server-side listeners; external clients need the reachable host
+bindings. MQTT needs a broker, LwM2M needs a Leshan-compatible server, and BLE needs
+a separately supported adapter environment. Profiles declare selections and do
+not deploy those services. Start with the protocol-free temperature tutorial if
+you do not yet have the required infrastructure.
+
 Bundle of BLE/LwM2M/MQTT edge nodes and SCPI/modbus instruments for CI pipelines
 and firmware validation labs.
 
