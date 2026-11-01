@@ -17,6 +17,7 @@ from tools.model_catalog import (
     digest,
     read_yaml,
     select_models,
+    server_matches,
     verify_catalog,
 )
 
@@ -50,7 +51,15 @@ def _finite(value):
 
 
 def qualify_catalog(
-    directory, base_url: str, *, allow_writes=False, model_ids=(), expected_server=None
+    directory,
+    base_url: str,
+    *,
+    allow_writes=False,
+    model_ids=(),
+    expected_server=None,
+    excluded_protocols=(),
+    probe_all=False,
+    progress=None,
 ):
     if not allow_writes:
         raise CatalogError(
@@ -100,7 +109,20 @@ def qualify_catalog(
         raise CatalogError(
             f"Cannot establish an authenticated qualification session ({type(exc).__name__})"
         ) from None
-    selected = select_models(document, server, include_deprecated=True)
+    selected = (
+        document["models"]
+        if probe_all
+        else select_models(document, server, include_deprecated=True)
+    )
+    known_protocols = {p for m in document["models"] for p in m["protocols"]} | {
+        s["protocol"] for s in document["services"]
+    }
+    if set(excluded_protocols) - known_protocols:
+        raise CatalogError("Unknown excluded protocol")
+    excluded = [
+        m["id"] for m in selected if set(m["protocols"]) & set(excluded_protocols)
+    ]
+    selected = [m for m in selected if m["id"] not in excluded]
     if model_ids:
         unknown = set(model_ids) - {m["id"] for m in selected}
         if unknown:
@@ -113,8 +135,10 @@ def qualify_catalog(
             f"No catalog models declare compatibility with server {server}"
         )
     results = []
-    for model in selected:
+    for index, model in enumerate(selected, 1):
         model_id = model["id"]
+        if progress is not None:
+            progress(index, len(selected), model_id)
         instance_key = "catalog_qa_" + digest(model_id.encode())[:16]
         result = {
             "model_id": model_id,
@@ -123,6 +147,9 @@ def qualify_catalog(
             "behavior": "NOT_RUN",
             "lifecycle": "NOT_RUN",
             "cleanup": "NOT_RUN",
+            "declared_compatible": server_matches(
+                model["server_compatibility"], server
+            ),
         }
         stage = "registration"
         try:
@@ -205,7 +232,12 @@ def qualify_catalog(
         "source_commit": document["source"]["commit"],
         "catalog_sha256": digest((directory / "catalog.json").read_bytes()),
         "server_version": server,
-        "scope": "diagnostic-subset" if model_ids else "full-catalog",
+        "scope": (
+            "compatibility-probe"
+            if probe_all
+            else ("diagnostic-subset" if model_ids or excluded else "full-catalog")
+        ),
+        "excluded_models": excluded,
         "tested_at": datetime.now(timezone.utc).isoformat(),
         "checks": [
             "registration",

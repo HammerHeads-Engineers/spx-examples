@@ -1,0 +1,161 @@
+name: Model runtime compatibility
+
+on:
+  workflow_call:
+    secrets:
+      SPX_PRODUCT_KEY:
+        required: true
+    inputs:
+      catalog_artifact:
+        required: true
+        type: string
+      channel:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Catalog scope to test without publishing
+        type: choice
+        options: [stable, preview]
+        default: stable
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'HammerHeads-Engineers/spx-examples' &&
+      (github.ref_name == 'main' || github.ref_name == 'develop')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+      artifact: ${{ steps.catalog.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - uses: actions/download-artifact@v8
+        if: inputs.catalog_artifact != ''
+        with:
+          name: ${{ inputs.catalog_artifact }}
+          path: dist/catalog
+      - name: Prepare standalone candidate or use the caller's exact artifact
+        id: catalog
+        env:
+          INPUT_ARTIFACT: ${{ inputs.catalog_artifact }}
+          CATALOG_CHANNEL: ${{ inputs.channel || 'stable' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$INPUT_ARTIFACT" ]; then
+            poetry run python -m tools.catalog build --version "qa.$GITHUB_RUN_ID" --channel "$CATALOG_CHANNEL" --output dist/catalog --require-clean
+            echo 'artifact=runtime-catalog' >> "$GITHUB_OUTPUT"
+          else
+            poetry run python -m tools.catalog verify dist/catalog
+            echo "artifact=$INPUT_ARTIFACT" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: inputs.catalog_artifact == ''
+        with:
+          name: runtime-catalog
+          path: dist/catalog/
+          if-no-files-found: error
+      - name: Freeze latest stable, latest RC and all declared server targets
+        id: targets
+        run: poetry run python -m tools.runtime_targets dist/catalog --output dist/runtime-matrix.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: runtime-matrix
+          path: dist/runtime-matrix.json
+          if-no-files-found: error
+
+  runtime:
+    needs: prepare
+    name: SPX ${{ matrix.channel }} ${{ matrix.version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: catalog-qualification
+    continue-on-error: ${{ !matrix.qualifying }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.prepare.outputs.artifact }}
+          path: dist/catalog
+      - name: Start disposable server/services and test published models
+        env:
+          SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+          SERVER_VERSION: ${{ matrix.version }}
+          SERVER_IMAGE: ${{ matrix.image }}
+          SERVER_CHANNEL: ${{ matrix.channel }}
+          QUALIFYING: ${{ matrix.qualifying }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          arguments=()
+          report="qualification-$SERVER_VERSION.json"
+          if [ "$QUALIFYING" != true ]; then
+            arguments+=(--probe-all)
+            report="probe-$SERVER_CHANNEL-$SERVER_VERSION.json"
+          fi
+          poetry run python -m tools.runtime_stack dist/catalog --server-image "$SERVER_IMAGE" --expected-server "$SERVER_VERSION" --output "dist/reports/$report" "${arguments[@]}"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: runtime-${{ matrix.channel }}-${{ matrix.version }}
+          path: dist/reports/
+          if-no-files-found: error
+
+  evidence:
+    needs: [prepare, runtime]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.prepare.outputs.artifact }}
+          path: dist/catalog
+      - uses: actions/download-artifact@v8
+        with:
+          name: runtime-matrix
+          path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: runtime-*-*
+          merge-multiple: true
+          path: dist/reports
+      - name: Enforce declared compatibility and summarize advisory probes
+        run: poetry run python -m tools.runtime_policy dist/catalog dist/runtime-matrix.json dist/reports --output dist/runtime-summary.json --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: runtime-summary
+          path: dist/runtime-summary.json
+          if-no-files-found: error

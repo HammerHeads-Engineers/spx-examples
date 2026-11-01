@@ -45,8 +45,10 @@ class Instances(dict):
 
 
 @pytest.mark.parametrize("fail", [False, True])
+@pytest.mark.parametrize("probe", [False, True])
+@pytest.mark.parametrize("exclude", [False, True])
 def test_qualifier_records_runtime_stages_and_always_cleans_up(
-    source, tmp_path, monkeypatch, fail
+    source, tmp_path, monkeypatch, fail, probe, exclude
 ):
     directory = tmp_path / "artifact"
     document = export_catalog(source, directory, "test.runtime")
@@ -59,13 +61,26 @@ def test_qualifier_records_runtime_stages_and_always_cleans_up(
             pass
 
         def json(self):
-            return {"server_version": "v1.0.0-rc.78"}
+            return {"server_version": "v0.2.0" if probe else "v1.0.0-rc.78"}
 
     monkeypatch.setattr("requests.get", lambda *args, **kwargs: Response())
-    report = qualify_catalog(directory, "http://localhost:18000", allow_writes=True)
-    assert report["server_version"] == "1.0.0-rc.78"
+    report = qualify_catalog(
+        directory,
+        "http://localhost:18000",
+        allow_writes=True,
+        probe_all=probe,
+        excluded_protocols=["mqtt"] if exclude else [],
+    )
+    assert report["server_version"] == ("0.2.0" if probe else "1.0.0-rc.78")
     assert report["status"] == ("FAILED" if fail else "PASSED")
-    assert len(report["results"]) == len(document["models"])
+    assert len(report["results"]) == len(document["models"]) - int(exclude)
+    assert report["excluded_models"] == (["Env.EnvSensor.Mqtt"] if exclude else [])
+    assert report["scope"] == (
+        "compatibility-probe"
+        if probe
+        else ("diagnostic-subset" if exclude else "full-catalog")
+    )
+    assert all(row["declared_compatible"] == (not probe) for row in report["results"])
     assert all(row["registration"] == "PASSED" for row in report["results"])
     assert all(row["cleanup"] == "PASSED" for row in report["results"])
     assert not client["models"] and not client["instances"]

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2025 Hammerheads Engineers Sp. z o.o.
 # Helper routines for thermal simulations and actuator dynamics.
+from __future__ import annotations
+
 import math
 from typing import Tuple
 

@@ -6,7 +6,8 @@ private `spx-installer`. No installer release is needed for a new model catalog.
 
 ## Branches and promotion
 
-Contributions target `develop`. Its reviewed merges produce immutable preview
+Contributions target `develop`. Its reviewed merges, after the required runtime
+checks, produce immutable preview
 releases named `catalog-preview.<run-id>`. Stable catalog versions are explicitly
 chosen (for example `2026.11.01.1`) and published by manual dispatch from `main`
 after the model changes have been reviewed and promoted there. The version is
@@ -21,29 +22,49 @@ maintainer reviewers for stable publication and qualification as appropriate.
 Fork PR jobs have read-only permissions and no runtime credentials. The release
 workflow only publishes in the canonical repository from the designated branches.
 
-## Qualification environment setup
+## CI-managed qualification
 
-In the `catalog-qualification` GitHub environment configure:
+Configure the secret `SPX_PRODUCT_KEY` in the GitHub environment
+`catalog-qualification`, restricted to `main` and `develop`. The product key is
+passed through the environment, never through workflow arguments or committed
+files. Public fork/PR checks remain credential-free. There is no permanently
+running qualification server or CI endpoint URL to maintain.
+The publication workflow explicitly forwards the named secret to the reusable
+workflow; its `workflow_call` declaration requires it. The environment-scoped
+value takes precedence and remains restricted to the permitted branches.
 
-- Secret `SPX_PRODUCT_KEY`, for the disposable qualification environment.
-- Variable `SPX_CATALOG_QUALIFICATION_URLS`, JSON mapping each exact declared
-  server target to its credential-free API base URL, for example
-  `{"1.0.0-rc.78":"https://qualification.example.invalid"}`.
+`Model runtime compatibility` runs before preview/stable publication and by
+manual dispatch without publication. It discovers the latest official
+and RC server images from the public registry and retains all exact targets
+declared by the candidate catalog. It freezes their version/digest matrix as a
+workflow artifact. A newly published server does not silently change model
+compatibility declarations.
 
-Provision dedicated servers and their protocol dependencies through the private
-deployment/qualification infrastructure. The runner must be able to reach them.
-Mount the catalog's reviewed `extensions/` resources where required by that
-server. Endpoints must start with empty model and instance registries; never use
-the user's working server. Different matrix targets need corresponding server
-versions and isolated endpoints. The workflow serializes release runs.
+Each matrix job creates its own disposable SPX Server, MQTT broker, software
+KNX bus, LwM2M server and Matter controller service. Dependency images are pinned
+in `tests/runtime/images.json`; test-only configs live alongside it. Only the
+SPX API is published on an ephemeral loopback port. Resources come from the
+candidate artifact. The harness collects key-redacted logs and removes its own
+containers, anonymous data volumes and network even after failures. Writable
+Matter state stays in a Docker volume so root-owned files do not remain on the
+runner filesystem. These are CI fixtures, not product
+installation or native-adapter provisioning recipes.
 
-Prepare the declared protocol services as well as the SPX API. Matter models
-take their controller/fabric/node/endpoint through meta parameters; a node ID
-such as `0x1234` is a provisioning example. BLE models require a running SPX BLE
-Adapter on a supported macOS/Linux host with its Bluetooth backend available.
-A Windows Docker server alone does not provide that adapter. Supply its URL
-through `ble_adapter_base_url` in the prepared test environment; an unavailable
-adapter is a failed qualification, not a reason to skip those catalog models.
+Declared compatibility targets are required checks. Latest official/RC versions
+outside those declarations are advisory compatibility probes: their failures
+are shown explicitly in the workflow summary and artifacts, and do not invent
+support for an older or newer server. Initially the latest official release is
+0.2.0 and the declared target is 1.0.0-rc.78; they are separate test rows. The
+runtime checks verify the server's reported version rather than trusting a tag.
+
+BLE examples are deferred to a later model release. Both remain in the source
+library and preview catalogs with `distribution.channels: [preview]`. Stable
+catalogs currently contain the other 95 models, with matching pack presets and
+example-instance lists. Preview software checks record the two BLE exclusions
+as a diagnostic subset. Stable checks must cover every model actually present
+in the stable artifact; a partial report cannot qualify that artifact. Promoting
+BLE requires adding its native/virtual Bluetooth test environment and updating
+the channel policy together, rather than marking unavailable tests as passed.
 
 The qualifier reads `/api/versions` itself and verifies the reported version
 against the selected matrix target. For every compatible model it tests:
@@ -64,16 +85,28 @@ After committing the exact candidate source:
 
 ```sh
 poetry run python -m tools.check
-poetry run python -m tools.catalog build --version preview.rehearsal --output dist/rehearsal --require-clean
+poetry run python -m tools.catalog build --version preview.rehearsal --channel preview --output dist/rehearsal --require-clean
 poetry run python -m tools.catalog release-manifest dist/rehearsal --channel preview
 ```
 
-That verifies the preview artifact flow without publishing anything. For real
-runtime evidence, supply the key through your local environment and run:
+That verifies the preview artifact flow without publishing anything. To reproduce
+the CI matrix locally, provide the key through your environment and run:
 
 ```sh
-poetry run python -m tools.catalog qualify dist/rehearsal --base-url http://localhost:18000 --allow-runtime-writes --output dist/qualification-1.0.0-rc.78.json
-poetry run python -m tools.catalog release-manifest dist/rehearsal --channel stable --qualification dist/qualification-1.0.0-rc.78.json
+poetry run python -m tools.catalog build --version qa.local --channel stable --output dist/qa-local --require-clean
+poetry run python -m tools.runtime_targets dist/qa-local --output dist/runtime-matrix.json
+```
+
+For each frozen matrix row, run `python -m tools.runtime_stack` with its exact
+`--server-image`, `--expected-server` and `--output`. Advisory rows additionally
+use `--probe-all`. The same harness and fixtures run on a local Docker engine.
+Inspect `python -m tools.runtime_stack --help` for the complete interface.
+
+The existing direct API qualifier also supports explicitly prepared, empty servers:
+
+```sh
+poetry run python -m tools.catalog qualify dist/qa-local --base-url http://localhost:18000 --allow-runtime-writes --output dist/qualification-1.0.0-rc.78.json
+poetry run python -m tools.catalog release-manifest dist/qa-local --channel stable --qualification dist/qualification-1.0.0-rc.78.json
 ```
 
 Stable metadata is refused unless full passing reports cover every declared

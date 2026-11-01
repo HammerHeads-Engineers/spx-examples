@@ -27,6 +27,7 @@ distribution:
   resources:
     - extensions/thermal_model.py
   status: active
+  channels: [preview, stable]
 ```
 
 `resources` lists individual repository files under `extensions/` or
@@ -38,6 +39,14 @@ resource dependencies still require explicit declarations and runtime tests.
 
 To deprecate a model, set `status: deprecated` and optionally `replaced_by` to an
 existing different model ID. Keep the old entry available for existing users.
+
+`channels` defaults to `[preview, stable]`. A model under evaluation can use
+`[preview]` while retaining its source ID and path. `build --channel stable`
+omits those definitions/resources and filters pack protocol presets, default
+instances and auto-start lists to the models in that artifact. The default build
+channel is preview. The release manifest records the channel; the catalog v1
+JSON shape remains the same, as a self-contained snapshot of its published
+models. The two BLE examples are currently preview-only pending separate BLE QA.
 
 ## Compatibility and versions
 
@@ -59,7 +68,7 @@ and a retained usable previous release.
 ## Build and inspect
 
 ```sh
-poetry run python -m tools.catalog build --version preview.local --output dist/catalog-local
+poetry run python -m tools.catalog build --version preview.local --channel preview --output dist/catalog-local
 poetry run python -m tools.catalog verify dist/catalog-local
 poetry run python -m tools.catalog list dist/catalog-local --server 1.0.0-rc.78 --protocol modbus
 poetry run python -m tools.catalog list dist/catalog-local --server 1.0.0-rc.78 --pack industrial_iiot_pack --protocol mqtt
