@@ -4,6 +4,27 @@ OPC UA/Modbus/MQTT/HTTP-oriented kit for line automation, process control and
 factory monitoring. The present iteration links the models we already maintain;
 additional Redfish device twins can land alongside.
 
+## Start here
+
+| Item | What to use |
+| --- | --- |
+| First SPX result | [Temperature tutorial](../../../examples/README.md#first-success-temperature-telemetry) |
+| Protocol-free behavior | `Process.ThermalController.Advanced`: `setpoint`, `temperature`, `heating_power` |
+| Process-cell preset | [Process-cell profile](../../../profiles/industrial_iiot_pack/process_cell_quickstart.yaml) |
+| Coupled Modbus demo | [PLC/VFD/meter profile](../../../profiles/industrial_iiot_pack/modbus_master_plc_demo.yaml) |
+| Live workflow | [MCP/runtime guide](../../../docs/RUNTIME_WORKFLOW.md) |
+
+Use a compatible SPX test server with its declared model helpers available. An
+agent can register the advanced thermal model, start a uniquely named instance
+and observe the response to a setpoint change. The legacy public attributes above
+are intentionally retained; do not rename them to follow new-model conventions.
+Success means `RUNNING` plus the observed behavior, not closed-loop protocol proof.
+Stop/delete only the example objects when finished.
+
+Profiles select models/services rather than deploying them. Ports below are
+prepared-deployment defaults; inspect actual instance endpoints/host bindings.
+The coupled Modbus demo also needs its slave devices and explicit read/write tests.
+
 Legacy `modbus_tcp` twins (thermal/PID controllers, VFD, pressure transmitter,
 I/O module) expose `modbus_host` and `modbus_port` provisioning parameters.
 The default container port remains 502 for compatibility with the shared gateway.
@@ -26,8 +47,8 @@ to `false` (MQTT `command/autonomous_navigation`) to use the legacy manual
 - **Models**: motion control, process instrumentation, QA instrumentation, vendor-specific controllers (Eurotherm, Siemens, Schneider Electric, WAGO, APC Rack PDU).
 - **OPC UA**: process-focused twins:
   * `Process.ProcessCell.OpcUa` – thermal/pressure loop mirroring AsyncUA tests.
-  * `Process.Workcell.OpcUa` – robotic/machining gniazdo z pomiarem cykli i alarmami.
-  * `Process.PackagingLine.OpcUa` – linia pakująca z wrapperem, kolejką i alarmami.
+  * `Process.Workcell.OpcUa` – robotic/machining cell with cycle measurements and alarms.
+  * `Process.PackagingLine.OpcUa` – packaging line with wrapper, queue and alarms.
   * `Process.ProcessCell.SiemensS7_1500.OpcUa` – vendor-specific process cell endpoint.
 - **Quickstarts**:
   * `profiles/industrial_iiot_pack/process_cell_quickstart.yaml`

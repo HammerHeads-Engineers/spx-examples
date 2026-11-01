@@ -2,7 +2,8 @@
 
 Use this template for persistent model contributions in `repo_dev` mode. For a
 runtime-only request, follow the smaller `runtime_mcp` workflow in `AGENTS.md`.
-Read `CONTRIBUTING.md`, `docs/LLM_SPEC.md`, and `docs/MODEL_LANGUAGE.md` first.
+Follow [CONTRIBUTING.md](../CONTRIBUTING.md) and the [authoring rules](LLM_SPEC.md).
+Read the [language reference](MODEL_LANGUAGE.md) before substantive YAML work.
 
 ## Goal
 - What is the change and why?
@@ -13,6 +14,7 @@ Read `CONTRIBUTING.md`, `docs/LLM_SPEC.md`, and `docs/MODEL_LANGUAGE.md` first.
 - Target protocol:
 - Required source constraints (if vendor/protocol-specific):
 - Branch policy: contribution PR base is `develop`.
+- Canonical base reference: `origin/develop` for a maintainer checkout or `upstream/develop` for a fork.
 
 ## Base example
 - Closest existing model/profile/test used as a starting point:
@@ -51,7 +53,8 @@ poetry run python -m tools.check --json --report dist/contribution-checks.json
 ```
 
 The shared check runs structural validation, public-contract checks when a base
-reference is supplied, catalog export verification, and the relevant unit suites.
+reference is supplied, documentation checks, catalog export verification, and unit suites.
+Use `--base-ref upstream/develop` in the fork workflow from CONTRIBUTING.
 Add behavior tests that prove the change; use
 `templates/tests/test_temperature_behavior.py.example` as a runtime starting point.
 `--no-tests` is a structural check only, not complete contribution validation.

@@ -1,28 +1,30 @@
-# spx-examples
+# SPX public model library
 
-Public SPX models, industry packs, runnable examples, runtime MCP modules and
-agent working instructions. The full product documentation lives at
-[docs.simplephysx.com](https://docs.simplephysx.com).
+Find a simulation model, run it on SPX, or contribute a reusable model for other
+people and agents. This repository contains model YAML, industry packs, examples,
+runtime MCP tools and the checks used to review community contributions.
 
-## Choose your next step
+## Start with your task
 
-| I want to… | Start here |
-| --- | --- |
-| Work with an agent: choose live runtime or a durable contribution | [Agent Start Here](https://docs.simplephysx.com/llm-first-model-authoring/agent-start-here) |
-| Install SPX | [Installation Guide](https://docs.simplephysx.com/readme/installation-guide) |
-| Understand model definitions in YAML or JSON | [Model documentation](https://docs.simplephysx.com/reference/model-definition-reference), or [offline snapshot](docs/MODEL_LANGUAGE.md) |
-| Find an existing model or industry pack | [Device Catalog](https://docs.simplephysx.com/usage-scenarios-and-examples/device-catalog), then `library/` below |
-| Run my first simulation in the UI | [First device in the UI](https://docs.simplephysx.com/readme/getting-started) |
-| Write a model in YAML or JSON | [Create your first model](https://docs.simplephysx.com/spx-development-guide/build-your-first-simulation) |
-| Work with a live server through an agent | [MCP guide](https://docs.simplephysx.com/llm-first-model-authoring/connect-llm-with-spx-mcp), or [offline snapshot](docs/MCP.md) |
-| Contribute a model, as a person or agent | [Contribution quickstart](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), [task template](docs/LLM_TASK_TEMPLATE.md) |
-| Build or consume a versioned model catalog | [Catalog contract](docs/CATALOG_CONTRACT.md), [release flow](docs/CATALOG_RELEASES.md) |
+| Your goal | Start here | Expected result |
+| --- | --- | --- |
+| Find and use a model | [Library overview](#library-overview), [published catalogs](https://github.com/HammerHeads-Engineers/spx-examples/releases) and [first example](examples/README.md) | A suitable model and a verified running example |
+| Work on a live server with an agent | [Runtime workflow](docs/RUNTIME_WORKFLOW.md) | A working instance, scenario or connection on that server |
+| Add or improve a shared model | [Contributing](CONTRIBUTING.md) | A tested, reviewable PR to `develop` |
+| Maintain or consume catalog releases | [Catalog contract](docs/CATALOG_CONTRACT.md) and [release operations](docs/CATALOG_RELEASES.md) | A pinned catalog with explicit compatibility and evidence |
+
+Need to install SPX first? Follow the product
+[installation guide](https://docs.simplephysx.com/readme/installation-guide).
+Use [the documentation map](docs/README.md) to find syntax, agent rules and QA notes.
 
 ## Library overview
 
 <!-- catalog-overview:start -->
 
-97 catalog models across 5 domain groups.
+Source library: **97 models** across 5 domain groups.
+
+Channel eligibility in this checkout: **97 preview / 95 stable**.
+These counts describe source policy; released contents and qualification are recorded in release assets.
 
 | Domain group | Models |
 | --- | ---: |
@@ -39,34 +41,25 @@ Protocol tags: `bacnet`, `ble`, `coap`, `http`, `knx`, `lwm2m`, `matter`, `modbu
 These are reference simulations, not manufacturer-certified digital twins.
 <!-- catalog-overview:end -->
 
-The library advances independently of product installers. Public `catalog-*`
-releases contain versioned discovery metadata, model/resource hashes and an
-offline model archive. Preview and qualified stable releases follow the
-[catalog release flow](docs/CATALOG_RELEASES.md). Existing installer builds still
-use their pinned public context until their catalog consumer is updated;
-updating this checkout does not update installed services or running instances.
-Stable catalogs can contain fewer models than the source library when examples
-are preview-only. BLE is currently deferred; CI tests all models published in the
-stable artifact against declared server targets and probes latest official/RC
-servers separately.
+Source membership and release qualification answer different questions. For a
+published catalog's exact model set and tested server versions, inspect its
+`catalog.json`, `release.json` and qualification reports. A protocol tag identifies
+an interface; lifecycle qualification does not certify every wire mapping.
+BLE models remain preview-only pending separate BLE qualification.
 
-## Repository map
+## Run your first example
 
-| Path | Contents |
-| --- | --- |
-| `library/domains/<domain_group>/<device_class>/<vendor>/` | Model YAML files |
-| `library/catalog/` | Discovery, domain, pack and service metadata |
-| `library/industries/` and `profiles/` | Pack instructions, indexes and presets |
-| `examples/` and `extensions/` | Runnable scripts/notebooks and model helpers |
-| `spx_mcp/` | Runtime MCP and catalog tools |
-| `tests/` and `tools/` | Validation and contribution tooling |
-| `schemas/` and `templates/` | Distribution contract, model starter and behavior-test template |
-| `docs/` | Agent playbook plus generated offline product references |
+Use a running SPX test server and the Python client to change a temperature input,
+read the resulting telemetry, and clean up the example's own model and instance.
+The [example quickstart](examples/README.md#first-success-temperature-telemetry)
+provides Windows and Linux/macOS setup, the command, expected output and recovery
+steps. It needs no external protocol service or physical device.
 
-## Minimal model: PT100-style temperature telemetry
+## Minimal model: temperature input and telemetry
 
-Save this as `pt100_demo.yaml` while experimenting:
+This complete definition demonstrates the same input/output relationship:
 
+<!-- spx-model-example -->
 ```yaml
 name: pt100_demo
 description: Minimal deterministic temperature sensor
@@ -85,54 +78,55 @@ actions:
     call: $in(k__temperature_c)
 ```
 
-`k__temperature_c` is the persistent input; `temperature_c` is telemetry.
-This is a temperature model, not a physical PT100 resistance calculation.
-The [complete offline reference](docs/MODEL_LANGUAGE.md) provides equivalent
-JSON and explains units, actions, scenarios, timers and parameterized
-communication. The [portal model documentation](https://docs.simplephysx.com/reference/model-definition-reference)
-is the stable online entry point. Library contributions use YAML and require a
-catalog entry; JSON is supported at the API/import boundary.
+`k__temperature_c` is a persistent control input; `temperature_c` is telemetry.
+This simulates temperature telemetry rather than PT100 electrical resistance.
+The [model reference](docs/MODEL_LANGUAGE.md) defines the language and equivalent
+JSON form. Library contributions use YAML; the API/import boundary also accepts JSON.
 
-## Development and validation
+## Contribute and validate
 
-Use Python 3.12 (the CI baseline) and Poetry. MCP requires Python 3.10+.
+For a development checkout, use Python 3.12 and Poetry 2.2.1, matching CI:
 
 ```sh
 poetry install --with dev
 poetry run python -m tools.check
 ```
 
-This is the same credential-free command used by public CI on Windows and Linux.
-Use `--json --report dist/contribution-checks.json` for agents and `--no-tests`
-only for fast structural iteration. See [CONTRIBUTING.md](CONTRIBUTING.md) for
-the scaffold command, behavioral twins, generated-file refresh, testing and PR
-review. A model/catalog draft and its derived indexes can be created together:
+The shared credential-free check covers models, catalogs, documentation,
+generated indexes, archive integrity and unit tests on Windows and Linux.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete fork-to-PR flow and scaffold
+command. Agents start with [AGENTS.md](AGENTS.md) and read task-specific guidance.
+Local live work follows the smaller [runtime workflow](docs/RUNTIME_WORKFLOW.md).
 
-```sh
-poetry run python -m tools.catalog scaffold --id Community.Pt100 --name community_pt100 --description "Temperature demo" --pack embedded_lab_pack
-```
+## Repository map
 
-Static validation does not establish runtime compatibility. Stable catalog
-publication requires reports from actual target servers, bound to the exact
-catalog hash. Model-specific protocol proof remains part of transport changes.
+| Path | Responsibility |
+| --- | --- |
+| `library/domains/<group>/<class>/<vendor>/` | Model YAML: behavior, state and protocol bindings |
+| `library/catalog/` | IDs, discovery, pack membership, services and distribution policy |
+| `library/industries/` and `profiles/` | Pack documentation, generated indexes and presets |
+| `examples/` | Runnable tutorials, scripts and notebooks |
+| `extensions/` | Helpers explicitly required by models |
+| `spx_mcp/` | Repository-aware catalog tools and live-server MCP operations |
+| `tests/`, `tools/`, `scripts/` | Behavior tests, validation and maintenance commands |
+| `schemas/` and `templates/` | Catalog schema and contribution starters |
+| `docs/` | Task guides, catalog contracts and pinned offline product references |
 
-For live work, set `SPX_BASE_URL` and `SPX_PRODUCT_KEY` locally; keep keys private.
-Integration tests require the corresponding stack and services. Start the
-installed environment with SPX Start before running the examples.
+## Ownership and versions
 
-## Documentation ownership and updates
+[spx-docs](https://docs.simplephysx.com) owns product behavior, model-language
+semantics and public API reference. This repository owns practical examples,
+library conventions, contribution workflows and model-catalog releases.
+`docs/MODEL_LANGUAGE.md` and `docs/MCP.md` are generated snapshots pinned by
+[docs-source.json](docs-source.json); propose semantic corrections upstream.
 
-`spx-docs/main` owns product semantics. `docs/MODEL_LANGUAGE.md` and `docs/MCP.md`
-are complete generated offline snapshots; [docs-source.json](docs-source.json)
-records their exact source. Propose semantic corrections in `spx-docs`, not by
-editing these exports. A daily/manual workflow opens a review PR against
-`develop` when those canonical pages change; changes reach `main` through normal
-promotion. `AGENTS.md`, `LLM_SPEC.md` and task templates remain local working rules.
+Catalog versions, catalog schema versions, SPX Server versions, Python package
+versions and installer versions are independent. Compatibility belongs in
+[catalog metadata](docs/CATALOG_CONTRACT.md#compatibility-and-versions) and is
+verified against actual servers before stable publication.
 
-Product/MCP installation, Python preparation, client configuration, native
-packaging, signing and product release publication belong to private `spx-installer`.
-Public model-only catalog publication belongs here and includes no installer code.
-Get product packages through [SPX Downloads](https://staging.simplephysx.com/downloads).
-`downloads.simplephysx.com` delivers authorized files. This public repository
-has fresh history and contains no installer code, installer releases, product
-Compose bundle or compatibility shims for older installers.
+Product installation, client configuration, packaging and signing belong to the
+private `spx-installer` repository. Its current builds use pinned public context;
+the [published-catalog consumer contract](docs/CATALOG_CONTRACT.md#installer-consumer-contract)
+describes the integration to implement there. Updating this checkout or publishing
+a catalog does not migrate installed services or live instances.

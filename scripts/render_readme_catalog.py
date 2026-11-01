@@ -19,10 +19,20 @@ def render(root=ROOT):
     )["industries"]
     domains = Counter(m.get("domain_group", m.get("domain")) for m in models)
     protocols = sorted({v for m in models for v in m.get("protocols", [])})
+    eligible = Counter(
+        channel
+        for model in models
+        for channel in model.get("distribution", {}).get(
+            "channels", ["preview", "stable"]
+        )
+    )
     lines = [
         START,
         "",
-        f"{len(models)} catalog models across {len(domains)} domain groups.",
+        f"Source library: **{len(models)} models** across {len(domains)} domain groups.",
+        "",
+        f"Channel eligibility in this checkout: **{eligible['preview']} preview / {eligible['stable']} stable**.",
+        "These counts describe source policy; released contents and qualification are recorded in release assets.",
         "",
         "| Domain group | Models |",
         "| --- | ---: |",

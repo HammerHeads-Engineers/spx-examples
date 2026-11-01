@@ -1,5 +1,14 @@
 # Release model behavior checks
 
+<!-- documentation-status: historical -->
+
+> Scope: targeted behavior notes for a historical 54-model installer selection.
+> Version-specific findings below, including rc.65 OPC UA paths, need rechecking
+> on the actual target runtime. This is not a qualification certificate for the
+> current catalog. Use [release operations](CATALOG_RELEASES.md) and the exact
+> reports attached to [published catalogs](https://github.com/HammerHeads-Engineers/spx-examples/releases)
+> for current model coverage. General behavior checks here remain useful test ideas.
+
 The BACnet, KNX, Modbus and OPC UA installer selection contains 54 models.
 Starting an instance is only the first check: verify that polling continues,
 numeric outputs remain finite, controls affect telemetry and scenarios recover.
