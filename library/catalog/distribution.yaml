@@ -1,0 +1,10 @@
+# Distribution metadata; model language semantics remain in model YAML files.
+schema_version: 1
+library_id: spx-examples
+repository: HammerHeads-Engineers/spx-examples
+license: MIT
+# A declared target is not runtime test evidence. Stable publication requires
+# a passing qualification report for this exact catalog and every target.
+server_compatibility: '==1.0.0-rc.78'
+qualification_targets:
+  - 1.0.0-rc.78

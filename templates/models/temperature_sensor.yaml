@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+name: temperature_sensor
+description: Deterministic temperature telemetry; adapt this draft to the device.
+attributes:
+  k__temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+  temperature_c:
+    type: float
+    default: 20.0
+    unit: degC
+actions:
+  - function: $in(temperature_c)
+    name: update_temperature
+    call: $in(k__temperature_c)

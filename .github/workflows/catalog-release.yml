@@ -1,0 +1,178 @@
+name: Publish model catalog
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Preview from develop or qualified stable from main
+        required: true
+        type: choice
+        options: [preview, stable]
+      version:
+        description: Immutable catalog version (required for stable, e.g. 2026.11.01.1)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# A qualification endpoint is disposable and shared by trusted release runs.
+concurrency:
+  group: model-catalog-publication
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    if: >-
+      github.repository == 'HammerHeads-Engineers/spx-examples' &&
+      (github.ref_name == 'develop' ||
+       (github.event_name == 'workflow_dispatch' && github.ref_name == 'main' && inputs.channel == 'stable'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      channel: ${{ steps.metadata.outputs.channel }}
+      version: ${{ steps.metadata.outputs.version }}
+      targets: ${{ steps.metadata.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - name: Validate publication inputs and declared server targets
+        id: metadata
+        shell: bash
+        env:
+          REQUESTED_CHANNEL: ${{ inputs.channel }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          poetry run python - <<'PY'
+          import json, os
+          from tools.model_catalog import ROOT, VERSION_RE, distribution_config
+          channel = os.environ.get('REQUESTED_CHANNEL') or 'preview'
+          branch = os.environ['GITHUB_REF_NAME']
+          if (channel == 'stable' and branch != 'main') or (channel == 'preview' and branch != 'develop'):
+              raise SystemExit('Preview publishes from develop; stable publishes from main.')
+          version = os.environ.get('REQUESTED_VERSION') or ('' if channel == 'stable' else 'preview.' + os.environ['GITHUB_RUN_ID'])
+          if not VERSION_RE.fullmatch(version):
+              raise SystemExit('Provide an explicit immutable catalog version for stable.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('channel=' + channel + '\nversion=' + version + '\n')
+              output.write('targets=' + json.dumps(distribution_config(ROOT)['qualification_targets']) + '\n')
+          PY
+      - run: poetry run python -m tools.check --report dist/contribution-checks.json
+      - name: Export committed model content
+        env:
+          CATALOG_VERSION: ${{ steps.metadata.outputs.version }}
+        run: poetry run python -m tools.catalog build --version "$CATALOG_VERSION" --output dist/catalog --require-clean
+      - uses: actions/upload-artifact@v7
+        with:
+          name: catalog-candidate
+          path: dist/catalog/
+          if-no-files-found: error
+
+  qualify:
+    needs: candidate
+    if: needs.candidate.outputs.channel == 'stable'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: catalog-qualification
+    strategy:
+      fail-fast: false
+      matrix:
+        server: ${{ fromJSON(needs.candidate.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - uses: actions/download-artifact@v8
+        with:
+          name: catalog-candidate
+          path: dist/catalog
+      - name: Qualify every compatible model on the actual target server
+        env:
+          SPX_PRODUCT_KEY: ${{ secrets.SPX_PRODUCT_KEY }}
+          SPX_CATALOG_QUALIFICATION_URLS: ${{ vars.SPX_CATALOG_QUALIFICATION_URLS }}
+          SERVER_TARGET: ${{ matrix.server }}
+        run: >-
+          poetry run python -m tools.catalog qualify dist/catalog
+          --target "$SERVER_TARGET" --allow-runtime-writes
+          --output "dist/qualification-$SERVER_TARGET.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qualification-${{ matrix.server }}
+          path: dist/qualification-*.json
+          if-no-files-found: error
+
+  publish:
+    needs: [candidate, qualify]
+    if: >-
+      always() && needs.candidate.result == 'success' &&
+      (needs.candidate.outputs.channel == 'preview' || needs.qualify.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: catalog-${{ needs.candidate.outputs.channel }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install poetry==2.2.1
+      - run: poetry install --with dev --no-interaction
+      - uses: actions/download-artifact@v8
+        with:
+          name: catalog-candidate
+          path: dist/catalog
+      - uses: actions/download-artifact@v8
+        if: needs.candidate.outputs.channel == 'stable'
+        with:
+          pattern: qualification-*
+          merge-multiple: true
+          path: dist/catalog
+      - name: Reverify artifacts and enforce the stable qualification gate
+        env:
+          CATALOG_CHANNEL: ${{ needs.candidate.outputs.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          arguments=()
+          for report in dist/catalog/qualification-*.json; do
+            arguments+=(--qualification "$report")
+          done
+          poetry run python -m tools.catalog release-manifest dist/catalog --channel "$CATALOG_CHANNEL" "${arguments[@]}"
+      - name: Publish an immutable library release (not a product installer)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CATALOG_CHANNEL: ${{ needs.candidate.outputs.channel }}
+          CATALOG_VERSION: ${{ needs.candidate.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="catalog-$CATALOG_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'This catalog version already exists. Published versions must not be overwritten.' >&2
+            exit 1
+          fi
+          shopt -s nullglob
+          flags=()
+          if [ "$CATALOG_CHANNEL" = preview ]; then flags+=(--prerelease); fi
+          files=(dist/catalog/catalog.json dist/catalog/release.json dist/catalog/model-files.zip dist/catalog/qualification-*.json)
+          gh release create "$tag" "${files[@]}" --draft --target "$GITHUB_SHA" --title "Model catalog $CATALOG_VERSION ($CATALOG_CHANNEL)" --notes 'Public SPX model library. Compatibility declarations are in catalog.json; runtime evidence, when present, is referenced by release.json.' "${flags[@]}"
+          gh release edit "$tag" --draft=false

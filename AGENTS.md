@@ -2,6 +2,25 @@
 
 This file is the entry point for automated agents and contributors.
 
+## Community contribution entry point
+
+People and agents follow [CONTRIBUTING.md](CONTRIBUTING.md). A request to add or
+improve the public library is `repo_dev`; local live experiments retain the
+separate `runtime_mcp` stopping criteria below. Start from a behavioral twin or
+use `poetry run python -m tools.catalog scaffold`; review its generated draft.
+Use `poetry run python -m tools.catalog refresh` after manual membership edits.
+The shared local/CI completion command is `poetry run python -m tools.check`.
+Agents can add `--json --report dist/contribution-checks.json`. `--no-tests` is
+structural iteration only, not a complete contribution check.
+Use `--base-ref origin/develop` to compare public model interfaces before a PR;
+public PR CI supplies its base SHA automatically.
+
+Distribution requirements belong to catalog entries, not model runtime YAML.
+Read [CATALOG_CONTRACT.md](docs/CATALOG_CONTRACT.md) before changing compatibility,
+resources or deprecation metadata. Runtime compatibility claims require evidence;
+the defaults in `library/catalog/distribution.yaml` are declared qualification
+targets, not proof. Preserve IDs, paths and public attributes in a maintained line.
+
 ## Repository map
 - Models: `library/domains/<domain_group>/<device_class>/<vendor|generic>/*.yaml`
 - Catalogs: `library/catalog/*.yaml`
@@ -213,10 +232,8 @@ When the user is clearly asking for runtime-only work on a live server, stay in 
 ## Local validation and tests
 ```bash
 poetry install --with dev --no-root
-poetry run python tools/check_model_branch_guard.py --base-ref origin/develop
-poetry run python tools/render_pack_indexes.py
-poetry run python tools/validate_models.py
-poetry run pytest
+poetry run python -m tools.catalog refresh
+poetry run python -m tools.check
 ```
 
 ## Local MCP tool
@@ -243,6 +260,9 @@ poetry run pytest tests/packs/<pack>
 - [ ] Tests added or updated
 - [ ] `tools/validate_models.py` passes
 - [ ] `pytest` passes
+- [ ] Full `python -m tools.check` passes; structural-only checks are not sufficient
+- [ ] Local helper/resource files are declared in catalog distribution metadata
+- [ ] Runtime/protocol claims include actual evidence or are marked unverified
 
 ### MCP-only Definition of Done
 - [ ] Model YAML added or updated
@@ -266,4 +286,8 @@ Protocol verification is not part of the default `runtime_mcp` definition of don
 
 ## Repository boundary
 
-This is the public model/example/MCP runtime repository. Product and MCP installation, Python preparation, client configuration, packaging, signing, and publication belong to private `spx-installer`. Do not add installer code or older-installer compatibility shims here.
+This is the public model/example/MCP runtime repository. Product and MCP installation,
+Python preparation, client configuration, native packaging, signing and product
+publication belong to private `spx-installer`. Public model-only catalog releases
+belong here; see [CATALOG_RELEASES.md](docs/CATALOG_RELEASES.md). Do not add installer
+code or older-installer compatibility shims here.

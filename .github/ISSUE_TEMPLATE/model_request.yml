@@ -1,0 +1,21 @@
+name: Model or pack request
+description: Propose a device model, vendor adaptation or community pack
+title: "model: "
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: Device and useful outcome
+      description: What should a person or agent be able to demonstrate?
+    validations:
+      required: true
+  - type: textarea
+    id: reference
+    attributes:
+      label: Nearest model and public references
+      description: Existing model ID, protocol, vendor documentation links and minimal useful points/registers. Do not include keys or private files.
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Runtime and validation
+      description: SPX Server version, requested protocols/pack, and how the result can be checked.

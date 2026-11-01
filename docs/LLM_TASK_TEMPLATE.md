@@ -1,6 +1,8 @@
 # LLM Task Template
 
-Use this template for new-device-model generation tasks.
+Use this template for persistent model contributions in `repo_dev` mode. For a
+runtime-only request, follow the smaller `runtime_mcp` workflow in `AGENTS.md`.
+Read `CONTRIBUTING.md`, `docs/LLM_SPEC.md`, and `docs/MODEL_LANGUAGE.md` first.
 
 ## Goal
 - What is the change and why?
@@ -10,7 +12,7 @@ Use this template for new-device-model generation tasks.
 - Target domain / pack:
 - Target protocol:
 - Required source constraints (if vendor/protocol-specific):
-- Branch policy: PR base is `develop` only.
+- Branch policy: contribution PR base is `develop`.
 
 ## Base example
 - Closest existing model/profile/test used as a starting point:
@@ -23,48 +25,48 @@ Use this template for new-device-model generation tasks.
 ## Files touched
 - 
 
-## Pack registration checklist (required)
-- Catalog entry includes target pack in `packages`:
-- Target pack profile includes the model path:
-- `library/catalog/industries.yaml` update needed?
-- If one-click sample provisioning is expected: `default_instances` / `start_instances` updated:
+## Public contract and catalog
+- Stable model ID and path; existing public attributes preserved:
+- Catalog taxonomy and target pack membership in `packages`:
+- Profile/example changes, only if the contribution changes a runnable example:
+- Server compatibility and the evidence supporting any new claim:
+- Explicit local Python/resource dependencies in `distribution.resources`:
+- License and provenance of contributed content:
+- Generated indexes refreshed with `poetry run python -m tools.catalog refresh`:
 
 ## Runtime smoke test plan (required for new model YAML)
 - Model path:
 - Target pack:
 - Smoke test path:
 - Bootstrap method (`spx_python` + instance start):
-- Protocol probe(s):
+- Protocol probe(s), when relevant to the changed behavior:
 - Expected running/healthy criteria:
+- Cleanup method and isolated test environment:
+- Actual tested server version; unavailable checks explicitly marked unverified:
 
 ## Validation
 ```bash
-poetry run python tools/validate_models.py
-poetry run pytest
+poetry run python -m tools.check --base-ref origin/develop
+poetry run python -m tools.check --json --report dist/contribution-checks.json
 ```
 
-## CI remediation loop
-- Attempt 1/3:
-- Attempt 2/3:
-- Attempt 3/3:
-- Stop after 3 failed CI attempts and create issue.
+The shared check runs structural validation, public-contract checks when a base
+reference is supplied, catalog export verification, and the relevant unit suites.
+Add behavior tests that prove the change; use
+`templates/tests/test_temperature_behavior.py.example` as a runtime starting point.
+`--no-tests` is a structural check only, not complete contribution validation.
 
-## Process upgrade gate (required for new model workflow)
-- CI-visible rule ensuring new model YAML changes include smoke coverage:
-- Guard implementation path (pytest/validation script):
-- Guard result:
+## Failures and evidence
+- Fix implementation and test failures before declaring completion.
+- Record any external blocker, affected check, and the evidence collected.
+- Never report an unavailable runtime or protocol test as passed.
+- Do not include product keys, credentials, private endpoints, or raw secret-bearing logs.
 
 ## PR summary (target `develop`)
 - Source links (first-party):
 - Register/attribute rationale:
 - `k__` / `cmd__` decisions:
 - Validation/test evidence:
-
-## Failure issue summary (if CI failed 3 times)
-- Workflow/job links:
-- Last error signature:
-- Attempted fixes:
-- Blocker and recommended manual action:
 
 ## Risks or follow-ups
 - 

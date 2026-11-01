@@ -8,6 +8,8 @@ generated offline reference. Propose semantic corrections in `spx-docs` first.
 Single source of truth for LLM and agent contributions.
 
 ## MUST
+- For a public-library contribution, follow `CONTRIBUTING.md` and run `poetry run python -m tools.check` before reporting completion. Use its JSON report for agent evidence; `--no-tests` is not a full check.
+- Keep distribution compatibility, declared resource files and deprecation metadata in the catalog, following `docs/CATALOG_CONTRACT.md`. Do not infer runtime qualification from valid YAML.
 - Keep runtime behavior unchanged unless the change is required for tooling or validation.
 - Place new models under `library/domains/<domain_group>/<device_class>/<vendor|generic>/`.
 - Follow `docs/MODEL_LANGUAGE.md` for YAML structure and expressions; update it if you add new constructs.

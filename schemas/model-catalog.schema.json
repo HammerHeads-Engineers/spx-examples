@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/HammerHeads-Engineers/spx-examples/model-catalog/v1",
+  "title": "SPX public model catalog, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "catalog_version", "library_id", "source", "qualification_targets", "license", "models", "packs", "services", "files"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "catalog_version": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"},
+    "library_id": {"type": "string", "minLength": 1},
+    "license": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repository", "commit", "dirty"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "dirty": {"type": "boolean"}
+      }
+    },
+    "qualification_targets": {"$ref": "#/$defs/strings", "minItems": 1},
+    "models": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/model"}},
+    "packs": {"type": "array", "items": {"$ref": "#/$defs/pack"}},
+    "services": {
+      "type": "array", "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "protocol", "description"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "name": {"type": "string", "minLength": 1},
+          "protocol": {"type": "string", "minLength": 1},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "files": {
+      "type": "array", "minItems": 1, "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "sha256", "size"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "size": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "strings": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "model": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "description", "path", "domain_group", "device_class", "vendor", "protocols", "packages", "required_services", "server_compatibility", "license", "status", "replaced_by", "files"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "path": {"type": "string", "pattern": "^library/domains/.*\\.yaml$"},
+        "domain_group": {"enum": ["building", "environment", "industrial", "energy", "lab"]},
+        "device_class": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "vendor": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "protocols": {"$ref": "#/$defs/strings"},
+        "packages": {"$ref": "#/$defs/strings"},
+        "required_services": {"$ref": "#/$defs/strings"},
+        "server_compatibility": {"type": "string", "minLength": 1},
+        "license": {"type": "string", "minLength": 1},
+        "status": {"enum": ["active", "deprecated"]},
+        "replaced_by": {"type": ["string", "null"]},
+        "files": {"$ref": "#/$defs/strings", "minItems": 1}
+      }
+    },
+    "pack": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "name", "description", "default_protocols", "recommended_model_ids", "default_instances", "start_instances"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "default_protocols": {"$ref": "#/$defs/strings"},
+        "recommended_model_ids": {"$ref": "#/$defs/strings"},
+        "start_instances": {"$ref": "#/$defs/strings"},
+        "default_instances": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["model", "instance"],
+            "properties": {
+              "model": {"type": "string", "minLength": 1},
+              "instance": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}
