@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 
@@ -72,7 +71,6 @@ class RuntimeStack:
         self.network = self.prefix + "-net"
         self.containers = []
         self.created_network = False
-        self.settings = tempfile.TemporaryDirectory(prefix="spx-model-ci-")
         self.config = fixture_config()
 
     def docker(self, *args):
@@ -162,15 +160,15 @@ class RuntimeStack:
                 "--env",
                 "JAVA_TOOL_OPTIONS=--add-opens=java.base/java.util=ALL-UNNAMED",
             )
-            data = Path(self.settings.name) / "matter"
-            data.mkdir()
             self.start(
                 "matter",
                 images["matter"],
                 "--network-alias",
                 "matter-server",
                 "--mount",
-                f"type=bind,source={data},target=/data",
+                # Docker owns and removes this anonymous volume. A host bind
+                # leaves root-owned Matter state that the CI runner cannot delete.
+                "type=volume,target=/data",
             )
             server = self.prefix + "-server"
             self.docker(
@@ -241,7 +239,9 @@ class RuntimeStack:
                 encoding="utf-8",
             )
             result = subprocess.run(
-                ["docker", "rm", "--force", name], capture_output=True, timeout=30
+                ["docker", "rm", "--force", "--volumes", name],
+                capture_output=True,
+                timeout=30,
             )
             if result.returncode:
                 errors.append(service)
@@ -255,14 +255,6 @@ class RuntimeStack:
             if result.returncode:
                 errors.append("network")
             self.created_network = False
-        settings_path = Path(self.settings.name).resolve()
-        if settings_path.parent != Path(
-            tempfile.gettempdir()
-        ).resolve() or not settings_path.name.startswith("spx-model-ci-"):
-            raise CatalogError(
-                "Refusing cleanup outside the owned temporary fixture directory"
-            )
-        self.settings.cleanup()
         if errors:
             raise CatalogError(
                 "Disposable infrastructure cleanup failed: " + ", ".join(errors)

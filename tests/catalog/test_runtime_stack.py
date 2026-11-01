@@ -33,6 +33,13 @@ def test_docker_fixtures_keep_the_key_out_of_arguments_and_redact_collected_logs
         assert stack.url == "http://127.0.0.1:18000"
     assert all(key not in " ".join(args) for args in calls)
     assert len([args for args in calls if args[1:3] == ["rm", "--force"]]) == 5
+    # Matter writes as root on Linux; keep its state off the runner filesystem
+    # and delete every fixture's anonymous volumes with the owned container.
+    matter = next(args for args in calls if "matter-server" in args)
+    assert "type=volume,target=/data" in matter
+    removals = [args for args in calls if args[1:3] == ["rm", "--force"]]
+    assert all("--volumes" in args for args in removals)
+    assert all(args[-1].startswith(stack.prefix + "-") for args in removals)
     assert any(args[1:3] == ["network", "rm"] for args in calls)
     assert all(
         key not in path.read_text(encoding="utf-8") for path in logs.glob("*.log")

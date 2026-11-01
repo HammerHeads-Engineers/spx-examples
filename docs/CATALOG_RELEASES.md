@@ -45,7 +45,9 @@ KNX bus, LwM2M server and Matter controller service. Dependency images are pinne
 in `tests/runtime/images.json`; test-only configs live alongside it. Only the
 SPX API is published on an ephemeral loopback port. Resources come from the
 candidate artifact. The harness collects key-redacted logs and removes its own
-containers/network even after failures. These are CI fixtures, not product
+containers, anonymous data volumes and network even after failures. Writable
+Matter state stays in a Docker volume so root-owned files do not remain on the
+runner filesystem. These are CI fixtures, not product
 installation or native-adapter provisioning recipes.
 
 Declared compatibility targets are required checks. Latest official/RC versions
