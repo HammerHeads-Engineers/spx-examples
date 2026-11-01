@@ -15,6 +15,7 @@ import tempfile
 from pathlib import Path
 
 from tools.model_catalog import CatalogError, ROOT, export_catalog
+from tools.check_docs import check_docs
 from tools.validate_models import validate_models
 
 
@@ -28,6 +29,7 @@ def check(root: Path, *, tests=True, base_ref=None) -> dict:
 
     result = validate_models(root)
     record("models-and-pack-indexes", result.errors)
+    record("documentation", check_docs(root))
     if base_ref:
         from tools.catalog_compatibility import public_contract_issues
 
@@ -62,6 +64,7 @@ def check(root: Path, *, tests=True, base_ref=None) -> dict:
                     "tests/core/unit",
                     "tests/mcp/unit",
                     "tests/catalog",
+                    "tests/docs/unit",
                     *[
                         str(path.relative_to(root))
                         for path in sorted((root / "tests/packs").glob("*/unit"))

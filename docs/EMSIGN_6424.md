@@ -1,5 +1,11 @@
 # eMudhra / emSign remediation — task 6424
 
+<!-- documentation-status: historical -->
+
+> Historical record from October 2026, including private installer/server work.
+> Paths and commands describe that investigation, not current public-checkout
+> setup. See [the documentation map](README.md) for maintained operating guides.
+
 Status on 2026-10-23: source changes and local verification; no production
 deployment or release publication. Native installers and the ARM64 image still
 need release qualification. Do not close the incident based only on these edits.

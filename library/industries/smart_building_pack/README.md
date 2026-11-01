@@ -4,6 +4,27 @@ Smart-building BMS/BAS demo pack covering HVAC, lighting, safety, energy, and te
 across MQTT, LwM2M/CoAP, HTTP, Modbus TCP, OPC UA, KNX, Matter, and BACnet. Use it
 to validate multi-protocol integrations, test gateways, or build demo dashboards.
 
+## Start here
+
+| Item | What to use |
+| --- | --- |
+| First SPX result | [Temperature tutorial](../../../examples/README.md#first-success-temperature-telemetry) |
+| Protocol-free pack model | `Building.Physics.Generic`: inspect `k__outdoor_temperature_c` and `indoor_temperature_c` |
+| Pack selection/preset | [BMS profile](../../../profiles/smart_building_pack/bms_quickstart.yaml) |
+| Live workflow | [MCP/runtime guide](../../../docs/RUNTIME_WORKFLOW.md) |
+| Notebook | [Weather gateway example](../../../examples/packs/smart_building_pack/README.md), requiring its prepared MQTT instance |
+
+Use a compatible SPX test server with a free instance slot. For the protocol-free
+model, ask an agent to find/register `Building.Physics.Generic`, start a uniquely
+named instance, inspect its defaults and compare its telemetry after changing an
+outdoor input. Success means a `RUNNING` instance and the requested observed change.
+Stop/delete only the example objects when finished. Transport checks require the
+corresponding services and an explicit protocol probe.
+
+Service names/ports below describe defaults inside a prepared deployment. Profiles
+select models/services; they do not install or start those services themselves.
+Use actual published host endpoints from your installation or live instance.
+
 MQTT models default to the bundled `mosquitto-server:1883` on the Docker network,
 independently of the wizard's host/LAN port binding. Override `mqtt_broker_host`,
 `mqtt_broker_port`, and `mqtt_topic_prefix` for an external broker or multiple instances.
@@ -71,20 +92,17 @@ the reconnect scenario performs Stop/Start of that same component.
 
 ## Quickstart
 
-- Profile: `profiles/smart_building_pack/bms_quickstart.yaml`
-- Services enabled by the profile: MQTT, Modbus, BACnet, LwM2M, HTTP, OPC UA, KNX,
-  Home Assistant bridge, Matter server.
-- The installer's default starter set is intentionally capped at 5 running instances so
-  the pack works out of the box with the Community license. The default starter
-  instances are: `HVAC_Flexit_Nordic_BACnet`, `Energy_Meter_iEM3000_Modbus`,
-  `Victron_Cerbo_GX_ESS_Modbus`, `Weather_Gateway_WAGO_PFC200_Vaisala_WXT530_MQTT`,
-  and `Building_Physics`.
-- When selecting this pack in the installer, Home Assistant is installed as well.
-  Access it at `http://localhost:8123` (login: `admin`, password: `spx-examples`).
-- Use the installer wizard (`./spx-install.sh`) or generate non-interactively:
-  `python -m installer generate --packages smart_building_pack --profile-ids bms_quickstart`
-- Integration tests: `poetry run pytest tests/packs/smart_building_pack/integration`
-- Notebook: `examples/packs/smart_building_pack/smart_building_pack_weather_gateway.ipynb`
+- The [source pack catalog](../../catalog/industries.yaml) defines recommended
+  instances and a smaller auto-start subset. Registration and running-instance
+  limits depend on the selected license and deployment.
+- The BMS profile declares MQTT, Modbus, BACnet, LwM2M, HTTP, OPC UA, KNX,
+  Home Assistant and Matter service requirements. The product installer owns
+  deployment, available platform adapters, bindings and credentials.
+- To install the product, use the public
+  [installation guide](https://docs.simplephysx.com/readme/installation-guide).
+  This public checkout contains model/catalog tools and has no installer CLI.
+- Run `poetry run pytest tests/packs/smart_building_pack/integration` only in a
+  prepared test environment with the required server/services and local credentials.
 
 ## Connection matrix
 

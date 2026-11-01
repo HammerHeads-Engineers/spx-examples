@@ -1,5 +1,11 @@
 # Wyniki remediacji eMudhra / emSign — 6424
 
+<!-- documentation-status: historical -->
+
+> Historical results from October 2026, including private installer/server work.
+> These commands and local evidence are retained for traceability, not as current
+> public setup instructions. See [the documentation map](README.md).
+
 Stan walidacji: 2026-10-23. Zmiany przygotowano do PR-ów z bazą `develop`
 na gałęziach `fix/emsign-bootstrap`. Poniższe wyniki pochodzą z lokalnej walidacji
 przed wysłaniem PR-ów. Nie opublikowano wydania ani nie wdrożono produkcji.

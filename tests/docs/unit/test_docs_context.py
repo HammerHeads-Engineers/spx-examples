@@ -83,3 +83,23 @@ def test_readme_model_matches_canonical_snapshot():
     assert load(readme) == load(reference)
     jsn = json.loads(re.search(r'```json\n(.*?)\n```', reference, re.S).group(1))
     assert jsn == load(readme)
+
+
+def test_unicode_provenance_is_independent_of_windows_default_encoding(source, monkeypatch):
+    repo, _, destination = source
+    path = repo / next(iter(sync.PAGES))
+    text = '# Model reference\n\nTemperature: 20 °C; control → telemetry.\n'
+    path.write_text(text, encoding='utf-8')
+    sha = commit(repo, 'unicode reference')
+    original = subprocess.check_output
+
+    def legacy_default(*args, **kwargs):
+        # Emulate a Windows non-UTF-8 default only if the caller omits encoding.
+        kwargs.setdefault('encoding', 'cp1250')
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, 'check_output', legacy_default)
+    sync.synchronize(repo, sha)
+    exported = destination / 'docs/MODEL_LANGUAGE.md'
+    assert text in exported.read_text(encoding='utf-8')
+    sync.synchronize(repo, sha, check=True)

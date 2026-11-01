@@ -19,4 +19,5 @@ jobs:
       - run: pip install PyYAML==6.0.3 pytest==8.4.2
       - run: python scripts/sync_docs_context.py --check
       - run: python scripts/render_readme_catalog.py --check
+      - run: python -m tools.check_docs
       - run: pytest -q tests/docs/unit
