@@ -37,6 +37,14 @@ server. Endpoints must start with empty model and instance registries; never use
 the user's working server. Different matrix targets need corresponding server
 versions and isolated endpoints. The workflow serializes release runs.
 
+Prepare the declared protocol services as well as the SPX API. Matter models
+take their controller/fabric/node/endpoint through meta parameters; a node ID
+such as `0x1234` is a provisioning example. BLE models require a running SPX BLE
+Adapter on a supported macOS/Linux host with its Bluetooth backend available.
+A Windows Docker server alone does not provide that adapter. Supply its URL
+through `ble_adapter_base_url` in the prepared test environment; an unavailable
+adapter is a failed qualification, not a reason to skip those catalog models.
+
 The qualifier reads `/api/versions` itself and verifies the reported version
 against the selected matrix target. For every compatible model it tests:
 registration, instance creation with declared meta defaults, start to RUNNING,
