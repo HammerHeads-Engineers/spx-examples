@@ -73,6 +73,7 @@ def safe_file(root: Path, value: str, *, resource=False) -> Path:
     if (
         relative.is_absolute()
         or not relative.parts
+        or relative.as_posix() != value
         or any(p in {".", ".."} or p.startswith(".") for p in value.split("/"))
     ):
         raise CatalogError(f"Unsafe catalog path: {value!r}")

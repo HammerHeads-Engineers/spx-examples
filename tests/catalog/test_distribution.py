@@ -74,6 +74,7 @@ def baseline(tmp_path_factory):
         ("init", "-q"),
         ("config", "user.email", "catalog-test@example.invalid"),
         ("config", "user.name", "Catalog test"),
+        ("config", "core.autocrlf", "input"),
         ("add", "."),
         ("commit", "-qm", "fixture"),
     ):
@@ -183,6 +184,11 @@ def test_artifact_tampering_is_rejected(source, tmp_path, kind):
 def test_export_paths_cannot_escape_the_resource_boundary(source, path):
     with pytest.raises(CatalogError):
         safe_file(source, path)
+
+
+def test_resource_paths_have_one_canonical_archive_name(source):
+    with pytest.raises(CatalogError, match="Unsafe catalog path"):
+        safe_file(source, "extensions//thermal_model.py", resource=True)
 
 
 def test_dirty_catalog_is_local_only(source, tmp_path):
@@ -363,14 +369,37 @@ def test_clean_export_reads_git_blobs_instead_of_checkout_newlines(source, tmp_p
     name = (
         "library/domains/industrial/controller/generic/thermal_controller_advanced.yaml"
     )
-    path = source / name
-    committed = path.read_bytes().replace(b"\r\n", b"\n")
-    subprocess.run(
-        ["git", "-C", str(source), "config", "core.autocrlf", "true"], check=True
+    committed = subprocess.check_output(
+        ["git", "-C", str(source), "show", "HEAD:" + name]
     )
-    path.write_bytes(committed.replace(b"\n", b"\r\n"))
+    checkout = tmp_path / "crlf-checkout"
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--no-checkout",
+            "--no-hardlinks",
+            str(source),
+            str(checkout),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "config", "core.autocrlf", "true"], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "checkout", "--quiet", "--force", "HEAD"],
+        check=True,
+    )
+    # The reduced fixture has empty taxonomy/profile directories, which Git
+    # does not store. Restore those directories without introducing any files.
+    for relative in ("profiles", "library/domains/building", "library/domains/lab"):
+        (checkout / relative).mkdir(parents=True, exist_ok=True)
+    assert (checkout / name).read_bytes() == committed.replace(b"\n", b"\r\n")
     directory = tmp_path / "eol-artifact"
-    document = export_catalog(source, directory, "eol", require_clean=True)
+    document = export_catalog(checkout, directory, "eol", require_clean=True)
     assert not document["source"]["dirty"]
     assert (directory / "files" / name).read_bytes() == committed
 
