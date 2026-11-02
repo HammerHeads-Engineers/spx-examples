@@ -35,6 +35,13 @@ def baseline(tmp_path_factory):
     (root / "profiles").mkdir()
     for name in ("domains.yaml", "services.yaml", "distribution.yaml"):
         shutil.copyfile(ROOT / "library/catalog" / name, catalog / name)
+    # These artifact fixtures exercise one exact target independently of the
+    # supported versions declared by the real library.
+    distribution_path = catalog / "distribution.yaml"
+    distribution = yaml.safe_load(distribution_path.read_text(encoding="utf-8"))
+    distribution["server_compatibility"] = "==1.0.0-rc.78"
+    distribution["qualification_targets"] = ["1.0.0-rc.78"]
+    distribution_path.write_text(yaml.safe_dump(distribution), encoding="utf-8")
     for domain in ("building", "environment", "industrial", "energy", "lab"):
         (root / "library/domains" / domain).mkdir(parents=True)
     chosen = {
