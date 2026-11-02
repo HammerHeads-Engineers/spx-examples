@@ -57,7 +57,7 @@ SemVer versions and comma-separated clauses, for example `>=1.1.0,<2.0.0`.
 Pre-release handling follows SimpleSpec: explicit RC bounds/equality should be
 used for RC qualification, rather than assuming a stable range includes RCs.
 
-The default declares only `1.0.0-rc.78` through `1.0.0-rc.79`, with both exact
+The default declares only `1.0.0-rc.78` through `1.0.0-rc.80`, with all three exact
 RCs listed as qualification targets. This is a declaration, not proof that every
 model works there. Do not broaden it to 1.1.x
 or all 1.x based only on structural validation. An override needs at least one
