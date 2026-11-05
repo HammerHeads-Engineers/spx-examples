@@ -5,8 +5,9 @@ repository: HammerHeads-Engineers/spx-examples
 license: MIT
 # A declared target is not runtime test evidence. Stable publication requires
 # a passing qualification report for this exact catalog and every target.
-server_compatibility: '>=1.0.0-rc.78,<=1.0.0-rc.80'
+server_compatibility: '>=1.0.0-rc.78,<=1.0.0'
 qualification_targets:
   - 1.0.0-rc.78
   - 1.0.0-rc.79
   - 1.0.0-rc.80
+  - 1.0.0
