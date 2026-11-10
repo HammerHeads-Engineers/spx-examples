@@ -1,7 +1,7 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@d16c58d985b36850174181fb5e990059fb08b7bc:getting-started/mcp-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@2fdf034867c9741ae32f4bb6ae506bf2f5efee14:getting-started/mcp-reference.md; do not edit. -->
 
 > Canonical reference: [https://docs.simplephysx.com/reference/mcp-reference](https://docs.simplephysx.com/reference/mcp-reference)
-> Source commit: `d16c58d985b36850174181fb5e990059fb08b7bc`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Source commit: `2fdf034867c9741ae32f4bb6ae506bf2f5efee14`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
 
 # MCP tools and runtime rules
 
