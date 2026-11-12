@@ -33,6 +33,7 @@ SERVER_WRITE_TOOL_SPECS: List[Dict[str, Any]] = [
     {"name": "server_stop_instance", "description": "Stop one instance.", "write": True},
     {"name": "server_reset_instance", "description": "Reset one instance.", "write": True},
     {"name": "server_set_attr", "description": "Set one instance attribute by path.", "write": True},
+    {"name": "server_set_text_attr", "description": "Set one text attribute without parsing its contents as JSON.", "write": True},
     {"name": "server_set_attrs", "description": "Set multiple instance attributes by path.", "write": True},
     {"name": "server_ramp_attr", "description": "Ramp one numeric instance attribute over time.", "write": True},
     {"name": "server_upsert_scenario", "description": "Create or replace one runtime scenario on an instance.", "write": True},
@@ -185,6 +186,21 @@ def register_server_write_tools(server, runtime) -> None:
                 resolved_path=resolved_path,
                 value=value,
             )
+        except Exception as exc:
+            return exception_to_response(exc)
+
+    @server.tool(
+        name="server_set_text_attr",
+        description="Set a text attribute exactly as supplied, including JSON text.",
+    )
+    def server_set_text_attr(instance_key: str, attr_path: str, value: str) -> Dict[str, Any]:
+        try:
+            runtime.require_write()
+            client = runtime.create_client()
+            instance = client["instances"][instance_key]
+            resolved_path = set_attribute_value(instance, attr_path, value)
+            return success_response(instance_key=instance_key, attr_path=attr_path,
+                                    resolved_path=resolved_path, value=value)
         except Exception as exc:
             return exception_to_response(exc)
 
