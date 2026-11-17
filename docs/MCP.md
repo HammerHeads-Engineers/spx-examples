@@ -1,7 +1,11 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@d16c58d985b36850174181fb5e990059fb08b7bc:getting-started/mcp-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@666ce6372cdaaf9ef2041df9d8e837069a341f11:getting-started/mcp-reference.md; do not edit. -->
 
 > Canonical reference: [https://docs.simplephysx.com/reference/mcp-reference](https://docs.simplephysx.com/reference/mcp-reference)
-> Source commit: `d16c58d985b36850174181fb5e990059fb08b7bc`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Source commit: `666ce6372cdaaf9ef2041df9d8e837069a341f11`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+
+---
+description: "Reference SPX MCP tools, local workspace requirements and runtime rules for inspecting models and controlling a running server."
+---
 
 # MCP tools and runtime rules
 
