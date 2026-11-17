@@ -1,12 +1,16 @@
-<!-- Generated from HammerHeads-Engineers/spx-docs@d16c58d985b36850174181fb5e990059fb08b7bc:simulation-and-modeling/model-definition-reference.md; do not edit. -->
+<!-- Generated from HammerHeads-Engineers/spx-docs@666ce6372cdaaf9ef2041df9d8e837069a341f11:simulation-and-modeling/model-definition-reference.md; do not edit. -->
 
 > Canonical reference: [https://docs.simplephysx.com/reference/model-definition-reference](https://docs.simplephysx.com/reference/model-definition-reference)
-> Source commit: `d16c58d985b36850174181fb5e990059fb08b7bc`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+> Source commit: `666ce6372cdaaf9ef2041df9d8e837069a341f11`. This complete offline snapshot follows the release baseline in spx-docs/sources.json.
+
+---
+description: "Define SPX models in YAML or JSON: attributes, expressions, actions, communication and runtime structure for the released baseline."
+---
 
 # Model definition reference (YAML and JSON)
 
 This is the canonical SPX model-definition reference. It describes the released
-server RC76 / SDK RC21 baseline recorded in `sources.json`. Public examples and
+server 1.0.0 / SDK 1.0.0 baseline recorded in `sources.json`. Public examples and
 repository conventions live in [spx-examples](https://github.com/HammerHeads-Engineers/spx-examples).
 Its `docs/MODEL_LANGUAGE.md` is a generated offline copy of this page.
 
